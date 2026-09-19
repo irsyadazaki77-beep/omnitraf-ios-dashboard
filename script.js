@@ -11,6 +11,13 @@ const greenRange = document.getElementById("greenRange");
 const greenValue = document.getElementById("greenValue");
 const networkLoad = document.getElementById("networkLoad");
 
+// Global DOM elements & Leaflet variables declared early to prevent TDZ ReferenceErrors on load
+let sidebar = document.getElementById("sidebar");
+let drawerBackdrop = document.getElementById("drawerBackdrop");
+let surabayaMap = null;
+let leafletTileLayer = null;
+let vehicleAnimInterval = null;
+
 // CCTV simulation and incident variables declared globally to prevent TDZ ReferenceError on load
 let simSpeedMultiplier = 1;
 let isCctvPaused = false;
@@ -293,7 +300,7 @@ function resetChaosMode() {
   updateKpiVal("Rata-rata Waktu Tunggu", "42", "-6 detik", "metric-up");
   updateKpiVal("Kendaraan Darurat Aktif", "3", "Status prioritas aktif", "metric-down");
   updateKpiVal("Reduksi Emisi CO₂", "18", "Dampak ESG positif", "metric-up");
-  updateKpiVal("Efisiensi Lampu Lampu", "92", "Optimalisasi AI", "metric-up");
+  updateKpiVal("Efisiensi Sinyal APILL", "92", "Optimalisasi AI", "metric-up");
 
   if (networkLoad) networkLoad.textContent = "72%";
   const latencyValEl = document.getElementById("latencyVal");
@@ -635,10 +642,14 @@ function switchView(viewId) {
   window.scrollTo({ top: 0, behavior: "smooth" });
   
   // Custom initializations on view activation
-  if (viewId === "map" || viewId === "prediction") {
-    cloneMaps();
+  if (viewId === "map") {
+    initLeafletSurabayaMap();
+    if (surabayaMap) {
+      setTimeout(() => surabayaMap.invalidateSize(), 150);
+    }
   }
   if (viewId === "prediction") {
+    cloneMaps();
     const slider = document.getElementById("predictionTimeSlider");
     if (slider) updatePredictionMap(parseInt(slider.value));
   }
@@ -647,7 +658,7 @@ function switchView(viewId) {
   }
 }
 
-// Sidebar Links routing activation
+// Sidebar & Mobile Tab Bar routing activation
 navItems.forEach(item => {
   item.addEventListener("click", (event) => {
     const viewId = item.dataset.view;
@@ -655,11 +666,11 @@ navItems.forEach(item => {
 
     event.preventDefault();
     navItems.forEach(nav => nav.classList.remove("active"));
-    item.classList.add("active");
+    document.querySelectorAll(`.nav-item[data-view="${viewId}"]`).forEach(n => n.classList.add("active"));
 
-    if (sidebar.classList.contains("open")) {
+    if (sidebar && sidebar.classList.contains("open")) {
       sidebar.classList.remove("open");
-      drawerBackdrop.classList.remove("show");
+      if (drawerBackdrop) drawerBackdrop.classList.remove("show");
     }
 
     switchView(viewId);
@@ -1139,6 +1150,7 @@ setInterval(updateClock, 30000);
 
 // CCTV Camera Widget dynamic timestamp
 function updateCctvTime() {
+  if (typeof isCctvPaused !== "undefined" && isCctvPaused) return;
   const cctvTimes = document.querySelectorAll(".cctv-time");
   const now = new Date();
   const dateFormatted = now.toLocaleDateString("id-ID", {
@@ -1164,7 +1176,13 @@ setInterval(updateCctvTime, 1000);
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem("omnitraf-theme", theme);
-  themeToggle.querySelector(".theme-icon").textContent = theme === "dark" ? "☀" : "☾";
+  const icon = themeToggle ? themeToggle.querySelector(".theme-icon") : null;
+  if (icon) icon.textContent = theme === "dark" ? "☀" : "☾";
+  if (leafletTileLayer) {
+    const darkUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+    const lightUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+    leafletTileLayer.setUrl(theme === 'dark' ? darkUrl : lightUrl);
+  }
 }
 
 const savedTheme = localStorage.getItem("omnitraf-theme");
@@ -1185,8 +1203,8 @@ themeToggle.addEventListener("click", () => {
 // Mobile Drawer Navigation Toggle
 const menuToggle = document.getElementById("menuToggle");
 const closeDrawer = document.getElementById("closeDrawer");
-const sidebar = document.getElementById("sidebar");
-const drawerBackdrop = document.getElementById("drawerBackdrop");
+sidebar = document.getElementById("sidebar");
+drawerBackdrop = document.getElementById("drawerBackdrop");
 
 if (menuToggle && sidebar && drawerBackdrop) {
   menuToggle.addEventListener("click", () => {
@@ -1227,6 +1245,15 @@ if (drawerBackdrop && sidebar) {
   drawerBackdrop.addEventListener("click", () => {
     sidebar.classList.remove("open");
     drawerBackdrop.classList.remove("show");
+    playSound('click');
+  });
+}
+
+const mobTabMenu = document.getElementById("mobTabMenu");
+if (mobTabMenu && sidebar && drawerBackdrop) {
+  mobTabMenu.addEventListener("click", () => {
+    sidebar.classList.add("open");
+    drawerBackdrop.classList.add("show");
     playSound('click');
   });
 }
@@ -1779,6 +1806,19 @@ function setupLayerToggles() {
           layerElement.classList.toggle("layer-hidden", !checked);
         }
       });
+
+      // Real-Time Leaflet Layer Group Toggle
+      if (surabayaMap && mapLayerGroups && mapLayerGroups[layerName]) {
+        if (checked) {
+          if (!surabayaMap.hasLayer(mapLayerGroups[layerName])) {
+            surabayaMap.addLayer(mapLayerGroups[layerName]);
+          }
+        } else {
+          if (surabayaMap.hasLayer(mapLayerGroups[layerName])) {
+            surabayaMap.removeLayer(mapLayerGroups[layerName]);
+          }
+        }
+      }
       
       // Sync across all layer checkboxes of the same type
       document.querySelectorAll(`.layer-toggle-checkbox[data-layer="${layerName}"]`).forEach(otherChk => {
@@ -2363,11 +2403,11 @@ function updateTelemetryTick() {
 
     // ESG Reduksi Emisi CO₂
     const co2Red = (17.5 + Math.random() * 1.5).toFixed(1);
-    updateKpiVal("Reduksi Emisi CO₂", co2Red + "%", "Dampak ESG positif", "metric-up");
+    updateKpiVal("Reduksi Emisi CO₂", co2Red, "Dampak ESG positif", "metric-up");
 
-    // Efisiensi Lampu Lampu
+    // Efisiensi Sinyal APILL
     const efficiency = Math.floor(90 + Math.random() * 4); // 90 - 93%
-    updateKpiVal("Efisiensi Lampu Lampu", efficiency + "%", "Optimalisasi AI", "metric-up");
+    updateKpiVal("Efisiensi Sinyal APILL", efficiency, "Optimalisasi AI", "metric-up");
 
     // SITS Signal Status in topbar updates
     if (sitsStatus) {
@@ -2565,10 +2605,65 @@ function initLiveTelemetryStream() {
 initLiveTelemetryStream();
 
 // ==================== EMERGENCY RESPONDER GPS MAP MAPPING ====================
-function updateEmergencyGpsDots() {
-  document.querySelectorAll(".emergency-gps-dot, .emergency-gps-ripple, .emergency-gps-label").forEach(el => el.remove());
+// ==================== EMERGENCY RESPONDER GPS MAP MAPPING ====================
+function showEmergencyVehiclePopover(preempt, point, svg) {
+  const popover = document.getElementById("mapVehiclePopover");
+  if (!popover) return;
   
-  activePreemptions.forEach(preempt => {
+  const titleEl = document.getElementById("popoverTitle");
+  const badgeEl = document.getElementById("popoverBadge");
+  const speedEl = document.getElementById("popoverSpeed");
+  const routeEl = document.getElementById("popoverRoute");
+  const etaEl = document.getElementById("popoverEta");
+  
+  const isAmbulance = preempt.name.toLowerCase().includes("ambulans") || preempt.name.toLowerCase().includes("amb");
+  const isFire = preempt.name.toLowerCase().includes("pemadam") || preempt.name.toLowerCase().includes("pmk");
+  
+  if (badgeEl) {
+    badgeEl.textContent = isAmbulance ? "🚑 AMBULANS MEDIS SITS" : isFire ? "🚒 PEMADAM KEBAKARAN" : "🚨 PATROLI DARURAT";
+    badgeEl.style.color = isAmbulance ? "#ef4444" : isFire ? "#f59e0b" : "#00e5ff";
+  }
+  if (titleEl) titleEl.textContent = preempt.name;
+  if (speedEl) speedEl.textContent = `${preempt.speed || (isAmbulance ? 62 : 55)} km/jam`;
+  if (routeEl) {
+    let routeName = "Koridor Utama SITS Surabaya";
+    if (preempt.route === "route-yani-darmo") routeName = "A. Yani → Darmo → Basuki Rahmat";
+    else if (preempt.route) routeName = preempt.route.replace(/-/g, " ").toUpperCase();
+    routeEl.textContent = routeName;
+  }
+  if (etaEl) {
+    const mins = Math.floor(preempt.secondsLeft / 60);
+    const secs = Math.max(1, preempt.secondsLeft % 60);
+    etaEl.textContent = mins > 0 ? `${mins}m ${secs}s` : `${secs} detik`;
+  }
+  
+  // Position popover relative to wrapper container
+  const wrapper = document.getElementById("fullMapContainerWrapper");
+  if (wrapper && svg) {
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const svgRect = svg.getBoundingClientRect();
+    
+    const scaleX = svgRect.width / 980;
+    const scaleY = svgRect.height / 560;
+    
+    let targetX = (svgRect.left - wrapperRect.left) + (point.x * scaleX) + 12;
+    let targetY = (svgRect.top - wrapperRect.top) + (point.y * scaleY) - 60;
+    
+    targetX = Math.max(16, Math.min(wrapperRect.width - 285, targetX));
+    targetY = Math.max(16, Math.min(wrapperRect.height - 190, targetY));
+    
+    popover.style.left = `${targetX}px`;
+    popover.style.top = `${targetY}px`;
+  }
+  
+  popover.classList.remove("is-hidden");
+  if (typeof playSound === 'function') playSound('click');
+}
+
+function updateEmergencyGpsDots() {
+  document.querySelectorAll(".emergency-gps-marker-group, .emergency-gps-dot, .emergency-gps-ripple, .emergency-gps-label").forEach(el => el.remove());
+  
+  activePreemptions.forEach((preempt, pIdx) => {
     if (preempt.secondsLeft <= 0) return;
     
     const duration = preempt.totalDuration || 30;
@@ -2591,50 +2686,102 @@ function updateEmergencyGpsDots() {
           const pathLen = roadPath.getTotalLength();
           const point = roadPath.getPointAtLength(segmentProgress * pathLen);
           
-          const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-          dot.setAttribute("cx", point.x);
-          dot.setAttribute("cy", point.y);
-          dot.setAttribute("r", "6.5");
-          dot.setAttribute("class", "emergency-gps-dot");
-          
           const isAmbulance = preempt.name.toLowerCase().includes("ambulans") || preempt.name.toLowerCase().includes("amb");
           const isFire = preempt.name.toLowerCase().includes("pemadam") || preempt.name.toLowerCase().includes("pmk");
           
-          if (isAmbulance) {
-            dot.style.fill = "#ef4444";
-            dot.style.filter = "drop-shadow(0 0 6px #ef4444)";
-          } else if (isFire) {
-            dot.style.fill = "#f59e0b";
-            dot.style.filter = "drop-shadow(0 0 6px #f59e0b)";
+          const mainColor = isAmbulance ? "#ef4444" : isFire ? "#f59e0b" : "#00e5ff";
+          const icon = isAmbulance ? "🚑" : isFire ? "🚒" : "🚨";
+          
+          // Anti-Collision Offset Calculation
+          // Stagger badges to opposite sides to prevent label collision in dense corridors
+          let offsetX = 0;
+          let offsetY = 0;
+          if (isAmbulance || pIdx % 2 === 0) {
+            offsetX = -50;
+            offsetY = -16;
           } else {
-            dot.style.fill = "#38bdf8";
-            dot.style.filter = "drop-shadow(0 0 6px #38bdf8)";
+            offsetX = +50;
+            offsetY = +14;
           }
           
+          // Outer marker group for click interactivity
+          const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          group.setAttribute("class", "emergency-gps-marker-group");
+          group.setAttribute("data-vehicle-id", preempt.id);
+          group.style.cursor = "pointer";
+          
+          // Connector Leader Line
+          const leaderLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          leaderLine.setAttribute("x1", point.x);
+          leaderLine.setAttribute("y1", point.y);
+          leaderLine.setAttribute("x2", point.x + offsetX);
+          leaderLine.setAttribute("y2", point.y + offsetY);
+          leaderLine.setAttribute("stroke", mainColor);
+          leaderLine.setAttribute("stroke-width", "1");
+          leaderLine.setAttribute("stroke-dasharray", "2 2");
+          leaderLine.setAttribute("opacity", "0.75");
+          group.appendChild(leaderLine);
+          
+          // Pulse Ripple
           const ripple = document.createElementNS("http://www.w3.org/2000/svg", "circle");
           ripple.setAttribute("cx", point.x);
           ripple.setAttribute("cy", point.y);
           ripple.setAttribute("r", "15");
           ripple.setAttribute("class", "emergency-gps-ripple");
-          ripple.style.stroke = isAmbulance ? "#ef4444" : isFire ? "#f59e0b" : "#38bdf8";
+          ripple.style.stroke = mainColor;
+          group.appendChild(ripple);
           
+          // Core Dot
+          const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          dot.setAttribute("cx", point.x);
+          dot.setAttribute("cy", point.y);
+          dot.setAttribute("r", "6.5");
+          dot.setAttribute("class", "emergency-gps-dot");
+          dot.style.fill = mainColor;
+          dot.style.filter = `drop-shadow(0 0 6px ${mainColor})`;
+          group.appendChild(dot);
+          
+          // Semi-transparent high-contrast Pill Badge
+          const labelText = `${icon} ${preempt.name}`;
+          const badgeWidth = Math.max(68, labelText.length * 6.6);
+          const badgeHeight = 17;
+          
+          const pillBg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          pillBg.setAttribute("x", point.x + offsetX - (badgeWidth / 2));
+          pillBg.setAttribute("y", point.y + offsetY - (badgeHeight / 2));
+          pillBg.setAttribute("width", badgeWidth);
+          pillBg.setAttribute("height", badgeHeight);
+          pillBg.setAttribute("rx", "8.5");
+          pillBg.setAttribute("ry", "8.5");
+          pillBg.setAttribute("class", "emergency-gps-pill-bg");
+          pillBg.style.fill = "rgba(12, 18, 32, 0.88)";
+          pillBg.style.stroke = mainColor;
+          pillBg.style.strokeWidth = "1.2";
+          pillBg.style.filter = "drop-shadow(0 2px 5px rgba(0,0,0,0.5))";
+          group.appendChild(pillBg);
+          
+          // Crisp Pill Text
           const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-          text.setAttribute("x", point.x);
-          text.setAttribute("y", point.y - 12);
+          text.setAttribute("x", point.x + offsetX);
+          text.setAttribute("y", point.y + offsetY + 3.2);
           text.setAttribute("class", "emergency-gps-label");
-          text.textContent = preempt.name;
+          text.textContent = labelText;
           text.style.fill = "#ffffff";
-          text.style.fontSize = "8.5px";
-          text.style.fontFamily = "'Share Tech Mono', monospace";
-          text.style.fontWeight = "bold";
+          text.style.fontSize = "8.2px";
+          text.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif";
+          text.style.fontWeight = "700";
           text.style.textAnchor = "middle";
-          text.style.textShadow = "0 1px 3px #000";
+          group.appendChild(text);
+          
+          // Click Handler to Show Interactive Popover
+          group.addEventListener("click", (e) => {
+            e.stopPropagation();
+            showEmergencyVehiclePopover(preempt, point, svg);
+          });
           
           const parent = roadPath.parentElement;
           if (parent) {
-            parent.appendChild(ripple);
-            parent.appendChild(dot);
-            parent.appendChild(text);
+            parent.appendChild(group);
           }
         } catch (err) {
           console.warn("GPS point calculation error", err);
@@ -3408,8 +3555,15 @@ const btnPlayPauseCctv = document.getElementById("btnPlayPauseCctv");
 if (btnPlayPauseCctv) {
   btnPlayPauseCctv.addEventListener("click", () => {
     isCctvPaused = !isCctvPaused;
-    btnPlayPauseCctv.textContent = isCctvPaused ? "▶ Putar" : "⏸ Jeda";
+    btnPlayPauseCctv.innerHTML = isCctvPaused ? `<span class="btn-icon">▶</span> Putar` : `<span class="btn-icon">⏸</span> Jeda`;
     btnPlayPauseCctv.classList.toggle("active", isCctvPaused);
+    
+    // Toggle paused state on all CCTV video boxes to show PAUSED indicator badge
+    const cameraBoxes = document.querySelectorAll(".camera-box");
+    cameraBoxes.forEach(box => {
+      box.classList.toggle("is-paused", isCctvPaused);
+    });
+
     if (isCctvPaused) {
       if (simSpeedRange && simSpeedVal) {
         simSpeedRange.value = 0;
@@ -3422,7 +3576,7 @@ if (btnPlayPauseCctv) {
         simSpeedMultiplier = 1;
       }
     }
-    showToast(isCctvPaused ? "Simulasi feed CCTV dihentikan." : "Simulasi feed CCTV dijalankan kembali.");
+    showToast(isCctvPaused ? "Simulasi feed CCTV dihentikan (PAUSED)." : "Simulasi feed CCTV dijalankan kembali.");
     playSound('switch');
   });
 }
@@ -3476,32 +3630,137 @@ if (btnZoomReset) {
   });
 }
 
-// Allow dragging the map when zoomed in
-let isDraggingMap = false;
-let startDragX = 0;
-let startDragY = 0;
-const mapBoxContainer = document.querySelector(".map-box-container");
-if (mapBoxContainer) {
-  mapBoxContainer.addEventListener("mousedown", (e) => {
-    if (zoomScale > 1) {
+// Full-Bleed Map Zoom & Reset Controls (iOS Round Buttons)
+const btnFullZoomIn = document.getElementById("btnFullMapZoomIn");
+const btnFullZoomOut = document.getElementById("btnFullMapZoomOut");
+const btnFullReset = document.getElementById("btnFullMapReset");
+
+if (btnFullZoomIn) {
+  btnFullZoomIn.addEventListener("click", () => {
+    if (surabayaMap) {
+      surabayaMap.zoomIn();
+    } else {
+      zoomScale = Math.min(3, zoomScale + 0.25);
+      applyMapTransform();
+    }
+    if (typeof playSound === 'function') playSound('click');
+  });
+}
+if (btnFullZoomOut) {
+  btnFullZoomOut.addEventListener("click", () => {
+    if (surabayaMap) {
+      surabayaMap.zoomOut();
+    } else {
+      zoomScale = Math.max(1, zoomScale - 0.25);
+      if (zoomScale === 1) { panX = 0; panY = 0; }
+      applyMapTransform();
+    }
+    if (typeof playSound === 'function') playSound('click');
+  });
+}
+if (btnFullReset) {
+  btnFullReset.addEventListener("click", () => {
+    if (surabayaMap) {
+      surabayaMap.setView([-7.2756, 112.7424], 13);
+    } else {
+      zoomScale = 1;
+      panX = 0;
+      panY = 0;
+      applyMapTransform();
+    }
+    if (typeof playSound === 'function') playSound('success');
+  });
+}
+
+// Collapsible Layer Drawer Toggle Handlers (🥞 Button)
+const btnToggleLayers = document.getElementById("btnToggleFullMapLayers");
+const fullMapLayerDeck = document.getElementById("fullMapLayerDeck");
+const btnCloseLayers = document.getElementById("btnCloseFullMapLayers");
+
+if (btnToggleLayers && fullMapLayerDeck) {
+  btnToggleLayers.addEventListener("click", (e) => {
+    e.stopPropagation();
+    fullMapLayerDeck.classList.toggle("is-open");
+    if (typeof playSound === 'function') playSound('click');
+  });
+}
+
+if (btnCloseLayers && fullMapLayerDeck) {
+  btnCloseLayers.addEventListener("click", (e) => {
+    e.stopPropagation();
+    fullMapLayerDeck.classList.remove("is-open");
+    if (typeof playSound === 'function') playSound('click');
+  });
+}
+
+// Close layer drawer or vehicle popover when clicking anywhere else on the map wrapper
+const fullMapWrapper = document.getElementById("fullMapContainerWrapper");
+if (fullMapWrapper) {
+  fullMapWrapper.addEventListener("click", (e) => {
+    if (fullMapLayerDeck && !fullMapLayerDeck.contains(e.target) && e.target !== btnToggleLayers && !btnToggleLayers?.contains(e.target)) {
+      fullMapLayerDeck.classList.remove("is-open");
+    }
+    const popover = document.getElementById("mapVehiclePopover");
+    if (popover && !popover.contains(e.target) && !e.target.closest(".emergency-gps-marker-group")) {
+      popover.classList.add("is-hidden");
+    }
+  });
+
+  // Allow dragging full-bleed map when zoomed
+  fullMapWrapper.addEventListener("mousedown", (e) => {
+    if (zoomScale > 1 && !e.target.closest("button") && !e.target.closest(".map-layer-deck") && !e.target.closest(".map-interactive-popover")) {
       isDraggingMap = true;
       startDragX = e.clientX - panX;
       startDragY = e.clientY - panY;
-      mapBoxContainer.style.cursor = "grabbing";
-    }
-  });
-  window.addEventListener("mousemove", (e) => {
-    if (isDraggingMap && zoomScale > 1) {
-      panX = e.clientX - startDragX;
-      panY = e.clientY - startDragY;
-      applyMapTransform();
+      fullMapWrapper.style.cursor = "grabbing";
     }
   });
   window.addEventListener("mouseup", () => {
-    isDraggingMap = false;
-    if (mapBoxContainer) mapBoxContainer.style.cursor = "";
+    if (fullMapWrapper) fullMapWrapper.style.cursor = "";
   });
 }
+
+// Close Vehicle Popover Button
+const btnClosePopover = document.getElementById("btnCloseVehiclePopover");
+if (btnClosePopover) {
+  btnClosePopover.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const popover = document.getElementById("mapVehiclePopover");
+    if (popover) popover.classList.add("is-hidden");
+    if (typeof playSound === 'function') playSound('click');
+  });
+}
+
+// Hook up warning points click to show incident info in popover
+function setupIncidentPointClicks() {
+  document.querySelectorAll(".warn-points path, .warn-points circle").forEach(pt => {
+    pt.style.cursor = "pointer";
+    pt.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const popover = document.getElementById("mapVehiclePopover");
+      if (!popover) return;
+      
+      const titleEl = document.getElementById("popoverTitle");
+      const badgeEl = document.getElementById("popoverBadge");
+      const speedEl = document.getElementById("popoverSpeed");
+      const routeEl = document.getElementById("popoverRoute");
+      const etaEl = document.getElementById("popoverEta");
+      
+      if (badgeEl) {
+        badgeEl.textContent = "⚠️ PERINGATAN INSIDEN LALU LINTAS";
+        badgeEl.style.color = "#f59e0b";
+      }
+      if (titleEl) titleEl.textContent = "Kepadatan Simpang Wonokromo - Darmo";
+      if (speedEl) speedEl.textContent = "14 km/jam (Padat)";
+      if (routeEl) routeEl.textContent = "Penyempitan Lajur Akibat Kendaraan Mogok";
+      if (etaEl) etaEl.textContent = "+12 menit kelambatan";
+      
+      popover.classList.remove("is-hidden");
+      if (typeof playSound === 'function') playSound('alert');
+    });
+  });
+}
+setTimeout(setupIncidentPointClicks, 800);
 
 // 4. Landmark Click Detail Cards Overlay
 function setupLandmarkClicks() {
@@ -3587,29 +3846,29 @@ setupLandmarkClicks();
 
 // 5. CCTV Filters (Color Matrix Effects)
 const filterModeButtons = document.querySelectorAll(".filter-mode-btn");
-const cctvCanvases = document.querySelectorAll(".cctv-canvas");
 if (filterModeButtons.length > 0) {
   filterModeButtons.forEach(btn => {
     btn.addEventListener("click", () => {
       filterModeButtons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       
-      const filterType = btn.dataset.filter;
+      const filterType = btn.dataset.filter || "none";
       playSound('click');
       
-      cctvCanvases.forEach(canvas => {
+      const cameraBoxes = document.querySelectorAll(".camera-box");
+      cameraBoxes.forEach(box => {
         if (filterType === "mono") {
-          canvas.style.filter = "grayscale(1) contrast(1.2)";
+          box.style.filter = "grayscale(100%) contrast(1.1)";
         } else if (filterType === "night") {
-          canvas.style.filter = "hue-rotate(90deg) brightness(0.7) contrast(1.4) saturate(1.5)";
+          box.style.filter = "brightness(1.2) contrast(1.2) hue-rotate(80deg)";
         } else if (filterType === "thermal") {
-          canvas.style.filter = "hue-rotate(180deg) saturate(3) invert(1) contrast(1.3)";
+          box.style.filter = "invert(1) hue-rotate(180deg) saturate(2.5)";
         } else {
-          canvas.style.filter = "none";
+          box.style.filter = "none";
         }
       });
       
-      showToast(`Filter video CCTV diubah ke: ${btn.textContent}`);
+      showToast(`Filter video CCTV: ${btn.textContent}`);
     });
   });
 }
@@ -3618,7 +3877,7 @@ if (filterModeButtons.length > 0) {
 const cctvThresholdRange = document.getElementById("cctvThresholdRange");
 const thresholdVal = document.getElementById("thresholdVal");
 if (cctvThresholdRange && thresholdVal) {
-  cctvThresholdRange.addEventListener("input", () => {
+  const updateThreshold = () => {
     const threshold = parseInt(cctvThresholdRange.value);
     thresholdVal.textContent = `${threshold}%`;
     
@@ -3629,11 +3888,22 @@ if (cctvThresholdRange && thresholdVal) {
         const match = tag.textContent.match(/(\d+)%/);
         if (match) {
           const conf = parseInt(match[1]);
-          rect.style.display = conf < threshold ? "none" : "";
+          if (conf < threshold) {
+            rect.style.opacity = "0";
+            rect.style.pointerEvents = "none";
+            rect.style.transform = "scale(0.85)";
+          } else {
+            rect.style.opacity = "1";
+            rect.style.pointerEvents = "auto";
+            rect.style.transform = "scale(1)";
+          }
         }
       }
     });
-  });
+  };
+
+  cctvThresholdRange.addEventListener("input", updateThreshold);
+  updateThreshold();
 }
 
 // 7. Intersections Grid/Cards Layout Switcher
@@ -4612,15 +4882,22 @@ window.speakAlert = function(message) {
   }
 };
 
-// 10. Stacked Toast Alert System
+// 10. Stacked Toast Alert System (Max 2, Auto-dismiss, Close button, iOS frosted glass)
 window.showStackedToast = function(title, message, type = 'info') {
   const stack = document.getElementById("toastStack");
   if (!stack) return;
   
-  // Prevent pile up: limit active toasts to maximum 3
-  const activeToasts = stack.querySelectorAll(".stacked-toast");
-  if (activeToasts.length >= 3) {
-    activeToasts[0].remove();
+  // Enforce queue constraint: limit active visible toasts to MAXIMUM 2
+  const activeToasts = stack.querySelectorAll(".stacked-toast:not(.hide)");
+  if (activeToasts.length >= 2) {
+    // Dismiss the oldest one smoothly
+    const oldest = activeToasts[0];
+    oldest.classList.remove("show");
+    oldest.classList.add("hide");
+    oldest.style.pointerEvents = "none";
+    setTimeout(() => {
+      if (oldest.parentNode) oldest.remove();
+    }, 300);
   }
   
   const toastCard = document.createElement("div");
@@ -4629,14 +4906,15 @@ window.showStackedToast = function(title, message, type = 'info') {
   let icon = "⚡";
   if (type === 'danger' || type === 'error') {
     icon = "🚨";
-    toastCard.style.borderColor = "rgba(239, 68, 68, 0.4)";
+    toastCard.style.borderColor = "rgba(239, 68, 68, 0.5)";
   } else if (type === 'warning') {
     icon = "⚠️";
-    toastCard.style.borderColor = "rgba(245, 158, 11, 0.4)";
+    toastCard.style.borderColor = "rgba(245, 158, 11, 0.5)";
   } else if (type === 'success') {
-    icon = "🎉";
-    toastCard.style.borderColor = "rgba(16, 185, 129, 0.4)";
+    icon = "✅";
+    toastCard.style.borderColor = "rgba(16, 185, 129, 0.5)";
   } else {
+    icon = "ℹ️";
     toastCard.style.borderColor = "rgba(0, 229, 255, 0.4)";
   }
   
@@ -4646,45 +4924,77 @@ window.showStackedToast = function(title, message, type = 'info') {
       <div class="stacked-toast-title">${title}</div>
       <div class="stacked-toast-message">${message}</div>
     </div>
+    <button class="stacked-toast-close" type="button" aria-label="Tutup Notifikasi">&times;</button>
   `;
   
+  let dismissTimer = null;
+
+  const dismissToast = () => {
+    if (dismissTimer) {
+      clearTimeout(dismissTimer);
+      dismissTimer = null;
+    }
+    toastCard.classList.remove("show");
+    toastCard.classList.add("hide");
+    toastCard.style.pointerEvents = "none";
+    setTimeout(() => {
+      if (toastCard.parentNode) {
+        toastCard.remove();
+      }
+    }, 300);
+  };
+
+  // Close button listener
+  const btnClose = toastCard.querySelector(".stacked-toast-close");
+  if (btnClose) {
+    btnClose.addEventListener("click", (e) => {
+      e.stopPropagation();
+      dismissToast();
+    });
+  }
+  
   stack.appendChild(toastCard);
-  toastCard.offsetHeight; // trigger reflow
+  void toastCard.offsetHeight; // trigger reflow
   toastCard.classList.add("show");
   
   const isSystemAlert = title.toLowerCase().includes("alert");
   if (!isSystemAlert) {
     if (type === 'danger' || type === 'error') {
-      playSound('warning');
+      if (typeof playSound === "function") playSound('warning');
     } else {
-      playSound('click');
+      if (typeof playSound === "function") playSound('click');
     }
     
     // TTS Voice Broadcast
     if (type === 'danger' || type === 'warning') {
-      speakAlert(`${title}. ${message}`);
+      if (typeof speakAlert === "function") speakAlert(`${title}. ${message}`);
     }
   }
   
-  setTimeout(() => {
-    toastCard.classList.remove("show");
-    toastCard.classList.add("hide");
-    setTimeout(() => {
-      toastCard.remove();
-    }, 400);
-  }, 4500);
+  // Auto-dismiss after 4.5 seconds
+  dismissTimer = setTimeout(dismissToast, 4500);
 };
 
-// Override default showToast to use stacked toasts occasionally for critical notices
+// Route default showToast into modern toast stack
 const originalShowToast = window.showToast;
-window.showToast = function(msg) {
-  if (msg.toLowerCase().includes("keos") || msg.toLowerCase().includes("prioritas") || msg.toLowerCase().includes("hujan") || msg.toLowerCase().includes("insiden")) {
-    showStackedToast("System Alert", msg, "warning");
-  } else {
-    if (typeof originalShowToast === "function") {
-      originalShowToast(msg);
-    }
+window.showToast = function(msg, customType = null) {
+  if (!msg) return;
+  const msgLower = msg.toLowerCase();
+  let type = customType || 'info';
+  let title = 'Pemberitahuan Sistem';
+  
+  if (msgLower.includes("keos") || msgLower.includes("gridlock") || msgLower.includes("bahaya") || msgLower.includes("terputus")) {
+    type = 'danger';
+    title = 'System Alert';
+  } else if (msgLower.includes("prioritas") || msgLower.includes("hujan") || msgLower.includes("insiden") || msgLower.includes("padat") || msgLower.includes("peringatan")) {
+    type = 'warning';
+    title = 'Peringatan Lalu Lintas';
+  } else if (msgLower.includes("berhasil") || msgLower.includes("sukses") || msgLower.includes("diaktifkan") || msgLower.includes("normal") || msgLower.includes("lancar")) {
+    type = 'success';
+    title = 'Operasi Berhasil';
   }
+  
+  showStackedToast(title, msg, type);
 };
 
 // 1. BMKG Weather Widget & AI Recommendation Adaptor
@@ -5310,6 +5620,936 @@ if (tourOverlay) {
     }
   });
 }
+
+// ==================== REAL LEAFLET.JS SURABAYA GEOSPATIAL MAP ====================
+
+const mapLayerGroups = {
+  'district-zones': null,
+  'map-river': null,
+  'road-glows': null,
+  'minor-roads': null,
+  'warn-points': null,
+  'landmark-group': null
+};
+
+function initLeafletSurabayaMap() {
+  const mapContainer = document.getElementById("map-surabaya");
+  if (!mapContainer || typeof L === 'undefined') return;
+  if (surabayaMap) {
+    surabayaMap.invalidateSize();
+    return;
+  }
+
+  // 1. Instantiate Leaflet Map centered at Surabaya
+  surabayaMap = L.map('map-surabaya', {
+    zoomControl: false,
+    attributionControl: true
+  }).setView([-7.2756, 112.7424], 13);
+
+  // 2. Base Tile Layer (Clean Esri Canvas Light Gray Base - Free & Watermark-Free)
+  const esriTileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+
+  leafletTileLayer = L.tileLayer(esriTileUrl, {
+    attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+    maxZoom: 17
+  }).addTo(surabayaMap);
+
+  // Initialize Layer Groups
+  Object.keys(mapLayerGroups).forEach(key => {
+    mapLayerGroups[key] = L.layerGroup().addTo(surabayaMap);
+  });
+
+  // 3. Draw Real Surabaya Corridors (Polylines with Status & Glowing Effect)
+  drawSurabayaCorridors();
+
+  // 4. Draw Kalimas River Waterway
+  drawSurabayaRiver();
+
+  // 5. Draw City District Zones
+  drawSurabayaDistricts();
+
+  // 6. Draw Incident Points (Kupang, Kertajaya)
+  drawSurabayaIncidents();
+
+  // 7. Draw Landmarks & CCTV Camera Points
+  drawSurabayaLandmarksAndCctv();
+
+  // 8. Draw Moving Emergency Vehicles (Ambulans 02 & Pemadam 04)
+  drawMovingEmergencyVehicles();
+
+  // Initial resize calculation
+  setTimeout(() => {
+    if (surabayaMap) surabayaMap.invalidateSize();
+  }, 250);
+}
+
+function drawSurabayaCorridors() {
+  if (!surabayaMap || !mapLayerGroups['road-glows']) return;
+
+  const corridors = [
+    {
+      name: "Koridor Darmo - A. Yani",
+      status: "Padat / Macet (14 km/jam)",
+      color: "#ef4444",
+      weight: 6,
+      coords: [
+        [-7.3450, 112.7285],
+        [-7.3320, 112.7300],
+        [-7.3180, 112.7320],
+        [-7.3050, 112.7345],
+        [-7.2920, 112.7370],
+        [-7.2810, 112.7395],
+        [-7.2710, 112.7410],
+        [-7.2650, 112.7420]
+      ]
+    },
+    {
+      name: "Koridor MERR / Dr. Ir. H. Soekarno",
+      status: "Lancar Jaya (52 km/jam)",
+      color: "#22c55e",
+      weight: 6,
+      coords: [
+        [-7.2480, 112.7850],
+        [-7.2620, 112.7838],
+        [-7.2780, 112.7825],
+        [-7.2980, 112.7810],
+        [-7.3220, 112.7795],
+        [-7.3450, 112.7780]
+      ]
+    },
+    {
+      name: "Koridor Tunjungan - Pemuda",
+      status: "Normal / Ramai (32 km/jam)",
+      color: "#06b6d4",
+      weight: 5,
+      coords: [
+        [-7.2550, 112.7375],
+        [-7.2610, 112.7390],
+        [-7.2635, 112.7420],
+        [-7.2655, 112.7460],
+        [-7.2680, 112.7520],
+        [-7.2720, 112.7590]
+      ]
+    },
+    {
+      name: "Koridor HR Muhammad - Mayjen Sungkono",
+      status: "Ramai Lancar (38 km/jam)",
+      color: "#eab308",
+      weight: 5,
+      coords: [
+        [-7.2915, 112.7330],
+        [-7.2895, 112.7160],
+        [-7.2875, 112.6970],
+        [-7.2855, 112.6820],
+        [-7.2830, 112.6680]
+      ]
+    }
+  ];
+
+  corridors.forEach(c => {
+    const glowLine = L.polyline(c.coords, {
+      color: c.color,
+      weight: c.weight + 4,
+      opacity: 0.35,
+      lineCap: 'round',
+      lineJoin: 'round'
+    });
+
+    const coreLine = L.polyline(c.coords, {
+      color: c.color,
+      weight: c.weight,
+      opacity: 0.9,
+      lineCap: 'round',
+      lineJoin: 'round'
+    });
+
+    const popupHtml = `
+      <div class="ios-popup-card">
+        <div class="ios-popup-header">
+          <span class="cctv-live-tag"><span class="live-dot"></span> REALTIME SITS</span>
+          <span class="ios-popup-subtitle">KORIDOR TRAFFIC</span>
+        </div>
+        <h4 class="ios-popup-title">🛣️ ${c.name}</h4>
+        <div class="ios-popup-info-grid">
+          <div class="ios-info-row">
+            <span class="ios-info-label">Status Koridor:</span>
+            <span class="ios-info-value" style="color:${c.color}; font-weight:800;">${c.status}</span>
+          </div>
+          <div class="ios-info-row">
+            <span class="ios-info-label">Sistem Pengatur:</span>
+            <span class="ios-info-value">ATCS Surabaya Integrated Traffic System</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    coreLine.bindPopup(popupHtml);
+    glowLine.bindPopup(popupHtml);
+
+    mapLayerGroups['road-glows'].addLayer(glowLine);
+    mapLayerGroups['road-glows'].addLayer(coreLine);
+  });
+
+  const minorRoads = [
+    {
+      name: "Jl. Diponegoro - Pasar Kembang",
+      color: "#f59e0b",
+      coords: [
+        [-7.2960, 112.7340],
+        [-7.2910, 112.7300],
+        [-7.2780, 112.7260],
+        [-7.2670, 112.7240],
+        [-7.2560, 112.7230]
+      ]
+    },
+    {
+      name: "Akses Jembatan Suramadu",
+      color: "#22c55e",
+      coords: [
+        [-7.2280, 112.7720],
+        [-7.2080, 112.7700],
+        [-7.1850, 112.7680]
+      ]
+    }
+  ];
+
+  minorRoads.forEach(mr => {
+    const line = L.polyline(mr.coords, {
+      color: mr.color,
+      weight: 3.5,
+      opacity: 0.75,
+      dashArray: '6, 4'
+    });
+    line.bindTooltip(mr.name, { sticky: true });
+    mapLayerGroups['minor-roads'].addLayer(line);
+  });
+}
+
+function drawSurabayaRiver() {
+  if (!surabayaMap || !mapLayerGroups['map-river']) return;
+
+  const kalimasCoords = [
+    [-7.2350, 112.7410],
+    [-7.2480, 112.7400],
+    [-7.2610, 112.7440],
+    [-7.2670, 112.7490],
+    [-7.2820, 112.7480],
+    [-7.2980, 112.7380]
+  ];
+
+  const riverLine = L.polyline(kalimasCoords, {
+    color: '#0284c7',
+    weight: 5,
+    opacity: 0.7,
+    dashArray: '8, 4'
+  });
+
+  riverLine.bindTooltip("🌊 Aliran Sungai Kalimas Surabaya", { sticky: true });
+  mapLayerGroups['map-river'].addLayer(riverLine);
+}
+
+function drawSurabayaDistricts() {
+  if (!surabayaMap || !mapLayerGroups['district-zones']) return;
+
+  const districts = [
+    {
+      name: "Surabaya Pusat",
+      color: "#38bdf8",
+      coords: [[-7.2500, 112.7300], [-7.2500, 112.7600], [-7.2800, 112.7600], [-7.2800, 112.7300]]
+    },
+    {
+      name: "Surabaya Selatan",
+      color: "#3b82f6",
+      coords: [[-7.2800, 112.7150], [-7.2800, 112.7500], [-7.3400, 112.7500], [-7.3400, 112.7150]]
+    },
+    {
+      name: "Surabaya Timur",
+      color: "#10b981",
+      coords: [[-7.2500, 112.7600], [-7.2500, 112.8000], [-7.3400, 112.8000], [-7.3400, 112.7600]]
+    }
+  ];
+
+  districts.forEach(d => {
+    const polygon = L.polygon(d.coords, {
+      color: d.color,
+      weight: 1,
+      dashArray: '4, 4',
+      fillColor: d.color,
+      fillOpacity: 0.05
+    });
+    polygon.bindTooltip(`📍 Wilayah: ${d.name}`, { sticky: true });
+    mapLayerGroups['district-zones'].addLayer(polygon);
+  });
+}
+
+function drawSurabayaIncidents() {
+  if (!surabayaMap || !mapLayerGroups['warn-points']) return;
+
+  const incidents = [
+    {
+      id: "inc-kupang",
+      name: "Simpang Kupang / Pasar Kembang",
+      lat: -7.2650,
+      lng: 112.7240,
+      jenis: "Penyempitan Jalan Akibat Truk Mogok",
+      est: "± 20 Menit (Derek On-Site)",
+      petugas: "Bripka Rahmat (Satlantas) & Tim SITS"
+    },
+    {
+      id: "inc-kertajaya",
+      name: "Simpang Kertajaya Indah",
+      lat: -7.2780,
+      lng: 112.7680,
+      jenis: "Genangan Air (12 cm) Lajur Kiri",
+      est: "± 15 Menit (Pompa DPU-BMCK)",
+      petugas: "Tim BPBD Surabaya & Dishub"
+    }
+  ];
+
+  incidents.forEach(inc => {
+    const customIcon = L.divIcon({
+      className: 'custom-incident-div-icon',
+      html: `<div class="leaflet-incident-marker" title="${inc.name}">⚠️</div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14]
+    });
+
+    const marker = L.marker([inc.lat, inc.lng], { icon: customIcon });
+    
+    marker.bindPopup(`
+      <div class="ios-popup-card incident-popup">
+        <div class="ios-popup-header alert">
+          <span class="alert-pill">⚠️ INSIDEN LALU LINTAS</span>
+          <span class="ios-popup-subtitle">SIAGA SITS 112</span>
+        </div>
+        <h4 class="ios-popup-title">${inc.name}</h4>
+        <div class="ios-popup-info-grid">
+          <div class="ios-info-row">
+            <span class="ios-info-label">Jenis Insiden:</span>
+            <span class="ios-info-value highlight-red">${inc.jenis}</span>
+          </div>
+          <div class="ios-info-row">
+            <span class="ios-info-label">Status Penanganan:</span>
+            <span class="ios-info-value highlight-amber">${inc.est} (${inc.petugas})</span>
+          </div>
+        </div>
+      </div>
+    `);
+
+    mapLayerGroups['warn-points'].addLayer(marker);
+  });
+}
+
+function drawSurabayaLandmarksAndCctv() {
+  if (!surabayaMap || !mapLayerGroups['landmark-group']) return;
+
+  // Optimized CCTV Positions (with coordinate offsets in North area to prevent overlaps)
+  const cameras = [
+    {
+      name: "CCTV-01 Margorejo",
+      lat: -7.3180,
+      lng: 112.7320,
+      ruas: "Jl. A. Yani → Wonokromo",
+      status: "Padat Merayap (350m)",
+      statusClass: "red",
+      speed: "14 km/jam"
+    },
+    {
+      name: "CCTV-02 Wonokromo",
+      lat: -7.2985,
+      lng: 112.7345,
+      ruas: "Simpang Wonokromo → Darmo",
+      status: "Ramai Lancar (120m)",
+      statusClass: "yellow",
+      speed: "28 km/jam"
+    },
+    {
+      name: "CCTV-03 Tunjungan",
+      lat: -7.2580,
+      lng: 112.7365,
+      ruas: "Jl. Tunjungan → Gubernur Suryo",
+      status: "Padat Merayap (210m)",
+      statusClass: "red",
+      speed: "18 km/jam"
+    },
+    {
+      name: "CCTV-04 MERR Kertajaya",
+      lat: -7.2780,
+      lng: 112.7825,
+      ruas: "MERR → Kenjeran",
+      status: "Lancar Jaya (Bebas)",
+      statusClass: "green",
+      speed: "54 km/jam"
+    }
+  ];
+
+  cameras.forEach((cam, idx) => {
+    const cctvIcon = L.divIcon({
+      className: 'custom-cctv-div-icon',
+      html: `<div class="leaflet-cctv-marker">📷 ${cam.name}</div>`,
+      iconSize: [120, 24],
+      iconAnchor: [60, 12]
+    });
+
+    const marker = L.marker([cam.lat, cam.lng], { icon: cctvIcon });
+    
+    marker.bindPopup(`
+      <div class="ios-popup-card cctv-popup">
+        <div class="ios-popup-header">
+          <span class="cctv-live-tag"><span class="live-dot"></span> LIVE SITS</span>
+          <span class="ios-popup-subtitle">CCTV MONITORING</span>
+        </div>
+        <h4 class="ios-popup-title">📷 ${cam.name}</h4>
+        <div class="ios-popup-info-grid">
+          <div class="ios-info-row">
+            <span class="ios-info-label">Nama Simpang:</span>
+            <span class="ios-info-value">${cam.name}</span>
+          </div>
+          <div class="ios-info-row">
+            <span class="ios-info-label">Status Antrean:</span>
+            <span class="ios-info-value status-badge ${cam.statusClass}">${cam.status}</span>
+          </div>
+          <div class="ios-info-row">
+            <span class="ios-info-label">Ruas & Arah Jalur:</span>
+            <span class="ios-info-value">${cam.ruas}</span>
+          </div>
+          <div class="ios-info-row">
+            <span class="ios-info-label">Kecepatan Rata-rata:</span>
+            <span class="ios-info-value speed-val">${cam.speed}</span>
+          </div>
+        </div>
+        <div class="ios-popup-video-box">
+          <div class="video-overlay-bar">
+            <span>FEED: CAM-#0${idx+1}</span>
+            <span class="tech-mono">ONLINE // 1080P 30FPS</span>
+          </div>
+          <div class="video-sim-wave"></div>
+        </div>
+      </div>
+    `);
+
+    mapLayerGroups['landmark-group'].addLayer(marker);
+  });
+
+  // Optimized Landmark Positions (with offsets in Pusat/Tunjungan/Soetomo area)
+  const landmarks = [
+    { name: "🏥 RSUD Dr. Soetomo", lat: -7.2690, lng: 112.7635 },
+    { name: "🏬 Tunjungan Plaza", lat: -7.2635, lng: 112.7410 },
+    { name: "🏛️ Balaikota Surabaya", lat: -7.2660, lng: 112.7525 },
+    { name: "🚉 Stasiun Pasarturi", lat: -7.2480, lng: 112.7320 },
+    { name: "🌳 Taman Bungkul", lat: -7.2885, lng: 112.7380 },
+    { name: "🌉 Jembatan Suramadu", lat: -7.2080, lng: 112.7700 }
+  ];
+
+  landmarks.forEach(lm => {
+    const lmIcon = L.divIcon({
+      className: 'custom-lm-div-icon',
+      html: `<div class="leaflet-landmark-marker">${lm.name}</div>`,
+      iconSize: [120, 20],
+      iconAnchor: [60, 10]
+    });
+
+    const marker = L.marker([lm.lat, lm.lng], { icon: lmIcon });
+    marker.bindTooltip(lm.name, { sticky: true });
+    mapLayerGroups['landmark-group'].addLayer(marker);
+  });
+}
+
+function drawMovingEmergencyVehicles() {
+  if (!surabayaMap) return;
+
+  const pathAmbulance = [
+    [-7.3320, 112.7300],
+    [-7.3180, 112.7320],
+    [-7.3050, 112.7345],
+    [-7.2920, 112.7370],
+    [-7.2810, 112.7395],
+    [-7.2710, 112.7410],
+    [-7.2690, 112.7580]
+  ];
+
+  const pathFire = [
+    [-7.2895, 112.7160],
+    [-7.2875, 112.6970],
+    [-7.2855, 112.6820],
+    [-7.2875, 112.6970]
+  ];
+
+  const ambIcon = L.divIcon({
+    className: 'custom-veh-div-icon',
+    html: `<div class="leaflet-vehicle-pill ambulance"><span class="v-icon">🚑</span><span>Ambulans 02</span><span class="v-speed-badge">62 km/j</span></div>`,
+    iconSize: [120, 26],
+    iconAnchor: [60, 13]
+  });
+
+  const ambMarker = L.marker(pathAmbulance[0], { icon: ambIcon }).addTo(surabayaMap);
+  ambMarker.bindPopup(`
+    <div class="ios-popup-card vehicle-popup">
+      <div class="ios-popup-header">
+        <span class="cctv-live-tag" style="background: rgba(239, 68, 68, 0.2); color: #ef4444;"><span class="live-dot" style="background:#ef4444;"></span> DARURAT</span>
+        <span class="ios-popup-subtitle">RESPON DINI SITS</span>
+      </div>
+      <h4 class="ios-popup-title">🚑 Ambulans 02</h4>
+      <div class="ios-popup-info-grid">
+        <div class="ios-info-row">
+          <span class="ios-info-label">Kecepatan:</span>
+          <span class="ios-info-value speed-val" style="color:#ef4444; font-weight:800;">62 km/jam</span>
+        </div>
+        <div class="ios-info-row">
+          <span class="ios-info-label">Rute Tujuan:</span>
+          <span class="ios-info-value">A. Yani → Darmo → RSU Dr. Soetomo</span>
+        </div>
+      </div>
+    </div>
+  `);
+
+  const fireIcon = L.divIcon({
+    className: 'custom-veh-div-icon',
+    html: `<div class="leaflet-vehicle-pill fire"><span class="v-icon">🚒</span><span>Pemadam 04</span><span class="v-speed-badge">55 km/j</span></div>`,
+    iconSize: [120, 26],
+    iconAnchor: [60, 13]
+  });
+
+  const fireMarker = L.marker(pathFire[0], { icon: fireIcon }).addTo(surabayaMap);
+  fireMarker.bindPopup(`
+    <div class="ios-popup-card vehicle-popup">
+      <div class="ios-popup-header">
+        <span class="cctv-live-tag" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;"><span class="live-dot" style="background:#f59e0b;"></span> DARURAT</span>
+        <span class="ios-popup-subtitle">RESPON DINI PMK</span>
+      </div>
+      <h4 class="ios-popup-title">🚒 Pemadam 04</h4>
+      <div class="ios-popup-info-grid">
+        <div class="ios-info-row">
+          <span class="ios-info-label">Kecepatan:</span>
+          <span class="ios-info-value speed-val" style="color:#f59e0b; font-weight:800;">55 km/jam</span>
+        </div>
+        <div class="ios-info-row">
+          <span class="ios-info-label">Rute Tujuan:</span>
+          <span class="ios-info-value">Mayjen Sungkono → HR Muhammad</span>
+        </div>
+      </div>
+    </div>
+  `);
+
+  let ambSeg = 0;
+  let ambProgress = 0;
+  let fireSeg = 0;
+  let fireProgress = 0;
+
+  if (vehicleAnimInterval) clearInterval(vehicleAnimInterval);
+
+  vehicleAnimInterval = setInterval(() => {
+    // Interpolasi Ambulans 02
+    ambProgress += 0.04;
+    if (ambProgress >= 1) {
+      ambProgress = 0;
+      ambSeg = (ambSeg + 1) % (pathAmbulance.length - 1);
+    }
+    const p1Amb = pathAmbulance[ambSeg];
+    const p2Amb = pathAmbulance[ambSeg + 1];
+    const latAmb = p1Amb[0] + (p2Amb[0] - p1Amb[0]) * ambProgress;
+    const lngAmb = p1Amb[1] + (p2Amb[1] - p1Amb[1]) * ambProgress;
+    ambMarker.setLatLng([latAmb, lngAmb]);
+
+    // Interpolasi Pemadam 04
+    fireProgress += 0.03;
+    if (fireProgress >= 1) {
+      fireProgress = 0;
+      fireSeg = (fireSeg + 1) % (pathFire.length - 1);
+    }
+    const p1Fire = pathFire[fireSeg];
+    const p2Fire = pathFire[fireSeg + 1];
+    const latFire = p1Fire[0] + (p2Fire[0] - p1Fire[0]) * fireProgress;
+    const lngFire = p1Fire[1] + (p2Fire[1] - p1Fire[1]) * fireProgress;
+    fireMarker.setLatLng([latFire, lngFire]);
+  }, 100);
+}
+
+// Auto Initialize Leaflet Map on Load if Container Exists
+document.addEventListener("DOMContentLoaded", () => {
+  setTimeout(() => {
+    if (document.getElementById("map-surabaya")) {
+      initLeafletSurabayaMap();
+    }
+  }, 300);
+});
+
+// ==================== 22. ALL REMAINING INTERACTIVE FEATURES ====================
+
+// --- FEATURE 1: CCTV INTERACTIVE CONTROLS ---
+document.addEventListener("DOMContentLoaded", () => {
+  // CCTV Filter Mode buttons
+  document.querySelectorAll(".filter-mode-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".filter-mode-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const mode = btn.dataset.filter || "none";
+      const cctvGrid = document.querySelector(".cctv-feed-grid");
+      if (cctvGrid) {
+        cctvGrid.classList.remove("cctv-filter-mono", "cctv-filter-night", "cctv-filter-thermal");
+        if (mode !== "none") {
+          cctvGrid.classList.add(`cctv-filter-${mode}`);
+        }
+      }
+      if (typeof playSound === "function") playSound("click");
+      if (typeof showStackedToast === "function") {
+        showStackedToast("Filter CCTV Diubah", `Mode filter visual: ${mode.toUpperCase()}`, "info");
+      }
+    });
+  });
+
+  // Threshold CV slider
+  const thresholdSlider = document.getElementById("cctvThresholdRange");
+  const thresholdValText = document.getElementById("thresholdVal");
+  if (thresholdSlider) {
+    thresholdSlider.addEventListener("input", (e) => {
+      const val = parseInt(e.target.value);
+      if (thresholdValText) thresholdValText.textContent = `${val}%`;
+      // Adjust visibility/opacity of bounding boxes
+      document.querySelectorAll(".cv-rect").forEach(rect => {
+        const tag = rect.querySelector(".cv-tag");
+        if (tag) {
+          const match = tag.textContent.match(/(\d+)%/);
+          if (match) {
+            const conf = parseInt(match[1]);
+            if (conf < val) {
+              rect.style.opacity = "0.15";
+              rect.style.borderStyle = "dashed";
+            } else {
+              rect.style.opacity = "1";
+              rect.style.borderStyle = "solid";
+            }
+          }
+        }
+      });
+    });
+  }
+
+  // Jeda CCTV button
+  const btnPlayPauseCctv = document.getElementById("btnPlayPauseCctv");
+  if (btnPlayPauseCctv) {
+    btnPlayPauseCctv.addEventListener("click", () => {
+      window.isCctvPaused = !window.isCctvPaused;
+      const isPaused = window.isCctvPaused;
+      btnPlayPauseCctv.innerHTML = isPaused ? `<span class="btn-icon">▶</span> Putar` : `<span class="btn-icon">⏸</span> Jeda`;
+      document.querySelectorAll(".camera-box").forEach(box => {
+        box.classList.toggle("is-paused", isPaused);
+      });
+      if (typeof playSound === "function") playSound("click");
+      if (typeof showStackedToast === "function") {
+        showStackedToast("Status CCTV", isPaused ? "Streaming CCTV di-jeda (bingkai dibekukan)" : "Streaming CCTV dilanjutkan", isPaused ? "warning" : "success");
+      }
+    });
+  }
+
+  // --- FEATURE 2: SIGNAL INTELLIGENCE MODAL ---
+  const signalIntelModal = document.getElementById("signalIntelModal");
+  const closeSignalIntelModal = document.getElementById("closeSignalIntelModal");
+  const chkGreenWave = document.getElementById("chkGreenWave");
+
+  document.querySelectorAll('button[data-action="system-check"]').forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (signalIntelModal) {
+        signalIntelModal.style.display = "flex";
+        signalIntelModal.classList.add("show");
+      }
+      if (typeof playSound === "function") playSound("click");
+    });
+  });
+
+  if (closeSignalIntelModal) {
+    closeSignalIntelModal.addEventListener("click", () => {
+      if (signalIntelModal) {
+        signalIntelModal.style.display = "none";
+        signalIntelModal.classList.remove("show");
+      }
+    });
+  }
+
+  if (signalIntelModal) {
+    signalIntelModal.addEventListener("click", (e) => {
+      if (e.target === signalIntelModal) {
+        signalIntelModal.style.display = "none";
+        signalIntelModal.classList.remove("show");
+      }
+    });
+  }
+
+  // Auto updating APILL timers inside modal
+  let apillTimerSec = 24;
+  let apillStateWonokromo = "green";
+  let isGreenWaveActive = false;
+
+  setInterval(() => {
+    if (isGreenWaveActive) return;
+    
+    apillTimerSec--;
+    if (apillTimerSec <= 0) {
+      if (apillStateWonokromo === "green") {
+        apillStateWonokromo = "yellow";
+        apillTimerSec = 3;
+      } else if (apillStateWonokromo === "yellow") {
+        apillStateWonokromo = "red";
+        apillTimerSec = 25;
+      } else {
+        apillStateWonokromo = "green";
+        apillTimerSec = 30;
+      }
+    }
+
+    const wBadge = document.getElementById("wonokromoBadge");
+    const wGreenTime = document.getElementById("wonokromoGreenTime");
+    const wYellowTime = document.getElementById("wonokromoYellowTime");
+    const wRedTime = document.getElementById("wonokromoRedTime");
+
+    if (wBadge) {
+      if (apillStateWonokromo === "green") {
+        wBadge.textContent = `HIJAU (${apillTimerSec}s)`;
+        wBadge.className = "status-badge green";
+        if (wGreenTime) wGreenTime.textContent = `${apillTimerSec}s`;
+        if (wYellowTime) wYellowTime.textContent = "0s";
+        if (wRedTime) wRedTime.textContent = "0s";
+      } else if (apillStateWonokromo === "yellow") {
+        wBadge.textContent = `KUNING (${apillTimerSec}s)`;
+        wBadge.className = "status-badge yellow";
+        if (wGreenTime) wGreenTime.textContent = "0s";
+        if (wYellowTime) wYellowTime.textContent = `${apillTimerSec}s`;
+        if (wRedTime) wRedTime.textContent = "0s";
+      } else {
+        wBadge.textContent = `MERAH (${apillTimerSec}s)`;
+        wBadge.className = "status-badge red";
+        if (wGreenTime) wGreenTime.textContent = "0s";
+        if (wYellowTime) wYellowTime.textContent = "0s";
+        if (wRedTime) wRedTime.textContent = `${apillTimerSec}s`;
+      }
+    }
+
+    const mBadge = document.getElementById("margorejoBadge");
+    const mGreenTime = document.getElementById("margorejoGreenTime");
+    const mRedTime = document.getElementById("margorejoRedTime");
+    if (mBadge) {
+      if (apillStateWonokromo === "green") {
+        mBadge.textContent = `MERAH (${apillTimerSec}s)`;
+        mBadge.className = "status-badge red";
+        if (mRedTime) mRedTime.textContent = `${apillTimerSec}s`;
+        if (mGreenTime) mGreenTime.textContent = "0s";
+      } else {
+        mBadge.textContent = `HIJAU (${apillTimerSec}s)`;
+        mBadge.className = "status-badge green";
+        if (mGreenTime) mGreenTime.textContent = `${apillTimerSec}s`;
+        if (mRedTime) mRedTime.textContent = "0s";
+      }
+    }
+  }, 1000);
+
+  // Emergency Green Wave Toggle
+  if (chkGreenWave) {
+    chkGreenWave.addEventListener("change", (e) => {
+      isGreenWaveActive = e.target.checked;
+      const wBadge = document.getElementById("wonokromoBadge");
+      const mBadge = document.getElementById("margorejoBadge");
+      const wGreenTime = document.getElementById("wonokromoGreenTime");
+      const mGreenTime = document.getElementById("margorejoGreenTime");
+
+      if (isGreenWaveActive) {
+        if (wBadge) {
+          wBadge.textContent = "GREEN WAVE (HIJAU)";
+          wBadge.className = "status-badge green";
+        }
+        if (mBadge) {
+          mBadge.textContent = "GREEN WAVE (HIJAU)";
+          mBadge.className = "status-badge green";
+        }
+        if (wGreenTime) wGreenTime.textContent = "∞";
+        if (mGreenTime) mGreenTime.textContent = "∞";
+        if (typeof playSound === "function") playSound("alert");
+        if (typeof showStackedToast === "function") {
+          showStackedToast("🚨 Emergency Green Wave Aktif!", "Sinyal koridor A. Yani - Darmo dikunci Hijau Permanen.", "danger");
+        }
+      } else {
+        apillTimerSec = 20;
+        apillStateWonokromo = "green";
+        if (typeof playSound === "function") playSound("click");
+        if (typeof showStackedToast === "function") {
+          showStackedToast("Green Wave Dinonaktifkan", "Mode otomatisasi sinyal ATCS SITS Surabaya kembali normal.", "info");
+        }
+      }
+    });
+  }
+
+  // --- FEATURE 3: NOTIFICATION DRAWER ---
+  const notifToggle = document.getElementById("notifToggle");
+  const notifDrawer = document.getElementById("notifDrawer");
+  const notifDrawerBackdrop = document.getElementById("notifDrawerBackdrop");
+  const closeNotifDrawer = document.getElementById("closeNotifDrawer");
+  const notifBadgeCount = document.getElementById("notifBadgeCount");
+
+  function openNotifDrawer() {
+    if (notifDrawer) notifDrawer.classList.add("show");
+    if (notifDrawerBackdrop) notifDrawerBackdrop.classList.add("show");
+    if (typeof playSound === "function") playSound("click");
+  }
+
+  function closeNotifDrawerPanel() {
+    if (notifDrawer) notifDrawer.classList.remove("show");
+    if (notifDrawerBackdrop) notifDrawerBackdrop.classList.remove("show");
+  }
+
+  if (notifToggle) notifToggle.addEventListener("click", openNotifDrawer);
+  if (closeNotifDrawer) closeNotifDrawer.addEventListener("click", closeNotifDrawerPanel);
+  if (notifDrawerBackdrop) notifDrawerBackdrop.addEventListener("click", closeNotifDrawerPanel);
+
+  // Handle "Tandai Selesai" incident item removal
+  document.addEventListener("click", (e) => {
+    if (e.target && e.target.classList.contains("resolve-notif-btn")) {
+      const cardId = e.target.dataset.notifId;
+      const card = document.getElementById(cardId);
+      if (card) {
+        card.style.opacity = "0";
+        card.style.transform = "translateX(20px)";
+        card.style.transition = "all 0.3s ease";
+        setTimeout(() => {
+          card.remove();
+          const remaining = document.querySelectorAll("#notifListContainer .notif-item-card").length;
+          if (notifBadgeCount) {
+            notifBadgeCount.textContent = remaining;
+            if (remaining === 0) notifBadgeCount.style.display = "none";
+          }
+          if (typeof showStackedToast === "function") {
+            showStackedToast("Insiden Diarsipkan", "Status insiden ditandai selesai oleh dispatcher.", "success");
+          }
+        }, 300);
+      }
+    }
+  });
+
+  // --- FEATURE 4: OFFICER COORDINATION CHAT POPOVER ---
+  const staffChatPanel = document.getElementById("staffChatPanel");
+  const staffChatHeader = document.getElementById("staffChatHeader");
+  const btnToggleChatPanel = document.getElementById("btnToggleChatPanel");
+
+  if (staffChatHeader) {
+    staffChatHeader.addEventListener("click", () => {
+      if (staffChatPanel) {
+        staffChatPanel.classList.toggle("expanded");
+        if (btnToggleChatPanel) {
+          btnToggleChatPanel.textContent = staffChatPanel.classList.contains("expanded") ? "▼" : "▲";
+        }
+        if (typeof playSound === "function") playSound("click");
+      }
+    });
+  }
+
+  // --- FEATURE 5: GLOBAL THEME & AUDIO TOGGLE ---
+  const btnThemeToggle = document.getElementById("themeToggle");
+  if (btnThemeToggle) {
+    btnThemeToggle.addEventListener("click", () => {
+      const isDark = document.body.classList.toggle("dark-theme");
+      document.documentElement.dataset.theme = isDark ? "dark" : "light";
+      const icon = btnThemeToggle.querySelector(".theme-icon");
+      if (icon) icon.textContent = isDark ? "☀" : "☾";
+      if (typeof leafletTileLayer !== "undefined" && leafletTileLayer) {
+        const darkUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+        const lightUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+        leafletTileLayer.setUrl(isDark ? darkUrl : lightUrl);
+      }
+      if (typeof playSound === "function") playSound("click");
+      if (typeof showStackedToast === "function") {
+        showStackedToast("Tema Sistem Diperbarui", isDark ? "Mengaktifkan Dark Theme Mode (Cyberpunk)" : "Mengaktifkan Light Theme Mode (Glassmorphism)", "info");
+      }
+    });
+  }
+
+  const btnAudioToggle = document.getElementById("audioToggle");
+  if (btnAudioToggle) {
+    btnAudioToggle.addEventListener("click", () => {
+      window.audioEnabled = !window.audioEnabled;
+      const isMuted = !window.audioEnabled;
+      const icon = btnAudioToggle.querySelector(".audio-icon");
+      if (icon) icon.textContent = isMuted ? "🔇" : "🔊";
+      if (typeof showStackedToast === "function") {
+        showStackedToast("Efek Suara SITS", isMuted ? "Suara alarm & sirine di-Mute" : "Efek suara & sirine di-Unmute", isMuted ? "warning" : "success");
+      }
+    });
+  }
+});
+
+// --- CENTRALIZED REAL-TIME CLOCK & STAMP SYNCHRONIZER (1000ms) ---
+function startCentralClockSync() {
+  setInterval(() => {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const timeStr = `${hours}:${minutes}:${seconds}`;
+    const dateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
+    
+    const clockEl = document.getElementById("clock");
+    const opTimeEl = document.getElementById("opTimeVal");
+    
+    if (clockEl) clockEl.textContent = `${timeStr} WIB`;
+    if (opTimeEl) opTimeEl.textContent = `${hours}.${minutes} WIB`;
+    
+    // Sync CCTV camera overlay timestamps (.cctv-time)
+    document.querySelectorAll(".cctv-time").forEach(el => {
+      el.textContent = `${dateStr} ${timeStr}`;
+    });
+  }, 1000);
+}
+startCentralClockSync();
+
+// --- LEAFLET MAP STABILITY RESIZE LISTENER ---
+window.addEventListener('resize', () => {
+  if (typeof surabayaMap !== 'undefined' && surabayaMap) {
+    surabayaMap.invalidateSize();
+  }
+});
+
+// --- DASHBOARD LIVE CCTV SWITCHER & AI RECOMMENDATION HANDLERS ---
+const dashCctvSwitcher = document.getElementById("dashCctvSwitcher");
+if (dashCctvSwitcher) {
+  dashCctvSwitcher.addEventListener("click", (e) => {
+    const btn = e.target.closest(".cctv-mini-btn");
+    if (!btn) return;
+    
+    dashCctvSwitcher.querySelectorAll(".cctv-mini-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    
+    const camNum = btn.dataset.cam;
+    const camName = btn.dataset.name;
+    const camSub = btn.dataset.sub;
+    
+    const titleEl = document.getElementById("dashCamTitle");
+    const subEl = document.getElementById("dashCamSub");
+    if (titleEl) titleEl.textContent = camName;
+    if (subEl) subEl.textContent = camSub;
+    
+    // Trigger visual glitch transition
+    const glitch = document.getElementById("dashCameraGlitch");
+    if (glitch) {
+      glitch.classList.add("show");
+      setTimeout(() => glitch.classList.remove("show"), 350);
+    }
+    
+    playSound('click');
+    showToast(`Beralih ke feed ${btn.textContent}: ${camName}`);
+  });
+}
+
+window.dismissAiRecommendation = function() {
+  playSound('click');
+  showToast("Rekomendasi AI diabaikan. Jadwal kalkulasi ulang siklus berikutnya dalam 60 detik.");
+  const aiRecText = document.getElementById("aiRecText");
+  if (aiRecText) {
+    aiRecText.style.opacity = "0.45";
+    setTimeout(() => {
+      aiRecText.style.opacity = "1";
+    }, 400);
+  }
+};
+
+
+
 
 
 

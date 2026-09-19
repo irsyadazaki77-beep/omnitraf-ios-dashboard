@@ -13,6 +13,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <!-- Leaflet.js Real Geospatial Mapping CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -198,32 +200,21 @@
         <p>Sistem rekomendasi AI aktif untuk optimasi durasi sinyal lalu lintas, prioritas kendaraan darurat, dan proyeksi kepadatan koridor Surabaya.</p>
         <button class="btn btn-ghost" type="button" data-action="system-check">Cek Sistem</button>
       </section>
+
+      <!-- Diagnostic Performance Telemetry Pill Badge -->
+      <div class="telemetry-pill glass-soft" id="perfChip">
+        <span class="perf-dot"></span>
+        <span class="perf-text">FPS: 60 | Ping: 12 ms | Mem: 48 MB</span>
+      </div>
     </aside>
 
     <main class="main-content" id="mainContent">
       <header class="topbar glass-panel">
-        <div class="topbar-left">
-          <button class="menu-toggle glass-soft" id="menuToggle" aria-label="Buka menu" type="button">
-            <span class="menu-line"></span>
-            <span class="menu-line"></span>
-            <span class="menu-line"></span>
-          </button>
-          <div class="hero-copy">
-            <p class="eyebrow" id="viewEyebrow">SURABAYA INTELLIGENT TRANSPORT SYSTEM (SITS)</p>
-            <h1 id="viewTitle">OmniTRAF Command Center</h1>
-            <p id="viewDescription">Dashboard lalu lintas adaptif berbasis AI dengan visualisasi real-time Kota Surabaya, integrasi sensor IoT, serta analisis computer vision pada jaringan CCTV eksisting kota secara real-time.</p>
-            <!-- Dashboard quick stats sub-headers count indicators -->
-            <div class="quick-stats-strip hide-mobile">
-              <span class="qstat-item"><span class="qstat-dot normal"></span>Lancar: <strong id="qstatLancar">120</strong></span>
-              <span class="qstat-item"><span class="qstat-dot warn"></span>Padat: <strong id="qstatPadat">4</strong></span>
-              <span class="qstat-item"><span class="qstat-dot danger"></span>Macet: <strong id="qstatMacet">2</strong></span>
-            </div>
-          </div>
-        </div>
-
-        <div class="hero-logo-card glass-soft">
-          <img src="assets/omnitraf-logo.png" alt="OmniTRAF Adaptive Urban Mobility System" />
-        </div>
+        <button class="menu-toggle glass-soft hide-desktop" id="menuToggle" aria-label="Buka menu" type="button">
+          <span class="menu-line"></span>
+          <span class="menu-line"></span>
+          <span class="menu-line"></span>
+        </button>
 
         <div class="topbar-actions" aria-label="Operational status">
           <article class="info-chip glass-soft">
@@ -239,6 +230,16 @@
               <strong><span class="status-dot"></span><span id="sitsStatusText">98%</span></strong>
             </div>
           </article>
+          <!-- System Alert Pill Badge in Topbar -->
+          <article class="system-alert-pill glass-soft" id="sirenBanner" style="display: none;">
+            <span class="siren-icon">🚨</span>
+            <div class="siren-content">
+              <small>System Alert</small>
+              <strong class="siren-text">Mode Keos Aktif</strong>
+            </div>
+            <span class="siren-badge-count">1</span>
+            <button class="siren-mute-btn" id="btnMuteSiren" type="button" aria-label="Mute Siren" title="Mute/Unmute Sirine">🔊</button>
+          </article>
           <article class="profile-chip glass-soft">
             <div class="avatar-container">
               <div class="avatar" aria-hidden="true">Z</div>
@@ -249,51 +250,55 @@
               <small>Traffic Supervisor</small>
             </div>
           </article>
-          <!-- Weather Widget (Fitur 1) -->
+          <!-- Weather Widget -->
           <article class="info-chip glass-soft" id="weatherWidget" style="cursor: pointer;" onclick="showToast('BMKG Cuaca Surabaya. AI menyesuaikan durasi hijau jika hujan.')">
             <small>Cuaca Surabaya</small>
             <strong style="display:flex; align-items:center; gap:4px;"><span id="weatherIcon" style="font-size:13px;">☀</span> <span id="weatherTemp">32°C</span></strong>
           </article>
-          <button class="audio-toggle glass-soft" type="button" id="audioToggle" aria-label="Aktifkan suara">
-            <span class="audio-icon">🔇</span>
-          </button>
-          <button class="theme-toggle glass-soft" type="button" id="themeToggle" aria-label="Ganti tema">
-            <span class="theme-icon">☾</span>
-          </button>
+          <div class="topbar-action-buttons">
+            <button class="notif-toggle glass-soft" type="button" id="notifToggle" aria-label="Notifikasi Insiden" title="Notifikasi Insiden Lalu Lintas">
+              <span class="notif-icon">🔔</span>
+              <span class="notif-badge" id="notifBadgeCount">3</span>
+            </button>
+            <button class="help-toggle glass-soft" type="button" id="btnQuickTour" aria-label="Bantuan Tour SITS" title="Panduan & Bantuan SITS">
+              ?
+            </button>
+            <button class="audio-toggle glass-soft" type="button" id="audioToggle" aria-label="Aktifkan suara">
+              <span class="audio-icon">🔇</span>
+            </button>
+            <button class="theme-toggle glass-soft" type="button" id="themeToggle" aria-label="Ganti tema">
+              <span class="theme-icon">☾</span>
+            </button>
+          </div>
         </div>
       </header>
-
-      <!-- Siren Alert Banner (Visible only during Chaos Mode) -->
-      <div class="siren-banner" id="sirenBanner">
-        <span class="siren-icon">🚨</span>
-        <strong class="siren-text">SITS SYSTEM ALERT: CRITICAL VEHICLE GRIDLOCK & DEVICE DISCONNECTIONS DETECTED</strong>
-        <button class="siren-mute-btn" id="btnMuteSiren" type="button" aria-label="Mute Siren">🔊</button>
-      </div>
 
       <!-- ==================== VIEW 1: DASHBOARD ==================== -->
       <div class="view-pane active" id="view-dashboard">
         <section class="control-strip glass-panel" aria-label="Quick controls">
-          <div class="search-box-wrapper" style="position: relative;">
-            <div class="search-box">
-              <span>⌕</span>
-              <input id="intersectionSearch" type="search" placeholder="Cari simpang Surabaya..." autocomplete="off" />
+          <div class="control-group-left">
+            <div class="search-box-wrapper" style="position: relative; flex: 1; max-width: 220px;">
+              <div class="search-box">
+                <span>⌕</span>
+                <input id="intersectionSearch" type="search" placeholder="Cari simpang Surabaya..." autocomplete="off" />
+              </div>
+              <!-- Search Autocomplete Suggestions Dropdown -->
+              <div class="search-suggestions glass-panel is-hidden" id="searchSuggestions"></div>
             </div>
-            <!-- Search Autocomplete Suggestions Dropdown -->
-            <div class="search-suggestions glass-panel is-hidden" id="searchSuggestions"></div>
+
+            <div class="filter-group filter-chips ios-segmented-control" aria-label="Density filters">
+              <button class="filter-chip active" type="button" data-filter="all">Semua</button>
+              <button class="filter-chip" type="button" data-filter="high">High</button>
+              <button class="filter-chip" type="button" data-filter="moderate">Moderate</button>
+              <button class="filter-chip" type="button" data-filter="low">Low</button>
+            </div>
           </div>
 
-          <div class="filter-group" aria-label="Density filters">
-            <button class="filter-chip active" type="button" data-filter="all">Semua</button>
-            <button class="filter-chip" type="button" data-filter="high">High</button>
-            <button class="filter-chip" type="button" data-filter="moderate">Moderate</button>
-            <button class="filter-chip" type="button" data-filter="low">Low</button>
-          </div>
-
-          <div class="quick-actions">
+          <div class="control-group-right quick-actions">
             <!-- Simulation Speed Range Control -->
-            <div class="sim-speed-box glass-soft" style="display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 10px;">
-              <label for="simulationSpeedRange" style="font-size: 11px; font-weight: 700; color: var(--text-muted);">Speed: <span id="simSpeedVal">1x</span></label>
-              <input id="simulationSpeedRange" type="range" min="0" max="4" value="1" step="1" style="width: 60px;" />
+            <div class="sim-speed-box glass-soft">
+              <label for="simulationSpeedRange" style="font-size: 11px; font-weight: 700; color: var(--text-muted); white-space: nowrap;">Speed: <span id="simSpeedVal">1x</span></label>
+              <input id="simulationSpeedRange" type="range" min="0" max="4" value="1" step="1" style="width: 50px;" />
             </div>
             
             <button class="btn btn-ghost" type="button" data-action="simulate">Simulasi AI</button>
@@ -371,7 +376,7 @@
           <article class="stat-card glass-panel reveal-card">
             <div class="stat-icon blue-tone">⚡</div>
             <div>
-              <p>Efisiensi Lampu Lampu</p>
+              <p>Efisiensi Sinyal APILL</p>
               <h2><span class="counter-val" data-counter="92">92</span><span>%</span></h2>
               <span class="metric-up">Optimalisasi AI</span>
             </div>
@@ -594,14 +599,14 @@
                 </g>
 
                 <!-- ===== COMPASS ROSE ===== -->
-                <g class="compass-rose" transform="translate(928, 506)">
-                  <circle cx="0" cy="0" r="22" class="compass-bg" />
-                  <circle cx="0" cy="0" r="18" class="compass-ring" />
-                  <polygon class="compass-north-arrow" points="0,-15 3.5,-5 0,-8 -3.5,-5" />
-                  <polygon class="compass-south-arrow" points="0,15 3.5,5 0,8 -3.5,5" />
-                  <polygon class="compass-ew-arrow" points="-15,0 -5,3.5 -8,0 -5,-3.5" />
-                  <polygon class="compass-ew-arrow" points="15,0 5,3.5 8,0 5,-3.5" />
-                  <text class="compass-n-label" x="0" y="-19">N</text>
+                <g class="compass-rose" id="mapCompassRose" transform="translate(932, 508)">
+                  <circle cx="0" cy="0" r="20" class="compass-bg" />
+                  <circle cx="0" cy="0" r="16" class="compass-ring" />
+                  <polygon class="compass-north-arrow" points="0,-13 3.2,-4 0,-7 -3.2,-4" />
+                  <polygon class="compass-south-arrow" points="0,13 3.2,4 0,7 -3.2,4" />
+                  <polygon class="compass-ew-arrow" points="-13,0 -4,3.2 -7,0 -4,-3.2" />
+                  <polygon class="compass-ew-arrow" points="13,0 4,3.2 7,0 4,-3.2" />
+                  <text class="compass-n-label" x="0" y="-14">N</text>
                 </g>
 
               </svg>
@@ -663,22 +668,32 @@
           </article>
 
           <aside class="right-widgets" aria-label="Operational widgets">
-            <!-- Camera Widget -->
-            <article class="widget glass-panel reveal-card">
+            <!-- 1. Live Camera Widget -->
+            <article class="widget glass-panel reveal-card" id="widgetLiveCamera">
               <div class="section-head compact">
                 <div>
-                  <h2>Live Camera</h2>
-                  <p>CCTV Simpang Prioritas Surabaya.</p>
+                  <h2 style="font-size: 15px; font-weight: 700; margin: 0;">Live Camera</h2>
+                  <p style="font-size: 11px; margin: 2px 0 0 0; color: var(--text-muted);">CCTV Simpang Prioritas SITS Surabaya.</p>
                 </div>
-                <span class="pill pill-live">Live</span>
+                <div class="camera-head-actions">
+                  <!-- Mini Camera Switcher [CCTV-01 | CCTV-02 | CCTV-03] -->
+                  <div class="cctv-mini-switch" id="dashCctvSwitcher" aria-label="Pilihan CCTV Simpang">
+                    <button class="cctv-mini-btn active" type="button" data-cam="1" data-name="Jl. Ahmad Yani (Wonokromo)" data-sub="Camera 01 • SITS Stable feed">CCTV-01</button>
+                    <button class="cctv-mini-btn" type="button" data-cam="2" data-name="Jl. Raya Darmo (Al-Falah)" data-sub="Camera 02 • SITS Stable feed">CCTV-02</button>
+                    <button class="cctv-mini-btn" type="button" data-cam="3" data-name="Jl. Tunjungan (Siola)" data-sub="Camera 03 • SITS Stable feed">CCTV-03</button>
+                  </div>
+                  <span class="pill pill-live"><span class="pulse-dot"></span>Live</span>
+                </div>
               </div>
+
+              <!-- 16:9 Aspect Ratio Camera Viewport -->
               <div class="camera-box" id="cameraBox">
-                <canvas class="cctv-canvas" id="dashCameraCanvas" width="320" height="180"></canvas>
+                <canvas class="cctv-canvas" id="dashCameraCanvas" width="640" height="360"></canvas>
                 <div class="scan-line"></div>
                 <div class="camera-noise" id="cameraNoise"></div>
-                <div class="camera-badge">REC</div>
+                <div class="camera-badge hud-pill"><span class="rec-dot"></span>REC</div>
                 <div class="camera-grid-overlay"></div>
-                <div class="camera-timestamp" id="cameraTime">--</div>
+                <div class="camera-timestamp cctv-time hud-pill" id="cameraTime">--</div>
                 
                 <!-- Bounding Box Overlays -->
                 <div class="cv-rect rect-car" id="rect-dash-1"><span class="cv-tag">Mobil 97%</span></div>
@@ -687,151 +702,46 @@
                 <!-- Glitch Overlay -->
                 <div class="cctv-glitch-overlay" id="dashCameraGlitch">
                   <div class="glitch-static"></div>
-                  <div class="glitch-text">FEED LOST — DEV-OFFLINE</div>
+                  <div class="glitch-text">FEED BUFFERING</div>
                 </div>
 
                 <div class="camera-caption">
-                  <strong>Jl. Ahmad Yani (Wonokromo)</strong>
-                  <small>Camera 07 • SITS Stable feed</small>
+                  <strong id="dashCamTitle">Jl. Ahmad Yani (Wonokromo)</strong>
+                  <small id="dashCamSub">Camera 01 • SITS Stable feed</small>
                 </div>
               </div>
             </article>
 
-            <!-- AI Recommendation widget -->
-            <article class="widget glass-panel reveal-card">
+            <!-- 2. AI Recommendation Widget -->
+            <article class="widget glass-panel reveal-card" id="widgetAiRec">
               <div class="section-head compact">
                 <div>
-                  <h2>AI Recommendation</h2>
-                  <p>Rekomendasi optimasi berbasis machine learning.</p>
+                  <h2 style="font-size: 15px; font-weight: 700; margin: 0;">AI Recommendation</h2>
+                  <p style="font-size: 11px; margin: 2px 0 0 0; color: var(--text-muted);">Optimasi siklus adaptif ATCS berbasis Edge AI.</p>
                 </div>
-                <span class="pill pill-ai">AI</span>
+                <span class="pill pill-ai">🤖 AI Optimization Active</span>
               </div>
-              <div class="recommend-grid">
-                <div class="score-ring-container">
-                  <div class="score-ring" aria-label="AI score 92 persen">
-                    <svg class="radial-score-svg" viewBox="0 0 120 120">
-                      <circle class="score-ring-bg" cx="60" cy="60" r="50"></circle>
-                      <circle class="score-ring-val" id="aiScoreCircle" cx="60" cy="60" r="50" stroke-dasharray="314" stroke-dashoffset="314"></circle>
-                    </svg>
-                    <div class="score-text">
-                      <strong id="aiScoreVal">0</strong>
-                      <span>Score</span>
-                    </div>
-                  </div>
-                </div>
-                <ul id="aiRecommendationList">
-                  <li>Tambah hijau Wonokromo +12 detik</li>
-                  <li>Turunkan cycle Darmo menjadi 80 detik</li>
-                  <li>Aktifkan prioritas pedestrian Tunjungan</li>
-                  <li>Reduksi delay frontage A. Yani</li>
-                </ul>
-              </div>
-              <div class="confidence">
-                <span>AI Confidence</span>
-                <strong id="aiConfidenceVal">92%</strong>
-                <i id="aiConfidenceBar" style="--value: 92%"></i>
-              </div>
-              <button class="btn btn-primary" type="button" data-action="apply-ai">Terapkan Rekomendasi</button>
-            </article>
 
-            <!-- District Congestion Leaderboard (Fitur 5) -->
-            <article class="widget glass-panel reveal-card" id="widgetLeaderboard">
-              <div class="section-head compact">
-                <div>
-                  <h2>Indeks Kepadatan Koridor</h2>
-                  <p>Peringkat kemacetan koridor utama (Real-time).</p>
+              <div class="ai-rec-card-body">
+                <div class="ai-rec-badge-row">
+                  <span class="ai-rec-tag">
+                    <span class="pulse-dot-ai"></span> Skenario SITS Surabaya
+                  </span>
+                  <span class="ai-confidence-badge">Confidence 94%</span>
                 </div>
-                <span class="pill pill-live">Peringkat</span>
-              </div>
-              <div class="leaderboard-container" style="display:flex; flex-direction:column; gap:8px;">
-                <div class="leaderboard-item" id="leadRoad-0" style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--panel-soft); border-radius:8px; font-size:11px;">
-                  <span>1. Jl. Ahmad Yani</span>
-                  <strong style="color:var(--danger);" class="lead-val">83%</strong>
-                </div>
-                <div class="leaderboard-item" id="leadRoad-1" style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--panel-soft); border-radius:8px; font-size:11px;">
-                  <span>2. Jl. Raya Darmo</span>
-                  <strong style="color:var(--warning);" class="lead-val">61%</strong>
-                </div>
-                <div class="leaderboard-item" id="leadRoad-2" style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--panel-soft); border-radius:8px; font-size:11px;">
-                  <span>3. Jl. Tunjungan</span>
-                  <strong style="color:var(--text);" class="lead-val">44%</strong>
-                </div>
-                <div class="leaderboard-item" id="leadRoad-3" style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--panel-soft); border-radius:8px; font-size:11px;">
-                  <span>4. Jl. Kertajaya</span>
-                  <strong style="color:var(--success);" class="lead-val">22%</strong>
-                </div>
-                <div class="leaderboard-item" id="leadRoad-4" style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--panel-soft); border-radius:8px; font-size:11px;">
-                  <span>5. MERR Ir. Soekarno</span>
-                  <strong style="color:var(--success);" class="lead-val">18%</strong>
+                <p class="ai-rec-text" id="aiRecText">
+                  Deteksi antrean <strong>180m</strong> di <strong>Jl. Raya Darmo</strong>. Rekomendasi penambahan <strong>+15 detik</strong> durasi fase hijau pada <strong>Simpang Darmo–Polisi Istimewa</strong>.
+                </p>
+                <div class="ai-rec-meta-row">
+                  <span>🎯 Dampak: <strong style="color: var(--success);">-35% Kepadatan</strong></span>
+                  <span>⏱ Efek: <strong>2 Menit</strong></span>
+                  <span>⚡ Sinyal: <strong style="color: var(--primary-2);">Adaptive Green Wave</strong></span>
                 </div>
               </div>
-            </article>
 
-            <!-- Export History Logs (Fitur 13) -->
-            <article class="widget glass-panel reveal-card" id="widgetExportHistory">
-              <div class="section-head compact">
-                <div>
-                  <h2>Riwayat Ekspor Data</h2>
-                  <p>Laporan yang diunduh pada sesi operasional ini.</p>
-                </div>
-                <span class="pill">Riwayat</span>
-              </div>
-              <div class="export-history-list" id="exportHistoryList" style="max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
-                <p class="empty-history-text" style="font-size:11px; text-align:center; padding:10px; color:var(--text-muted); margin:0;">Belum ada riwayat unduhan.</p>
-              </div>
-            </article>
-
-            <!-- Signal Phase Control Widget -->
-            <article class="widget glass-panel reveal-card" id="signals">
-              <div class="section-head compact">
-                <div>
-                  <h2>Signal Phase Control</h2>
-                  <p>Durasi siklus adaptif Simpang Wonokromo.</p>
-                </div>
-                <span class="pill pill-ai">Auto</span>
-              </div>
-              <div class="phase-control">
-                <div class="phase-row">
-                  <span>Green A. Yani (Utara)</span>
-                  <strong id="greenValue">42 dtk</strong>
-                </div>
-                <div class="range-container">
-                  <input id="greenRange" class="slider-glow" type="range" min="25" max="75" value="42" />
-                  <span class="slider-tooltip" id="sliderTooltip">42s</span>
-                </div>
-                <!-- Linear Phase Timeline -->
-                <div class="phase-timeline-bar" id="dashboardPhaseTimeline">
-                  <div class="phase-sec phase-red" style="width: 35%"></div>
-                  <div class="phase-sec phase-yellow" style="width: 10%"></div>
-                  <div class="phase-sec phase-green" style="width: 55%"></div>
-                  <div class="phase-indicator" id="dashboardPhaseIndicator" style="left: 0%"></div>
-                </div>
-                <div class="phase-bars">
-                  <span style="--size: 64%"></span>
-                  <span style="--size: 42%"></span>
-                  <span style="--size: 78%"></span>
-                </div>
-              </div>
-            </article>
-
-            <!-- Emergency Priority Widget -->
-            <article class="widget glass-panel reveal-card priority-alert-widget">
-              <div class="section-head compact">
-                <div>
-                  <h2>Emergency Priority</h2>
-                  <p>Prioritas kendaraan darurat terdeteksi.</p>
-                </div>
-                <span class="pill pill-danger">Aktif</span>
-              </div>
-              <div class="emergency-row">
-                <div class="emergency-icon-container">
-                  <div class="emergency-icon pulse-red">✚</div>
-                </div>
-                <div>
-                  <strong>Ambulans menuju RSU Dr. Soetomo</strong>
-                  <p>ETA 1 menit 45 detik</p>
-                  <small>Rute: Jl. Raya Darmo → RSU Dr. Soetomo</small>
-                </div>
+              <div class="ai-rec-actions">
+                <button class="btn btn-ghost compact" type="button" id="btnDismissAiRec" onclick="dismissAiRecommendation()">Abaikan</button>
+                <button class="btn btn-primary compact" type="button" id="btnApplyAiRec" data-action="apply-ai">Terapkan Rekomendasi</button>
               </div>
             </article>
           </aside>
@@ -839,6 +749,106 @@
 
         <!-- Operations Grid -->
         <section class="operations-grid">
+          <!-- Signal Phase Control Widget -->
+          <article class="ops-card glass-panel reveal-card" id="signals">
+            <div class="section-head compact">
+              <div>
+                <h2>Signal Phase Control</h2>
+                <p>Durasi siklus adaptif Simpang Wonokromo.</p>
+              </div>
+              <span class="pill pill-ai">Auto</span>
+            </div>
+            <div class="phase-control">
+              <div class="phase-row">
+                <span>Green A. Yani (Utara)</span>
+                <strong id="greenValue">42 dtk</strong>
+              </div>
+              <div class="range-container">
+                <input id="greenRange" class="slider-glow" type="range" min="25" max="75" value="42" />
+                <span class="slider-tooltip" id="sliderTooltip">42s</span>
+              </div>
+              <!-- Linear Phase Timeline -->
+              <div class="phase-timeline-bar" id="dashboardPhaseTimeline">
+                <div class="phase-sec phase-red" style="width: 35%"></div>
+                <div class="phase-sec phase-yellow" style="width: 10%"></div>
+                <div class="phase-sec phase-green" style="width: 55%"></div>
+                <div class="phase-indicator" id="dashboardPhaseIndicator" style="left: 0%"></div>
+              </div>
+              <div class="phase-bars">
+                <span style="--size: 64%"></span>
+                <span style="--size: 42%"></span>
+                <span style="--size: 78%"></span>
+              </div>
+            </div>
+          </article>
+
+          <!-- District Congestion Leaderboard (Fitur 5) -->
+          <article class="ops-card glass-panel reveal-card" id="widgetLeaderboard">
+            <div class="section-head compact">
+              <div>
+                <h2>Indeks Kepadatan Koridor</h2>
+                <p>Peringkat kemacetan koridor utama (Real-time).</p>
+              </div>
+              <span class="pill pill-live">Peringkat</span>
+            </div>
+            <div class="leaderboard-container" style="display:flex; flex-direction:column; gap:8px;">
+              <div class="leaderboard-item" id="leadRoad-0" style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--panel-soft); border-radius:8px; font-size:11px;">
+                <span>1. Jl. Ahmad Yani</span>
+                <strong style="color:var(--danger);" class="lead-val">83%</strong>
+              </div>
+              <div class="leaderboard-item" id="leadRoad-1" style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--panel-soft); border-radius:8px; font-size:11px;">
+                <span>2. Jl. Raya Darmo</span>
+                <strong style="color:var(--warning);" class="lead-val">61%</strong>
+              </div>
+              <div class="leaderboard-item" id="leadRoad-2" style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--panel-soft); border-radius:8px; font-size:11px;">
+                <span>3. Jl. Tunjungan</span>
+                <strong style="color:var(--text);" class="lead-val">44%</strong>
+              </div>
+              <div class="leaderboard-item" id="leadRoad-3" style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--panel-soft); border-radius:8px; font-size:11px;">
+                <span>4. Jl. Kertajaya</span>
+                <strong style="color:var(--success);" class="lead-val">22%</strong>
+              </div>
+              <div class="leaderboard-item" id="leadRoad-4" style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--panel-soft); border-radius:8px; font-size:11px;">
+                <span>5. MERR Ir. Soekarno</span>
+                <strong style="color:var(--success);" class="lead-val">18%</strong>
+              </div>
+            </div>
+          </article>
+
+          <!-- Emergency Priority Widget -->
+          <article class="ops-card glass-panel reveal-card priority-alert-widget">
+            <div class="section-head compact">
+              <div>
+                <h2>Emergency Priority</h2>
+                <p>Prioritas kendaraan darurat terdeteksi.</p>
+              </div>
+              <span class="pill pill-danger">Aktif</span>
+            </div>
+            <div class="emergency-row">
+              <div class="emergency-icon-container">
+                <div class="emergency-icon pulse-red">✚</div>
+              </div>
+              <div>
+                <strong>Ambulans menuju RSU Dr. Soetomo</strong>
+                <p>ETA 1 menit 45 detik</p>
+                <small>Rute: Jl. Raya Darmo → RSU Dr. Soetomo</small>
+              </div>
+            </div>
+          </article>
+
+          <!-- Export History Logs (Fitur 13) -->
+          <article class="ops-card glass-panel reveal-card" id="widgetExportHistory">
+            <div class="section-head compact">
+              <div>
+                <h2>Riwayat Ekspor Data</h2>
+                <p>Laporan yang diunduh pada sesi operasional ini.</p>
+              </div>
+              <span class="pill">Riwayat</span>
+            </div>
+            <div class="export-history-list" id="exportHistoryList" style="max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
+              <p class="empty-history-text" style="font-size:11px; text-align:center; padding:10px; color:var(--text-muted); margin:0;">Belum ada riwayat unduhan.</p>
+            </div>
+          </article>
           <article class="ops-card glass-panel reveal-card" id="incidents">
             <div class="section-head compact">
               <div>
@@ -1082,12 +1092,25 @@
               <p>Peta geospasial real-time koridor utama kota Surabaya.</p>
             </div>
           </div>
-          <div class="map-container-wrapper">
-            <div id="fullMapPlaceholder"></div>
+          <div class="map-container-wrapper" id="fullMapContainerWrapper">
+            <!-- Real Leaflet.js Interactive Surabaya Map -->
+            <div id="map-surabaya"></div>
             
-            <!-- Map Layer Controls -->
-            <div class="map-layer-deck glass-soft">
-              <h3>Lapisan Peta</h3>
+            <!-- Floating Layer Control Button (iOS Frosted Glass) -->
+            <button class="map-floating-ctrl-btn map-layer-toggle-btn" id="btnToggleFullMapLayers" type="button" aria-label="Buka Kontrol Lapisan Peta" title="Kontrol Lapisan Peta">
+              <span class="btn-layer-icon">🥞</span>
+              <span class="btn-layer-text">Lapisan</span>
+            </button>
+
+            <!-- Collapsible Map Layer Controls (Slide-in Drawer) -->
+            <div class="map-layer-deck glass-panel" id="fullMapLayerDeck">
+              <div class="layer-deck-header">
+                <div class="layer-deck-title">
+                  <span class="layer-deck-icon">🥞</span>
+                  <h3>Lapisan Peta</h3>
+                </div>
+                <button class="layer-deck-close-btn" id="btnCloseFullMapLayers" type="button" aria-label="Tutup panel lapisan">&times;</button>
+              </div>
               <div class="layer-option-list">
                 <label class="layer-item">
                   <input type="checkbox" class="layer-toggle-checkbox" data-layer="district-zones" checked />
@@ -1119,6 +1142,52 @@
                 </label>
               </div>
             </div>
+
+            <!-- Mini Round iOS Map Controls (Bottom-Right) -->
+            <div class="map-floating-actions-group" id="fullMapActionsGroup">
+              <button class="map-action-round-btn" id="btnFullMapZoomIn" type="button" title="Perbesar Peta (+)" aria-label="Zoom in">＋</button>
+              <button class="map-action-round-btn" id="btnFullMapZoomOut" type="button" title="Perkecil Peta (-)" aria-label="Zoom out">－</button>
+              <button class="map-action-round-btn" id="btnFullMapReset" type="button" title="Pusatkan Peta (Surabaya)" aria-label="Center view">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="7"></circle>
+                  <line x1="12" y1="2" x2="12" y2="5"></line>
+                  <line x1="12" y1="19" x2="12" y2="22"></line>
+                  <line x1="2" y1="12" x2="5" y2="12"></line>
+                  <line x1="19" y1="12" x2="22" y2="12"></line>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Slim Horizontal iOS Legend (Bottom-Left) -->
+            <div class="map-horizontal-legend glass-panel" id="fullMapLegend" aria-label="Legenda Status Lalu Lintas">
+              <span class="legend-chip"><span class="legend-dot dot-success"></span>Lancar</span>
+              <span class="legend-chip"><span class="legend-dot dot-primary"></span>Normal</span>
+              <span class="legend-chip"><span class="legend-dot dot-danger"></span>Padat/Macet</span>
+              <span class="legend-chip"><span class="legend-tri">▲</span>Insiden</span>
+            </div>
+
+            <!-- Interactive Vehicle & Incident Popover -->
+            <div class="map-interactive-popover glass-panel is-hidden" id="mapVehiclePopover">
+              <button class="popover-close-btn" id="btnCloseVehiclePopover" type="button" aria-label="Tutup info">&times;</button>
+              <div class="popover-header">
+                <span class="popover-badge" id="popoverBadge">🚑 PRIORITAS SITS</span>
+                <h4 id="popoverTitle">Ambulans 02</h4>
+              </div>
+              <div class="popover-content">
+                <div class="popover-metric">
+                  <span class="popover-label">Kecepatan:</span>
+                  <strong class="popover-value text-accent" id="popoverSpeed">58 km/jam</strong>
+                </div>
+                <div class="popover-metric">
+                  <span class="popover-label">Status Rute:</span>
+                  <span class="popover-value" id="popoverRoute">Koridor Darmo - Sinyal Prioritas Aktif</span>
+                </div>
+                <div class="popover-metric">
+                  <span class="popover-label">Estimasi Tiba (ETA):</span>
+                  <strong class="popover-value text-warning" id="popoverEta">1m 45s</strong>
+                </div>
+              </div>
+            </div>
           </div>
         </article>
       </div>
@@ -1126,49 +1195,65 @@
       <!-- ==================== VIEW 3: LIVE CCTV ==================== -->
       <div class="view-pane" id="view-cctv">
         <section class="cctv-dashboard">
-          <div class="cctv-header-actions" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px;">
-            <p class="view-description">Computer Vision inference real-time pada CCTV SITS Surabaya. Mengklasifikasi volume kendaraan dan panjang antrean.</p>
-            <div class="cctv-dashboard-toolbar" style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 12px;">
-              <div class="cctv-controls-group">
-                <div class="matrix-selector glass-soft">
-                  <button class="matrix-btn active" data-grid="grid-2x2" title="Grid 2x2">⊞</button>
-                  <button class="matrix-btn" data-grid="grid-1x3" title="Kolom 1x3">☰</button>
-                  <button class="matrix-btn" data-grid="grid-focus" title="Fokus Utama">🔍</button>
-                </div>
-                
-                <!-- Play/Pause Simulation Control -->
-                <button class="btn btn-ghost compact" id="btnPlayPauseCctv" title="Jeda/Putar CCTV">⏸ Jeda</button>
-                
-                <!-- Color Filter Selectors -->
-                <div class="cctv-filter-selector glass-soft" style="display: flex; padding: 2px; border-radius: 8px;">
-                  <button class="filter-mode-btn active" data-filter="none" style="font-size: 11px; padding: 4px 8px; border-radius: 6px; border: 0; background: transparent; color: var(--text-muted); cursor: pointer;">Default</button>
-                  <button class="filter-mode-btn" data-filter="mono" style="font-size: 11px; padding: 4px 8px; border-radius: 6px; border: 0; background: transparent; color: var(--text-muted); cursor: pointer;">Mono</button>
-                  <button class="filter-mode-btn" data-filter="night" style="font-size: 11px; padding: 4px 8px; border-radius: 6px; border: 0; background: transparent; color: var(--text-muted); cursor: pointer;">Night</button>
-                  <button class="filter-mode-btn" data-filter="thermal" style="font-size: 11px; padding: 4px 8px; border-radius: 6px; border: 0; background: transparent; color: var(--text-muted); cursor: pointer;">Thermal</button>
-                </div>
-              </div>
-
-              <!-- Confidence Score Threshold Slider -->
-              <div class="threshold-slider-container glass-soft" style="display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 10px;">
-                <label for="cctvThresholdRange" style="font-size: 11px; font-weight: 700; color: var(--text-muted);">Threshold CV: <span id="thresholdVal">85%</span></label>
-                <input id="cctvThresholdRange" type="range" min="50" max="95" value="85" style="width: 80px;" />
+          <!-- Unified iOS-Style CCTV Control Bar -->
+          <div class="cctv-unified-toolbar glass-panel">
+            <div class="cctv-toolbar-section cctv-toolbar-left">
+              <!-- Matrix View Selector (iOS Segmented Style) -->
+              <div class="ios-segmented-control matrix-selector" role="group" aria-label="Layout Grid Kamera">
+                <button class="matrix-btn active" data-grid="grid-2x2" title="Grid 2x2">⊞</button>
+                <button class="matrix-btn" data-grid="grid-1x3" title="Kolom 1x3">☰</button>
+                <button class="matrix-btn" data-grid="grid-focus" title="Fokus Utama">🔍</button>
               </div>
               
-              <button class="btn btn-primary compact" id="btnToggleCVBoxes">Toggle Bounding Boxes</button>
+              <!-- Play/Pause Simulation Control -->
+              <button class="cctv-toolbar-btn" id="btnPlayPauseCctv" title="Jeda/Putar CCTV">
+                <span class="btn-icon">⏸</span> Jeda
+              </button>
+              
+              <!-- Color Filter Selectors (iOS Segmented Control) -->
+              <div class="ios-segmented-control cctv-filter-selector" role="group" aria-label="Filter Mode">
+                <button class="filter-mode-btn active" data-filter="none">Default</button>
+                <button class="filter-mode-btn" data-filter="mono">Mono</button>
+                <button class="filter-mode-btn" data-filter="night">Night</button>
+                <button class="filter-mode-btn" data-filter="thermal">Thermal</button>
+              </div>
+            </div>
+
+            <div class="cctv-toolbar-section cctv-toolbar-right">
+              <!-- Confidence Score Threshold Slider -->
+              <div class="cctv-threshold-pill" title="Ambang batas deteksi Computer Vision">
+                <label for="cctvThresholdRange" class="threshold-label">
+                  <span class="threshold-tag">Threshold:</span>
+                  <strong id="thresholdVal">85%</strong>
+                </label>
+                <input id="cctvThresholdRange" class="cctv-range-slider" type="range" min="50" max="95" value="85" />
+              </div>
+              
+              <!-- Toggle Bounding Box Button -->
+              <button class="cctv-toolbar-btn cctv-btn-primary" id="btnToggleCVBoxes" title="Toggle Visual Bounding Box AI">
+                <span class="btn-icon">▣</span> Toggle Bounding Boxes
+              </button>
             </div>
           </div>
+
           <div class="cctv-feed-grid">
+            <!-- CCTV 01 -->
             <div class="camera-card glass-panel">
               <div class="camera-card-header">
-                <h3>CCTV-01 — Jl. Ahmad Yani (Frontage Margorejo)</h3>
-                <span class="pill pill-live">Active</span>
+                <div class="camera-title-wrap">
+                  <span class="camera-id-badge">CAM 01</span>
+                  <h3 class="camera-street-name">CCTV-01 — Jl. Ahmad Yani (Frontage Margorejo)</h3>
+                </div>
+                <span class="pill pill-live"><span class="pulse-dot"></span>Active</span>
               </div>
               <div class="camera-box cv-box-container">
                 <canvas class="cctv-canvas" id="cctvCanvas1" width="360" height="240"></canvas>
                 <div class="scan-line"></div>
                 <div class="camera-grid-overlay"></div>
-                <div class="camera-badge">REC</div>
-                <div class="camera-timestamp cctv-time">--</div>
+                
+                <!-- HUD Top: Modern semi-transparent dark pills -->
+                <div class="camera-timestamp cctv-time hud-pill">--</div>
+                <div class="camera-badge hud-pill"><span class="rec-dot"></span>REC</div>
                 
                 <!-- Simulated Bounding Boxes -->
                 <div class="cv-rect rect-car" id="rect-1-1"><span class="cv-tag">Mobil 98%</span></div>
@@ -1181,21 +1266,48 @@
                   <div class="glitch-static"></div>
                   <div class="glitch-text">CONNECTION FAILED (504)</div>
                 </div>
+
+                <!-- HUD Bottom: Real-time Performance Metrics -->
+                <div class="camera-hud-bottom">
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">FPS</span>
+                    <span class="hud-metric-val">30.0</span>
+                  </div>
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">LATENCY</span>
+                    <span class="hud-metric-val">18ms</span>
+                  </div>
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">VRAM</span>
+                    <span class="hud-metric-val">412MB</span>
+                  </div>
+                  <div class="hud-metric-pill hud-engine hide-mobile">
+                    <span class="hud-metric-dot"></span>
+                    <span class="hud-metric-val">YOLOv8 • 1080p</span>
+                  </div>
+                </div>
               </div>
             </div>
 
+            <!-- CCTV 02 -->
             <div class="camera-card glass-panel">
               <div class="camera-card-header">
-                <h3>CCTV-02 — Flyover Wonokromo (Jemur Handayani)</h3>
-                <span class="pill pill-live">Active</span>
+                <div class="camera-title-wrap">
+                  <span class="camera-id-badge">CAM 02</span>
+                  <h3 class="camera-street-name">CCTV-02 — Flyover Wonokromo (Jemur Handayani)</h3>
+                </div>
+                <span class="pill pill-live"><span class="pulse-dot"></span>Active</span>
               </div>
               <div class="camera-box cv-box-container">
                 <canvas class="cctv-canvas" id="cctvCanvas2" width="360" height="240"></canvas>
                 <div class="scan-line"></div>
                 <div class="camera-grid-overlay"></div>
-                <div class="camera-badge">REC</div>
-                <div class="camera-timestamp cctv-time">--</div>
+                
+                <!-- HUD Top: Modern semi-transparent dark pills -->
+                <div class="camera-timestamp cctv-time hud-pill">--</div>
+                <div class="camera-badge hud-pill"><span class="rec-dot"></span>REC</div>
 
+                <!-- Simulated Bounding Boxes -->
                 <div class="cv-rect rect-car" id="rect-2-1"><span class="cv-tag">Mobil 99%</span></div>
                 <div class="cv-rect rect-motorcycle" id="rect-2-2"><span class="cv-tag">Motor 93%</span></div>
                 <div class="cv-rect rect-car" id="rect-2-3"><span class="cv-tag">Mobil 95%</span></div>
@@ -1205,21 +1317,48 @@
                   <div class="glitch-static"></div>
                   <div class="glitch-text">RTSP DISCONNECTED</div>
                 </div>
+
+                <!-- HUD Bottom: Real-time Performance Metrics -->
+                <div class="camera-hud-bottom">
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">FPS</span>
+                    <span class="hud-metric-val">29.8</span>
+                  </div>
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">LATENCY</span>
+                    <span class="hud-metric-val">22ms</span>
+                  </div>
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">VRAM</span>
+                    <span class="hud-metric-val">398MB</span>
+                  </div>
+                  <div class="hud-metric-pill hud-engine hide-mobile">
+                    <span class="hud-metric-dot"></span>
+                    <span class="hud-metric-val">YOLOv8 • 1080p</span>
+                  </div>
+                </div>
               </div>
             </div>
 
+            <!-- CCTV 03 -->
             <div class="camera-card glass-panel">
               <div class="camera-card-header">
-                <h3>CCTV-03 — Jl. Raya Darmo (Taman Bungkul)</h3>
-                <span class="pill pill-live">Active</span>
+                <div class="camera-title-wrap">
+                  <span class="camera-id-badge">CAM 03</span>
+                  <h3 class="camera-street-name">CCTV-03 — Jl. Raya Darmo (Taman Bungkul)</h3>
+                </div>
+                <span class="pill pill-live"><span class="pulse-dot"></span>Active</span>
               </div>
               <div class="camera-box cv-box-container">
                 <canvas class="cctv-canvas" id="cctvCanvas3" width="360" height="240"></canvas>
                 <div class="scan-line"></div>
                 <div class="camera-grid-overlay"></div>
-                <div class="camera-badge">REC</div>
-                <div class="camera-timestamp cctv-time">--</div>
+                
+                <!-- HUD Top: Modern semi-transparent dark pills -->
+                <div class="camera-timestamp cctv-time hud-pill">--</div>
+                <div class="camera-badge hud-pill"><span class="rec-dot"></span>REC</div>
 
+                <!-- Simulated Bounding Boxes -->
                 <div class="cv-rect rect-car" id="rect-3-1"><span class="cv-tag">Mobil 97%</span></div>
                 <div class="cv-rect rect-bus" id="rect-3-2"><span class="cv-tag">SuroboyoBus 95%</span></div>
                 <div class="cv-rect rect-truck" id="rect-3-3"><span class="cv-tag">Truk 92%</span></div>
@@ -1229,21 +1368,48 @@
                   <div class="glitch-static"></div>
                   <div class="glitch-text">BUFFER ERROR (999ms)</div>
                 </div>
+
+                <!-- HUD Bottom: Real-time Performance Metrics -->
+                <div class="camera-hud-bottom">
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">FPS</span>
+                    <span class="hud-metric-val">30.0</span>
+                  </div>
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">LATENCY</span>
+                    <span class="hud-metric-val">17ms</span>
+                  </div>
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">VRAM</span>
+                    <span class="hud-metric-val">415MB</span>
+                  </div>
+                  <div class="hud-metric-pill hud-engine hide-mobile">
+                    <span class="hud-metric-dot"></span>
+                    <span class="hud-metric-val">YOLOv8 • 1080p</span>
+                  </div>
+                </div>
               </div>
             </div>
 
+            <!-- CCTV 04 -->
             <div class="camera-card glass-panel">
               <div class="camera-card-header">
-                <h3>CCTV-04 — Jl. Tunjungan (Gedung Siola)</h3>
-                <span class="pill pill-live">Active</span>
+                <div class="camera-title-wrap">
+                  <span class="camera-id-badge">CAM 04</span>
+                  <h3 class="camera-street-name">CCTV-04 — Jl. Tunjungan (Gedung Siola)</h3>
+                </div>
+                <span class="pill pill-live"><span class="pulse-dot"></span>Active</span>
               </div>
               <div class="camera-box cv-box-container">
                 <canvas class="cctv-canvas" id="cctvCanvas4" width="360" height="240"></canvas>
                 <div class="scan-line"></div>
                 <div class="camera-grid-overlay"></div>
-                <div class="camera-badge">REC</div>
-                <div class="camera-timestamp cctv-time">--</div>
+                
+                <!-- HUD Top: Modern semi-transparent dark pills -->
+                <div class="camera-timestamp cctv-time hud-pill">--</div>
+                <div class="camera-badge hud-pill"><span class="rec-dot"></span>REC</div>
 
+                <!-- Simulated Bounding Boxes -->
                 <div class="cv-rect rect-car" id="rect-4-1"><span class="cv-tag">Mobil 98%</span></div>
                 <div class="cv-rect rect-person" id="rect-4-2"><span class="cv-tag">Pejalan 94%</span></div>
                 <div class="cv-rect rect-car" id="rect-4-3"><span class="cv-tag">Mobil 96%</span></div>
@@ -1252,6 +1418,26 @@
                 <div class="cctv-glitch-overlay" id="cctvGlitch4">
                   <div class="glitch-static"></div>
                   <div class="glitch-text">HOST NOT REACHABLE</div>
+                </div>
+
+                <!-- HUD Bottom: Real-time Performance Metrics -->
+                <div class="camera-hud-bottom">
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">FPS</span>
+                    <span class="hud-metric-val">29.9</span>
+                  </div>
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">LATENCY</span>
+                    <span class="hud-metric-val">20ms</span>
+                  </div>
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">VRAM</span>
+                    <span class="hud-metric-val">405MB</span>
+                  </div>
+                  <div class="hud-metric-pill hud-engine hide-mobile">
+                    <span class="hud-metric-dot"></span>
+                    <span class="hud-metric-val">YOLOv8 • 1080p</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1974,19 +2160,16 @@
   <!-- Custom Map Tooltip -->
   <div class="map-tooltip" id="mapTooltip"></div>
 
-  <!-- Floating info quick tour widget -->
-  <div class="quick-tour-widget">
-    <button class="quick-tour-btn" id="btnQuickTour" aria-label="Bantuan Tour SITS" type="button">?</button>
-    <div class="quick-tour-tooltip glass-panel" id="quickTourTooltip">
-      <h3>SITS Command Center Guide</h3>
-      <p>Dashboard ini mengoptimalkan lampu lalu lintas secara adaptif berbasis AI.</p>
-      <ul>
-        <li><strong>Mode Keos</strong> menyimulasikan gridlock parah.</li>
-        <li><strong>Sinyal SITS</strong> menampilkan latensi transmisi.</li>
-        <li><strong>Preemption</strong> memberikan prioritas darurat.</li>
-      </ul>
-      <button class="btn btn-primary compact" id="btnCloseTour" type="button">Tutup Panduan</button>
-    </div>
+  <!-- Floating info quick tour tooltip -->
+  <div class="quick-tour-tooltip glass-panel" id="quickTourTooltip" style="display: none;">
+    <h3>SITS Command Center Guide</h3>
+    <p>Dashboard ini mengoptimalkan lampu lalu lintas secara adaptif berbasis AI.</p>
+    <ul>
+      <li><strong>Mode Keos</strong> menyimulasikan gridlock parah.</li>
+      <li><strong>Sinyal SITS</strong> menampilkan latensi transmisi.</li>
+      <li><strong>Preemption</strong> memberikan prioritas darurat.</li>
+    </ul>
+    <button class="btn btn-primary compact" id="btnCloseTour" type="button">Tutup Panduan</button>
   </div>
 
   <!-- Incident Detailed Modal Viewer -->
@@ -2150,11 +2333,49 @@
     </div>
   </div>
 
-  <!-- Diagnostic Performance Chip (Fitur 8) -->
-  <div class="perf-chip glass-panel" id="perfChip">
-    <span class="perf-dot"></span>
-    <span class="perf-text">FPS: -- | Ping: -- ms | Mem: -- MB</span>
-  </div>
+  <!-- iOS-Style Bottom Navigation Tab Bar (Mobile View) -->
+  <nav class="mobile-tab-bar glass-panel" id="mobileTabBar" aria-label="Navigasi Cepat Mobile">
+    <a href="#dashboard" class="mobile-tab-item nav-item active" data-view="dashboard" id="mobTabDashboard">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7"></rect>
+        <rect x="14" y="3" width="7" height="7"></rect>
+        <rect x="14" y="14" width="7" height="7"></rect>
+        <rect x="3" y="14" width="7" height="7"></rect>
+      </svg>
+      <span>Dashboard</span>
+    </a>
+    <a href="#map" class="mobile-tab-item nav-item" data-view="map" id="mobTabMap">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+        <line x1="8" y1="2" x2="8" y2="18"></line>
+        <line x1="16" y1="6" x2="16" y2="22"></line>
+      </svg>
+      <span>Peta</span>
+    </a>
+    <a href="#cctv" class="mobile-tab-item nav-item" data-view="cctv" id="mobTabCctv">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+        <circle cx="12" cy="13" r="4"></circle>
+      </svg>
+      <span>CCTV</span>
+    </a>
+    <a href="#signals" class="mobile-tab-item nav-item" data-view="signals" id="mobTabSignals">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="20" x2="18" y2="10"></line>
+        <line x1="12" y1="20" x2="12" y2="4"></line>
+        <line x1="6" y1="20" x2="6" y2="14"></line>
+      </svg>
+      <span>Sinyal</span>
+    </a>
+    <button class="mobile-tab-item" type="button" id="mobTabMenu" aria-label="Buka Semua Menu SITS">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+      <span>Menu</span>
+    </button>
+  </nav>
 
   <!-- Notification Toast Stack (Fitur 10) -->
   <div class="toast-stack-container" id="toastStack"></div>
@@ -2200,6 +2421,126 @@
     </div>
   </div>
 
+  <!-- Modal Signal Intelligence (APILL & Green Wave) -->
+  <div class="modal-overlay" id="signalIntelModal" role="dialog" aria-modal="true" style="display: none;">
+    <div class="modal-content glass-panel ios-sheet-modal" style="max-width: 480px; width: 92%;">
+      <button class="modal-close" id="closeSignalIntelModal">&times;</button>
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="pill pill-ai">Signal Intelligence</span>
+          <span class="cctv-live-tag"><span class="live-dot"></span> SITS ATCS</span>
+        </div>
+        <h2 style="margin: 8px 0 2px 0; font-size: 17px;">Status Sinyal APILL & Emergency Green Wave</h2>
+        <p style="margin: 0; font-size: 11.5px; color: var(--text-muted);">Sistem Otomatisasi Sinyal Lampu Lalu Lintas Kota Surabaya</p>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 12px; margin: 16px 0;">
+        <!-- Simpang Wonokromo -->
+        <div class="apill-card glass-soft" style="padding: 12px 14px; border-radius: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <strong style="font-size: 13px;">🚥 Simpang Wonokromo (A. Yani)</strong>
+            <span class="status-badge green" id="wonokromoBadge">HIJAU (24s)</span>
+          </div>
+          <div class="apill-lights-row" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center;">
+            <div class="apill-light red" id="wonokromoRed" style="padding: 8px; border-radius: 8px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2);">
+              <span style="display: block; font-size: 9px; color: var(--text-muted);">MERAH</span>
+              <strong id="wonokromoRedTime" style="font-size: 14px; color: #ef4444;">0s</strong>
+            </div>
+            <div class="apill-light yellow" id="wonokromoYellow" style="padding: 8px; border-radius: 8px; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2);">
+              <span style="display: block; font-size: 9px; color: var(--text-muted);">KUNING</span>
+              <strong id="wonokromoYellowTime" style="font-size: 14px; color: #f59e0b;">0s</strong>
+            </div>
+            <div class="apill-light green active" id="wonokromoGreen" style="padding: 8px; border-radius: 8px; background: rgba(34,197,94,0.2); border: 1.5px solid #22c55e; box-shadow: 0 0 10px rgba(34,197,94,0.3);">
+              <span style="display: block; font-size: 9px; color: var(--text-muted);">HIJAU</span>
+              <strong id="wonokromoGreenTime" style="font-size: 14px; color: #22c55e;">24s</strong>
+            </div>
+          </div>
+        </div>
+        <!-- Simpang Margorejo -->
+        <div class="apill-card glass-soft" style="padding: 12px 14px; border-radius: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <strong style="font-size: 13px;">🚥 Simpang Margorejo (Jemursari)</strong>
+            <span class="status-badge red" id="margorejoBadge">MERAH (12s)</span>
+          </div>
+          <div class="apill-lights-row" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center;">
+            <div class="apill-light red active" id="margorejoRed" style="padding: 8px; border-radius: 8px; background: rgba(239,68,68,0.2); border: 1.5px solid #ef4444; box-shadow: 0 0 10px rgba(239,68,68,0.3);">
+              <span style="display: block; font-size: 9px; color: var(--text-muted);">MERAH</span>
+              <strong id="margorejoRedTime" style="font-size: 14px; color: #ef4444;">12s</strong>
+            </div>
+            <div class="apill-light yellow" id="margorejoYellow" style="padding: 8px; border-radius: 8px; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2);">
+              <span style="display: block; font-size: 9px; color: var(--text-muted);">KUNING</span>
+              <strong id="margorejoYellowTime" style="font-size: 14px; color: #f59e0b;">0s</strong>
+            </div>
+            <div class="apill-light green" id="margorejoGreen" style="padding: 8px; border-radius: 8px; background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.2);">
+              <span style="display: block; font-size: 9px; color: var(--text-muted);">HIJAU</span>
+              <strong id="margorejoGreenTime" style="font-size: 14px; color: #22c55e;">0s</strong>
+            </div>
+          </div>
+        </div>
+        <!-- Emergency Green Wave Switch -->
+        <div class="green-wave-box glass-soft" style="padding: 12px 14px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239,68,68,0.05);">
+          <div>
+            <strong style="font-size: 12.5px; color: var(--danger); display: flex; align-items: center; gap: 6px;">
+              🚨 Emergency Green Wave
+            </strong>
+            <p style="margin: 2px 0 0 0; font-size: 10.5px; color: var(--text-muted);">Paksa semua lampu koridor A. Yani - Darmo Hijau Permanen</p>
+          </div>
+          <label class="toggle-switch-ios">
+            <input type="checkbox" id="chkGreenWave" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Drawer (Slide-Over iOS Style) & Backdrop -->
+  <div class="drawer-backdrop" id="notifDrawerBackdrop"></div>
+  <aside class="notif-drawer glass-panel" id="notifDrawer">
+    <div class="notif-drawer-header" style="display: flex; justify-content: space-between; align-items: center; padding: 16px; border-bottom: 1px solid var(--border);">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 20px;">🔔</span>
+        <div>
+          <h3 style="margin: 0; font-size: 14px; font-weight: 700;">Riwayat Insiden Hari Ini</h3>
+          <p style="margin: 2px 0 0 0; font-size: 11px; color: var(--text-muted);">Laporan SITS Surabaya & Command Center 112</p>
+        </div>
+      </div>
+      <button class="layer-deck-close-btn" id="closeNotifDrawer" type="button" aria-label="Tutup Notifikasi">&times;</button>
+    </div>
+    <div class="notif-drawer-body" id="notifListContainer" style="padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; max-height: calc(100vh - 80px);">
+      <article class="notif-item-card glass-soft" id="notifItem1" style="padding: 12px; border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span class="status-badge red">⚠️ Tabrakan Ringan</span>
+          <small style="font-size: 10px; color: var(--text-muted);">08:14 WIB</small>
+        </div>
+        <strong style="font-size: 12.5px;">Simpang Diponegoro - Dr. Soetomo</strong>
+        <p style="margin: 0; font-size: 11px; color: var(--text-muted); line-height: 1.4;">2 Sepeda motor bersenggolan di lajur kiri. Petugas Satlantas & Tim SITS di lokasi.</p>
+        <button class="btn btn-ghost compact resolve-notif-btn" data-notif-id="notifItem1" style="align-self: flex-end; margin-top: 4px; font-size: 10.5px; color: var(--success);">✓ Tandai Selesai</button>
+      </article>
+
+      <article class="notif-item-card glass-soft" id="notifItem2" style="padding: 12px; border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span class="status-badge yellow">🚧 Pohon Tumbang</span>
+          <small style="font-size: 10px; color: var(--text-muted);">07:45 WIB</small>
+        </div>
+        <strong style="font-size: 12.5px;">Jl. Pemuda (Depan Gedung RRI)</strong>
+        <p style="margin: 0; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Dahan pohon peneduh patah menutupi 1 lajur. Tim DLH Surabaya proses evakuasi.</p>
+        <button class="btn btn-ghost compact resolve-notif-btn" data-notif-id="notifItem2" style="align-self: flex-end; margin-top: 4px; font-size: 10.5px; color: var(--success);">✓ Tandai Selesai</button>
+      </article>
+
+      <article class="notif-item-card glass-soft" id="notifItem3" style="padding: 12px; border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span class="status-badge red">🚨 Truk Mogok</span>
+          <small style="font-size: 10px; color: var(--text-muted);">06:30 WIB</small>
+        </div>
+        <strong style="font-size: 12.5px;">Simpang Kupang / Pasar Kembang</strong>
+        <p style="margin: 0; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Truk engkel patah as roda di tengah persimpangan. Unit Derek Dishub proses evakuasi.</p>
+        <button class="btn btn-ghost compact resolve-notif-btn" data-notif-id="notifItem3" style="align-self: flex-end; margin-top: 4px; font-size: 10.5px; color: var(--success);">✓ Tandai Selesai</button>
+      </article>
+    </div>
+  </aside>
+
+  <!-- Leaflet.js Real Geospatial Mapping Library -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
