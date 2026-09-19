@@ -1,0 +1,6 @@
+{
+  "name": "OmniTRAF Surabaya Command Center",
+  "description": "SITS Surabaya - OmniTRAF Command Center Dashboard - Adaptive Urban Mobility System",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -87,15 +87,27 @@
 
 html {
   scroll-behavior: smooth;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   min-height: 100vh;
+  min-height: -webkit-fill-available;
   margin: 0;
   color: var(--text);
   background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 46%, var(--bg-bottom) 100%);
   overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
   transition: background 0.4s var(--ease), color 0.4s var(--ease);
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
 }
 
 img {
@@ -575,6 +587,11 @@ h1, h2, h3, p {
 .main-content {
   padding: 24px;
   z-index: 1;
+  max-width: 1920px;
+  width: 100%;
+  margin: 0 auto;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .topbar {
@@ -1201,9 +1218,10 @@ h1 {
 }
 
 .map-overview {
-  top: 14px;
-  left: 14px;
+  bottom: 14px;
+  right: 14px;
   width: 168px;
+  z-index: 10;
 }
 
 .map-overview h3,
@@ -2927,53 +2945,62 @@ tbody tr.is-hidden {
 /* Responsive Breakpoints */
 @media (max-width: 1380px) {
   .topbar {
-    grid-template-columns: minmax(0, 1fr) minmax(200px, 280px);
+    grid-template-columns: minmax(0, 1.2fr) auto;
+    gap: 14px;
   }
 
   .topbar-actions {
     grid-column: 1 / -1;
     justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .control-strip {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
 }
 
 @media (max-width: 1260px) {
   .app-shell {
-    grid-template-columns: 90px minmax(0, 1fr);
+    grid-template-columns: 84px minmax(0, 1fr);
   }
 
   .sidebar {
-    padding: 20px 12px;
+    padding: 20px 10px;
+    width: 84px;
   }
 
   .brand {
     grid-template-columns: 1fr;
     place-items: center;
+    margin-bottom: 24px;
   }
 
   .brand-copy,
   .nav-item span:last-child,
   .sidebar-card {
-    display: none;
+    display: none !important;
   }
 
   .brand-mark {
-    width: 50px;
-    height: 50px;
+    width: 46px;
+    height: 46px;
   }
 
   .nav-item {
     justify-content: center;
     padding: 0;
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 4px;
   }
 
   .nav-icon {
     width: 36px;
     height: 36px;
-    border-radius: 11px;
+    border-radius: 10px;
   }
 
   .dashboard-grid {
@@ -2998,31 +3025,48 @@ tbody tr.is-hidden {
   }
 
   .operations-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
   
-  .cctv-feed-grid,
-  .signals-console-grid,
-  .emergency-list-grid,
-  .emergency-dashboard,
-  .integration-status-grid {
+  .cctv-feed-grid {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  }
+
+  .signals-console-grid {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+
+  .emergency-list-grid {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+
+  .emergency-dashboard {
     grid-template-columns: 1fr;
+  }
+
+  .integration-status-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
+  .reports-manager-grid {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   }
 }
 
 @media (max-width: 920px) {
   .app-shell {
     display: block;
+    width: 100%;
   }
 
   .menu-toggle {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    width: 44px;
-    height: 44px;
-    padding: 13px;
-    border-radius: 12px;
+    width: 42px;
+    height: 42px;
+    padding: 12px;
+    border-radius: 10px;
     background: var(--panel-soft);
     border: 1px solid var(--border);
     cursor: pointer;
@@ -3043,12 +3087,15 @@ tbody tr.is-hidden {
     left: -320px;
     width: 280px;
     height: 100vh;
-    z-index: 10;
+    height: 100dvh;
+    z-index: 1000;
     box-shadow: var(--shadow-hover);
-    transition: left 0.3s var(--ease);
+    transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     border-right: 1px solid var(--border);
     background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 100%);
     display: flex !important;
+    padding: 20px 16px;
+    box-sizing: border-box;
   }
 
   .sidebar.open {
@@ -3058,14 +3105,18 @@ tbody tr.is-hidden {
   .close-drawer {
     display: block;
     position: absolute;
-    top: 20px;
-    right: 20px;
+    top: 18px;
+    right: 18px;
     background: none;
     border: none;
     font-size: 26px;
     color: var(--text-muted);
     cursor: pointer;
     line-height: 1;
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
   }
 
   .close-drawer:hover {
@@ -3077,6 +3128,7 @@ tbody tr.is-hidden {
     grid-template-columns: 46px minmax(0, 1fr) !important;
     place-items: start !important;
     width: 100%;
+    margin-bottom: 20px;
   }
 
   .brand-copy,
@@ -3088,11 +3140,15 @@ tbody tr.is-hidden {
   .nav-menu {
     display: grid !important;
     width: 100%;
+    max-height: calc(100vh - 220px);
+    overflow-y: auto;
   }
 
   .nav-item {
     justify-content: flex-start !important;
     padding: 0 14px !important;
+    width: 100% !important;
+    height: 42px !important;
   }
 
   .nav-icon {
@@ -3102,25 +3158,57 @@ tbody tr.is-hidden {
 
   .main-content {
     padding: 16px;
+    width: 100%;
   }
 
   .topbar {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    padding: 16px;
+    min-height: auto;
+  }
+
+  .topbar-left {
+    width: 100%;
+    display: flex;
     align-items: flex-start;
+    gap: 12px;
+  }
+
+  .hero-copy {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .hero-copy h1 {
+    font-size: clamp(20px, 4vw, 28px);
   }
 
   .hero-logo-card {
-    width: 100%;
-    justify-content: start;
+    width: auto;
+    max-width: 220px;
+    min-height: 48px;
+    padding: 6px 14px;
+    align-self: flex-start;
+  }
+
+  .hero-logo-card img {
+    max-height: 40px;
   }
 
   .topbar-actions {
     justify-content: flex-start;
     width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
 
   .trend-layout,
@@ -3131,61 +3219,502 @@ tbody tr.is-hidden {
   .layer-panel {
     display: none;
   }
+
+  .table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-wrap table {
+    min-width: 580px;
+  }
 }
 
-@media (max-width: 620px) {
-  .main-content {
+/* Tablet Portrait & Mobile Landscape */
+@media (max-width: 768px) {
+  input[type="text"],
+  input[type="search"],
+  input[type="number"],
+  select,
+  textarea {
+    font-size: 16px !important; /* Prevents iOS auto-zoom */
+  }
+
+  .control-strip {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
     padding: 12px;
   }
 
-  .hide-mobile {
+  .search-box-wrapper {
+    width: 100%;
+  }
+
+  .search-box {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .filter-group {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .filter-group::-webkit-scrollbar {
     display: none;
   }
 
+  .filter-chip {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    min-height: 36px;
+    padding: 0 14px;
+    font-size: 11.5px;
+  }
+
+  .quick-actions {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .quick-actions .btn {
+    flex: 1 1 auto;
+    min-height: 38px;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .siren-banner {
+    margin: 8px 12px;
+    padding: 8px 14px;
+    font-size: 11.5px;
+  }
+}
+
+/* Phones & Compact Mobile */
+@media (max-width: 640px) {
+  .main-content {
+    padding: 10px;
+  }
+
+  .system-marquee {
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+
+  .hide-mobile {
+    display: none !important;
+  }
+
+  .topbar {
+    padding: 12px;
+    gap: 10px;
+    border-radius: var(--radius-lg);
+    margin-bottom: 12px;
+  }
+
   h1 {
-    font-size: 26px;
+    font-size: clamp(17px, 5.5vw, 22px);
+    line-height: 1.18;
+  }
+
+  .hero-copy p {
+    font-size: 11px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .hero-logo-card {
-    min-height: 60px;
+    max-width: 160px;
+    min-height: 38px;
+    padding: 4px 10px;
+    border-radius: 10px;
   }
 
+  .hero-logo-card img {
+    max-height: 30px;
+  }
+
+  .topbar-actions {
+    gap: 6px;
+  }
+
+  .info-chip {
+    padding: 4px 8px;
+    min-height: 36px;
+    font-size: 10.5px;
+    border-radius: 8px;
+  }
+
+  .profile-chip {
+    padding: 4px 8px;
+    min-height: 36px;
+    border-radius: 8px;
+  }
+
+  .theme-toggle,
+  .audio-toggle {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    border-radius: 9px;
+  }
+
+  /* Compact 2-column KPI Cards for mobile (never squished, never 8 tall blocks) */
   .stat-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
   }
 
+  .stat-card {
+    min-height: 72px;
+    padding: 10px 12px;
+    gap: 8px;
+    border-radius: var(--radius-md);
+  }
+
+  .stat-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 15px;
+    border-radius: 8px;
+  }
+
+  .stat-card h2 {
+    font-size: 17px;
+    margin-bottom: 2px;
+    line-height: 1.1;
+  }
+
+  .stat-card p {
+    font-size: 10.5px;
+    margin-bottom: 2px;
+    line-height: 1.25;
+  }
+
+  .stat-card span[class^="metric"] {
+    font-size: 9.5px;
+  }
+
+  .stat-progress-bar {
+    margin-top: 6px;
+    height: 3px;
+  }
+
+  /* Map and overlays on mobile */
+  .map-box {
+    min-height: 320px;
+    height: clamp(320px, 48vh, 400px);
+  }
+
+  .map-zoom-controls {
+    top: 8px;
+    left: 8px;
+    flex-direction: row;
+    gap: 4px;
+    z-index: 20;
+  }
+
+  .map-zoom-controls button {
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+    border-radius: 6px;
+  }
+
+  .map-layer-deck {
+    top: 8px;
+    right: 8px;
+    width: auto;
+    max-width: 130px;
+    padding: 6px 8px;
+    font-size: 9.5px;
+    z-index: 15;
+    max-height: 130px;
+    overflow-y: auto;
+    border-radius: 8px;
+  }
+
+  .map-layer-deck h3 {
+    font-size: 9px;
+    margin-bottom: 4px;
+  }
+
+  .layer-item {
+    font-size: 9.5px;
+    padding: 2px 0;
+    gap: 4px;
+  }
+
+  .layer-toggle-checkbox {
+    width: 26px;
+    height: 15px;
+  }
+
+  .layer-toggle-checkbox::before {
+    width: 11px;
+    height: 11px;
+  }
+
+  .layer-toggle-checkbox:checked::before {
+    transform: translateX(11px);
+  }
+
+  .legend {
+    bottom: 8px;
+    left: 8px;
+    width: auto;
+    max-width: 130px;
+    padding: 6px 8px;
+    font-size: 9.5px;
+    z-index: 10;
+    gap: 3px;
+    border-radius: 8px;
+    transform: none;
+  }
+
+  .legend h3 {
+    font-size: 9px;
+    margin-bottom: 2px;
+  }
+
+  .legend span {
+    gap: 5px;
+    font-size: 9.5px;
+  }
+
+  .legend-line {
+    width: 14px;
+    height: 3px;
+  }
+
+  .map-overview {
+    bottom: 8px;
+    right: 8px;
+    width: auto;
+    max-width: 130px;
+    padding: 6px 8px;
+    z-index: 10;
+    border-radius: 8px;
+  }
+
+  .map-overview h3 {
+    font-size: 9px;
+    margin-bottom: 2px;
+  }
+
+  .map-overview strong {
+    font-size: 16px;
+    margin-bottom: 2px;
+  }
+
+  .map-overview p {
+    font-size: 9px;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .landmark-detail-card {
+    bottom: 8px !important;
+    left: 8px !important;
+    right: 8px !important;
+    top: auto !important;
+    width: auto !important;
+    max-width: none !important;
+    z-index: 30 !important;
+    padding: 10px !important;
+    font-size: 11px !important;
+    border-radius: 10px !important;
+  }
+
+  /* Operations cards & widgets */
   .section-head,
   .report-card,
   .settings-card {
     align-items: flex-start;
     flex-direction: column;
+    gap: 8px;
+  }
+
+  .section-head h2 {
+    font-size: 15px;
+  }
+
+  .map-panel,
+  .widget,
+  .trend-panel,
+  .table-panel,
+  .ops-card,
+  .report-card,
+  .settings-card,
+  .esg-monitor-card,
+  .terminal-logs-card,
+  .devices-list-panel,
+  .reports-generator {
+    padding: 14px;
+    border-radius: var(--radius-lg);
   }
 
   .recommend-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
 
-  .map-box {
-    min-height: 380px;
+  .score-ring-container {
+    display: flex;
+    justify-content: center;
   }
 
-  .map-overview {
-    width: 144px;
+  .score-ring {
+    margin: 0 auto;
   }
 
-  .legend {
-    transform: scale(.88);
-    transform-origin: bottom left;
+  .operations-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
 
-  .quick-actions,
-  .filter-group {
+  .cctv-feed-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .signals-console-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .signal-active-panel {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .emergency-list-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .em-meta-row {
+    gap: 6px;
+  }
+
+  .em-meta-row strong {
+    font-size: 10.5px;
+  }
+
+  .esg-metrics-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .esg-header {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* Floating elements */
+  .staff-chat-panel {
+    bottom: 72px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    max-width: none;
+    height: 350px;
+    max-height: 52vh;
+  }
+
+  .quick-tour-widget {
+    bottom: 14px;
+    right: 14px;
+  }
+
+  .quick-tour-tooltip {
+    width: calc(100vw - 28px);
+    max-width: 320px;
+    right: 0;
+  }
+
+  .perf-chip {
+    bottom: 8px;
+    left: 8px;
+    right: auto;
+    font-size: 9px;
+    padding: 4px 8px;
+  }
+
+  .toast-stack-container {
+    top: 50px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+
+  .stacked-toast {
+    min-width: 0;
     width: 100%;
   }
 
-  .quick-actions .btn,
-  .filter-chip {
-    flex: 1;
+  .modal-content {
+    width: calc(100% - 24px);
+    max-width: none;
+    padding: 18px;
+    margin: 12px;
+  }
+}
+
+/* Ultra-compact phones (<= 380px) */
+@media (max-width: 380px) {
+  .profile-chip .chip-meta small {
+    display: none;
+  }
+
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .stat-card {
+    padding: 8px 10px;
+  }
+
+  .stat-card h2 {
+    font-size: 15px;
+  }
+
+  .hero-copy h1 {
+    font-size: 17px;
+  }
+}
+
+/* Touch targets ergonomics for touch devices */
+@media (pointer: coarse) {
+  .btn,
+  .filter-chip,
+  .nav-item,
+  .menu-toggle,
+  .close-drawer,
+  .map-tools button,
+  .theme-toggle,
+  .audio-toggle,
+  .chat-toggle-btn {
+    min-height: 40px;
   }
 }
 
