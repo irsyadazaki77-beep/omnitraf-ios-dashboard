@@ -1,6 +1,6 @@
 {
   "name": "OmniTRAF Surabaya Command Center",
-  "description": "SITS Surabaya - OmniTRAF Command Center Dashboard - Adaptive Urban Mobility System",
+  "description": "Platform pemantauan lalu lintas cerdas perkotaan terintegrasi ATCS SITS Surabaya, computer vision edge AI, dan optimasi sinyal adaptif.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

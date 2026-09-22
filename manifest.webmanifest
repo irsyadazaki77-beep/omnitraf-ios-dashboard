@@ -1,0 +1,45 @@
+{
+  "id": "/",
+  "name": "OmniTRAF Surabaya — Command Center Dashboard",
+  "short_name": "OmniTRAF",
+  "description": "SITS Surabaya - OmniTRAF Command Center Dashboard - Adaptive Urban Mobility System",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#03080e",
+  "background_color": "#03080e",
+  "lang": "id",
+  "dir": "ltr",
+  "categories": [
+    "transportation",
+    "utilities",
+    "government"
+  ],
+  "icons": [
+    {
+      "src": "/assets/favicon.png",
+      "sizes": "64x64",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/omnitraf-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/omnitraf-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/omnitraf-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
