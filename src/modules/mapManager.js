@@ -620,6 +620,53 @@ export class MapManager {
   }
 
   /**
+   * Main initializer called by App orchestrator
+   */
+  init() {
+    this.initAllMaps();
+    this._bindZoomControls();
+    this._bindLandmarkHUDClose();
+  }
+
+  _bindZoomControls() {
+    const zoomInBtns = document.querySelectorAll("#btnMapZoomIn, .btn-zoom-in");
+    const zoomOutBtns = document.querySelectorAll("#btnMapZoomOut, .btn-zoom-out");
+    const zoomResetBtns = document.querySelectorAll("#btnMapZoomReset, .btn-zoom-reset");
+
+    zoomInBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        this.maps.forEach(map => map.zoomIn());
+        soundManager.play('click');
+      });
+    });
+
+    zoomOutBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        this.maps.forEach(map => map.zoomOut());
+        soundManager.play('click');
+      });
+    });
+
+    zoomResetBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        this.maps.forEach(map => map.setView([SURABAYA_CENTER.lat, SURABAYA_CENTER.lng], SURABAYA_CENTER.zoom));
+        soundManager.play('click');
+      });
+    });
+  }
+
+  _bindLandmarkHUDClose() {
+    const closeBtn = document.getElementById("btnCloseLandmarkCard");
+    const card = document.getElementById("landmarkDetailCard");
+    if (closeBtn && card) {
+      closeBtn.addEventListener("click", () => {
+        card.classList.add("is-hidden");
+        soundManager.play('click');
+      });
+    }
+  }
+
+  /**
    * Inisialisasi seluruh kontainer peta Leaflet yang tersedia di DOM
    */
   initAllMaps() {
@@ -1956,17 +2003,32 @@ export class MapManager {
    * Menyesuaikan kondisi jam sibuk pagi (07:00-09:00) dan sore (17:00-19:00)
    */
   updateCorridorLoadByHour(hour) {
-    const isPeak = (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19);
-    const isMid = (hour >= 10 && hour <= 16) || (hour >= 20 && hour <= 22);
+    const isPeak = (hour >= 6 && hour <= 9) || (hour >= 16 && hour <= 19);
+    const isMid = (hour >= 10 && hour <= 15) || (hour >= 20 && hour <= 21);
 
     const color = isPeak ? '#ef4444' : (isMid ? '#f59e0b' : '#10b981');
     const weight = isPeak ? 8 : (isMid ? 5 : 4);
-    const opacity = isPeak ? 0.95 : 0.75;
+    const opacity = isPeak ? 0.95 : (isMid ? 0.8 : 0.7);
+
+    // Update tracked corridor layers
+    this.corridorGeoJsonLayers.forEach(({ glow, core }) => {
+      if (glow && typeof glow.setStyle === 'function') {
+        glow.setStyle({ color, weight: weight + 4, opacity: opacity * 0.5 });
+      }
+      if (core && typeof core.setStyle === 'function') {
+        core.setStyle({
+          color,
+          weight,
+          opacity,
+          className: isPeak ? 'corridor-congested-flow' : 'corridor-smooth-flow'
+        });
+      }
+    });
 
     this.layerGroupsMap.forEach(groups => {
-      const corridorsGroup = groups['corridors'];
-      if (corridorsGroup) {
-        corridorsGroup.eachLayer(layer => {
+      const roadGroup = groups['road-glows'] || groups['corridors'];
+      if (roadGroup) {
+        roadGroup.eachLayer(layer => {
           if (typeof layer.setStyle === 'function') {
             layer.setStyle({ color, weight, opacity });
           }

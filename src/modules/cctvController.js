@@ -7,6 +7,7 @@
 
 import { stateStore } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
+import { socketClient } from '../core/socketClient.js';
 
 // Color map for YOLOv8 object classes
 const CLASS_COLORS = {
@@ -310,34 +311,14 @@ export class CctvController {
   _connectSocketStream() {
     let lastReceivedTime = 0;
 
-    const attachSocket = (s) => {
-      if (!s) return;
-      s.on('cctv:vision-update', (framePayload) => {
-        if (!framePayload) return;
-        lastReceivedTime = Date.now();
-        this.renderers.forEach((renderer, camId) => {
-          const boxes = framePayload[camId] || framePayload['dashCameraCanvas'] || [];
-          renderer.updateBoxes(boxes);
-        });
+    socketClient.on('cctv:vision-update', (framePayload) => {
+      if (!framePayload) return;
+      lastReceivedTime = Date.now();
+      this.renderers.forEach((renderer, camId) => {
+        const boxes = framePayload[camId] || framePayload['dashCameraCanvas'] || [];
+        renderer.updateBoxes(boxes);
       });
-    };
-
-    if (typeof window.io !== "undefined") {
-      this.socket = window.io();
-      attachSocket(this.socket);
-    } else {
-      let attempts = 0;
-      const checkIo = setInterval(() => {
-        attempts++;
-        if (typeof window.io !== "undefined") {
-          clearInterval(checkIo);
-          this.socket = window.io();
-          attachSocket(this.socket);
-        } else if (attempts > 8) {
-          clearInterval(checkIo);
-        }
-      }, 300);
-    }
+    });
 
     // Local fallback generator for offline / standalone demonstration
     const classes = ['car', 'bus', 'truck', 'motorcycle', 'ambulance'];

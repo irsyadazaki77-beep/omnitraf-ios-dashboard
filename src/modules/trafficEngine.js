@@ -8,127 +8,11 @@
 
 import { stateStore } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
+import { socketClient } from '../core/socketClient.js';
 import { mapManager } from './mapManager.js';
-
-let socketInstance = null;
-
-function getSocket() {
-  if (socketInstance) return socketInstance;
-
-  try {
-    if (typeof window.io !== "undefined") {
-      socketInstance = window.io({
-        reconnection: true,
-        reconnectionAttempts: Infinity,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 4000
-      });
-      bindSocketEvents(socketInstance);
-    } else {
-      // Dynamic fallback import for ESM environment
-      const script = document.createElement("script");
-      script.src = "/socket.io/socket.io.js";
-      script.onload = () => {
-        if (typeof window.io !== "undefined" && !socketInstance) {
-          socketInstance = window.io({
-            reconnection: true,
-            reconnectionAttempts: Infinity,
-            reconnectionDelay: 1000,
-            reconnectionDelayMax: 5000,
-            timeout: 4000
-          });
-          bindSocketEvents(socketInstance);
-        }
-      };
-      script.onerror = () => {
-        console.info("[TrafficEngine] Backend Socket.io unavailable. Running Local Mock Simulation Fallback.");
-        stateStore.setState({ sseConnected: false });
-        stateStore.publish("socket:status", "fallback");
-        stateStore.publish("socket:connected", false);
-        trafficEngine.startLocalSimulation();
-      };
-      document.head.appendChild(script);
-    }
-  } catch (err) {
-    console.warn("[TrafficEngine] Socket connection deferred:", err);
-    stateStore.publish("socket:status", "fallback");
-    trafficEngine.startLocalSimulation();
-  }
-
-  if (socketInstance) {
-    bindSocketEvents(socketInstance);
-  }
-
-  return socketInstance;
-}
-
-function bindSocketEvents(socket) {
-  if (!socket) return;
-
-  socket.on('connect', () => {
-    console.info("⚡ [TrafficEngine] Terhubung ke Backend Socket.io Real-Time Engine.");
-    stateStore.setState({ sseConnected: true });
-    stateStore.publish("socket:status", "connected");
-    stateStore.publish("socket:connected", true);
-    trafficEngine.stopLocalSimulation();
-  });
-
-  socket.on('reconnect_attempt', () => {
-    stateStore.publish("socket:status", "reconnecting");
-  });
-
-  socket.on('reconnecting', () => {
-    stateStore.publish("socket:status", "reconnecting");
-  });
-
-  socket.on('connect_error', () => {
-    stateStore.setState({ sseConnected: false });
-    stateStore.publish("socket:status", "fallback");
-    stateStore.publish("socket:connected", false);
-    trafficEngine.startLocalSimulation();
-  });
-
-  socket.on('disconnect', () => {
-    console.warn("⚠️ [TrafficEngine] Koneksi Socket.io terputus dari server. Beralih ke Local Simulation.");
-    stateStore.setState({ sseConnected: false });
-    stateStore.publish("socket:status", "fallback");
-    stateStore.publish("socket:connected", false);
-    trafficEngine.startLocalSimulation();
-  });
-
-  // Handle Initial & Periodic Traffic State Updates from Server
-  socket.on('traffic:init', (data) => {
-    trafficEngine.handleServerStateUpdate(data);
-  });
-
-  socket.on('traffic:update', (data) => {
-    trafficEngine.handleServerStateUpdate(data);
-  });
-
-  // System Toast Notifications from Server
-  socket.on('system:toast', (data) => {
-    if (data && data.message && typeof window.showToast === "function") {
-      window.showToast(data.message);
-      if (data.type === 'alert' || data.type === 'danger') {
-        soundManager.play('alert');
-      } else {
-        soundManager.play('success');
-      }
-    }
-  });
-
-  socket.on('emergency:dispatch-alert', (data) => {
-    if (data && typeof window.showToast === "function") {
-      window.showToast(`🚨 DISPATCH AUTOMATION: ${data.code} (${data.vehicle}) diberikan Hak Utama.`);
-      soundManager.play('alert');
-    }
-  });
-}
 
 export class TrafficEngine {
   constructor() {
-    this.socket = null;
     this.lastState = null;
     this.localSimInterval = null;
     this._localSimulationRunning = false;
@@ -204,15 +88,13 @@ export class TrafficEngine {
   init() {
     console.info("🚀 [TrafficEngine] Menginisialisasi Reactive Socket Traffic Engine...");
 
-    this.socket = getSocket();
+    socketClient.getSocket();
+    socketClient.on('traffic:init', (data) => this.handleServerStateUpdate(data));
+    socketClient.on('traffic:update', (data) => this.handleServerStateUpdate(data));
 
-    this._bindGreenSplitSlider();
     this._bindGreenWaveToggle();
     this._bindChaosMode();
     this._bindSignalModal();
-    this._bindEmergencyForm();
-    this._bindEmergency112Simulation();
-    this._bindForceOverrideButtons();
     this._bindAiRecommendationButtons();
 
     // Jalankan render initial state segera
@@ -241,9 +123,8 @@ export class TrafficEngine {
       chk.checked = isBool;
     }
 
-    const socket = getSocket();
-    if (socket && socket.connected) {
-      socket.emit('green-wave:toggle', { active: isBool });
+    if (socketClient.isConnected()) {
+      socketClient.emit('green-wave:toggle', { active: isBool });
     } else {
       // Local fallback simulation immediate synchronization
       const currentData = this.lastState || this.mockState;
@@ -282,10 +163,7 @@ export class TrafficEngine {
       });
       this.handleServerStateUpdate(currentData);
     }
-    const socket = getSocket();
-    if (socket && socket.connected) {
-      socket.emit('signal:override', { intersectionId: nodeId, duration: durationSec });
-    }
+    socketClient.emit('signal:override', { intersectionId: nodeId, duration: durationSec });
   }
 
   /**
@@ -557,23 +435,6 @@ export class TrafficEngine {
   /**
    * Bind DOM Events & Controls
    */
-  _bindGreenSplitSlider() {
-    const slider = document.getElementById("greenSplitSlider") || document.getElementById("greenRange");
-    if (!slider) return;
-
-    slider.addEventListener("input", (e) => {
-      const val = parseInt(e.target.value, 10);
-      stateStore.setState({ greenSplitWonokromo: val });
-      const tt = document.getElementById("sliderTooltip");
-      if (tt) tt.textContent = `${val}s`;
-
-      const socket = getSocket();
-      if (socket && socket.connected) {
-        socket.emit('green-split:update', { value: val, intersectionId: "node-wonokromo" });
-      }
-    });
-  }
-
   _bindGreenWaveToggle() {
     const chkGreenWave = document.getElementById("chkGreenWave");
     if (!chkGreenWave) return;
@@ -593,9 +454,8 @@ export class TrafficEngine {
       btnToggleChaos.addEventListener("click", () => {
         const current = stateStore.getState().isChaosMode;
         const target = !current;
-        const socket = getSocket();
-        if (socket && socket.connected) {
-          socket.emit('chaos:toggle', { active: target });
+        if (socketClient.isConnected()) {
+          socketClient.emit('chaos:toggle', { active: target });
         } else {
           this.mockState.isChaosMode = target;
           this.mockState.chaosLevel = target ? 4 : 0;
@@ -619,95 +479,18 @@ export class TrafficEngine {
   _bindAiRecommendationButtons() {
     document.querySelectorAll('button[data-action="simulate"], .btn-apply-ai').forEach(btn => {
       btn.addEventListener("click", () => {
-        const socket = getSocket();
-        if (socket && socket.connected) {
-          socket.emit('ai:apply-recommendation', { intersectionId: 'node-wonokromo' });
+        if (socketClient.isConnected()) {
+          socketClient.emit('ai:apply-recommendation', { intersectionId: 'node-wonokromo' });
         } else {
           const optimizedSplit = Math.floor(38 + Math.random() * 12);
           stateStore.setState({ greenSplitWonokromo: optimizedSplit });
-          const slider = document.getElementById("greenSplitSlider");
+          const slider = document.getElementById("greenSplitSlider") || document.getElementById("greenRange");
           if (slider) slider.value = optimizedSplit;
           window.showToast(`✨ Rekomendasi AI Diterapkan: Green Split Wonokromo dioptimalkan ke ${optimizedSplit}s!`);
         }
         soundManager.play('success');
       });
     });
-  }
-
-  _bindForceOverrideButtons() {
-    document.querySelectorAll(".force-override-btn").forEach((btn, idx) => {
-      btn.addEventListener("click", () => {
-        const intersectionIds = ["node-wonokromo", "node-margorejo", "node-darmo", "node-tunjungan"];
-        const targetId = intersectionIds[idx] || "node-wonokromo";
-        const socket = getSocket();
-        if (socket && socket.connected) {
-          socket.emit('signal:override', { intersectionId: targetId, duration: 45 });
-        } else {
-          window.showToast(`🛠️ Manual Override Aktif: Durasi ${targetId} dikunci 45s!`);
-        }
-        soundManager.play('click');
-      });
-    });
-  }
-
-  _bindEmergencyForm() {
-    const emergencyForm = document.getElementById("emergencyActuatorForm");
-
-    if (emergencyForm) {
-      emergencyForm.addEventListener("submit", (e) => {
-        const typeInput = document.getElementById("respType");
-        const routeInput = document.getElementById("respRoute");
-        const nameInput = document.getElementById("respName");
-
-        const code = nameInput ? nameInput.value.trim() : "AMB-02";
-        const route = routeInput ? routeInput.value : "route-yani-darmo";
-
-        this.setGreenWave(true);
-
-        const socket = getSocket();
-        if (socket && socket.connected) {
-          socket.emit('emergency:activate', { code, route });
-        }
-      });
-    }
-  }
-
-  _bindEmergency112Simulation() {
-    const btnStart = document.getElementById("btnStart112Sim");
-    const btnStop = document.getElementById("btnStop112Sim");
-
-    if (btnStart) {
-      btnStart.addEventListener("click", () => {
-        btnStart.disabled = true;
-        if (btnStop) btnStop.disabled = false;
-
-        // Beralih ke view peta agar animasi dan HUD terlihat jelas
-        const curView = stateStore.getState().currentView;
-        if (curView === 'emergency') {
-          const mapNav = document.querySelector('[data-view="map"]');
-          if (mapNav) mapNav.click();
-        }
-
-        mapManager.startEmergency112Simulation(
-          (telemetry) => {
-            // Telemetry update hook
-          },
-          () => {
-            btnStart.disabled = false;
-            if (btnStop) btnStop.disabled = true;
-          }
-        );
-      });
-    }
-
-    if (btnStop) {
-      btnStop.addEventListener("click", () => {
-        mapManager.stopEmergency112Simulation(false);
-        if (btnStart) btnStart.disabled = false;
-        btnStop.disabled = true;
-        soundManager.play('click');
-      });
-    }
   }
 
   _bindSignalModal() {

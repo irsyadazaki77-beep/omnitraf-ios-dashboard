@@ -21,7 +21,6 @@ const PORT = process.env.PORT || 3000;
 // Middleware Header Keamanan HTTP & Content Security Policy (CSP)
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader(
     'Content-Security-Policy',
@@ -30,8 +29,9 @@ app.use((req, res, next) => {
       "script-src 'self' 'unsafe-inline' https://unpkg.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.cartocdn.com https://*.arcgisonline.com https://*.tile.openstreetmap.org https://unpkg.com https://*.unpkg.com",
-      "connect-src 'self' ws: wss: http: https:"
+      "img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.cartocdn.com https://*.arcgisonline.com https://server.arcgisonline.com https://*.tile.openstreetmap.org https://unpkg.com https://*.unpkg.com",
+      "connect-src 'self' ws: wss: http: https:",
+      "frame-ancestors *"
     ].join('; ')
   );
   next();
@@ -572,6 +572,25 @@ io.on('connection', (socket) => {
 // REST API ENDPOINTS FOR SMART CITY SYSTEM INTEGRATION
 // ============================================================================
 
+// 0. Real-time Server-Sent Events (SSE) Stream Endpoint for Traffic Telemetry
+app.get('/api/stream-traffic', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  // Send initial payload immediately
+  res.write(`data: ${JSON.stringify(backendState.state)}\n\n`);
+
+  const sseInterval = setInterval(() => {
+    res.write(`data: ${JSON.stringify(backendState.state)}\n\n`);
+  }, 1000);
+
+  req.on('close', () => {
+    clearInterval(sseInterval);
+  });
+});
+
 // 1. PDF Report Download REST API
 app.get('/api/reports/download', (req, res) => {
   try {
@@ -656,13 +675,20 @@ app.get('/api/prediction/v1/forecast', (req, res) => {
 
     res.json({
       status: "success",
+      success: true,
       timestamp: new Date().toISOString(),
       hour: Math.round(clampedHour),
       hourLabel: `${String(Math.round(clampedHour)).padStart(2, '0')}:00 WIB`,
       congestionProbability: probability,
+      probability: `${probability}%`,
+      probabilityValue: probability,
       riskText: riskText,
+      riskLabel: `Status: ${riskText}`,
       riskColor: riskColor,
       expectedSpeedKmh: expectedSpeed,
+      speed: `${expectedSpeed} km/jam`,
+      speedValue: expectedSpeed,
+      tomorrowStatus: probability >= 75 ? "Tinggi" : probability >= 48 ? "Sedang" : "Rendah",
       trafficStatus: status,
       recommendation: recommendation,
       factors: factorList
@@ -928,12 +954,11 @@ function startServer(port) {
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
-    const nextPort = Number(err.port || 3000) + 1;
-    console.warn(`⚠️ Port ${err.port || 3000} sedang dipakai, otomatis beralih ke port ${nextPort}...`);
+    console.warn(`⚠️ Port ${PORT} sedang dipakai, mencoba kembali dalam 500ms...`);
     setTimeout(() => {
       server.close();
-      startServer(nextPort);
-    }, 200);
+      startServer(PORT);
+    }, 500);
   } else {
     console.error('Server error:', err);
   }

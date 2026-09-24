@@ -9,18 +9,18 @@
   <meta name="apple-mobile-web-app-title" content="OmniTRAF" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="description" content="Platform pemantauan lalu lintas cerdas perkotaan terintegrasi ATCS SITS Surabaya, computer vision edge AI, dan optimasi sinyal adaptif." />
-  <title>OmniTRAF Surabaya — Intelligent Transport System Command Center</title>
+  <title>OmniTRAF Surabaya Command Center</title>
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="OmniTRAF Surabaya — Intelligent Transport System Command Center" />
+  <meta property="og:title" content="OmniTRAF Surabaya Command Center" />
   <meta property="og:description" content="Platform pemantauan lalu lintas cerdas perkotaan terintegrasi ATCS SITS Surabaya, computer vision edge AI, dan optimasi sinyal adaptif." />
   <meta property="og:image" content="/assets/omnitraf-logo.png" />
   <meta property="og:url" content="https://omnitraf-surabaya.id" />
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="OmniTRAF Surabaya — Intelligent Transport System Command Center" />
+  <meta name="twitter:title" content="OmniTRAF Surabaya Command Center" />
   <meta name="twitter:description" content="Platform pemantauan lalu lintas cerdas perkotaan terintegrasi ATCS SITS Surabaya, computer vision edge AI, dan optimasi sinyal adaptif." />
   <meta name="twitter:image" content="/assets/omnitraf-logo.png" />
 
@@ -47,6 +47,8 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <link rel="stylesheet" href="style.css" />
+  <!-- Socket.io Client Library -->
+  <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
   <!-- System Announcement Marquee Banner -->
@@ -386,10 +388,10 @@
           </div>
         </section>
 
-        <!-- Bento Grid Executive Telemetry (Apple Vision Pro & Linear Style) -->
+        <!-- Bento Grid Executive Telemetry (Operator-Focused Hierarchy) -->
         <section class="stat-grid bento-telemetry-grid" aria-label="Key metrics">
-          <!-- Bento Hero 1: Indeks Kemacetan Kota (with Circular Ring Gauge) -->
-          <article class="stat-card bento-card bento-hero bento-card-spotlight glass-panel reveal-card" id="bentoCardCongestion">
+          <!-- Bento Hero 1: Indeks Kemacetan Kota -->
+          <article class="stat-card bento-card bento-hero glass-panel reveal-card" id="bentoCardCongestion">
             <div class="bento-card-inner">
               <div class="bento-content-wrap">
                 <div class="bento-header-badge">
@@ -399,110 +401,101 @@
                 <div class="bento-meta-body">
                   <p>Indeks Kemacetan Kota</p>
                   <h2><span class="counter-val" data-counter="68">68</span><span class="denom-val">/100</span></h2>
-                  <span class="metric-warn pill-trend"><span class="trend-arrow">▲</span> Peningkatan Kepadatan</span>
+                  <span class="metric-warn pill-trend"><span class="trend-arrow">▲</span> Padat • Wonokromo</span>
                 </div>
               </div>
-              <!-- Circular Ring Gauge Visual -->
               <div class="bento-gauge-wrapper">
-                <svg class="radial-ring-gauge" viewBox="0 0 100 100" width="84" height="84">
-                  <circle class="gauge-track" cx="50" cy="50" r="40" fill="none" stroke-width="7" />
-                  <circle class="gauge-fill-ring amber-glow-ring" cx="50" cy="50" r="40" fill="none" stroke-width="7" stroke-dasharray="251.2" stroke-dashoffset="80.4" stroke-linecap="round" />
+                <svg class="radial-ring-gauge" viewBox="0 0 100 100" width="76" height="76">
+                  <circle class="gauge-track" cx="50" cy="50" r="38" fill="none" stroke-width="6" />
+                  <circle class="gauge-fill-ring amber-glow-ring" cx="50" cy="50" r="38" fill="none" stroke-width="6" stroke-dasharray="238.76" stroke-dashoffset="76.4" stroke-linecap="round" />
                 </svg>
                 <div class="gauge-center-text">
                   <span class="gauge-center-val">68%</span>
-                  <span class="gauge-center-sub">Load</span>
+                  <span class="gauge-center-sub">Beban</span>
                 </div>
               </div>
             </div>
             <div class="stat-progress-bar"><div class="progress-fill amber-bar w-68p"></div></div>
           </article>
 
-          <!-- Bento Hero 2: Reduksi Emisi CO₂ ESG (with Circular Ring Gauge) -->
-          <article class="stat-card bento-card bento-hero bento-card-spotlight glass-panel reveal-card" id="bentoCardCO2">
+          <!-- Bento Hero 2: Reduksi Emisi CO₂ ESG -->
+          <article class="stat-card bento-card bento-hero glass-panel reveal-card" id="bentoCardCO2">
             <div class="bento-card-inner">
               <div class="bento-content-wrap">
                 <div class="bento-header-badge">
                   <span class="stat-icon green-tone">🌱</span>
-                  <span class="bento-pill-tag green-tag">ESG Sustainable Urban</span>
+                  <span class="bento-pill-tag green-tag">ESG Urban Impact</span>
                 </div>
                 <div class="bento-meta-body">
                   <p>Reduksi Emisi CO₂</p>
                   <h2><span class="counter-val" data-counter="18">18</span><span class="denom-val">%</span></h2>
-                  <span class="metric-up emissions-counter-text pill-trend" id="emissionsCounter">Saved: 184.20 kg</span>
+                  <span class="metric-up emissions-counter-text pill-trend" id="emissionsCounter">Tereduksi: 184.20 kg</span>
                 </div>
               </div>
-              <!-- Circular Ring Gauge Visual -->
               <div class="bento-gauge-wrapper">
-                <svg class="radial-ring-gauge" viewBox="0 0 100 100" width="84" height="84">
-                  <circle class="gauge-track" cx="50" cy="50" r="40" fill="none" stroke-width="7" />
-                  <circle class="gauge-fill-ring green-glow-ring" cx="50" cy="50" r="40" fill="none" stroke-width="7" stroke-dasharray="251.2" stroke-dashoffset="205.9" stroke-linecap="round" />
+                <svg class="radial-ring-gauge" viewBox="0 0 100 100" width="76" height="76">
+                  <circle class="gauge-track" cx="50" cy="50" r="38" fill="none" stroke-width="6" />
+                  <circle class="gauge-fill-ring green-glow-ring" cx="50" cy="50" r="38" fill="none" stroke-width="6" stroke-dasharray="238.76" stroke-dashoffset="195.78" stroke-linecap="round" />
                 </svg>
                 <div class="gauge-center-text">
                   <span class="gauge-center-val">18%</span>
-                  <span class="gauge-center-sub">ESG</span>
+                  <span class="gauge-center-sub">Efisiensi</span>
                 </div>
               </div>
             </div>
             <div class="stat-progress-bar"><div class="progress-fill green-bar w-18p"></div></div>
           </article>
 
-          <!-- Bento 3: Persimpangan Aktif (with Sparkline Mini Chart) -->
-          <article class="stat-card bento-card bento-card-spotlight glass-panel reveal-card">
+          <!-- Bento 3: Persimpangan Aktif -->
+          <article class="stat-card bento-card glass-panel reveal-card">
             <div class="bento-card-header-row">
               <div class="stat-icon blue-tone">⌁</div>
-              <!-- Mini SVG Sparkline -->
-              <svg class="bento-sparkline" viewBox="0 0 60 20" width="54" height="18" aria-hidden="true">
-                <path d="M0,14 Q10,12 20,8 T40,11 T60,4" fill="none" stroke="var(--primary-2)" stroke-width="2" stroke-linecap="round" />
-              </svg>
+              <span class="pill pill-live">100% Online</span>
             </div>
             <div>
-              <p>Persimpangan Aktif</p>
+              <p>Persimpangan SITS Aktif</p>
               <h2 data-counter="126">126</h2>
-              <span class="metric-up pill-trend">Operasional SITS</span>
+              <span class="metric-up pill-trend">Siklus Adaptif Terkoneksi</span>
             </div>
             <div class="stat-progress-bar"><div class="progress-fill blue-bar w-84p"></div></div>
           </article>
 
           <!-- Bento 4: Rata-rata Waktu Tunggu -->
-          <article class="stat-card bento-card bento-card-spotlight glass-panel reveal-card">
+          <article class="stat-card bento-card glass-panel reveal-card">
             <div class="bento-card-header-row">
               <div class="stat-icon green-tone">⏱</div>
-              <svg class="bento-sparkline" viewBox="0 0 60 20" width="54" height="18" aria-hidden="true">
-                <path d="M0,6 Q15,14 30,16 T45,10 T60,15" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" />
-              </svg>
+              <span class="pill pill-live">-6s vs Rata-rata</span>
             </div>
             <div>
               <p>Rata-rata Waktu Tunggu</p>
               <h2><span class="counter-val" data-counter="42">42</span><span class="denom-val"> dtk</span></h2>
-              <span class="metric-up pill-trend">-6 detik vs lalu</span>
+              <span class="metric-up pill-trend">Antrean Terkendali</span>
             </div>
             <div class="stat-progress-bar"><div class="progress-fill green-bar w-42p"></div></div>
           </article>
 
           <!-- Bento 5: Kendaraan Darurat Aktif -->
-          <article class="stat-card bento-card bento-card-spotlight glass-panel reveal-card">
+          <article class="stat-card bento-card glass-panel reveal-card">
             <div class="bento-card-header-row">
               <div class="stat-icon red-tone">✚</div>
-              <span class="pulse-red-glow-badge">LIVE 112</span>
+              <span class="pill pill-danger">Prioritas 112</span>
             </div>
             <div>
-              <p>Kendaraan Darurat Aktif</p>
+              <p>Armada Darurat Aktif</p>
               <h2 data-counter="3">3</h2>
-              <span class="metric-down pill-trend">Prioritas Green Wave</span>
+              <span class="metric-down pill-trend">Green Wave Siaga</span>
             </div>
             <div class="stat-progress-bar"><div class="progress-fill red-bar w-30p"></div></div>
           </article>
 
           <!-- Bento 6: Kendaraan Hari Ini -->
-          <article class="stat-card bento-card bento-card-spotlight glass-panel reveal-card">
+          <article class="stat-card bento-card glass-panel reveal-card">
             <div class="bento-card-header-row">
               <div class="stat-icon blue-tone">🚗</div>
-              <svg class="bento-sparkline" viewBox="0 0 60 20" width="54" height="18" aria-hidden="true">
-                <path d="M0,16 Q15,10 30,12 T45,7 T60,3" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" />
-              </svg>
+              <span class="pill pill-live">SITS Sensor Flow</span>
             </div>
             <div>
-              <p>Kendaraan Hari Ini</p>
+              <p>Volume Kendaraan Hari Ini</p>
               <h2 data-counter="128540">128.540</h2>
               <span class="metric-up pill-trend">+14.8% vs normal</span>
             </div>
@@ -510,31 +503,29 @@
           </article>
 
           <!-- Bento 7: Prediksi Macet Besok -->
-          <article class="stat-card bento-card bento-card-spotlight glass-panel reveal-card">
+          <article class="stat-card bento-card glass-panel reveal-card">
             <div class="bento-card-header-row">
               <div class="stat-icon amber-tone">🔮</div>
-              <span class="pill pill-ai">LSTM AI</span>
+              <span class="pill pill-ai">Edge AI Model</span>
             </div>
             <div>
-              <p>Prediksi Macet Besok</p>
+              <p>Prediksi Beban Besok</p>
               <h2>Sedang</h2>
-              <span class="metric-warn pill-trend">Proyeksi Normal</span>
+              <span class="metric-warn pill-trend">Pola Jam Sibuk Siang</span>
             </div>
             <div class="stat-progress-bar"><div class="progress-fill amber-bar w-50p"></div></div>
           </article>
 
           <!-- Bento 8: Efisiensi Sinyal APILL -->
-          <article class="stat-card bento-card bento-card-spotlight glass-panel reveal-card">
+          <article class="stat-card bento-card glass-panel reveal-card">
             <div class="bento-card-header-row">
               <div class="stat-icon blue-tone">⚡</div>
-              <svg class="bento-sparkline" viewBox="0 0 60 20" width="54" height="18" aria-hidden="true">
-                <path d="M0,12 Q15,8 30,5 T45,7 T60,2" fill="none" stroke="var(--primary-2)" stroke-width="2" stroke-linecap="round" />
-              </svg>
+              <span class="pill pill-ai">Optimasi ATCS</span>
             </div>
             <div>
               <p>Efisiensi Sinyal APILL</p>
               <h2><span class="counter-val" data-counter="92">92</span><span class="denom-val">%</span></h2>
-              <span class="metric-up pill-trend">Optimalisasi AI</span>
+              <span class="metric-up pill-trend">Sinkronisasi Hijau Optimal</span>
             </div>
             <div class="stat-progress-bar"><div class="progress-fill blue-bar w-92p"></div></div>
           </article>
@@ -555,19 +546,19 @@
             <div class="map-box-container map-box-container-inner">
               <!-- Zoom & Pan Controls overlay -->
               <div class="map-zoom-controls glass-soft map-zoom-controls-overlay">
-                <button id="btnMapZoomIn" title="Zoom In" class="map-zoom-btn-item">+</button>
-                <button id="btnMapZoomOut" title="Zoom Out" class="map-zoom-btn-item">-</button>
-                <button id="btnMapZoomReset" title="Reset Zoom" class="map-zoom-btn-reset">⟲</button>
+                <button id="btnMapZoomIn" title="Perbesar Peta (+)" class="map-zoom-btn-item" aria-label="Zoom in">+</button>
+                <button id="btnMapZoomOut" title="Perkecil Peta (-)" class="map-zoom-btn-item" aria-label="Zoom out">-</button>
+                <button id="btnMapZoomReset" title="Pusatkan Surabaya" class="map-zoom-btn-reset" aria-label="Reset zoom">⟲</button>
               </div>
 
-              <!-- Holographic Sci-Fi Landmark & Intersection HUD Card -->
-              <div class="landmark-detail-card holo-hud-card glass-panel landmark-detail-card-overlay is-hidden" id="landmarkDetailCard">
+              <!-- Clean SITS Landmark & Node Detail Card -->
+              <div class="landmark-detail-card glass-panel landmark-detail-card-overlay is-hidden" id="landmarkDetailCard">
                 <div class="holo-hud-header">
                   <div class="holo-scan-badge">
                     <span class="holo-pulse-dot"></span>
-                    <span class="holo-badge-label">HOLO-GEOSPATIAL SITS</span>
+                    <span class="holo-badge-label">SITS SURABAYA GIS</span>
                   </div>
-                  <button class="close-landmark-card holo-close-btn" id="btnCloseLandmarkCard" aria-label="Tutup HUD">&times;</button>
+                  <button class="close-landmark-card holo-close-btn" id="btnCloseLandmarkCard" type="button" aria-label="Tutup info node">&times;</button>
                 </div>
                 <div class="holo-hud-body">
                   <div class="holo-title-row">
@@ -583,15 +574,11 @@
                       <strong id="landmarkStatus" class="text-success">Lancar (42 km/jam)</strong>
                     </div>
                     <div class="holo-stat-item">
-                      <small>Sensor Monitoring</small>
-                      <strong class="text-cyan">IoT Node 60Hz</strong>
+                      <small>Status Sensor</small>
+                      <strong class="text-cyan">IoT Node Aktif</strong>
                     </div>
                   </div>
                 </div>
-                <div class="holo-bracket holo-tl"></div>
-                <div class="holo-bracket holo-tr"></div>
-                <div class="holo-bracket holo-bl"></div>
-                <div class="holo-bracket holo-br"></div>
               </div>
 
               <div class="map-box" id="dashboardMapBox" data-density="all"></div>
@@ -603,10 +590,10 @@
               </div>
 
               <div class="legend glass-soft">
-                <h3>Legenda</h3>
-                <span><i class="legend-line danger"></i>Macet</span>
-                <span><i class="legend-line warning"></i>Padat</span>
-                <span><i class="legend-line success"></i>Lancar</span>
+                <h3>Legenda Status</h3>
+                <span><i class="legend-line danger"></i>Macet (&lt;15 km/j)</span>
+                <span><i class="legend-line warning"></i>Padat (15-30 km/j)</span>
+                <span><i class="legend-line success"></i>Lancar (&gt;30 km/j)</span>
                 <span><i class="legend-line primary"></i>Normal</span>
               </div>
 
@@ -670,7 +657,7 @@
                 </div>
               </div>
 
-              <!-- 16:9 Aspect Ratio Camera Viewport with Tactical HUD Overlays -->
+              <!-- 16:9 Aspect Ratio Camera Viewport with Crisp Overlays -->
               <div class="camera-box tactical-camera-box" id="cameraBox">
                 <canvas class="cctv-canvas" id="dashCameraCanvas" width="640" height="360"></canvas>
                 <div class="scan-line"></div>
@@ -678,12 +665,6 @@
                 <div class="camera-badge hud-pill"><span class="rec-dot"></span>REC</div>
                 <div class="camera-grid-overlay"></div>
                 <div class="camera-timestamp cctv-time hud-pill" id="cameraTime">--</div>
-                
-                <!-- Tactical Military Corner Brackets ⌜ ⌝ ⌞ ⌟ -->
-                <div class="cctv-corner-bracket cb-tl" aria-hidden="true"></div>
-                <div class="cctv-corner-bracket cb-tr" aria-hidden="true"></div>
-                <div class="cctv-corner-bracket cb-bl" aria-hidden="true"></div>
-                <div class="cctv-corner-bracket cb-br" aria-hidden="true"></div>
 
                 <!-- Official SITS Edge AI Inference Watermark -->
                 <div class="cctv-telemetry-watermark" id="cctvTelemetryWatermark">
@@ -759,7 +740,7 @@
                 <strong id="greenValue">42 dtk</strong>
               </div>
               <div class="range-container">
-                <input id="greenRange" class="slider-glow" type="range" min="25" max="75" value="42" />
+                <input id="greenRange" class="slider-glow" type="range" min="15" max="90" value="42" />
                 <span class="slider-tooltip" id="sliderTooltip">42s</span>
               </div>
               <!-- Linear Phase Timeline -->
@@ -1582,7 +1563,11 @@
               <span class="badge" id="analyticsHourBadge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; font-weight: 800; padding: 6px 12px; border-radius: 8px; font-size: 13px;">
                 🕒 08:00 WIB
               </span>
-              <button class="selector glass-soft" type="button" data-action="time-range">Hari Ini (24 Jam)</button>
+              <div class="time-range-segmented glass-soft" id="analyticsTimeRangeSegmented" role="group" aria-label="Rentang Waktu Analitik">
+                <button class="time-range-seg-btn active" data-range="today" type="button">Hari Ini</button>
+                <button class="time-range-seg-btn" data-range="7d" type="button">7 Hari</button>
+                <button class="time-range-seg-btn" data-range="30d" type="button">30 Hari</button>
+              </div>
             </div>
           </div>
 
@@ -2325,9 +2310,9 @@
   </div>
 
   <!-- Simulated PDF Generation Loading & Executive Document Preview Modal -->
-  <div class="modal-overlay" id="reportModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal-overlay" id="reportModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" style="display: none;">
     <div class="modal-content glass-panel" id="reportModalContent" style="max-width: 680px; width: 94vw; max-height: 90vh; overflow-y: auto; transition: max-width 0.3s ease;">
-      <button class="modal-close" id="closeModal" aria-label="Tutup modal">&times;</button>
+      <button class="modal-close" id="closeModal" onclick="closeReportModal()" aria-label="Tutup modal">&times;</button>
       
       <!-- State 1: Generating Loader -->
       <div id="reportLoaderState">
@@ -2335,7 +2320,7 @@
           <h2>Generating Mobility Snapshot Surabaya</h2>
           <p>Mengompilasi data telemetri, status sensor SITS, dan modul analitik kecerdasan buatan...</p>
         </div>
-        <div class="modal-body">
+        <div class="modal-body" style="display: flex; flex-direction: column; align-items: center; padding: 10px 0;">
           <div class="radial-loader">
             <svg viewBox="0 0 100 100">
               <circle class="loader-bg" cx="50" cy="50" r="42" />
@@ -2343,11 +2328,25 @@
             </svg>
             <div class="loader-percentage" id="loaderPercentage">0%</div>
           </div>
-          <div class="loader-status" id="loaderStatus">Mengunggah data telemetri persimpangan SITS...</div>
+          <div class="loader-status" id="loaderStatus" style="margin-top: 14px; font-size: 13px; color: var(--text-muted); text-align: center;">Mengunggah data telemetri persimpangan SITS...</div>
+          <button class="btn btn-ghost compact" id="btnCancelReportGen" onclick="closeReportModal()" type="button" style="margin-top: 18px;">Batal</button>
         </div>
       </div>
 
-      <!-- State 2: Tangible Executive Document Preview -->
+      <!-- State 2: Error State (Fallback & Retry) -->
+      <div id="reportErrorState" class="is-hidden" style="display: none; text-align: center; padding: 24px 12px;">
+        <div style="font-size: 42px; margin-bottom: 12px;">⚠️</div>
+        <h3 style="color: var(--danger); font-size: 18px; font-weight: 800; margin-bottom: 8px;">Gagal Menyusun Mobility Snapshot</h3>
+        <p id="reportErrorMessage" style="font-size: 13px; color: var(--text-muted); max-width: 480px; margin: 0 auto 20px auto; line-height: 1.5;">
+          Terjadi kendala saat menyambung ke server telemetri SITS.
+        </p>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+          <button class="btn btn-ghost" id="btnCancelReportError" onclick="closeReportModal()" type="button">Tutup</button>
+          <button class="btn btn-primary" id="btnRetryReportGen" type="button">Coba Lagi</button>
+        </div>
+      </div>
+
+      <!-- State 3: Tangible Executive Document Preview -->
       <div id="reportDocPreviewState" class="is-hidden" style="display: none;">
         <div class="doc-preview-wrapper" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-top: 8px;">
           <!-- Kop Resmi -->
@@ -2355,7 +2354,7 @@
             <div style="font-size: 11px; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; color: var(--text-muted);">PEMERINTAH KOTA SURABAYA — DINAS PERHUBUNGAN</div>
             <h3 style="margin: 4px 0; font-size: 17px; font-weight: 800; color: var(--primary-2); letter-spacing: -0.3px;">UPTD SITS SURABAYA INTELLIGENT TRANSPORT SYSTEM</h3>
             <p style="margin: 0; font-size: 11px; color: var(--text-muted);">Laporan Eksekutif Kinerja & Evaluasi Mobilitas Perkotaan Surabaya</p>
-            <div style="display: inline-block; margin-top: 8px; font-size: 10.5px; background: rgba(0, 229, 255, 0.1); border: 1px solid rgba(0, 229, 255, 0.25); padding: 3px 10px; border-radius: 99px; color: var(--primary-2); font-family: 'Share Tech Mono', monospace;">
+            <div id="repPreviewDocId" style="display: inline-block; margin-top: 8px; font-size: 10.5px; background: rgba(0, 229, 255, 0.1); border: 1px solid rgba(0, 229, 255, 0.25); padding: 3px 10px; border-radius: 99px; color: var(--primary-2); font-family: 'Share Tech Mono', monospace;">
               DOC-ID: SITS-EKS-2026/09/REC-0841 • TERVERIFIKASI SISTEM
             </div>
           </div>
@@ -2384,6 +2383,14 @@
             </div>
           </div>
 
+          <!-- Preview Canvas Grafik Tren Mobilitas -->
+          <div id="reportCanvasContainer" style="margin-bottom: 16px; width: 100%;">
+            <div style="font-size: 10.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;">
+              📈 Visualisasi Snapshot Tren Mobilitas Koridor (Canvas 2D)
+            </div>
+            <canvas id="reportPreviewCanvas" width="600" height="200" style="width: 100%; height: auto; max-height: 200px; border-radius: 8px; border: 1px solid var(--border); display: block; background: #0f172a; box-sizing: border-box;"></canvas>
+          </div>
+
           <!-- Rincian Catatan Analisis -->
           <div style="font-size: 11.5px; color: var(--text-muted); line-height: 1.5; background: rgba(0, 0, 0, 0.15); padding: 10px 14px; border-radius: 8px; border-left: 3px solid var(--primary-2);">
             <strong>Catatan Analisis Algoritma AI OmniTRAF:</strong>
@@ -2393,7 +2400,7 @@
 
         <!-- Tombol Aksi Bawah Dokumen -->
         <div class="doc-preview-actions" style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap;">
-          <button class="btn btn-ghost" id="btnClosePreviewDoc" type="button">Tutup Pratinjau</button>
+          <button class="btn btn-ghost" id="btnClosePreviewDoc" onclick="closeReportModal()" type="button">Tutup Pratinjau</button>
           <button class="btn btn-primary" id="btnPrintReportDoc" type="button" style="display: inline-flex; align-items: center; gap: 6px;">
             🖨️ Cetak / Simpan PDF
           </button>

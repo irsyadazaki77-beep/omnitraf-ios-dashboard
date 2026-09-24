@@ -11,6 +11,47 @@ export class SoundManager {
     this.volume = 0.5;
   }
 
+  init() {
+    // Unlock AudioContext on first user interaction to comply with browser autoplay policy
+    const unlock = () => {
+      this._ensureContext();
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('keydown', unlock);
+      window.removeEventListener('touchstart', unlock);
+    };
+    window.addEventListener('click', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    window.addEventListener('touchstart', unlock, { once: true });
+
+    const muteBtn = document.getElementById("audioToggle") || 
+                    document.getElementById("btnToggleAudio") || 
+                    document.getElementById("soundToggle");
+    if (muteBtn) {
+      const updateVisual = (unmuted) => {
+        muteBtn.classList.toggle("muted", !unmuted);
+        const icon = muteBtn.querySelector(".audio-icon, .squircle-btn-icon");
+        if (icon) {
+          icon.textContent = unmuted ? "🔊" : "🔇";
+        }
+        muteBtn.setAttribute("aria-label", unmuted ? "Nonaktifkan suara" : "Aktifkan suara");
+        muteBtn.setAttribute("title", unmuted ? "Audio Aktif (Klik untuk Mute)" : "Audio Nonaktif (Klik untuk Unmute)");
+      };
+
+      updateVisual(!this.isMuted);
+
+      muteBtn.addEventListener("click", () => {
+        const isUnmuted = this.toggleMute();
+        updateVisual(isUnmuted);
+        if (isUnmuted) {
+          this.play('click');
+        }
+        if (typeof window.showToast === "function") {
+          window.showToast(`Audio Sistem: ${isUnmuted ? 'Aktif' : 'Nonaktif'}`);
+        }
+      });
+    }
+  }
+
   _ensureContext() {
     if (!this.audioCtx) {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
