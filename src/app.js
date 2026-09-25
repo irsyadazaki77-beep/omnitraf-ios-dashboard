@@ -1,30 +1,18 @@
 /**
  * OmniTRAF Surabaya - SITS Intelligent Traffic Control Engine
- * Entry point utama aplikasi yang mengorkestrasikan seluruh modular controller:
- * - State Management (stateStore.js)
- * - Network Gateway (socketClient.js)
- * - GIS Mapping (mapManager.js)
- * - Reactive Traffic Engine (trafficEngine.js)
- * - Canvas YOLOv8 Vision (cctvController.js)
- * - Staff Coordination Chat (chatSystem.js)
- * - Announcement Ticker (uiMarquee.js)
- * - Navigation & Shell (navigationController.js)
- * - Signals & Webster (signalsController.js)
- * - Incident & Context Menu (incidentController.js)
- * - Emergency Preemption & 112 (emergencyController.js)
- * - Tour & Keyboard Shortcuts (tourShortcutsController.js)
- * - Analytics & AI Forecast (analyticsController.js)
- * - IoT Devices & Latency (deviceController.js)
- * - Reports & Executive Export (reportController.js)
- * - PWA & Offline Support (pwaController.js)
+ * Entry point utama aplikasi yang mengorkestrasikan seluruh modular controller dengan:
+ * - Lazy initialization untuk view berat (Map, CCTV, Analytics, Reports, Devices, dll)
+ * - Single initialization & idempotent lifecycle guards
+ * - View transition activate/deactivate lifecycle & deterministic cleanup
+ * - Internal runtime diagnostics integration
  */
 
 import { stateStore } from './core/stateStore.js';
 import { soundManager } from './core/soundManager.js';
 import { socketClient } from './core/socketClient.js';
-import { mapManager } from './modules/mapManager.js';
+import { diagnostics } from './core/diagnostics.js';
+import { runReleaseHealthCheck } from './core/healthCheck.js';
 import { trafficEngine } from './modules/trafficEngine.js';
-import { cctvController } from './modules/cctvController.js';
 import { chatSystem } from './modules/chatSystem.js';
 import { uiMarquee } from './modules/uiMarquee.js';
 
@@ -37,76 +25,157 @@ import { analyticsController } from './controllers/analyticsController.js';
 import { deviceController } from './controllers/deviceController.js';
 import { reportController } from './controllers/reportController.js';
 import { pwaController } from './controllers/pwaController.js';
+import { mapManager } from './modules/mapManager.js';
+import { cctvController } from './modules/cctvController.js';
 
 export class App {
   constructor() {
     this.isInitialized = false;
+    this.activeControllers = new Set();
+    this.currentView = 'dashboard';
   }
 
   init() {
     if (this.isInitialized) return;
     this.isInitialized = true;
 
-    console.info("🚦 [OmniTRAF] Menginisialisasi SITS Command Center Surabaya...");
+    console.info("🚦 [OmniTRAF] Menginisialisasi SITS Command Center Surabaya Kernel...");
 
-    // 1. Inisialisasi Socket & Network Gateway
+    // 0. Global Frontend Error Boundary, Accessibility & Health Check (Phase 9 & 10)
+    this._initGlobalErrorBoundary();
+    this._initAccessibleModalHandlers();
+    runReleaseHealthCheck();
+
+    // 1. Core Network & Socket Infrastructure
     if (socketClient && typeof socketClient.getSocket === 'function') {
       socketClient.getSocket();
     }
 
-    // 2. Inisialisasi Core Modules dengan safe guards
-    if (soundManager && typeof soundManager.init === 'function') {
-      soundManager.init();
-    }
-    if (uiMarquee && typeof uiMarquee.init === 'function') {
-      uiMarquee.init();
-    }
-    if (chatSystem && typeof chatSystem.init === 'function') {
-      chatSystem.init();
-    }
-    if (mapManager && typeof mapManager.init === 'function') {
-      mapManager.init();
-    }
-    if (trafficEngine && typeof trafficEngine.init === 'function') {
-      trafficEngine.init();
-    }
-    if (cctvController && typeof cctvController.init === 'function') {
-      cctvController.init();
-    }
+    // 2. Core UI & Shell Modules (First Paint Critical Path)
+    if (soundManager && typeof soundManager.init === 'function') soundManager.init();
+    if (uiMarquee && typeof uiMarquee.init === 'function') uiMarquee.init();
+    if (chatSystem && typeof chatSystem.init === 'function') chatSystem.init();
+    if (navigationController && typeof navigationController.init === 'function') navigationController.init();
+    if (tourShortcutsController && typeof tourShortcutsController.init === 'function') tourShortcutsController.init();
+    if (pwaController && typeof pwaController.init === 'function') pwaController.init();
+    if (trafficEngine && typeof trafficEngine.init === 'function') trafficEngine.init();
 
-    // 3. Inisialisasi Modular Controllers dengan safe guards
-    if (navigationController && typeof navigationController.init === 'function') {
-      navigationController.init();
-    }
-    if (signalsController && typeof signalsController.init === 'function') {
-      signalsController.init();
-    }
-    if (incidentController && typeof incidentController.init === 'function') {
-      incidentController.init();
-    }
-    if (emergencyController && typeof emergencyController.init === 'function') {
-      emergencyController.init();
-    }
-    if (tourShortcutsController && typeof tourShortcutsController.init === 'function') {
-      tourShortcutsController.init();
-    }
-    if (analyticsController && typeof analyticsController.init === 'function') {
-      analyticsController.init();
-    }
-    if (deviceController && typeof deviceController.init === 'function') {
-      deviceController.init();
-    }
-    if (reportController && typeof reportController.init === 'function') {
-      reportController.init();
-    }
-    if (pwaController && typeof pwaController.init === 'function') {
-      pwaController.init();
-    }
+    // 3. Lazy View Activator Subscription
+    stateStore.subscribe('state:currentView', ({ value, prev }) => {
+      this._handleViewTransition(value, prev);
+    });
 
-    // 4. Ekspos Bridge Global untuk Integrasi DOM & Inline Handlers
+    // Initial View Activate
+    const initialView = stateStore.getState().currentView || 'dashboard';
+    this._handleViewTransition(initialView, null);
+
+    // 4. Expose Global Bridges & Terminal Diagnostics
     this._exposeGlobalBridges();
 
-    console.info("✓ [OmniTRAF] Seluruh subsistem SITS Surabaya siap dan online.");
+    console.info("✓ [OmniTRAF] Kernel SITS Surabaya beroperasi secara optimal.");
+  }
+
+  /**
+   * Orchestrate Lazy Init & View Lifecycle
+   */
+  _handleViewTransition(newView, oldView) {
+    this.currentView = newView;
+
+    // Deactivate previous controllers if needed
+    if (oldView && oldView !== newView) {
+      this._deactivateViewModules(oldView);
+    }
+
+    // Lazy load & activate target view modules
+    this._activateViewModules(newView);
+  }
+
+  _activateViewModules(view) {
+    diagnostics.recordInit('view:' + view);
+
+    switch (view) {
+      case 'dashboard':
+        this._safeInitAndActivate('mapManager', mapManager);
+        this._safeInitAndActivate('cctvController', cctvController);
+        this._safeInitAndActivate('signalsController', signalsController);
+        this._safeInitAndActivate('incidentController', incidentController);
+        this._safeInitAndActivate('emergencyController', emergencyController);
+        break;
+
+      case 'map':
+        this._safeInitAndActivate('mapManager', mapManager);
+        break;
+
+      case 'cctv':
+        this._safeInitAndActivate('cctvController', cctvController);
+        break;
+
+      case 'signals':
+        this._safeInitAndActivate('signalsController', signalsController);
+        break;
+
+      case 'incidents':
+        this._safeInitAndActivate('incidentController', incidentController);
+        break;
+
+      case 'emergencies':
+        this._safeInitAndActivate('emergencyController', emergencyController);
+        break;
+
+      case 'analytics':
+      case 'prediction':
+        this._safeInitAndActivate('analyticsController', analyticsController);
+        break;
+
+      case 'devices':
+        this._safeInitAndActivate('deviceController', deviceController);
+        break;
+
+      case 'reports':
+        this._safeInitAndActivate('reportController', reportController);
+        break;
+
+      default:
+        break;
+    }
+  }
+
+  _deactivateViewModules(view) {
+    switch (view) {
+      case 'cctv':
+        if (cctvController && typeof cctvController.deactivate === 'function') {
+          cctvController.deactivate();
+        }
+        break;
+      case 'analytics':
+      case 'prediction':
+        if (analyticsController && typeof analyticsController.deactivate === 'function') {
+          analyticsController.deactivate();
+        }
+        break;
+      case 'devices':
+        if (deviceController && typeof deviceController.deactivate === 'function') {
+          deviceController.deactivate();
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  _safeInitAndActivate(name, ctrl) {
+    if (!ctrl) return;
+    try {
+      if (typeof ctrl.init === 'function') {
+        ctrl.init();
+      }
+      if (typeof ctrl.activate === 'function') {
+        ctrl.activate();
+      }
+      this.activeControllers.add(name);
+    } catch (err) {
+      console.warn(`[App] Failed to init/activate ${name}:`, err);
+    }
   }
 
   _exposeGlobalBridges() {
@@ -114,13 +183,24 @@ export class App {
     window.mapManager = mapManager;
     window.trafficEngine = trafficEngine;
     window.soundManager = soundManager;
+    window.diagnostics = diagnostics;
 
     window.resolveDynamicIncident = (id) => {
-      incidentController.resolveIncident(id);
+      if (incidentController && typeof incidentController.resolveIncident === 'function') {
+        incidentController.resolveIncident(id);
+      }
+    };
+
+    window.acknowledgeIncident = (id) => {
+      if (incidentController && typeof incidentController.updateIncidentStatus === 'function') {
+        incidentController.updateIncidentStatus(id, "ACKNOWLEDGED");
+      }
     };
 
     window.openIncidentDetail = (id, loc, time, desc) => {
-      incidentController.openIncidentDetail(id, loc, time, desc);
+      if (incidentController && typeof incidentController.openIncidentDetail === 'function') {
+        incidentController.openIncidentDetail(id, loc, time, desc);
+      }
     };
 
     window.dismissAiRecommendation = () => {
@@ -138,6 +218,9 @@ export class App {
     window.showToast = (msg, type = "normal") => {
       this._showToastNotification(msg, type);
     };
+
+    // Diagnostic console helpers
+    window.getDiagnostics = () => diagnostics.getMetrics();
   }
 
   _showToastNotification(msg, type = "normal") {
@@ -180,11 +263,44 @@ export class App {
       }, 3000);
     }
   }
+
+  _initGlobalErrorBoundary() {
+    window.addEventListener('error', (event) => {
+      console.warn("🛡️ [OmniTRAF Boundary] Global Error Handled:", event.error || event.message);
+      diagnostics.recordApiError();
+      this._showToastNotification("Terjadi kendala pada sistem UI. Operasi dilanjutkan secara aman.", "warning");
+      event.preventDefault();
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      console.warn("🛡️ [OmniTRAF Boundary] Unhandled Promise Rejection:", event.reason);
+      diagnostics.recordApiError();
+      this._showToastNotification("Penundaan koneksi data terdeteksi. Mencoba ulang...", "warning");
+      event.preventDefault();
+    });
+  }
+
+  _initAccessibleModalHandlers() {
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const activeModals = document.querySelectorAll('.modal.active, .modal.show, .modal-backdrop.active, #emergencyModal.show, .dialog.open');
+        activeModals.forEach(modal => {
+          modal.classList.remove('active', 'show', 'open');
+          if (modal.style) modal.style.display = 'none';
+        });
+        const drawer = document.getElementById('sidebar');
+        const backdrop = document.getElementById('drawerBackdrop');
+        if (drawer && drawer.classList.contains('open')) {
+          drawer.classList.remove('open');
+          if (backdrop) backdrop.classList.remove('show');
+        }
+      }
+    });
+  }
 }
 
 export const app = new App();
 
-// Auto-start on DOMContentLoaded
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => app.init());
 } else {

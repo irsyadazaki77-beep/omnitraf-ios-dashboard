@@ -10,13 +10,18 @@ import { socketClient } from '../core/socketClient.js';
 import { TRAFFIC_LIMITS } from '../config/trafficConfig.js';
 import { mapManager } from '../modules/mapManager.js';
 import { SITS_INTERSECTIONS } from '../config/surabayaCoords.js';
+import { commandLayer } from '../core/commandLayer.js';
 
 export class SignalsController {
   constructor() {
     this.isGridView = false;
+    this._isInitialized = false;
   }
 
   init() {
+    if (this._isInitialized) return;
+    this._isInitialized = true;
+
     this._bindDashboardSignalSlider();
     this._bindSignalsViewSliders();
     this._bindWebsterCalculator();
@@ -75,17 +80,25 @@ export class SignalsController {
 
       stateStore.setState({ greenSplitWonokromo: val });
       this._updateDashboardTimeline(val);
-
-      socketClient.emit('green-split:update', {
-        value: val,
-        intersectionId: "node-wonokromo"
-      });
     });
 
-    slider.addEventListener("change", () => {
+    slider.addEventListener("change", async (e) => {
+      const val = parseInt(e.target.value, 10);
       soundManager.play('click');
-      if (typeof window.showToast === "function") {
-        window.showToast(`Durasi Green Split Simpang Wonokromo disetel ke ${slider.value}s.`);
+      try {
+        await commandLayer.dispatchCommand({
+          action: 'green-split:update',
+          targetType: 'intersection',
+          targetId: 'node-wonokromo',
+          payload: { value: val }
+        }, false); // low-risk
+        if (typeof window.showToast === "function") {
+          window.showToast(`✓ Durasi Green Split Simpang Wonokromo disetel ke ${val}s.`);
+        }
+      } catch (err) {
+        if (typeof window.showToast === "function") {
+          window.showToast(`❌ Gagal menyetel Green Split: ${err.message}`, "danger");
+        }
       }
     });
   }
@@ -122,11 +135,26 @@ export class SignalsController {
         }
       });
 
-      slider.addEventListener("change", (e) => {
+      slider.addEventListener("change", async (e) => {
         const val = parseInt(e.target.value, 10);
         soundManager.play('click');
-        if (typeof window.showToast === "function") {
-          window.showToast(`Fase Sinyal disesuaikan ke ${val} detik.`);
+        const nodeIds = ["node-wonokromo", "node-tunjungan", "node-darmo", "node-margorejo"];
+        const targetId = nodeIds[idx] || "node-wonokromo";
+
+        try {
+          await commandLayer.dispatchCommand({
+            action: 'green-split:update',
+            targetType: 'intersection',
+            targetId,
+            payload: { value: val }
+          }, false); // low-risk
+          if (typeof window.showToast === "function") {
+            window.showToast(`✓ Sinyal ${targetId} disesuaikan ke ${val} detik.`);
+          }
+        } catch (err) {
+          if (typeof window.showToast === "function") {
+            window.showToast(`❌ Gagal menyesuaikan sinyal: ${err.message}`, "danger");
+          }
         }
       });
     });
@@ -137,26 +165,43 @@ export class SignalsController {
    */
   _bindForceOverrideButtons() {
     document.querySelectorAll(".force-override-btn").forEach((btn, idx) => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", async () => {
         const nodeIds = ["node-wonokromo", "node-tunjungan", "node-darmo", "node-margorejo"];
         const targetId = nodeIds[idx] || "node-wonokromo";
         const card = btn.closest(".widget");
         const name = card ? (card.querySelector("h2")?.textContent || targetId) : targetId;
 
-        socketClient.emit('signal:override', { intersectionId: targetId, duration: 45 });
-        
-        btn.textContent = "✓ Override Aktif (45s)";
-        btn.classList.add("btn-danger");
-        soundManager.play('alert');
+        btn.disabled = true;
+        btn.textContent = "PROCESSING...";
 
-        if (typeof window.showToast === "function") {
-          window.showToast(`🛠️ Manual Override Aktif: ${name} dikunci HIJAU 45 detik!`, "warning");
-        }
+        try {
+          await commandLayer.dispatchCommand({
+            action: 'signal:override',
+            targetType: 'intersection',
+            targetId,
+            payload: { duration: 45 }
+          }, true); // High risk! Matches security prompt requirement.
 
-        setTimeout(() => {
+          btn.textContent = "✓ Override Aktif (45s)";
+          btn.classList.add("btn-danger");
+          soundManager.play('alert');
+          if (typeof window.showToast === "function") {
+            window.showToast(`🛠️ Manual Override Aktif: ${name} dikunci HIJAU 45 detik!`, "warning");
+          }
+        } catch (err) {
+          console.warn("[SignalsController] Override failed:", err);
           btn.textContent = "Terapkan Manual Override";
           btn.classList.remove("btn-danger");
-        }, 5000);
+          if (typeof window.showToast === "function") {
+            window.showToast(`❌ Override Ditolak: ${err.message}`, "danger");
+          }
+        } finally {
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = "Terapkan Manual Override";
+            btn.classList.remove("btn-danger");
+          }, 5000);
+        }
       });
     });
   }

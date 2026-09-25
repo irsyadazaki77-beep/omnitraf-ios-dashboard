@@ -9,6 +9,7 @@ import { soundManager } from '../core/soundManager.js';
 export class TourShortcutsController {
   constructor() {
     this.currentStep = 0;
+    this._isInitialized = false;
     this.tourSteps = [
       {
         title: "Langkah 1: Topbar Status & Operasional SITS",
@@ -34,6 +35,9 @@ export class TourShortcutsController {
   }
 
   init() {
+    if (this._isInitialized) return;
+    this._isInitialized = true;
+
     this._bindQuickTourTooltip();
     this._bindQuickTourOverlay();
     this._bindShortcutsModal();

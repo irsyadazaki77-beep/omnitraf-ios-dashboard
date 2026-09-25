@@ -11,9 +11,13 @@ import { mapManager } from '../modules/mapManager.js';
 export class NavigationController {
   constructor() {
     this.clockInterval = null;
+    this._isInitialized = false;
   }
 
   init() {
+    if (this._isInitialized) return;
+    this._isInitialized = true;
+
     this._initRouter();
     this._initMobileNav();
     this._initThemeToggle();

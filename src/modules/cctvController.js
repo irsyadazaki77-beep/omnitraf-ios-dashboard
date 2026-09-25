@@ -1,13 +1,14 @@
 /**
- * OmniTRAF Surabaya - CCTV Controller & AI Vision Canvas Renderer
- * Mendengarkan stream real-time WebSockets berisi data bounding box [{x, y, w, h, class, confidence}]
- * dari server backend, dan menggambar visualisasi deteksi objek YOLOv8 secara langsung pada Canvas API.
- * Menggunakan sistem Interpolasi (Tweening / Lerp) 60 FPS dan estimasi lebar label matematis tanpa GPU bottleneck.
+ * OmniTRAF Surabaya - CCTV Controller & AI Vision Canvas Renderer (Phase 4)
+ * Menangani ingest data sensor kamera CCTV edge, estimasi kecerdasan lalu lintas (intelligence metrics),
+ * tracking objek YOLOv8 dengan filter smoothing, instrumentasi performa,
+ * deteksi anomali real-time, dan status kesehatan kamera (telemetry).
  */
 
 import { stateStore } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
 import { socketClient } from '../core/socketClient.js';
+import { commandLayer } from '../core/commandLayer.js';
 
 // Color map for YOLOv8 object classes
 const CLASS_COLORS = {
@@ -27,6 +28,13 @@ export class CctvCanvasRenderer {
     this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
     this.trackedBoxes = new Map();
     this.isVisible = true;
+
+    // Smoothing & validation history
+    this.lastFrameSeq = 0;
+    this.lastFrameTime = 0;
+    this.renderFps = 60;
+    this.fpsTimer = Date.now();
+    this.fpsCounter = 0;
   }
 
   /**
@@ -39,30 +47,34 @@ export class CctvCanvasRenderer {
   }
 
   /**
-   * Menerima target bounding box baru dari server WebSocket (dikirim per 300ms)
+   * Menerima target bounding box baru dari pipeline data terstruktur
    * dan mencatat target koordinat untuk diinterpolasi secara mulus di loop render 60 FPS.
-   * @param {Array} boxes
+   * @param {Array} boxes Bounding boxes YOLOv8
    */
   updateBoxes(boxes) {
     const incomingList = Array.isArray(boxes) ? boxes : [];
     const activeIds = new Set();
+    const alpha = 0.35; // Smoothing factor untuk tracking & confidence
 
     incomingList.forEach((box, index) => {
-      const boxId = box.id || `box-${index}`;
+      const boxId = box.trackId || box.id || `box-${index}`;
       activeIds.add(boxId);
 
       if (this.trackedBoxes.has(boxId)) {
         const existing = this.trackedBoxes.get(boxId);
+        
+        // Smoothing bounding box target (Lerp smoothing)
         existing.targetX = box.x;
         existing.targetY = box.y;
         existing.targetW = box.w;
         existing.targetH = box.h;
+        
+        // Rolling average smoothing untuk confidence
+        existing.confidence = Math.round(existing.confidence * (1 - alpha) + box.confidence * alpha);
         existing.class = box.class;
-        existing.confidence = box.confidence;
         existing.speedKmh = box.speedKmh;
 
-        // Jika terjadi lonjakan koordinat drastis (misal kendaraan me-reset progress dari 1 ke 0),
-        // lakukan snap instan agar tidak meluncur mundur di layar
+        // Snap instan jika terjadi perpindahan sangat drastis (reset lintasan)
         if (Math.abs(existing.targetX - existing.x) > 0.4 || Math.abs(existing.targetY - existing.y) > 0.4) {
           existing.x = existing.targetX;
           existing.y = existing.targetY;
@@ -70,7 +82,7 @@ export class CctvCanvasRenderer {
           existing.h = existing.targetH;
         }
       } else {
-        // Objek baru pertama kali terdeteksi
+        // Objek baru pertama kali terdeteksi (Inisialisasi)
         this.trackedBoxes.set(boxId, {
           id: boxId,
           x: box.x,
@@ -97,13 +109,16 @@ export class CctvCanvasRenderer {
   }
 
   /**
-   * Render frame kanvas 60 FPS dengan Lerp Tweening dan estimasi teks tanpa pemanggilan ctx.measureText()
+   * Render frame kanvas 60 FPS dengan Lerp Tweening & Overlay Intelijen AI
    * @param {boolean} isChaosMode
    * @param {boolean} isPaused
    * @param {boolean} showBoxes
    * @param {number} dt - Waktu delta antar frame dalam detik
+   * @param {Object} metrics - Derived intelligence metrics
+   * @param {Object} diagnostics - Performance diagnostics
+   * @param {string} status - Health Status (ONLINE, STALE, OFFLINE, DEGRADED)
    */
-  render(isChaosMode, isPaused, showBoxes, dt = 0.016) {
+  render(isChaosMode, isPaused, showBoxes, dt = 0.016, metrics = {}, diagnostics = {}, status = 'ONLINE') {
     if (!this.canvas || !this.ctx) {
       this.canvas = document.getElementById(this.canvasId);
       if (this.canvas) this.ctx = this.canvas.getContext('2d');
@@ -114,7 +129,16 @@ export class CctvCanvasRenderer {
     const w = this.canvas.width;
     const h = this.canvas.height;
 
-    // 1. Clear & Background Perspective Road Canvas
+    // 1. Hitung Render FPS Aktual
+    const now = Date.now();
+    this.fpsCounter++;
+    if (now - this.fpsTimer >= 1000) {
+      this.renderFps = Math.min(60, this.fpsCounter);
+      this.fpsCounter = 0;
+      this.fpsTimer = now;
+    }
+
+    // 2. Clear & Background Perspective Road Canvas
     ctx.fillStyle = '#070f1b';
     ctx.fillRect(0, 0, w, h);
 
@@ -144,9 +168,8 @@ export class CctvCanvasRenderer {
     });
     ctx.setLineDash([]); // Reset dash
 
-    // 2. Render Real-Time Bounding Boxes with Lerp Interpolation
+    // 3. Render Real-Time Bounding Boxes dengan Lerp Interpolation
     if (showBoxes && !isPaused && this.trackedBoxes.size > 0) {
-      // Faktor interpolasi eksponensial (Lerp speed 10x per detik)
       const lerpFactor = Math.min(1, dt * 10);
 
       this.trackedBoxes.forEach(box => {
@@ -166,7 +189,7 @@ export class CctvCanvasRenderer {
         const color = CLASS_COLORS[classKey] || '#00e5ff';
 
         // Bounding Box Fill Overlay
-        ctx.fillStyle = `${color}18`; // 10% opacity hex
+        ctx.fillStyle = `${color}18`; // 10% opacity
         ctx.fillRect(px, py, pw, ph);
 
         // Main Bounding Box Stroke
@@ -189,11 +212,9 @@ export class CctvCanvasRenderer {
         ctx.lineTo(px + pw, py + ph - bracketLen);
         ctx.stroke();
 
-        // Label Tag Fill (Class Name + Confidence Score)
-        const labelText = `${classKey.toUpperCase()} ${box.confidence || 95}%`;
-        
-        // Optimasi Performa: Hapus ctx.measureText() dan gunakan aproksimasi matematis (panjang * 6px + 10px padding)
-        const tagW = labelText.length * 6 + 10;
+        // Label Tag Fill (Class Name + Confidence Score + Speed)
+        const labelText = `${classKey.toUpperCase()} ${box.confidence || 95}% (${box.speedKmh || 40}km/h)`;
+        const tagW = labelText.length * 5.8 + 10;
         const tagH = 15;
 
         const tagY = py - tagH >= 0 ? py - tagH : py;
@@ -202,17 +223,16 @@ export class CctvCanvasRenderer {
 
         // Label Text
         ctx.fillStyle = '#000000';
-        ctx.font = 'bold 10px "Share Tech Mono", monospace, sans-serif';
+        ctx.font = 'bold 9px "Share Tech Mono", monospace';
         ctx.fillText(labelText, px + 4, tagY + 11);
       });
     }
 
-    // 3. Chaos Mode Distortions / Glitch Static Overlay
+    // 4. Chaos Mode Distortions / Glitch Static Overlay
     if (isChaosMode) {
       ctx.fillStyle = 'rgba(239, 68, 68, 0.08)';
       ctx.fillRect(0, 0, w, h);
 
-      // Random Scanline Glitch
       if (Math.random() < 0.6) {
         const scanY = Math.random() * h;
         const scanH = Math.random() * 8 + 2;
@@ -221,15 +241,15 @@ export class CctvCanvasRenderer {
       }
     }
 
-    // 4. Camera HUD Overlay (Watermark timestamp & SITS Edge AI Tag)
+    // 5. Camera HUD Overlay (Watermark timestamp & SITS Edge AI Tag)
     ctx.fillStyle = 'rgba(5, 11, 20, 0.85)';
-    ctx.fillRect(8, 8, 220, 22);
+    ctx.fillRect(8, 8, 230, 22);
     ctx.strokeStyle = 'rgba(0, 229, 255, 0.3)';
     ctx.lineWidth = 1;
-    ctx.strokeRect(8, 8, 220, 22);
+    ctx.strokeRect(8, 8, 230, 22);
 
     ctx.fillStyle = '#00e5ff';
-    ctx.font = 'bold 10px "Share Tech Mono", monospace, sans-serif';
+    ctx.font = 'bold 9.5px "Share Tech Mono", monospace';
     const nowStr = new Date().toLocaleTimeString('id-ID', { hour12: false }) + ' WIB';
     ctx.fillText(`SITS • ${this.cameraName.substring(0, 18)} • ${nowStr}`, 12, 23);
 
@@ -240,8 +260,96 @@ export class CctvCanvasRenderer {
     ctx.fill();
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 9px "Share Tech Mono", monospace, sans-serif';
+    ctx.font = 'bold 9px "Share Tech Mono", monospace';
     ctx.fillText(isChaosMode ? 'ALERT' : 'AI 60Hz', w - 68, 21);
+
+    // 6. Futuristic HUD Sidebar: Derived AI Intelligence Metrics Overlay
+    if (metrics && typeof metrics.vehicleCount !== 'undefined') {
+      const metricsPanelX = 8;
+      const metricsPanelY = 38;
+      const metricsPanelW = 145;
+      const metricsPanelH = 110;
+
+      ctx.fillStyle = 'rgba(5, 11, 20, 0.85)';
+      ctx.fillRect(metricsPanelX, metricsPanelY, metricsPanelW, metricsPanelH);
+      ctx.strokeStyle = isChaosMode ? 'rgba(239, 68, 68, 0.4)' : 'rgba(0, 229, 255, 0.3)';
+      ctx.strokeRect(metricsPanelX, metricsPanelY, metricsPanelW, metricsPanelH);
+
+      ctx.fillStyle = '#00e5ff';
+      ctx.font = 'bold 9px "Share Tech Mono", monospace';
+      ctx.fillText('EDGE AI INTELLIGENCE', metricsPanelX + 8, metricsPanelY + 14);
+      
+      // Divider
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.15)';
+      ctx.beginPath();
+      ctx.moveTo(metricsPanelX + 6, metricsPanelY + 18);
+      ctx.lineTo(metricsPanelX + metricsPanelW - 6, metricsPanelY + 18);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '8px "Share Tech Mono", monospace';
+      ctx.fillText(`VOLUME  : ${metrics.vehicleCount} Unit (Car:${metrics.carCount} Motor:${metrics.motorcycleCount})`, metricsPanelX + 8, metricsPanelY + 30);
+      ctx.fillText(`OCCUPY  : ${metrics.laneOccupancy}%`, metricsPanelX + 8, metricsPanelY + 42);
+      ctx.fillText(`QUEUE   : ${metrics.queueLengthMeters} Meter`, metricsPanelX + 8, metricsPanelY + 54);
+      ctx.fillText(`AVG SPD : ${metrics.estimatedAverageSpeed} Km/jam`, metricsPanelX + 8, metricsPanelY + 66);
+      
+      // Color-coded density
+      let densityColor = '#10b981'; // Green
+      if (metrics.trafficDensity > 75) densityColor = '#ef4444'; // Red
+      else if (metrics.trafficDensity > 45) densityColor = '#f59e0b'; // Yellow
+      
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText('DENSITY :', metricsPanelX + 8, metricsPanelY + 78);
+      ctx.fillStyle = densityColor;
+      ctx.fillText(`${metrics.trafficDensity}% (${metrics.estimatedAverageSpeed < 20 ? 'MACET' : metrics.trafficDensity > 70 ? 'PADAT' : 'LANCAR'})`, metricsPanelX + 54, metricsPanelY + 78);
+
+      // Risk index
+      let riskColor = '#10b981';
+      if (metrics.incidentRisk > 70) riskColor = '#ef4444';
+      else if (metrics.incidentRisk > 40) riskColor = '#f59e0b';
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText('RISK    :', metricsPanelX + 8, metricsPanelY + 90);
+      ctx.fillStyle = riskColor;
+      ctx.fillText(`${metrics.incidentRisk}% (${metrics.incidentRisk > 70 ? 'CRITICAL' : metrics.incidentRisk > 40 ? 'MED' : 'LOW'})`, metricsPanelX + 54, metricsPanelY + 90);
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText(`AI CONF : ${metrics.aiConfidence}%`, metricsPanelX + 8, metricsPanelY + 102);
+    }
+
+    // 7. Performance & Health Telemetry Diagnostic Footer Bar
+    if (diagnostics) {
+      const footerH = 14;
+      const footerY = h - footerH;
+
+      ctx.fillStyle = 'rgba(5, 11, 20, 0.9)';
+      ctx.fillRect(0, footerY, w, footerH);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.beginPath();
+      ctx.moveTo(0, footerY);
+      ctx.lineTo(w, footerY);
+      ctx.stroke();
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = 'bold 8px "Share Tech Mono", monospace';
+      
+      // Health state dot
+      let hColor = '#10b981'; // ONLINE
+      if (status === 'DEGRADED') hColor = '#f59e0b';
+      else if (status === 'STALE') hColor = '#ef4444';
+      else if (status === 'OFFLINE') hColor = '#64748b';
+
+      ctx.fillStyle = hColor;
+      ctx.beginPath();
+      ctx.arc(8, footerY + 7, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(`HEALTH: ${status}`, 15, footerY + 10);
+
+      ctx.fillStyle = '#64748b';
+      ctx.fillText(`RFPS: ${this.renderFps}Hz | LAT: ${diagnostics.averageLatencyMs || 8}ms | DROP: ${diagnostics.droppedFrameCount || 0} | AGE: ${diagnostics.lastPacketAge || 0}ms`, w - 215, footerY + 10);
+    }
   }
 }
 
@@ -254,6 +362,61 @@ export class CctvController {
     this.lastFrameTime = 0;
     this.activeCamId = 'cctvCanvas1';
 
+    // Advanced Pipeline properties
+    this.camerasRegistry = new Map([
+      ['dashCameraCanvas', { name: "Simpang Wonokromo (Frontage A. Yani)" }],
+      ['cctvCanvas1', { name: "Simpang Wonokromo (Frontage A. Yani)" }],
+      ['cctvCanvas2', { name: "Koridor Raya Darmo" }],
+      ['cctvCanvas3', { name: "Bundaran Waru (Gerbang Kota)" }],
+      ['cctvCanvas4', { name: "Simpang Margorejo - Jemursari" }],
+      ['cctvZoomCanvas', { name: "Zoom Feed View" }]
+    ]);
+
+    // Track active cameras metrics state
+    this.camerasState = new Map();
+    this.camerasRegistry.forEach((val, id) => {
+      this.camerasState.set(id, {
+        id,
+        name: val.name,
+        status: 'ONLINE',
+        lastFrameAt: Date.now(),
+        consecutiveFailures: 0,
+        metrics: {
+          vehicleCount: 0,
+          carCount: 0,
+          motorcycleCount: 0,
+          busCount: 0,
+          truckCount: 0,
+          ambulanceCount: 0,
+          personCount: 0,
+          laneOccupancy: 0,
+          queueLengthMeters: 0,
+          estimatedAverageSpeed: 0,
+          trafficDensity: 0,
+          incidentRisk: 0,
+          aiConfidence: 96
+        },
+        shortWindowHistory: [],
+        diagnostics: {
+          droppedFrameCount: 0,
+          averageLatencyMs: 8,
+          lastPacketAge: 0,
+          activeTracks: 0
+        }
+      });
+    });
+
+    // Anomaly Engine tracking
+    this.activeAnomalies = new Map(); // key -> anomalyEvent
+    this.anomalyCooldowns = new Map(); // key -> lastTriggeredTime
+    this.autoCreateConfig = {
+      EMERGENCY_VEHICLE_DETECTED: true,
+      CRITICAL_QUEUE_DETECTED: false,
+      CONGESTION_SPIKE: false,
+      STOPPED_VEHICLE_ON_LANE: true,
+      CAMERA_STALE_ALERT: false
+    };
+
     this._setupStoreListeners();
   }
 
@@ -263,10 +426,16 @@ export class CctvController {
     });
 
     stateStore.subscribe('state:cctvBoxesVisible', ({ value }) => {
-      // Broadcast or update state toggle
       const btnToggleCV = document.getElementById("btnToggleCVBoxes");
       if (btnToggleCV) {
         btnToggleCV.textContent = value ? "Sembunyikan Overlay AI" : "Tampilkan Overlay AI";
+      }
+    });
+
+    stateStore.subscribe('state:cctvPaused', ({ value }) => {
+      const btnPlayPause = document.getElementById("btnPlayPauseCctv");
+      if (btnPlayPause) {
+        btnPlayPause.innerHTML = value ? '<span class="btn-icon">▶</span> Putar' : '<span class="btn-icon">⏸</span> Jeda';
       }
     });
   }
@@ -275,26 +444,20 @@ export class CctvController {
    * Inisialisasi seluruh renderer CCTV dan koneksi WebSocket
    */
   init() {
-    console.info("🚀 [CctvController] Menginisialisasi Real-Time Canvas AI Vision Renderer...");
+    console.info("🚀 [CctvController] Menginisialisasi High-Fidelity Edge AI Pipeline & Renderer...");
 
-    const cameraConfig = [
-      { id: "dashCameraCanvas", name: "Simpang Wonokromo (Frontage A. Yani)" },
-      { id: "cctvCanvas1", name: "Simpang Wonokromo (Frontage A. Yani)" },
-      { id: "cctvCanvas2", name: "Koridor Raya Darmo" },
-      { id: "cctvCanvas3", name: "Bundaran Waru (Gerbang Kota)" },
-      { id: "cctvCanvas4", name: "Simpang Margorejo - Jemursari" },
-      { id: "cctvZoomCanvas", name: "Zoom Feed View" }
-    ];
-
-    cameraConfig.forEach(cfg => {
-      const el = document.getElementById(cfg.id);
+    this.camerasRegistry.forEach((val, id) => {
+      const el = document.getElementById(id);
       if (el) {
-        const renderer = new CctvCanvasRenderer(cfg.id, cfg.name);
-        this.renderers.set(cfg.id, renderer);
+        // Prevent duplicate rendering attachments
+        if (!this.renderers.has(id)) {
+          const renderer = new CctvCanvasRenderer(id, val.name);
+          this.renderers.set(id, renderer);
+        }
       }
     });
 
-    // Remove legacy DOM bounding boxes if present
+    // Remove legacy DOM bounding boxes if present (fully standardizing on Canvas pipeline)
     document.querySelectorAll(".cv-rect").forEach(el => el.remove());
 
     this._connectSocketStream();
@@ -302,38 +465,53 @@ export class CctvController {
     this._bindMultiCameraSwitcher();
     this._startAnimationLoop();
     this._startWatermarkClock();
+    this._startHealthTelemetryWatchdog();
   }
 
   /**
    * Menghubungkan ke Socket.io stream server untuk event `cctv:vision-update`
-   * dengan fallback local generator jika server offline.
+   * Memproses frame melalui pipeline terstruktur: ingestion → validation → tracking → metrics → stateStore → UI
    */
   _connectSocketStream() {
-    let lastReceivedTime = 0;
+    this.latestFramePayload = null;
+    this.lastProcessedSeq = 0;
+    this.lastReceivedTime = Date.now();
 
     socketClient.on('cctv:vision-update', (framePayload) => {
-      if (!framePayload) return;
-      lastReceivedTime = Date.now();
-      this.renderers.forEach((renderer, camId) => {
-        const boxes = framePayload[camId] || framePayload['dashCameraCanvas'] || [];
-        renderer.updateBoxes(boxes);
-      });
+      this._ingestFramePipeline(framePayload, 'server');
     });
 
     // Local fallback generator for offline / standalone demonstration
-    const classes = ['car', 'bus', 'truck', 'motorcycle', 'ambulance'];
-    const localVehicles = [
-      { id: 'v0', lane: 0, progress: 0.15, class: 'ambulance', speed: 0.012, conf: 98 },
-      { id: 'v1', lane: 1, progress: 0.45, class: 'car', speed: 0.009, conf: 95 },
-      { id: 'v2', lane: 2, progress: 0.70, class: 'bus', speed: 0.007, conf: 94 },
-      { id: 'v3', lane: 3, progress: 0.85, class: 'motorcycle', speed: 0.011, conf: 92 }
-    ];
+    // Runs when socket is disconnected or fails to send updates
+    const localVehicles = new Map();
+    this.camerasRegistry.forEach((val, id) => {
+      localVehicles.set(id, [
+        { id: `${id}-v0`, lane: 0, progress: 0.15, class: 'ambulance', speed: 0.012, conf: 98 },
+        { id: `${id}-v1`, lane: 1, progress: 0.45, class: 'car', speed: 0.009, conf: 95 },
+        { id: `${id}-v2`, lane: 2, progress: 0.70, class: 'bus', speed: 0.007, conf: 94 },
+        { id: `${id}-v3`, lane: 3, progress: 0.85, class: 'motorcycle', speed: 0.011, conf: 92 }
+      ]);
+    });
 
     setInterval(() => {
-      // Jika dalam 1.5 detik tidak ada stream dari server, jalankan local fallback
-      if (Date.now() - lastReceivedTime > 1500) {
-        const isChaos = stateStore.getState().isChaosMode;
-        const boxes = localVehicles.map(v => {
+      const connStatus = stateStore.getState().connectionStatus;
+      // Do not run local simulation if online and connected
+      if (connStatus === 'connected' || connStatus === 'resyncing') {
+        return;
+      }
+
+      // Standalone simulation mode
+      const isChaos = stateStore.getState().isChaosMode;
+      const timestamp = Date.now();
+      this.lastProcessedSeq++;
+
+      const camerasData = {};
+
+      this.camerasRegistry.forEach((val, camId) => {
+        const vehicles = localVehicles.get(camId) || [];
+        const detections = [];
+
+        vehicles.forEach(v => {
           v.progress += isChaos ? v.speed * 0.3 : v.speed;
           if (v.progress > 1.0) {
             v.progress = 0;
@@ -346,11 +524,17 @@ export class CctvController {
           const x = vx + (bx - vx) * t;
           const y = vy + (1.0 - vy) * t;
           const scale = 0.2 + t * 0.8;
-          const w = (v.class === 'bus' ? 0.16 : v.class === 'ambulance' ? 0.14 : 0.12) * scale;
-          const h = (v.class === 'bus' ? 0.12 : v.class === 'ambulance' ? 0.10 : 0.09) * scale;
+          
+          let baseW = 0.12, baseH = 0.09;
+          if (v.class === 'bus') { baseW = 0.16; baseH = 0.12; }
+          else if (v.class === 'ambulance') { baseW = 0.14; baseH = 0.10; }
 
-          return {
+          const w = baseW * scale;
+          const h = baseH * scale;
+
+          detections.push({
             id: v.id,
+            trackId: v.id,
             class: v.class,
             confidence: v.conf,
             x: Math.max(0.01, Math.min(0.95, x - w / 2)),
@@ -358,12 +542,411 @@ export class CctvController {
             w,
             h,
             speedKmh: Math.round((isChaos ? 12 : 45) + Math.random() * 4)
-          };
+          });
         });
 
-        this.renderers.forEach(renderer => renderer.updateBoxes(boxes));
-      }
+        camerasData[camId] = {
+          cameraId: camId,
+          timestamp: timestamp,
+          sequence: this.lastProcessedSeq,
+          fps: isChaos ? 18 : 30,
+          resolution: '1920x1080',
+          source: 'Local Simulation Fallback',
+          processingLatencyMs: isChaos ? 28 : 5,
+          streamStatus: isChaos ? 'DEGRADED' : 'ONLINE',
+          detections: detections
+        };
+      });
+
+      const fallbackPayload = {
+        seq: this.lastProcessedSeq,
+        timestamp: timestamp,
+        source: 'local',
+        cameras: camerasData
+      };
+
+      this._ingestFramePipeline(fallbackPayload, 'local');
     }, 300);
+  }
+
+  /**
+   * Pipeline Utama: ingestion → validation → tracking → metrics → stateStore → UI
+   */
+  _ingestFramePipeline(framePayload, source = 'server') {
+    if (!framePayload) return;
+
+    // 1. Ingestion
+    const incomingSeq = framePayload.seq || 0;
+    const timestamp = framePayload.timestamp || Date.now();
+
+    // 2. Validation & Frame-Dropping Guard
+    if (incomingSeq > 0 && incomingSeq < this.lastProcessedSeq) {
+      // Out of order frame, drop it
+      return;
+    }
+
+    const frameAge = Date.now() - timestamp;
+    if (frameAge > 3000) {
+      // Stale network frame backlog, drop it (backpressure)
+      return;
+    }
+
+    this.lastProcessedSeq = incomingSeq;
+    this.latestFramePayload = framePayload;
+    this.lastReceivedTime = Date.now();
+
+    // 3. Process each camera frame
+    const dataMap = framePayload.cameras || framePayload;
+    
+    this.camerasState.forEach((cam, camId) => {
+      const camFrame = dataMap[camId] || dataMap['dashCameraCanvas'] || null;
+      if (!camFrame) return;
+
+      const detections = Array.isArray(camFrame) ? camFrame : (camFrame.detections || []);
+      const sequence = camFrame.sequence || incomingSeq;
+      const latency = camFrame.processingLatencyMs || 8;
+      const status = camFrame.streamStatus || 'ONLINE';
+
+      // Parse & Validate detection objects (Ignore malformed payloads)
+      const validDetections = detections.filter(d => {
+        return d && typeof d.x === 'number' && typeof d.y === 'number' && typeof d.w === 'number' && typeof d.h === 'number';
+      });
+
+      // Update renderer targeted positions
+      const renderer = this.renderers.get(camId);
+      if (renderer) {
+        renderer.updateBoxes(validDetections);
+      }
+
+      // 4. Calculate Derived Intelligence Metrics
+      const metrics = this._calculateDerivedIntelligence(validDetections, isChaosMode => stateStore.getState().isChaosMode);
+
+      // 5. Update Health Telemetry & Performance Diagnostic State
+      cam.status = status;
+      cam.lastFrameAt = Date.now();
+      cam.consecutiveFailures = 0;
+      cam.metrics = metrics;
+      cam.diagnostics = {
+        droppedFrameCount: cam.diagnostics.droppedFrameCount,
+        averageLatencyMs: Math.round(cam.diagnostics.averageLatencyMs * 0.9 + latency * 0.1),
+        lastPacketAge: frameAge,
+        activeTracks: validDetections.length
+      };
+
+      // Store window aggregation history (rolling 10 items for graph trend lines)
+      cam.shortWindowHistory.push(metrics.vehicleCount);
+      if (cam.shortWindowHistory.length > 10) {
+        cam.shortWindowHistory.shift();
+      }
+
+      // 6. Evaluate Anomaly Detection Rules
+      this._evaluateAnomalyRules(camId, cam.name, metrics);
+
+      // Sync specific camera state to UI components
+      this._updateCameraDomHUD(camId, cam);
+    });
+
+    // Update global StateStore with full aggregated CCTV metrics
+    stateStore.setState({
+      cctvVisionData: framePayload,
+      cctvCamerasMetrics: Object.fromEntries(this.camerasState.entries())
+    }, { source, emitGeneric: false });
+  }
+
+  /**
+   * Menghitung Metrik Kecerdasan Buatan Terderivasi (AI Derived Metrics)
+   */
+  _calculateDerivedIntelligence(detections, isChaosEvaluator) {
+    const isChaos = isChaosEvaluator();
+    const counts = { car: 0, bus: 0, truck: 0, motorcycle: 0, ambulance: 0, person: 0 };
+    let speedSum = 0;
+    let confidenceSum = 0;
+
+    detections.forEach(d => {
+      const cls = (d.class || 'car').toLowerCase();
+      if (cls in counts) {
+        counts[cls]++;
+      }
+      speedSum += d.speedKmh || 42;
+      confidenceSum += d.confidence || 95;
+    });
+
+    const totalCount = counts.car + counts.bus + counts.truck + counts.motorcycle + counts.ambulance;
+    const avgSpeed = totalCount > 0 ? Math.round(speedSum / totalCount) : (isChaos ? 8 : 45);
+    const avgConfidence = detections.length > 0 ? Math.round(confidenceSum / detections.length) : 96;
+
+    // Heuristics calculations
+    // Occupancy based on bounding box areas
+    let areaSum = 0;
+    detections.forEach(d => {
+      areaSum += d.w * d.h;
+    });
+    const occupancy = Math.min(100, Math.round(areaSum * 380));
+
+    // Queue length calculation
+    let queueLength = 0;
+    if (totalCount > 0) {
+      queueLength = Math.round(totalCount * 9 + (occupancy * 0.8));
+      if (isChaos) queueLength += 65; // High artificial congestion in chaos mode
+    }
+
+    // Traffic density percentage
+    const density = Math.min(100, Math.round((totalCount * 12) + (occupancy * 0.4)));
+
+    // Incident Risk rating
+    let risk = Math.min(100, Math.round((density * 0.7) + (queueLength * 0.2)));
+    if (counts.ambulance > 0) risk = Math.min(100, risk + 15);
+
+    return {
+      vehicleCount: totalCount,
+      carCount: counts.car,
+      motorcycleCount: counts.motorcycle,
+      busCount: counts.bus,
+      truckCount: counts.truck,
+      ambulanceCount: counts.ambulance,
+      personCount: counts.person,
+      laneOccupancy: occupancy,
+      queueLengthMeters: queueLength,
+      estimatedAverageSpeed: avgSpeed,
+      trafficDensity: density,
+      incidentRisk: risk,
+      aiConfidence: avgConfidence
+    };
+  }
+
+  /**
+   * Mesin Evaluasi Anomaly Deteksi & Koordinasi Incident
+   */
+  _evaluateAnomalyRules(camId, camName, metrics) {
+    const timestamp = Date.now();
+    const anomaliesToCheck = [];
+
+    // Rule 1: Antrean sangat panjang
+    if (metrics.queueLengthMeters > 130) {
+      anomaliesToCheck.push({
+        type: 'CRITICAL_QUEUE_DETECTED',
+        severity: 'danger',
+        confidence: metrics.aiConfidence,
+        message: `Peringatan: Antrean antrean kritis terdeteksi sepanjang ${metrics.queueLengthMeters}m di ${camName}.`
+      });
+    }
+
+    // Rule 2: Kepadatan kritis
+    if (metrics.trafficDensity > 80) {
+      anomaliesToCheck.push({
+        type: 'CONGESTION_SPIKE',
+        severity: 'warning',
+        confidence: metrics.aiConfidence,
+        message: `Kepadatan lalu lintas melonjak hingga ${metrics.trafficDensity}% di ${camName}.`
+      });
+    }
+
+    // Rule 3: Ambulans / PMK terdeteksi
+    if (metrics.ambulanceCount > 0) {
+      anomaliesToCheck.push({
+        type: 'EMERGENCY_VEHICLE_DETECTED',
+        severity: 'danger',
+        confidence: 99,
+        message: `Prioritas ATCS: Ambulans tanggap darurat terdeteksi di area jangkauan ${camName}!`
+      });
+    }
+
+    // Process evaluated anomalies
+    anomaliesToCheck.forEach(anomaly => {
+      const key = `${camId}_${anomaly.type}`;
+      const lastTriggered = this.anomalyCooldowns.get(key) || 0;
+
+      // Cooldown 15 detik agar tidak membanjiri notifikasi/event log
+      if (timestamp - lastTriggered > 15000) {
+        this.anomalyCooldowns.set(key, timestamp);
+
+        const anomalyEvent = {
+          id: `ANM-${Date.now().toString().slice(-4)}`,
+          cameraId: camId,
+          sourceCamera: camName,
+          type: anomaly.type,
+          severity: anomaly.severity,
+          confidence: anomaly.confidence,
+          firstSeenAt: new Date().toISOString(),
+          lastSeenAt: new Date().toISOString(),
+          message: anomaly.message,
+          status: 'ACTIVE'
+        };
+
+        // Publish to global StateStore event system
+        stateStore.publish('cctv:anomaly', anomalyEvent);
+
+        // Explicit rule triggers incident creation automatically
+        if (this.autoCreateConfig[anomaly.type]) {
+          this._triggerAutomaticIncident(anomalyEvent);
+        } else {
+          // Log to system diagnostic terminal
+          if (typeof window.showToast === 'function' && anomaly.type === 'EMERGENCY_VEHICLE_DETECTED') {
+            window.showToast(`🚨 ${anomaly.message}`, 'warning');
+            soundManager.play('alert');
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Membuat rekaman incident SITS secara otomatis berdasarkan konfigurasi aturan eksplisit
+   */
+  async _triggerAutomaticIncident(anomalyEvent) {
+    try {
+      // Create request payload matching stateful incident format
+      const isAmbulance = anomalyEvent.type === 'EMERGENCY_VEHICLE_DETECTED';
+      const incidentPayload = {
+        title: isAmbulance ? `Kecerdasan AI: Prioritas Kendaraan Darurat (${anomalyEvent.id})` : `Kritis: Deteksi Hambatan Lajur AI (${anomalyEvent.id})`,
+        category: isAmbulance ? 'congestion' : 'accident',
+        severity: anomalyEvent.severity,
+        location: anomalyEvent.sourceCamera,
+        status: 'ACTIVE',
+        priority: 'high',
+        source: 'AI_VISION',
+        assignedUnit: isAmbulance ? 'Operator ATCS Surabaya' : 'SITS Patroli Wilayah Selatan',
+        notes: anomalyEvent.message
+      };
+
+      console.info(`⚡ [CctvController] Memicu pembuatan insiden otomatis untuk anomali: ${anomalyEvent.type}`);
+
+      // We can append this directly to the incidents list or invoke REST API
+      const response = await fetch('/api/incidents/create-auto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(incidentPayload)
+      }).catch(() => null); // Graceful network failure
+
+      if (response && response.ok) {
+        console.log("✓ Insiden otomatis berhasil disimpan di server SITS.");
+      } else {
+        // Optimistic local create
+        stateStore.setState(prev => {
+          const currentList = [...(prev.incidents || [])];
+          // Prevent duplicates
+          if (currentList.some(i => i.id === anomalyEvent.id)) return {};
+          
+          currentList.unshift({
+            id: anomalyEvent.id,
+            ...incidentPayload,
+            reportedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+          return { incidents: currentList };
+        });
+
+        if (typeof window.showToast === 'function') {
+          window.showToast(`📸 DETEKSI OTOMATIS: Insiden #${anomalyEvent.id} dibuat berdasarkan analisis kamera Edge AI!`, 'alert');
+          soundManager.play('alert');
+        }
+      }
+    } catch (err) {
+      console.warn("Failed auto incident trigger:", err);
+    }
+  }
+
+  /**
+   * Watchdog Telemetri Kesehatan Kamera
+   * Mendeteksi delay penerimaan data, latensi tinggi, dan memicu status OFFLINE/STALE secara deterministik
+   * Terintegrasi secara penuh dengan status kesehatan hardware Edge Node di StateStore.
+   */
+  _startHealthTelemetryWatchdog() {
+    setInterval(() => {
+      const now = Date.now();
+      const state = stateStore.getState();
+      const devices = state.devices || [];
+
+      this.camerasState.forEach((cam, id) => {
+        // Pemetaan kamera ke perangkat Edge Node fisik
+        let device = null;
+        if (id === 'cctvCanvas1' || id === 'dashCameraCanvas' || id === 'cctvZoomCanvas') {
+          device = devices.find(d => d.deviceId === 'NODE-EDGE-01');
+        } else if (id === 'cctvCanvas2') {
+          device = devices.find(d => d.deviceId === 'NODE-EDGE-02');
+        } else if (id === 'cctvCanvas3') {
+          device = devices.find(d => d.deviceId === 'NODE-EDGE-03');
+        } else if (id === 'cctvCanvas4') {
+          device = devices.find(d => d.deviceId === 'NODE-CTRL-01');
+        }
+
+        if (device) {
+          // Propagasikan status kesehatan device ke kamera
+          const previousStatus = cam.status;
+          cam.status = device.healthLevel === 'HEALTHY' ? 'ONLINE' : device.healthLevel;
+          
+          // Sinkronkan latensi & confidence rate
+          cam.diagnostics.averageLatencyMs = device.latencyMs;
+          if (device.fps > 0) {
+            cam.metrics.aiConfidence = device.healthScore;
+          }
+
+          if (cam.status !== previousStatus) {
+            this._updateCameraDomHUD(id, cam);
+          }
+        } else {
+          // Fallback berbasis timeout waktu jika device tidak ditemukan
+          const age = now - cam.lastFrameAt;
+          if (age > 10000) {
+            if (cam.status !== 'OFFLINE') {
+              cam.status = 'OFFLINE';
+              this._updateCameraDomHUD(id, cam);
+            }
+          } else if (age > 4000) {
+            if (cam.status !== 'STALE') {
+              cam.status = 'STALE';
+              this._updateCameraDomHUD(id, cam);
+            }
+          }
+        }
+      });
+    }, 2000);
+  }
+
+  /**
+   * Sync camera telemetry and stats into DOM elements dynamically
+   */
+  _updateCameraDomHUD(camId, camState) {
+    const card = document.querySelector(`[data-cam-id="${camId}"]`);
+    if (!card) return;
+
+    // Update active badges
+    const livePill = card.querySelector('.pill-live');
+    if (livePill) {
+      if (camState.status === 'OFFLINE') {
+        livePill.className = 'pill pill-danger';
+        livePill.innerHTML = '<span class="pulse-dot"></span>Offline';
+      } else if (camState.status === 'STALE' || camState.status === 'DEGRADED') {
+        livePill.className = 'pill pill-ai';
+        livePill.innerHTML = '<span class="pulse-dot"></span>Stale';
+      } else {
+        livePill.className = 'pill pill-live';
+        livePill.innerHTML = '<span class="pulse-dot"></span>Active';
+      }
+    }
+
+    // Update bottom HUD stats text elements
+    const hudValElements = card.querySelectorAll('.hud-metric-val');
+    if (hudValElements.length >= 3) {
+      hudValElements[0].textContent = camState.status === 'OFFLINE' ? '0.0' : camState.diagnostics.averageLatencyMs > 25 ? '15.0' : '30.0';
+      hudValElements[1].textContent = `${camState.diagnostics.averageLatencyMs}ms`;
+      hudValElements[2].textContent = camState.status === 'OFFLINE' ? '0MB' : camState.status === 'DEGRADED' ? '280MB' : '415MB';
+    }
+
+    // Dynamic error/glitch panel rendering
+    const glitchOverlay = document.getElementById(`cctvGlitch${camId.replace('cctvCanvas', '')}`);
+    if (glitchOverlay) {
+      const textEl = glitchOverlay.querySelector('.glitch-text');
+      if (camState.status === 'OFFLINE') {
+        glitchOverlay.classList.add('show');
+        if (textEl) textEl.textContent = 'HOST NOT REACHABLE (504)';
+      } else if (camState.status === 'STALE') {
+        glitchOverlay.classList.add('show');
+        if (textEl) textEl.textContent = 'STREAM STALE / RETRYING';
+      } else {
+        glitchOverlay.classList.remove('show');
+      }
+    }
   }
 
   _bindControls() {
@@ -380,8 +963,36 @@ export class CctvController {
       });
     }
 
+    const btnPlayPause = document.getElementById("btnPlayPauseCctv");
+    if (btnPlayPause) {
+      btnPlayPause.addEventListener("click", () => {
+        const current = stateStore.getState().cctvPaused;
+        const next = !current;
+        stateStore.setState({ cctvPaused: next });
+        btnPlayPause.innerHTML = next ? '<span class="btn-icon">▶</span> Putar' : '<span class="btn-icon">⏸</span> Jeda';
+        if (typeof window.showToast === "function") {
+          window.showToast(next ? "Pemutaran simulasi CCTV dijeda." : "Simulasi CCTV dilanjutkan kembali.");
+        }
+      });
+    }
+
+    // Ambang batas slider
+    const thresholdRange = document.getElementById("cctvThresholdRange");
+    const thresholdVal = document.getElementById("thresholdVal");
+    if (thresholdRange && thresholdVal) {
+      thresholdRange.addEventListener("input", (e) => {
+        const val = e.target.value;
+        thresholdVal.textContent = `${val}%`;
+        stateStore.setState({ cctvConfidenceThreshold: parseInt(val, 10) });
+      });
+    }
+
     // Tombol Ambil Snapshot / Bukti Pelanggaran ETLE
     document.querySelectorAll('#btnCaptureSnapshot, .btn-cam-snapshot').forEach(btn => {
+      // Prevent attaching duplicate event listeners
+      if (btn.dataset.hasListener) return;
+      btn.dataset.hasListener = "true";
+
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         const camId = btn.dataset.cam || this.activeCamId || 'cctvCanvas1';
@@ -391,28 +1002,39 @@ export class CctvController {
   }
 
   /**
-   * Switcher Multi-Kamera Langsung
+   * Switcher Kamera Tanpa Memory Leaks atau Listener Ganda
    */
   _bindMultiCameraSwitcher() {
     const tabs = document.querySelectorAll('.cctv-cam-tab');
     tabs.forEach(tab => {
       tab.addEventListener('click', (e) => {
         e.preventDefault();
-        tabs.forEach(t => t.classList.remove('active'));
+        tabs.forEach(t => {
+          t.classList.remove('active');
+          t.style.background = 'rgba(15, 23, 42, 0.6)';
+          t.style.borderColor = 'rgba(255,255,255,0.1)';
+          t.style.color = '#94a3b8';
+        });
+
         tab.classList.add('active');
+        tab.style.background = 'rgba(56, 189, 248, 0.2)';
+        tab.style.borderColor = '#38bdf8';
+        tab.style.color = '#fff';
+
         const camId = tab.dataset.cam;
         this.activeCamId = camId;
+        stateStore.setState({ activeCamId: camId });
 
         const card = document.querySelector(`[data-cam-id="${camId}"]`);
         if (card) {
           card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
           card.classList.add('camera-card-spotlight');
-          setTimeout(() => card.classList.remove('camera-card-spotlight'), 2000);
+          setTimeout(() => card.classList.remove('camera-card-spotlight'), 1500);
         }
 
         soundManager.play('click');
         if (typeof window.showToast === 'function') {
-          window.showToast(`Kamera Aktif: ${tab.textContent.trim()}`);
+          window.showToast(`Fokus Kamera: ${tab.textContent.trim().replace('📹 ', '')}`);
         }
       });
     });
@@ -420,13 +1042,12 @@ export class CctvController {
 
   /**
    * Menangkap snapshot frame canvas + bounding box YOLOv8 sebagai bukti ETLE
-   * @param {string} [camId]
    */
-  captureEvidence(camId = null) {
+  async captureEvidence(camId = null) {
     const targetCamId = camId || this.activeCamId || 'cctvCanvas1';
     let renderer = this.renderers.get(targetCamId);
     if (!renderer) {
-      renderer = this.renderers.values().next().value;
+      renderer = this.renderers.get('cctvCanvas1');
     }
 
     if (!renderer || !renderer.canvas) {
@@ -459,19 +1080,31 @@ export class CctvController {
       imgDataUrl: pngDataUrl
     };
 
-    this._insertIncidentEvidenceToDom(evidence);
-    soundManager.play('success');
+    try {
+      // Dispatch centralized command to log this critical CCTV action on the server
+      await commandLayer.dispatchCommand({
+        action: 'cctv:snapshot',
+        targetType: 'camera',
+        targetId: targetCamId,
+        payload: { violationId, location: camName }
+      }, false); // low risk
 
-    if (typeof window.showToast === 'function') {
-      window.showToast(`📸 Bukti Pelanggaran ETLE #${violationId} (${plateNumber}) berhasil diamankan!`);
+      this._insertIncidentEvidenceToDom(evidence);
+      soundManager.play('success');
+
+      if (typeof window.showToast === 'function') {
+        window.showToast(`📸 Bukti Pelanggaran ETLE #${violationId} (${plateNumber}) berhasil diamankan!`);
+      }
+    } catch (err) {
+      console.warn("CCTV snapshot command rejected:", err);
+      if (typeof window.showToast === 'function') {
+        window.showToast(`❌ Gagal mengambil snapshot: ${err.message}`, "danger");
+      }
     }
 
     return evidence;
   }
 
-  /**
-   * Memasukkan bukti snapshot ke riwayat insiden dan notifikasi
-   */
   _insertIncidentEvidenceToDom(evidence) {
     const list = document.querySelector('.incident-logs-list');
     if (!list) return;
@@ -504,7 +1137,7 @@ export class CctvController {
     // Update unresolved pill count
     const pill = document.querySelector('.incidents-active .pill-danger');
     if (pill) {
-      const match = pill.textContent.match(/(\\d+)/);
+      const match = pill.textContent.match(/(\d+)/);
       const count = match ? parseInt(match[1], 10) + 1 : 4;
       pill.textContent = `${count} Unresolved Alerts`;
     }
@@ -528,7 +1161,7 @@ export class CctvController {
         return;
       }
 
-      // Hitung delta time per frame untuk interpolasi (Lerp) yang akurat dan konsisten
+      // Delta time calculation for smooth 60fps independent interpolation
       const dt = Math.min(0.1, Math.max(0.001, (currentTime - this.lastFrameTime) / 1000));
       this.lastFrameTime = currentTime;
 
@@ -537,9 +1170,14 @@ export class CctvController {
       const isPaused = state.cctvPaused;
       const showBoxes = state.cctvBoxesVisible;
 
-      this.renderers.forEach(renderer => {
-        if (renderer.isVisible && renderer.canvas && renderer.canvas.offsetParent !== null) {
-          renderer.render(isChaos, isPaused, showBoxes, dt);
+      this.renderers.forEach((renderer, id) => {
+        if (renderer.canvas && renderer.canvas.offsetParent !== null) {
+          const camState = this.camerasState.get(id);
+          const metrics = camState ? camState.metrics : {};
+          const diagnostics = camState ? camState.diagnostics : {};
+          const status = camState ? camState.status : 'ONLINE';
+          
+          renderer.render(isChaos, isPaused, showBoxes, dt, metrics, diagnostics, status);
         }
       });
     };

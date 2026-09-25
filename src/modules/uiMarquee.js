@@ -10,6 +10,7 @@ export class UiMarquee {
   constructor() {
     this.marqueeContainer = null;
     this.contentEl = null;
+    this._isInitialized = false;
     this.defaultMessages = [
       "🚨 PEMBERITAHUAN: Rekayasa lalu lintas Simpang Wonokromo sedang berlangsung.",
       "⚡ SISTEM OVERRIDE: Prioritas Darurat otomatis aktif untuk rute RSU Dr. Soetomo.",
@@ -61,6 +62,9 @@ export class UiMarquee {
    * Inisialisasi referensi DOM marquee
    */
   init() {
+    if (this._isInitialized) return;
+    this._isInitialized = true;
+
     this.marqueeContainer = document.querySelector(".system-marquee");
     this.contentEl = document.querySelector(".system-marquee .marquee-content");
   }

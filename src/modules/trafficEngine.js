@@ -1,70 +1,37 @@
 /**
- * OmniTRAF Surabaya - Adaptive Traffic Engine (Reactive Socket.io Architecture)
- * Logika SITS Surabaya yang sepenuhnya reaktif berbasis WebSockets & Offline Fallback Simulation.
- * Seluruh kalkulasi timer, siklus APILL, status Mode Keos, dan prioritas darurat
- * dihitung oleh server (Single Source of Truth) saat online, atau fallback simulation mulus saat offline.
- * Dilengkapi helper `_smartUpdateDOM` untuk mencegah DOM Thrashing / Layout Recalculations.
+ * OmniTRAF Surabaya - Adaptive Traffic Engine (Phase 2 Master Architecture)
+ * Logika SITS Surabaya yang sepenuhnya reaktif berbasis StateStore sebagai Single Source of Truth.
+ *
+ * Alur Data:
+ * Backend State → Socket.io → StateStore → TrafficEngine Subscriptions → UI (Smart DOM Diffing)
+ *
+ * Prinsip:
+ * - Tidak ada dual-tick / timer acceleration saat connected ke backend.
+ * - Local Simulator hanya aktif setelah grace period (3000ms) saat koneksi offline.
+ * - Local Simulator selalu melanjutkan dari state terakhir (Last Known Good State) di StateStore.
+ * - Seluruh intervensi operator (Green Wave, Chaos, Preempt, Green Split) memiliki acknowledgement dari server.
  */
 
-import { stateStore } from '../core/stateStore.js';
+import { stateStore, updateTrafficState, updateSignalState } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
 import { socketClient } from '../core/socketClient.js';
-import { mapManager } from './mapManager.js';
+import { commandLayer } from '../core/commandLayer.js';
 
 export class TrafficEngine {
   constructor() {
-    this.lastState = null;
     this.localSimInterval = null;
+    this.graceTimer = null;
     this._localSimulationRunning = false;
-    this._initFallbackState();
-    this._setupStoreListeners();
-  }
+    this._isInitialized = false;
+    this._unsubscribeCallbacks = [];
 
-  _initFallbackState() {
-    this.mockState = {
-      timestamp: new Date().toLocaleTimeString('id-ID') + ' WIB',
-      networkLoad: 68,
-      avgWaitTime: 39,
-      congestionIndex: 58,
-      co2SavedKg: 1428,
-      fuelSavedLiters: 584,
-      vehiclesToday: 128620,
-      sitsUptime: 99.4,
-      cctvOnline: 184,
-      iotOnline: 312,
-      sitsSignal: 96,
-      aiScore: 94,
-      aiConfidence: 96,
-      isChaosMode: false,
-      chaosLevel: 0,
-      greenWaveActive: false,
-      greenSplitWonokromo: 35,
-      intersections: [
-        { id: "node-wonokromo", name: "Simpang Wonokromo", state: "green", timer: 24, greenSplit: 35, waitTime: 42, status: "Normal" },
-        { id: "node-margorejo", name: "Simpang Margorejo", state: "red", timer: 12, greenSplit: 28, waitTime: 36, status: "Lancar" },
-        { id: "node-darmo", name: "Simpang Raya Darmo", state: "green", timer: 28, greenSplit: 42, waitTime: 28, status: "Lancar" },
-        { id: "node-tunjungan", name: "Simpang Tunjungan", state: "yellow", timer: 3, greenSplit: 30, waitTime: 48, status: "Padat" },
-        { id: "node-merr", name: "Simpang MERR Kertajaya", state: "green", timer: 35, greenSplit: 45, waitTime: 22, status: "Lancar" }
-      ],
-      activeEmergencies: [
-        { id: "EMG-101", code: "AMB-01", route: "route-soetomo", vehicle: "Ambulans RSU Dr. Soetomo", status: "PRIORITAS AKTIF" }
-      ]
-    };
-  }
-
-  _setupStoreListeners() {
-    stateStore.subscribe('state:greenSplitWonokromo', ({ value }) => {
-      this._smartUpdateDOM("greenValue", `${value} dtk`);
-    });
-
-    stateStore.subscribe('state:isRainMode', ({ value }) => {
-      this.setWeatherAdaptation(value);
-    });
+    this.yellowDuration = 3;
+    this.redDurationBase = 25;
+    this.isRainMode = false;
   }
 
   /**
    * Helper mutasi DOM pintar untuk mencegah DOM Thrashing & Layout Recalculation yang tidak perlu.
-   * Hanya melakukan penulisan ke DOM jika textContent atau className mengalami perubahan riil.
    * @param {string|HTMLElement} target - ID elemen string atau instance HTMLElement
    * @param {string|null} [text=null] - Nilai teks baru
    * @param {string|null} [className=null] - Nilai class CSS baru
@@ -83,201 +50,102 @@ export class TrafficEngine {
   }
 
   /**
-   * Inisialisasi listener DOM dan koneksi Socket.io
+   * Inisialisasi reaktif Traffic Engine (Idempotent)
    */
   init() {
-    console.info("🚀 [TrafficEngine] Menginisialisasi Reactive Socket Traffic Engine...");
+    if (this._isInitialized) return;
+    this._isInitialized = true;
 
-    socketClient.getSocket();
-    socketClient.on('traffic:init', (data) => this.handleServerStateUpdate(data));
-    socketClient.on('traffic:update', (data) => this.handleServerStateUpdate(data));
+    console.info("🚀 [TrafficEngine] Menginisialisasi Unified Reactive Traffic Engine (Phase 2)...");
 
-    this._bindGreenWaveToggle();
-    this._bindChaosMode();
-    this._bindSignalModal();
-    this._bindAiRecommendationButtons();
+    this._setupStoreSubscriptions();
+    this._bindControls();
 
-    // Jalankan render initial state segera
-    this.handleServerStateUpdate(this.mockState);
+    // Render snapshot awal dari StateStore
+    this._renderFromState(stateStore.getState());
 
-    // Jika socket belum terkoneksi setelah 2.5 detik, aktifkan simulasi offline otomatis
-    setTimeout(() => {
-      if (!stateStore.getState().sseConnected) {
-        stateStore.publish("socket:status", "fallback");
+    // Evaluasi koneksi awal: jika dalam 3.5 detik tidak ada koneksi, jadwalkan simulasi lokal
+    this.graceTimer = setTimeout(() => {
+      const currentState = stateStore.getState();
+      if (!currentState.sseConnected && currentState.connectionStatus !== 'connected' && currentState.connectionStatus !== 'resyncing') {
         this.startLocalSimulation();
       }
-    }, 2500);
+    }, 3500);
   }
 
-  /**
-   * Mengatur status Emergency Green Wave secara global dan tersinkronisasi
-   * @param {boolean} active
-   */
-  setGreenWave(active) {
-    const isBool = !!active;
-    stateStore.setState({ greenWaveActive: isBool });
-    stateStore.publish('traffic:green-wave', { active: isBool });
+  _setupStoreSubscriptions() {
+    // 1. Dengarkan pembaruan telemetri & traffic dari StateStore
+    const unTraffic = stateStore.subscribe("traffic:update", () => {
+      const state = stateStore.getState();
+      this._renderFromState(state);
+    });
 
-    const chk = document.getElementById("chkGreenWave");
-    if (chk && chk.checked !== isBool) {
-      chk.checked = isBool;
-    }
+    const unResynced = stateStore.subscribe("state:resynced", () => {
+      const state = stateStore.getState();
+      this._renderFromState(state);
+    });
 
-    if (socketClient.isConnected()) {
-      socketClient.emit('green-wave:toggle', { active: isBool });
-    } else {
-      // Local fallback simulation immediate synchronization
-      const currentData = this.lastState || this.mockState;
-      currentData.greenWaveActive = isBool;
-      if (isBool) {
-        currentData.intersections.forEach(node => {
-          if (node.id === "node-wonokromo" || node.id === "node-margorejo" || node.id === "node-darmo") {
-            node.state = "green";
-            node.timer = "∞";
-            node.status = "Green Wave";
-          }
-        });
-      } else {
-        currentData.intersections.forEach(node => {
-          if (typeof node.timer === "string") {
-            node.timer = node.greenSplit || 35;
-          }
-        });
-      }
-      this.handleServerStateUpdate(currentData);
-    }
-  }
-
-  /**
-   * Preempt Spesifik Persimpangan untuk Koridor Prioritas Darurat (Green Wave Clearance)
-   */
-  preemptIntersection(nodeId, state = 'green', durationSec = 45) {
-    const currentData = this.lastState || this.mockState;
-    if (currentData && Array.isArray(currentData.intersections)) {
-      currentData.intersections.forEach(node => {
-        if (node.id === nodeId) {
-          node.state = state;
-          node.timer = durationSec;
-          node.status = "Preempt Clearance";
+    // 2. Dengarkan perubahan status socket untuk mengontrol simulator lokal & grace period
+    const unSocket = stateStore.subscribe("socket:status", (envelope) => {
+      const status = envelope?.payload?.status || envelope;
+      
+      if (status === "connected" || status === "resyncing") {
+        if (this.graceTimer) {
+          clearTimeout(this.graceTimer);
+          this.graceTimer = null;
         }
-      });
-      this.handleServerStateUpdate(currentData);
-    }
-    socketClient.emit('signal:override', { intersectionId: nodeId, duration: durationSec });
-  }
-
-  /**
-   * Mengatur adaptasi cuaca terhadap waktu kuning & all-red APILL
-   */
-  setWeatherAdaptation(isRain) {
-    this.isRainMode = !!isRain;
-    this.yellowDuration = this.isRainMode ? 4.5 : 3.0;
-    this.allRedBuffer = this.isRainMode ? 2.0 : 1.0;
-  }
-
-  /**
-   * Memulai Loop Simulasi Lokal jika server Socket offline
-   */
-  startLocalSimulation() {
-    if (this._localSimulationRunning) return;
-    this._localSimulationRunning = true;
-    console.info("⚡ [TrafficEngine] Local Mock Simulation Loop Active (Zero Backend Latency Fallback).");
-
-    if (this.localSimInterval) clearInterval(this.localSimInterval);
-
-    this.localSimInterval = setInterval(() => {
-      if (stateStore.getState().sseConnected) {
         this.stopLocalSimulation();
-        return;
+      } else if (status === "offline" || status === "fallback" || status === "reconnecting") {
+        // Jangan langsung menjalankan simulasi; tunggu grace period 3000ms
+        if (!this._localSimulationRunning && !this.graceTimer) {
+          this.graceTimer = setTimeout(() => {
+            this.graceTimer = null;
+            const cur = stateStore.getState();
+            if (cur.connectionStatus === "offline" || cur.connectionStatus === "fallback" || cur.connectionStatus === "reconnecting") {
+              this.startLocalSimulation();
+            }
+          }, 3000);
+        }
       }
+    });
 
-      const sim = this.mockState;
-      sim.timestamp = new Date().toLocaleTimeString('id-ID') + ' WIB';
-      sim.vehiclesToday += Math.floor(Math.random() * 4) + 1;
-      sim.co2SavedKg += 0.2;
-      sim.fuelSavedLiters += 0.08;
+    // 3. Subscription khusus untuk parameter slider & cuaca
+    const unGreenSplit = stateStore.subscribe("state:greenSplitWonokromo", ({ value }) => {
+      this._smartUpdateDOM("greenValue", `${value} dtk`);
+    });
 
-      // Advance APILL light timers
-      sim.intersections.forEach(node => {
-        if (sim.greenWaveActive && (node.id === "node-wonokromo" || node.id === "node-margorejo" || node.id === "node-darmo")) {
-          node.state = "green";
-          node.timer = "∞";
-          node.status = "Green Wave";
-          return;
-        }
+    const unRain = stateStore.subscribe("state:isRainMode", ({ value }) => {
+      this.setWeatherAdaptation(value);
+    });
 
-        if (typeof node.timer === "string") {
-          node.timer = node.greenSplit || 30;
-        }
-
-        node.timer--;
-
-        if (node.timer <= 0) {
-          if (node.state === "green") {
-            node.state = "yellow";
-            node.timer = 3;
-          } else if (node.state === "yellow") {
-            node.state = "red";
-            node.timer = 25;
-          } else {
-            node.state = "green";
-            node.timer = node.greenSplit || 35;
-          }
-        }
-
-        if (node.state === "red") node.status = sim.isChaosMode ? "Macet Total" : "Padat";
-        else if (node.state === "yellow") node.status = "Transisi";
-        else node.status = sim.isChaosMode ? "Merayap" : "Lancar";
-      });
-
-      this.handleServerStateUpdate(sim);
-    }, 1000);
+    this._unsubscribeCallbacks.push(unTraffic, unResynced, unSocket, unGreenSplit, unRain);
   }
 
   /**
-   * Menghentikan Loop Simulasi Lokal saat server Socket online kembali
+   * Render seluruh komponen UI berdasarkan StateStore Snapshot (Single Source of Truth)
+   * @param {Object} state
    */
-  stopLocalSimulation() {
-    this._localSimulationRunning = false;
-    if (this.localSimInterval) {
-      clearInterval(this.localSimInterval);
-      this.localSimInterval = null;
-    }
+  _renderFromState(state) {
+    if (!state) return;
+
+    const telemetry = state.telemetry || {};
+    const intersections = state.intersections || [];
+    const isChaos = !!state.isChaosMode;
+    const chaosLevel = state.chaosLevel || 0;
+    const isGreenWave = !!state.greenWaveActive;
+    const emergencies = state.activeEmergencies || [];
+
+    this._renderApillTimers(intersections, isGreenWave);
+    this._renderChaosUI(isChaos, chaosLevel);
+    this._renderKpiMetrics(telemetry, state);
+    this._renderEmergencyList(emergencies);
   }
 
   /**
-   * Menangani pembaruan state real-time dari Socket.io Server (Single Source of Truth)
-   * @param {Object} data - Snapshot state global dari backend
-   */
-  handleServerStateUpdate(data) {
-    if (!data) return;
-    this.lastState = data;
-
-    // Update stateStore local copy
-    stateStore.setState({
-      isChaosMode: data.isChaosMode,
-      chaosLevel: data.chaosLevel,
-      greenWaveActive: data.greenWaveActive,
-      greenSplitWonokromo: data.greenSplitWonokromo,
-      telemetry: data,
-      lastTelemetryTime: Date.now()
-    }, false);
-
-    stateStore.publish("telemetry:update", data);
-    stateStore.publish("traffic:green-wave", { active: !!data.greenWaveActive });
-
-    // Update DOM UI elements reactively with smart diffing
-    this._renderApillTimers(data.intersections, data.greenWaveActive);
-    this._renderChaosUI(data.isChaosMode, data.chaosLevel);
-    this._renderKpiMetrics(data);
-    this._renderEmergencyList(data.activeEmergencies);
-  }
-
-  /**
-   * 1. Rendering Timer APILL dengan _smartUpdateDOM (Wonokromo, Margorejo, Darmo, Tunjungan, MERR)
+   * 1. Rendering Timer APILL dengan Smart DOM Diffing
    */
   _renderApillTimers(intersections, isGreenWave) {
-    if (!intersections || !Array.isArray(intersections)) return;
+    if (!Array.isArray(intersections) || intersections.length === 0) return;
 
     // Simpang Wonokromo
     const nodeW = intersections.find(n => n.id === "node-wonokromo") || intersections[0];
@@ -323,7 +191,7 @@ export class TrafficEngine {
       }
     }
 
-    // Update Phase Cycle Numbers on Signal Dashboard Card
+    // Update Phase Cycle Numbers pada Widget Sinyal
     intersections.forEach((node, idx) => {
       const cycleText = typeof node.timer === "number" ? String(node.timer) : "∞";
       this._smartUpdateDOM(`cycleVal${idx + 1}`, cycleText);
@@ -365,34 +233,35 @@ export class TrafficEngine {
   /**
    * 3. Render Metric KPI Dashboard
    */
-  _renderKpiMetrics(data) {
+  _renderKpiMetrics(telemetry, state) {
+    const avgWaitTime = telemetry.avgWaitTime ?? 42;
+    const networkLoad = telemetry.networkLoad ?? 72;
+    const co2SavedKg = telemetry.co2SavedKg ?? 1420;
+    const sitsSignal = telemetry.sitsSignal ?? 94;
+
     const avgWaitCard = this._findKpiCard("Rata-rata Waktu Tunggu");
     if (avgWaitCard) {
       const counter = avgWaitCard.querySelector(".counter-val") || avgWaitCard.querySelector("h2");
-      if (counter) {
-        this._smartUpdateDOM(counter, `${data.avgWaitTime}s`);
-      }
+      if (counter) this._smartUpdateDOM(counter, `${avgWaitTime}s`);
     }
 
     const netLoadCard = this._findKpiCard("Beban Jaringan");
     if (netLoadCard) {
       const counter = netLoadCard.querySelector(".counter-val") || netLoadCard.querySelector("h2");
-      if (counter) {
-        this._smartUpdateDOM(counter, `${data.networkLoad}%`);
-      }
+      if (counter) this._smartUpdateDOM(counter, `${networkLoad}%`);
     }
 
     const co2Card = this._findKpiCard("Reduksi Emisi");
     if (co2Card) {
       const counter = co2Card.querySelector(".counter-val") || co2Card.querySelector("h2");
-      if (counter) {
-        this._smartUpdateDOM(counter, `${Math.round(data.co2SavedKg).toLocaleString('id-ID')} kg`);
-      }
+      if (counter) this._smartUpdateDOM(counter, `${Math.round(co2SavedKg).toLocaleString('id-ID')} kg`);
     }
 
     const sitsSignalEl = document.getElementById("sitsStatusText");
     if (sitsSignalEl) {
-      this._smartUpdateDOM(sitsSignalEl, `${data.sitsSignal || 96}%`);
+      if (state.connectionStatus === 'connected') {
+        this._smartUpdateDOM(sitsSignalEl, `${sitsSignal}%`);
+      }
     }
   }
 
@@ -411,10 +280,7 @@ export class TrafficEngine {
    * 4. Render Active Emergency List Feed
    */
   _renderEmergencyList(emergencies) {
-    if (!emergencies || !Array.isArray(emergencies)) return;
-    const container = document.getElementById("emergencyListGrid");
-    if (!container) return;
-
+    if (!Array.isArray(emergencies)) return;
     const countEl = document.getElementById("activePriorityCount");
     if (countEl) {
       this._smartUpdateDOM(countEl, `${emergencies.length} Active priority`);
@@ -433,8 +299,187 @@ export class TrafficEngine {
   }
 
   /**
+   * Mengatur status Emergency Green Wave secara global dengan Acknowledged Server Sync
+   * @param {boolean} active
+   */
+  async setGreenWave(active) {
+    const isBool = !!active;
+    const chk = document.getElementById("chkGreenWave");
+
+    try {
+      await commandLayer.dispatchCommand({
+        action: 'green-wave:toggle',
+        targetType: 'system',
+        targetId: 'green-wave-corridor',
+        payload: { active: isBool }
+      }, isBool); // High risk confirmation guard when activating (isBool === true)
+
+      if (chk && chk.checked !== isBool) {
+        chk.checked = isBool;
+      }
+    } catch (err) {
+      console.error("[TrafficEngine] Green wave change failed:", err);
+      if (chk) {
+        chk.checked = !isBool;
+      }
+      if (typeof window.showToast === "function") {
+        window.showToast(`❌ Gagal: ${err.message}`, "danger");
+      }
+    }
+  }
+
+  /**
+   * Preempt Spesifik Persimpangan untuk Koridor Prioritas Darurat
+   */
+  async preemptIntersection(nodeId, state = 'green', durationSec = 45) {
+    if (socketClient.isConnected()) {
+      try {
+        const response = await socketClient.emitWithAck('signal:override', { intersectionId: nodeId, duration: durationSec }, 4000);
+        if (response && response.success) {
+          updateSignalState(nodeId, {
+            state,
+            timer: durationSec,
+            status: "Preempt Clearance (Acknowledged)"
+          }, 'server');
+        } else {
+          throw new Error("Server rejected signal override");
+        }
+      } catch (err) {
+        console.error("[TrafficEngine] Preempt intersection server ack timeout/error:", err);
+        if (typeof window.showToast === "function") {
+          window.showToast(`❌ Gagal override sinyal ${nodeId}: Server tidak merespons.`, "danger");
+        }
+      }
+    } else {
+      updateSignalState(nodeId, {
+        state,
+        timer: durationSec,
+        status: "Preempt Clearance"
+      }, 'controller');
+    }
+  }
+
+  /**
+   * Mengatur adaptasi cuaca terhadap waktu kuning & buffer all-red
+   */
+  setWeatherAdaptation(isRain) {
+    this.isRainMode = !!isRain;
+    this.yellowDuration = this.isRainMode ? 4.5 : 3.0;
+  }
+
+  /**
+   * Memulai Loop Simulasi Lokal Offline (Meneruskan State Terakhir dari StateStore)
+   */
+  startLocalSimulation() {
+    if (this._localSimulationRunning) return;
+    this._localSimulationRunning = true;
+    console.info("⚡ [TrafficEngine] Local Simulation Loop Active (Melanjutkan dari Last Known Good State).");
+
+    if (this.localSimInterval) clearInterval(this.localSimInterval);
+
+    this.localSimInterval = setInterval(() => {
+      const curState = stateStore.getState();
+      // Guard mutlak: hentikan seketika jika backend terhubung
+      if (curState.connectionStatus === 'connected' || curState.connectionStatus === 'resyncing') {
+        this.stopLocalSimulation();
+        return;
+      }
+
+      const curTel = curState.telemetry || {};
+      const newVehicles = (curTel.vehiclesToday || 128540) + Math.floor(Math.random() * 4) + 1;
+      const newCo2 = (curTel.co2SavedKg || 1420) + 0.2;
+      const newFuel = (curTel.fuelSavedLiters || 580) + 0.08;
+      const timeStr = new Date().toLocaleTimeString('id-ID') + ' WIB';
+
+      const updatedIntersections = (curState.intersections || []).map(node => {
+        const nextNode = { ...node };
+
+        if (curState.greenWaveActive && (nextNode.id === "node-wonokromo" || nextNode.id === "node-margorejo" || nextNode.id === "node-darmo")) {
+          nextNode.state = "green";
+          nextNode.timer = "∞";
+          nextNode.status = "Green Wave";
+          return nextNode;
+        }
+
+        let curTimer = typeof nextNode.timer === "string" ? (nextNode.greenSplit || 35) : nextNode.timer;
+        curTimer--;
+
+        if (curTimer <= 0) {
+          if (nextNode.state === "green") {
+            nextNode.state = "yellow";
+            curTimer = Math.round(this.yellowDuration);
+          } else if (nextNode.state === "yellow") {
+            nextNode.state = "red";
+            curTimer = nextNode.id === "node-wonokromo" ? this.redDurationBase : 25;
+          } else {
+            nextNode.state = "green";
+            curTimer = nextNode.id === "node-wonokromo" ? (curState.greenSplitWonokromo || 35) : (nextNode.greenSplit || 30);
+          }
+        }
+
+        nextNode.timer = curTimer;
+        if (nextNode.state === "red") nextNode.status = curState.isChaosMode ? "Macet Total" : "Padat";
+        else if (nextNode.state === "yellow") nextNode.status = "Transisi";
+        else nextNode.status = curState.isChaosMode ? "Merayap" : "Lancar";
+
+        return nextNode;
+      });
+
+      // Handle chaos level decay in local simulation
+      let nextChaosLevel = curState.chaosLevel;
+      let nextIsChaos = curState.isChaosMode;
+      if (curState.isChaosMode && nextChaosLevel > 0 && Math.random() < 0.1) {
+        nextChaosLevel--;
+        if (nextChaosLevel <= 0) {
+          nextIsChaos = false;
+          if (typeof window.showToast === "function") {
+            window.showToast("Sistem ATCS Surabaya pulih otomatis dari Mode Keos.");
+          }
+        }
+      }
+
+      // Sinkronkan ke StateStore sebagai Single Source of Truth
+      updateTrafficState({
+        isChaosMode: nextIsChaos,
+        chaosLevel: nextChaosLevel,
+        intersections: updatedIntersections,
+        networkLoad: nextIsChaos ? Math.floor(90 + Math.random() * 8) : Math.floor(65 + Math.random() * 8),
+        avgWaitTime: nextIsChaos ? Math.floor(100 + Math.random() * 15) : Math.floor(38 + Math.random() * 6),
+        congestionIndex: nextIsChaos ? Math.floor(88 + Math.random() * 8) : Math.floor(58 + Math.random() * 6),
+        vehiclesToday: newVehicles,
+        co2SavedKg: Math.round(newCo2),
+        fuelSavedLiters: Math.round(newFuel),
+        timestamp: timeStr
+      }, 'local-simulator');
+
+    }, 1000);
+  }
+
+  /**
+   * Menghentikan Loop Simulasi Lokal saat server Socket online kembali
+   */
+  stopLocalSimulation() {
+    this._localSimulationRunning = false;
+    if (this.graceTimer) {
+      clearTimeout(this.graceTimer);
+      this.graceTimer = null;
+    }
+    if (this.localSimInterval) {
+      clearInterval(this.localSimInterval);
+      this.localSimInterval = null;
+    }
+  }
+
+  /**
    * Bind DOM Events & Controls
    */
+  _bindControls() {
+    this._bindGreenWaveToggle();
+    this._bindChaosMode();
+    this._bindSignalModal();
+    this._bindAiRecommendationButtons();
+  }
+
   _bindGreenWaveToggle() {
     const chkGreenWave = document.getElementById("chkGreenWave");
     if (!chkGreenWave) return;
@@ -451,42 +496,82 @@ export class TrafficEngine {
     const btnMuteSiren = document.getElementById("btnMuteSiren");
 
     if (btnToggleChaos) {
-      btnToggleChaos.addEventListener("click", () => {
+      btnToggleChaos.addEventListener("click", async () => {
         const current = stateStore.getState().isChaosMode;
         const target = !current;
-        if (socketClient.isConnected()) {
-          socketClient.emit('chaos:toggle', { active: target });
-        } else {
-          this.mockState.isChaosMode = target;
-          this.mockState.chaosLevel = target ? 4 : 0;
-          this.handleServerStateUpdate(this.mockState);
-          window.showToast(target ? '🔥 MODE KEOS SIMULASI AKTIF!' : 'Sistem pulih dari mode keos.');
+        btnToggleChaos.disabled = true;
+
+        try {
+          await commandLayer.dispatchCommand({
+            action: 'chaos:toggle',
+            targetType: 'system',
+            targetId: 'atcs-chaos-sim',
+            payload: { active: target }
+          }, false); // low-risk simulation toggle
+        } catch (err) {
+          console.warn("[TrafficEngine] Chaos toggle failed:", err);
+          if (typeof window.showToast === "function") {
+            window.showToast(`❌ Gagal: ${err.message}`, "danger");
+          }
+        } finally {
+          btnToggleChaos.disabled = false;
         }
         soundManager.play('click');
       });
     }
 
     if (btnMuteSiren) {
-      btnMuteSiren.addEventListener("click", () => {
-        const muted = !stateStore.getState().isSirenMuted;
-        stateStore.setState({ isSirenMuted: muted });
-        this._smartUpdateDOM(btnMuteSiren, muted ? "Unmute Sirine" : "Mute Sirine");
+      btnMuteSiren.addEventListener("click", async () => {
+        const currentMuted = !!stateStore.getState().isSirenMuted;
+        const targetMuted = !currentMuted;
+        btnMuteSiren.disabled = true;
+
+        try {
+          await commandLayer.dispatchCommand({
+            action: 'siren:mute',
+            targetType: 'system',
+            targetId: 'siren-sound-node',
+            payload: { muted: targetMuted }
+          }, false); // low-risk
+          this._smartUpdateDOM(btnMuteSiren, targetMuted ? "Unmute Sirine" : "Mute Sirine");
+        } catch (err) {
+          console.warn("[TrafficEngine] Siren mute failed:", err);
+        } finally {
+          btnMuteSiren.disabled = false;
+        }
         soundManager.play('click');
       });
     }
   }
 
   _bindAiRecommendationButtons() {
-    document.querySelectorAll('button[data-action="simulate"], .btn-apply-ai').forEach(btn => {
-      btn.addEventListener("click", () => {
-        if (socketClient.isConnected()) {
-          socketClient.emit('ai:apply-recommendation', { intersectionId: 'node-wonokromo' });
-        } else {
-          const optimizedSplit = Math.floor(38 + Math.random() * 12);
-          stateStore.setState({ greenSplitWonokromo: optimizedSplit });
-          const slider = document.getElementById("greenSplitSlider") || document.getElementById("greenRange");
-          if (slider) slider.value = optimizedSplit;
-          window.showToast(`✨ Rekomendasi AI Diterapkan: Green Split Wonokromo dioptimalkan ke ${optimizedSplit}s!`);
+    const buttons = document.querySelectorAll('button[data-action="simulate"], button[data-action="apply-ai"], .btn-apply-ai, #btnApplyAiRec');
+    buttons.forEach(btn => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        const originalText = btn.textContent;
+        btn.textContent = "PROCESSING...";
+
+        try {
+          const recId = "REC-AI-" + Date.now().toString().slice(-4);
+          await commandLayer.dispatchCommand({
+            action: 'ai:apply-recommendation',
+            targetType: 'intersection',
+            targetId: 'node-wonokromo',
+            payload: { recommendationId: recId }
+          }, false); // low-risk
+          
+          if (typeof window.showToast === "function") {
+            window.showToast("✓ Rekomendasi AI berhasil diterapkan oleh Operator!");
+          }
+        } catch (err) {
+          console.warn("[TrafficEngine] AI recommendation failed:", err);
+          if (typeof window.showToast === "function") {
+            window.showToast(`❌ Gagal: ${err.message}`, "danger");
+          }
+        } finally {
+          btn.disabled = false;
+          btn.textContent = originalText;
         }
         soundManager.play('success');
       });
@@ -520,6 +605,14 @@ export class TrafficEngine {
         }
       });
     }
+  }
+
+  destroy() {
+    this.stopLocalSimulation();
+    this._unsubscribeCallbacks.forEach(un => {
+      if (typeof un === 'function') un();
+    });
+    this._unsubscribeCallbacks = [];
   }
 }
 

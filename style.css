@@ -721,7 +721,8 @@ body.theme-light .ops-card:hover {
 .pill,
 .badge,
 .tag,
-.status-badge {
+.status-badge,
+.provenance-badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -734,12 +735,14 @@ body.theme-light .ops-card:hover {
   background: var(--panel-elevated);
   color: var(--text-muted);
   border: 1px solid var(--border);
+  text-transform: uppercase;
 }
 
 .pill-live,
 .tag-low,
 .badge-success,
-.status-badge.green {
+.status-badge.green,
+.provenance-badge.live {
   background: var(--success-soft);
   color: var(--success);
   border-color: var(--success-border);
@@ -748,7 +751,8 @@ body.theme-light .ops-card:hover {
 .pill-danger,
 .tag-high,
 .badge-danger,
-.status-badge.red {
+.status-badge.red,
+.provenance-badge.offline {
   background: var(--danger-soft);
   color: var(--danger);
   border-color: var(--danger-border);
@@ -757,10 +761,29 @@ body.theme-light .ops-card:hover {
 .pill-ai,
 .tag-moderate,
 .badge-ai,
-.status-badge.yellow {
+.status-badge.yellow,
+.provenance-badge.simulated {
   background: var(--warning-soft);
   color: var(--warning);
   border-color: var(--warning-border);
+}
+
+.provenance-badge.derived {
+  background: var(--primary-soft);
+  color: var(--primary-2);
+  border-color: var(--border-focus);
+}
+
+.provenance-badge.stale {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--text-muted);
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+.provenance-badge.user-triggered {
+  background: rgba(168, 85, 247, 0.12);
+  color: #c084fc;
+  border-color: rgba(168, 85, 247, 0.25);
 }
 
 .pulse-dot {
@@ -2883,5 +2906,39 @@ tbody tr:hover {
   
   .mobile-tab-item.active {
     color: var(--primary);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Phase 9: Accessibility & Focus Ring Hardening (WCAG 2.1 AA)
+   -------------------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--primary, #00e5ff) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(0, 229, 255, 0.25) !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--primary, #00e5ff) !important;
+  outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .marquee-content {
+    animation: none !important;
+  }
+  .ambient-particle-container,
+  .ambient {
+    display: none !important;
   }
 }

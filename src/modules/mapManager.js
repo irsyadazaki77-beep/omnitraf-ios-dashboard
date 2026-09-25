@@ -617,6 +617,63 @@ export class MapManager {
     stateStore.subscribe('state:isChaosMode', ({ value }) => {
       this.updateChaosVisuals(value);
     });
+
+    stateStore.subscribe('state:activeEmergencies', ({ value }) => {
+      this.syncActiveEmergenciesFromState(value);
+    });
+
+    stateStore.subscribe('state:incidents', ({ value }) => {
+      this.updateIncidentsOnMap(value);
+    });
+
+    stateStore.subscribe('state:devices', ({ value }) => {
+      this.updateDeviceMapVisuals(value);
+    });
+  }
+
+  updateDeviceMapVisuals(devices) {
+    if (!devices || typeof document === 'undefined') return;
+    devices.forEach(dev => {
+      let nodeId = null;
+      if (dev.deviceId === 'NODE-EDGE-01') nodeId = 'node-wonokromo';
+      else if (dev.deviceId === 'NODE-EDGE-02') nodeId = 'node-darmo';
+      else if (dev.deviceId === 'NODE-EDGE-03') nodeId = 'node-tunjungan';
+      else if (dev.deviceId === 'NODE-CTRL-01') nodeId = 'node-margorejo';
+
+      if (!nodeId) return;
+
+      const markerEl = document.getElementById(`signal-marker-${nodeId}`);
+      if (markerEl) {
+        const ripple = markerEl.querySelector('.signal-ripple');
+        const core = markerEl.querySelector('.signal-core');
+        if (ripple && core) {
+          // Reset classes
+          ripple.className = 'signal-ripple';
+          core.className = 'signal-core';
+
+          if (dev.healthLevel === 'OFFLINE' || dev.healthLevel === 'STALE') {
+            ripple.style.borderColor = '#64748b';
+            ripple.style.boxShadow = 'none';
+            core.style.backgroundColor = '#64748b';
+            core.style.boxShadow = '0 0 8px #64748b';
+          } else if (dev.healthLevel === 'DEGRADED') {
+            ripple.classList.add('ripple-warning');
+            core.classList.add('node-warning');
+            ripple.style.borderColor = '';
+            ripple.style.boxShadow = '';
+            core.style.backgroundColor = '';
+            core.style.boxShadow = '';
+          } else { // HEALTHY / ONLINE
+            ripple.classList.add('ripple-success');
+            core.classList.add('node-success');
+            ripple.style.borderColor = '';
+            ripple.style.boxShadow = '';
+            core.style.backgroundColor = '';
+            core.style.boxShadow = '';
+          }
+        }
+      }
+    });
   }
 
   /**
@@ -729,6 +786,13 @@ export class MapManager {
 
     this.layerGroupsMap.set(containerId, layerGroups);
     this.maps.set(containerId, map);
+
+    map.on('popupopen', (e) => {
+      this._handlePopupOpen(e, containerId);
+    });
+    map.on('popupclose', (e) => {
+      this._handlePopupClose(e, containerId);
+    });
 
     // 4. Render seluruh data geospasial menggunakan parser L.geoJSON()
     this.drawCorridors(map, layerGroups['road-glows'], layerGroups['minor-roads']);
@@ -1273,6 +1337,48 @@ export class MapManager {
           opacity: 0.35
         }));
       }
+    });
+  }
+
+  /**
+   * Update visual koridor berdasarkan jam Time-Travel (00:00 - 23:00)
+   */
+  updateCorridorLoadByHour(hour) {
+    const h = Math.max(0, Math.min(23, Number(hour) || 0));
+    const isPeakMorning = (h >= 7 && h <= 9);
+    const isPeakEvening = (h >= 16 && h <= 19);
+    const isNight = (h >= 22 || h <= 5);
+
+    let color = '#38bdf8';
+    let weightGlow = 8;
+    if (isPeakMorning || isPeakEvening) {
+      color = '#ef4444';
+      weightGlow = 14;
+    } else if (h >= 11 && h <= 14) {
+      color = '#f59e0b';
+      weightGlow = 10;
+    } else if (isNight) {
+      color = '#10b981';
+      weightGlow = 6;
+    }
+
+    this.corridorGeoJsonLayers.forEach(({ glow, core }) => {
+      glow.setStyle((feature) => {
+        const isCongested = (isPeakMorning || isPeakEvening) && (feature.properties.id === 'corridor-ayani' || feature.properties.id === 'corridor-darmo');
+        return {
+          color: isCongested ? '#ef4444' : color,
+          weight: isCongested ? weightGlow + 4 : weightGlow,
+          opacity: isCongested ? 0.7 : 0.4
+        };
+      });
+      core.setStyle((feature) => {
+        const isCongested = (isPeakMorning || isPeakEvening) && (feature.properties.id === 'corridor-ayani' || feature.properties.id === 'corridor-darmo');
+        return {
+          color: isCongested ? '#ef4444' : color,
+          weight: isCongested ? 7 : 5,
+          opacity: 0.95
+        };
+      });
     });
   }
 
@@ -1865,6 +1971,265 @@ export class MapManager {
     }
   }
 
+  syncActiveEmergenciesFromState(activeEmergencies) {
+    const ROUTES_DB_CLIENT = {
+      "route-soetomo": [
+        { name: "Bundaran Waru", lat: -7.3510, lng: 112.7290 },
+        { name: "Jl. Ahmad Yani (DOLOG)", lat: -7.3450, lng: 112.7300 },
+        { name: "Simpang Margorejo", lat: -7.3180, lng: 112.7330, isIntersection: true, id: "node-margorejo" },
+        { name: "Simpang Jemursari", lat: -7.3100, lng: 112.7335 },
+        { name: "Simpang Wonokromo (DTC)", lat: -7.2985, lng: 112.7345, isIntersection: true, id: "node-wonokromo" },
+        { name: "Marmoyo / KBD", lat: -7.2920, lng: 112.7370 },
+        { name: "Simpang Raya Darmo - Diponegoro", lat: -7.2810, lng: 112.7395, isIntersection: true, id: "node-darmo" },
+        { name: "Jl. Urip Sumoharjo", lat: -7.2760, lng: 112.7430 },
+        { name: "Jl. Ngagel - Dinoyo", lat: -7.2720, lng: 112.7480 },
+        { name: "RSUD Dr. Soetomo (UGD)", lat: -7.2690, lng: 112.7635, isEnd: true }
+      ],
+      "route-yani-darmo": [
+        { name: "Bundaran Waru", lat: -7.3510, lng: 112.7290 },
+        { name: "Jl. Ahmad Yani (DOLOG)", lat: -7.3450, lng: 112.7300 },
+        { name: "Simpang Margorejo", lat: -7.3180, lng: 112.7330, isIntersection: true, id: "node-margorejo" },
+        { name: "Simpang Jemursari", lat: -7.3100, lng: 112.7335 },
+        { name: "Simpang Wonokromo (DTC)", lat: -7.2985, lng: 112.7345, isIntersection: true, id: "node-wonokromo" },
+        { name: "Marmoyo / KBD", lat: -7.2920, lng: 112.7370 },
+        { name: "Simpang Raya Darmo - Diponegoro", lat: -7.2810, lng: 112.7395, isIntersection: true, id: "node-darmo" },
+        { name: "Jl. Urip Sumoharjo", lat: -7.2760, lng: 112.7430 },
+        { name: "Jl. Ngagel - Dinoyo", lat: -7.2720, lng: 112.7480 },
+        { name: "RSUD Dr. Soetomo (UGD)", lat: -7.2690, lng: 112.7635, isEnd: true }
+      ],
+      "route-merr-soetomo": [
+        { name: "MERR Kertajaya", lat: -7.2850, lng: 112.7830 },
+        { name: "Simpang MERR Kertajaya", lat: -7.2710, lng: 112.7565, isIntersection: true, id: "node-merr" },
+        { name: "Gubeng", lat: -7.2645, lng: 112.7635 },
+        { name: "RSUD Dr. Soetomo (UGD)", lat: -7.2690, lng: 112.7635, isEnd: true }
+      ]
+    };
+
+    // 1. Clear any active emergency simulation route/vehicle markers on all maps if array is empty
+    if (!Array.isArray(activeEmergencies) || activeEmergencies.length === 0) {
+      this.layerGroupsMap.forEach((groups) => {
+        const simGroup = groups['emergency-sim-route'];
+        if (simGroup) simGroup.clearLayers();
+      });
+      this._renderEmergencyHud(false);
+      if (this.activeEmergencyMarkers) {
+        this.activeEmergencyMarkers.clear();
+      }
+      return;
+    }
+
+    // 2. Initialize our tracking map if not already present
+    this.activeEmergencyMarkers = this.activeEmergencyMarkers || new Map();
+
+    // 3. For each active emergency in the server-canonical state, render/update its route and marker
+    activeEmergencies.forEach(emg => {
+      const routePoints = ROUTES_DB_CLIENT[emg.routeId] || ROUTES_DB_CLIENT["route-soetomo"];
+      const latlngs = routePoints.map(pt => [pt.lat, pt.lng]);
+
+      // Ensure glowing corridor line is drawn on the map
+      this.layerGroupsMap.forEach((groups, containerId) => {
+        const simGroup = groups['emergency-sim-route'];
+        const map = this.maps.get(containerId);
+        if (!simGroup || !map) return;
+
+        // Draw once if empty
+        if (simGroup.getLayers().length === 0) {
+          L.polyline(latlngs, {
+            color: '#22c55e',
+            weight: 12,
+            opacity: 0.5,
+            lineCap: 'round',
+            className: 'pulse-emergency-route-glow'
+          }).addTo(simGroup);
+
+          L.polyline(latlngs, {
+            color: '#00e5ff',
+            weight: 5,
+            opacity: 1,
+            dashArray: '8, 8',
+            className: 'emergency-route-active'
+          }).addTo(simGroup);
+
+          map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50], maxZoom: 15 });
+        }
+      });
+
+      // Render/update the vehicle marker
+      const markerId = emg.id;
+      let existingMarkerInfo = this.activeEmergencyMarkers.get(markerId);
+
+      const isPmk = emg.vehicleType === "PMK";
+      const iconHtml = `
+        <div style="position: relative; width: 44px; height: 28px;">
+          <div class="amb-radar-ring ${isPmk ? 'pmk' : ''}"></div>
+          <div class="amb-radar-ring ring-delay ${isPmk ? 'pmk' : ''}"></div>
+          <div class="amb-siren-beacon">
+            <span class="amb-flash-light red"></span>
+            <span class="amb-flash-light blue"></span>
+            <span class="amb-body">${isPmk ? '🚒' : '🚑'} ${emg.vehicleId}</span>
+          </div>
+        </div>
+      `;
+
+      const customIcon = L.divIcon({
+        className: 'emergency-112-ambulance-icon',
+        html: iconHtml,
+        iconSize: [44, 28],
+        iconAnchor: [22, 14]
+      });
+
+      if (!existingMarkerInfo) {
+        // Create new markers on all maps
+        const markers = [];
+        this.maps.forEach((map, containerId) => {
+          const simGroup = this.layerGroupsMap.get(containerId)?.['emergency-sim-route'];
+          if (simGroup) {
+            const marker = L.marker(emg.currentPosition, { icon: customIcon, zIndexOffset: 2000 }).addTo(simGroup);
+            
+            const popupContent = `
+              <div class="ios-popup-card vehicle-popup">
+                <div class="ios-popup-header">
+                  <span class="cctv-live-tag alert"><span class="live-dot"></span> PRIORITAS UTAMA</span>
+                  <span class="ios-popup-subtitle">${emg.vehicleType.toUpperCase()} STATUS: ${emg.status}</span>
+                </div>
+                <h4 class="ios-popup-title">${isPmk ? '🚒' : '🚑'} ${emg.vehicleId}</h4>
+                <div class="ios-popup-info-grid">
+                  <div class="ios-info-row">
+                    <span class="ios-info-label">Kecepatan:</span>
+                    <span class="ios-info-value speed-val" style="color: #ef4444; font-weight: 800;">${emg.speed} km/jam</span>
+                  </div>
+                  <div class="ios-info-row">
+                    <span class="ios-info-label">Asal:</span>
+                    <span class="ios-info-value">${emg.origin}</span>
+                  </div>
+                  <div class="ios-info-row">
+                    <span class="ios-info-label">Tujuan:</span>
+                    <span class="ios-info-value">${emg.destination}</span>
+                  </div>
+                  <div class="ios-info-row">
+                    <span class="ios-info-label">Simpang Depan:</span>
+                    <span class="ios-info-value text-primary-2">${emg.nextIntersection || 'Menuju UGD'}</span>
+                  </div>
+                </div>
+              </div>
+            `;
+            marker.bindPopup(popupContent, { maxWidth: 300 });
+            markers.push({ mapId: containerId, marker });
+          }
+        });
+
+        this.activeEmergencyMarkers.set(markerId, { markers, lastPos: emg.currentPosition });
+      } else {
+        // Update marker position on all maps
+        existingMarkerInfo.markers.forEach(({ marker }) => {
+          marker.setLatLng(emg.currentPosition);
+          
+          // Dynamically update popup contents if open
+          if (marker.isPopupOpen()) {
+            const popupContent = `
+              <div class="ios-popup-card vehicle-popup">
+                <div class="ios-popup-header">
+                  <span class="cctv-live-tag alert"><span class="live-dot"></span> PRIORITAS UTAMA</span>
+                  <span class="ios-popup-subtitle">${emg.vehicleType.toUpperCase()} STATUS: ${emg.status}</span>
+                </div>
+                <h4 class="ios-popup-title">${isPmk ? '🚒' : '🚑'} ${emg.vehicleId}</h4>
+                <div class="ios-popup-info-grid">
+                  <div class="ios-info-row">
+                    <span class="ios-info-label">Kecepatan:</span>
+                    <span class="ios-info-value speed-val" style="color: #ef4444; font-weight: 800;">${emg.speed} km/jam</span>
+                  </div>
+                  <div class="ios-info-row">
+                    <span class="ios-info-label">Asal:</span>
+                    <span class="ios-info-value">${emg.origin}</span>
+                  </div>
+                  <div class="ios-info-row">
+                    <span class="ios-info-label">Tujuan:</span>
+                    <span class="ios-info-value">${emg.destination}</span>
+                  </div>
+                  <div class="ios-info-row">
+                    <span class="ios-info-label">Simpang Depan:</span>
+                    <span class="ios-info-value text-primary-2">${emg.nextIntersection || 'Menuju UGD'}</span>
+                  </div>
+                </div>
+              </div>
+            `;
+            marker.setPopupContent(popupContent);
+          }
+        });
+        existingMarkerInfo.lastPos = emg.currentPosition;
+      }
+
+      // Update the floating telemetry HUD
+      this._renderEmergencyHud(true);
+      this._updateEmergencyHud({
+        etaSeconds: Math.round(emg.progress >= 1.0 ? 0 : (1 - emg.progress) * 165),
+        speedKmh: emg.speed,
+        nextIntersection: emg.status === "ARRIVED" ? "RSUD Dr. Soetomo: UGD ARRIVAL" : emg.nextIntersection,
+        progressPct: Math.round(emg.progress * 100)
+      });
+    });
+  }
+
+  updateIncidentsOnMap(incidents) {
+    if (!Array.isArray(incidents)) return;
+
+    this.layerGroupsMap.forEach((groups, containerId) => {
+      const map = this.maps.get(containerId);
+      const incidentGroup = groups['warn-points'];
+      if (!map || !incidentGroup) return;
+
+      incidentGroup.clearLayers();
+
+      const layers = [];
+      incidents.forEach(inc => {
+        // Only render non-archived incidents on map
+        if (inc.status === "ARCHIVED") return;
+
+        const severity = inc.severity || "warning";
+        const customIcon = L.divIcon({
+          className: 'custom-incident-div-icon',
+          html: `<div class="leaflet-incident-marker ${severity === 'danger' ? 'danger' : 'warning'}" style="background: ${severity === 'danger' ? '#ef4444' : '#f59e0b'};" title="${inc.title}">⚠️</div>`,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14]
+        });
+
+        // Use coordinate if provided, else fallback to a default coordinate based on ID
+        const coords = inc.coordinates || [-7.2985, 112.7345];
+        const marker = L.marker(coords, { icon: customIcon });
+
+        const popupContent = `
+          <div class="ios-popup-card incident-popup">
+            <div class="ios-popup-header alert">
+              <span class="alert-pill">⚠️ INSIDEN ${inc.category ? inc.category.toUpperCase() : 'TRAFFIC'}</span>
+              <span class="ios-popup-subtitle">STATUS: ${inc.status}</span>
+            </div>
+            <h4 class="ios-popup-title">${inc.title}</h4>
+            <div class="ios-popup-info-grid">
+              <div class="ios-info-row">
+                <span class="ios-info-label">Lokasi:</span>
+                <span class="ios-info-value">${inc.location || 'Surabaya'}</span>
+              </div>
+              <div class="ios-info-row">
+                <span class="ios-info-label">Unit Disposisi:</span>
+                <span class="ios-info-value text-primary-2" style="color: #00e5ff;">${inc.assignedUnit || 'Belum Ditugaskan'}</span>
+              </div>
+              <div class="ios-info-row">
+                <span class="ios-info-label">Keterangan:</span>
+                <span class="ios-info-value" style="font-family: inherit; font-weight: normal; color: #cbd5e1;">${inc.notes || 'Hambatan lajur terdeteksi.'}</span>
+              </div>
+            </div>
+          </div>
+        `;
+
+        marker.bindPopup(popupContent, { maxWidth: 300 });
+        layers.push(marker);
+      });
+
+      // Use Leaflet's native layer addition or safeAddLayers
+      layers.forEach(l => l.addTo(incidentGroup));
+    });
+  }
+
   /**
    * Render Floating Telemetry HUD di Atas Peta
    */
@@ -2042,6 +2407,78 @@ export class MapManager {
    */
   startEmergencyAmbulanceSimulation(onUpdate, onComplete) {
     return this.startEmergency112Simulation(onUpdate, onComplete);
+  }
+
+  _handlePopupOpen(e, containerId) {
+    const popup = e.popup;
+    const node = popup.getElement();
+    if (!node) return;
+
+    // Check if it's a CCTV popup
+    const titleEl = node.querySelector('.ios-popup-title');
+    if (titleEl && titleEl.textContent.includes('CCTV')) {
+      const name = titleEl.textContent.replace('📷 ', '').trim();
+      
+      const state = stateStore.getState();
+      const metricsMap = state.cctvCamerasMetrics || {};
+      
+      let matchedCamId = null;
+      let matchedCam = null;
+
+      for (const [camId, cam] of Object.entries(metricsMap)) {
+        if (name.toLowerCase().includes(cam.name.toLowerCase()) || cam.name.toLowerCase().includes(name.toLowerCase())) {
+          matchedCamId = camId;
+          matchedCam = cam;
+          break;
+        }
+      }
+
+      if (matchedCam) {
+        popup._liveSyncInterval = setInterval(() => {
+          const freshState = stateStore.getState();
+          const freshCam = freshState.cctvCamerasMetrics?.[matchedCamId];
+          if (!freshCam) return;
+
+          const infoGrid = node.querySelector('.ios-popup-info-grid');
+          if (infoGrid) {
+            infoGrid.innerHTML = `
+              <div class="ios-info-row">
+                <span class="ios-info-label">Status Kamera:</span>
+                <span class="ios-info-value" style="color:${freshCam.status === 'ONLINE' ? '#10b981' : '#f59e0b'}; font-weight:800;">${freshCam.status}</span>
+              </div>
+              <div class="ios-info-row">
+                <span class="ios-info-label">Volume Kendaraan:</span>
+                <span class="ios-info-value" style="color:#00e5ff; font-weight:800;">${freshCam.metrics.vehicleCount} Unit</span>
+              </div>
+              <div class="ios-info-row">
+                <span class="ios-info-label">Panjang Antrean:</span>
+                <span class="ios-info-value" style="color:#ef4444; font-weight:700;">${freshCam.metrics.queueLengthMeters} Meter</span>
+              </div>
+              <div class="ios-info-row">
+                <span class="ios-info-label">Kecepatan Rata-Rata:</span>
+                <span class="ios-info-value speed-val" style="color:#22c55e;">${freshCam.metrics.estimatedAverageSpeed} km/jam</span>
+              </div>
+              <div class="ios-info-row">
+                <span class="ios-info-label">Kepadatan Jalan:</span>
+                <span class="ios-info-value" style="color:#f59e0b;">${freshCam.metrics.trafficDensity}%</span>
+              </div>
+              <div class="ios-info-row">
+                <span class="ios-info-label">Resiko Insiden:</span>
+                <span class="ios-info-value" style="color:${freshCam.metrics.incidentRisk > 70 ? '#ef4444' : '#10b981'};">${freshCam.metrics.incidentRisk}%</span>
+              </div>
+            `;
+          }
+        }, 300);
+      }
+    }
+  }
+
+  _handlePopupClose(e, containerId) {
+    const popup = e.popup;
+    if (popup._liveSyncInterval) {
+      clearInterval(popup._liveSyncInterval);
+      delete popup._liveSyncInterval;
+    }
   }
 
   /**

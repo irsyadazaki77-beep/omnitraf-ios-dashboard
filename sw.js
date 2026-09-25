@@ -4,7 +4,7 @@
  * serta fallback offline resiliency jika jaringan terputus.
  */
 
-const CACHE_NAME = 'omnitraf-sits-v3';
+const CACHE_NAME = 'omnitraf-sits-v5';
 
 const STATIC_ASSETS = [
   '/',
@@ -19,6 +19,8 @@ const STATIC_ASSETS = [
   '/src/config/trafficConfig.js',
   '/src/core/stateStore.js',
   '/src/core/soundManager.js',
+  '/src/core/diagnostics.js',
+  '/src/core/disposer.js',
   '/src/modules/mapManager.js',
   '/src/modules/trafficEngine.js',
   '/src/modules/cctvController.js',

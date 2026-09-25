@@ -44,9 +44,13 @@ export class ChatSystem {
     this.chatBody = null;
     this.chatInput = null;
     this.typingWrapper = null;
+    this._isInitialized = false;
   }
 
   init() {
+    if (this._isInitialized) return;
+    this._isInitialized = true;
+
     this.chatBody = document.getElementById("staffChatBody");
     this.chatInput = document.getElementById("chatInputText");
     this.typingWrapper = document.getElementById("chatTypingWrapper");

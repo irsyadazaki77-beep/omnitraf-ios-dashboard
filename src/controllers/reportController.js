@@ -6,6 +6,7 @@
 
 import { soundManager } from '../core/soundManager.js';
 import { stateStore } from '../core/stateStore.js';
+import { commandLayer } from '../core/commandLayer.js';
 
 export class ReportController {
   constructor() {
@@ -148,6 +149,16 @@ export class ReportController {
 
       this._showDocPreviewState(telemetryData);
       this._logExportHistory(type);
+
+      // Log to centralized audit trail
+      commandLayer.addAuditEvent({
+        type: "report:generated",
+        entity: `Report ${type}`,
+        source: commandLayer.actor,
+        reasonCode: "REPORT_GEN",
+        result: "SUCCESS",
+        details: `Laporan Mobility Snapshot (${type}) berhasil digenerate (${telemetryData.docId}).`
+      });
 
       if (typeof window.showToast === "function") {
         window.showToast(`✓ Mobility Snapshot Surabaya (${type}) berhasil dibuat.`);

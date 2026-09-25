@@ -10,9 +10,13 @@ import { stateStore } from '../core/stateStore.js';
 export class PwaController {
   constructor() {
     this.deferredPrompt = null;
+    this._isInitialized = false;
   }
 
   init() {
+    if (this._isInitialized) return;
+    this._isInitialized = true;
+
     this._registerServiceWorker();
     this._bindInstallPrompt();
     this._bindNetworkStatusBanner();
