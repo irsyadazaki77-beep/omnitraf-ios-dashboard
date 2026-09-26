@@ -42,6 +42,8 @@ export class TrafficEngine {
 
     if (text !== null && el.textContent !== text) {
       el.textContent = text;
+      el.classList.add('value-flash');
+      setTimeout(() => el.classList.remove('value-flash'), 400);
     }
 
     if (className !== null && el.className !== className) {
@@ -135,10 +137,44 @@ export class TrafficEngine {
     const isGreenWave = !!state.greenWaveActive;
     const emergencies = state.activeEmergencies || [];
 
+    this._renderHeaderAndBriefing(state, telemetry, emergencies);
     this._renderApillTimers(intersections, isGreenWave);
     this._renderChaosUI(isChaos, chaosLevel);
     this._renderKpiMetrics(telemetry, state);
     this._renderEmergencyList(emergencies);
+  }
+
+  /**
+   * Render Header Status & Operational Briefing Bar
+   */
+  _renderHeaderAndBriefing(state, telemetry, emergencies) {
+    const isConnected = state.connectionStatus === 'connected';
+    const isResync = state.connectionStatus === 'resyncing';
+    
+    // Header Status Strip
+    const provText = isConnected ? 'SITS GATEWAY LIVE' : isResync ? 'RESYNCING SITS' : 'SIMULATED CACHE';
+    const provClass = isConnected ? 'provenance-badge live' : isResync ? 'provenance-badge derived' : 'provenance-badge simulated';
+    
+    this._smartUpdateDOM('dashHeaderProv', provText, provClass);
+    this._smartUpdateDOM('briefingProvenance', isConnected ? 'REALTIME SITS' : 'LOCAL SIMULATION', provClass);
+    
+    // Local Time Clock
+    const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
+    this._smartUpdateDOM('dashLocalTime', nowStr);
+
+    // Briefing Grid Metrics
+    const congestion = telemetry.congestionIndex ?? telemetry.networkLoad ?? 68;
+    const congestionText = `${congestion}% — ${congestion >= 75 ? 'Macet Total' : congestion >= 60 ? 'Beban Sedang-Tinggi' : 'Lancar'}`;
+    this._smartUpdateDOM('briefingCongestionVal', congestionText);
+
+    if (Array.isArray(emergencies) && emergencies.length > 0) {
+      const firstEmg = emergencies[0];
+      this._smartUpdateDOM('briefingAlertVal', `Prioritas ${firstEmg.vehicleId || 'Ambulans'} Aktif`);
+      this._smartUpdateDOM('briefingAlertSub', `ETA ${firstEmg.ETA || '1m 45s'} • Rute Prioritas Hijau`);
+    } else {
+      this._smartUpdateDOM('briefingAlertVal', 'Kondisi Koridor Normal');
+      this._smartUpdateDOM('briefingAlertSub', 'Sistem Siaga Dispatch 112');
+    }
   }
 
   /**

@@ -683,12 +683,13 @@ export class MapManager {
     this.initAllMaps();
     this._bindZoomControls();
     this._bindLandmarkHUDClose();
+    this._bindToolbarAndDrawerHandlers();
   }
 
   _bindZoomControls() {
-    const zoomInBtns = document.querySelectorAll("#btnMapZoomIn, .btn-zoom-in");
-    const zoomOutBtns = document.querySelectorAll("#btnMapZoomOut, .btn-zoom-out");
-    const zoomResetBtns = document.querySelectorAll("#btnMapZoomReset, .btn-zoom-reset");
+    const zoomInBtns = document.querySelectorAll("#btnMapZoomIn, #btnFullMapZoomIn, .btn-zoom-in");
+    const zoomOutBtns = document.querySelectorAll("#btnMapZoomOut, #btnFullMapZoomOut, .btn-zoom-out");
+    const zoomResetBtns = document.querySelectorAll("#btnMapZoomReset, #btnFullMapReset, .btn-zoom-reset");
 
     zoomInBtns.forEach(btn => {
       btn.addEventListener("click", () => {
@@ -710,6 +711,113 @@ export class MapManager {
         soundManager.play('click');
       });
     });
+  }
+
+  _bindToolbarAndDrawerHandlers() {
+    // Fullscreen toggle
+    const fsBtn = document.getElementById('btnFullMapFullscreen');
+    if (fsBtn) {
+      fsBtn.addEventListener('click', () => {
+        const target = document.getElementById('fullMapContainerWrapper') || document.getElementById('view-map');
+        if (target) {
+          if (!document.fullscreenElement) {
+            if (target.requestFullscreen) target.requestFullscreen();
+          } else {
+            if (document.exitFullscreen) document.exitFullscreen();
+          }
+        }
+        soundManager.play('click');
+      });
+    }
+
+    // Layer drawer deck toggle
+    const toggleLayerBtn = document.getElementById('btnToggleFullMapLayers');
+    const closeLayerBtn = document.getElementById('btnCloseFullMapLayers');
+    const layerDeck = document.getElementById('fullMapLayerDeck');
+
+    if (toggleLayerBtn && layerDeck) {
+      toggleLayerBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        layerDeck.classList.toggle('open');
+        soundManager.play('click');
+      });
+    }
+
+    if (closeLayerBtn && layerDeck) {
+      closeLayerBtn.addEventListener('click', () => {
+        layerDeck.classList.remove('open');
+        soundManager.play('click');
+      });
+    }
+
+    // Legend collapse toggle
+    const legendToggleBtn = document.getElementById('btnToggleLegendCollapse');
+    const legendItemsRow = document.getElementById('legendItemsRow');
+    if (legendToggleBtn && legendItemsRow) {
+      legendToggleBtn.addEventListener('click', () => {
+        legendItemsRow.classList.toggle('collapsed');
+        legendToggleBtn.classList.toggle('rotated');
+        soundManager.play('click');
+      });
+    }
+
+    // Layer mode quick buttons
+    const modeBtns = document.querySelectorAll('.spatial-tool-btn[data-layer-mode], .map-layer-pill-btn[data-layer-mode]');
+    modeBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const mode = btn.dataset.layerMode;
+        if (mode) this.setMapLayerMode(mode);
+        soundManager.play('click');
+      });
+    });
+
+    // Layer checkboxes inside drawer
+    document.querySelectorAll('.layer-toggle-checkbox').forEach(chk => {
+      chk.addEventListener('change', (e) => {
+        const layerKey = e.target.dataset.layer;
+        if (layerKey) {
+          this.toggleLayer(layerKey, e.target.checked);
+          soundManager.play('click');
+        }
+      });
+    });
+
+    // Custom Context Menu Actions
+    const contextMenu = document.getElementById('mapContextMenu');
+    if (contextMenu) {
+      contextMenu.querySelectorAll('.context-menu-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const action = item.dataset.action;
+          contextMenu.style.display = 'none';
+
+          if (action === 'center-here' && this._lastRightClickLatLng) {
+            this.maps.forEach(map => map.flyTo(this._lastRightClickLatLng, 16));
+            if (typeof window.showToast === 'function') window.showToast('📍 Tampilan dipusatkan.');
+          } else if (action === 'filter-incidents' && this._lastRightClickLatLng) {
+            this.setMapLayerMode('all');
+            if (typeof window.showToast === 'function') window.showToast('⚠️ Menampilkan insiden di area ini.');
+          } else if (action === 'filter-cctv' && this._lastRightClickLatLng) {
+            this.setMapLayerMode('nodes');
+            if (typeof window.showToast === 'function') window.showToast('📷 Menampilkan node CCTV SITS.');
+          } else if (action === 'sim-112') {
+            this.startEmergency112Simulation();
+          } else if (action === 'copy-coords' && this._lastRightClickLatLng) {
+            const str = `${this._lastRightClickLatLng.lat.toFixed(5)}, ${this._lastRightClickLatLng.lng.toFixed(5)}`;
+            if (navigator.clipboard) {
+              navigator.clipboard.writeText(str);
+            }
+            if (typeof window.showToast === 'function') window.showToast(`📋 Koordinat disalin: ${str}`);
+          }
+          soundManager.play('click');
+        });
+      });
+
+      document.addEventListener('click', () => {
+        contextMenu.style.display = 'none';
+      });
+    }
   }
 
   _bindLandmarkHUDClose() {
@@ -792,6 +900,18 @@ export class MapManager {
     });
     map.on('popupclose', (e) => {
       this._handlePopupClose(e, containerId);
+    });
+    map.on('contextmenu', (e) => {
+      if (e.originalEvent) e.originalEvent.preventDefault();
+      const menu = document.getElementById('mapContextMenu');
+      if (!menu) return;
+      this._lastRightClickLatLng = e.latlng;
+      menu.style.display = 'flex';
+      const x = Math.min(window.innerWidth - 220, e.originalEvent.clientX);
+      const y = Math.min(window.innerHeight - 240, e.originalEvent.clientY);
+      menu.style.left = `${x}px`;
+      menu.style.top = `${y}px`;
+      menu.setAttribute('aria-hidden', 'false');
     });
 
     // 4. Render seluruh data geospasial menggunakan parser L.geoJSON()
