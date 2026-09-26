@@ -18,6 +18,7 @@ import {
 } from '../config/surabayaCoords.js';
 import { stateStore } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
+import { Disposer } from '../core/disposer.js';
 
 /**
  * Helper menghitung jarak Euclidean antar dua titik koordinat [lng, lat]
@@ -90,7 +91,7 @@ function safeAddLayers(group, layers) {
 function createClusterGroup(clusterType = 'cctv') {
   if (typeof L !== 'undefined' && typeof L.markerClusterGroup === 'function') {
     return L.markerClusterGroup({
-      maxClusterRadius: 120,
+      maxClusterRadius: 80,
       spiderfyOnMaxZoom: true,
       showCoverageOnHover: false,
       zoomToBoundsOnClick: true,
@@ -104,7 +105,27 @@ function createClusterGroup(clusterType = 'cctv') {
         if (count > 12) sizeClass = 'cluster-large';
         else if (count > 4) sizeClass = 'cluster-medium';
 
+        // Inspect children dynamically to set the class
+        const markers = cluster.getAllChildMarkers();
+        let hasSignal = false;
+        let hasCctv = false;
+        let hasIncident = false;
+        
+        markers.forEach(m => {
+          const html = m.options.icon?.options?.html || '';
+          if (html.includes('leaflet-signal-node-wrapper') || html.includes('signal-marker-')) hasSignal = true;
+          else if (html.includes('leaflet-cctv-marker') || html.includes('cctv-popup') || html.includes('custom-cctv')) hasCctv = true;
+          else if (html.includes('leaflet-incident-marker') || html.includes('incident-popup')) hasIncident = true;
+        });
+
         let typeClass = `cluster-${clusterType}`;
+        if (clusterType === 'master') {
+          if (hasIncident && !hasSignal && !hasCctv) typeClass = 'cluster-incidents';
+          else if (hasSignal && !hasIncident && !hasCctv) typeClass = 'cluster-signals';
+          else if (hasCctv && !hasIncident && !hasSignal) typeClass = 'cluster-cctv';
+          else typeClass = 'cluster-mixed';
+        }
+
         return L.divIcon({
           html: `<div class="omni-cluster-bubble ${sizeClass} ${typeClass}"><span>${count}</span></div>`,
           className: 'omni-cluster-icon',
@@ -119,6 +140,41 @@ function createClusterGroup(clusterType = 'cctv') {
   return L.layerGroup();
 }
 
+/**
+ * Map speed to level of service (LOS), dynamic colors, density classes and labels
+ * @param {number} speed - actual or simulated speed in km/h
+ * @returns {Object} { vc, los, color, densityClass, label }
+ */
+export function getCorridorLOS(speed) {
+  let vc, los, color, densityClass, label;
+  if (speed <= 14) {
+    vc = 0.89;
+    los = "F";
+    color = "#7f1d1d"; // Dark Red
+    densityClass = "los-f-gridlock";
+    label = "Gridlock / Macet Total (LOS F)";
+  } else if (speed <= 25) {
+    vc = 0.78;
+    los = "D/E";
+    color = "#f97316"; // Orange
+    densityClass = "los-de-congested";
+    label = "Padat (LOS D/E)";
+  } else if (speed <= 40) {
+    vc = 0.58;
+    los = "C";
+    color = "#eab308"; // Yellow
+    densityClass = "los-c-moderate";
+    label = "Padat Lancar (LOS C)";
+  } else {
+    vc = 0.28;
+    los = "A/B";
+    color = "#22c55e"; // Green/Emerald
+    densityClass = "los-ab-smooth";
+    label = "Lancar (LOS A/B)";
+  }
+  return { vc, los, color, densityClass, label };
+}
+
 export class MapManager {
   constructor() {
     /** @type {Map<string, L.Map>} Map instance storage keyed by container ID */
@@ -126,6 +182,9 @@ export class MapManager {
     this.tileLayers = new Map();
     this.animFrameId = null;
     this.lastAnimTime = 0;
+    this.isActive = false;
+    this._invalidateTimer = null;
+    this.disposer = new Disposer('MapManager');
 
     /** Store references to corridor GeoJSON layers across map instances */
     this.corridorGeoJsonLayers = [];
@@ -155,6 +214,24 @@ export class MapManager {
 
     this._injectZIndexStyles();
     this._setupStoreListeners();
+    this._setupWindowListeners();
+
+    if (typeof window !== 'undefined') {
+      window.handleCorridorCctv = (corridorId) => {
+        stateStore.setState({ currentView: 'cctv' });
+        soundManager.play('click');
+        if (typeof window.showToast === 'function') {
+          window.showToast(`Memuat saluran CCTV SITS Koridor: ${corridorId}`);
+        }
+      };
+      window.handleCorridorApill = (corridorId) => {
+        stateStore.setState({ currentView: 'signals' });
+        soundManager.play('click');
+        if (typeof window.showToast === 'function') {
+          window.showToast(`Sinkronisasi siklus APILL SITS untuk Koridor: ${corridorId}`);
+        }
+      };
+    }
   }
 
   /**
@@ -605,30 +682,69 @@ export class MapManager {
   }
 
   _setupStoreListeners() {
-    stateStore.subscribe('state:currentView', ({ value }) => {
+    this.disposer.addStoreSubscription(stateStore, 'state:currentView', ({ value }) => {
       this.initAllMaps();
-      setTimeout(() => this.invalidateSize(), 200);
+      this.debouncedInvalidateSize(200);
     });
 
-    stateStore.subscribe('traffic:green-wave', ({ active }) => {
+    this.disposer.addStoreSubscription(stateStore, 'traffic:green-wave', ({ active }) => {
       this.updateGreenWaveVisuals(active);
     });
 
-    stateStore.subscribe('state:isChaosMode', ({ value }) => {
+    this.disposer.addStoreSubscription(stateStore, 'state:isChaosMode', ({ value }) => {
       this.updateChaosVisuals(value);
     });
 
-    stateStore.subscribe('state:activeEmergencies', ({ value }) => {
+    this.disposer.addStoreSubscription(stateStore, 'state:activeEmergencies', ({ value }) => {
       this.syncActiveEmergenciesFromState(value);
     });
 
-    stateStore.subscribe('state:incidents', ({ value }) => {
+    this.disposer.addStoreSubscription(stateStore, 'state:incidents', ({ value }) => {
       this.updateIncidentsOnMap(value);
     });
 
-    stateStore.subscribe('state:devices', ({ value }) => {
+    this.disposer.addStoreSubscription(stateStore, 'state:intersections', ({ value }) => {
+      this.syncIntersectionsFromState(value);
+    });
+
+    this.disposer.addStoreSubscription(stateStore, 'state:devices', ({ value }) => {
       this.updateDeviceMapVisuals(value);
     });
+  }
+
+  _setupWindowListeners() {
+    if (typeof window === 'undefined') return;
+
+    this.disposer.addEventListener(window, 'resize', () => {
+      this.debouncedInvalidateSize(200);
+    });
+
+    this.disposer.addEventListener(document, 'visibilitychange', () => {
+      if (document.hidden) {
+        if (this.animFrameId) {
+          cancelAnimationFrame(this.animFrameId);
+          this.animFrameId = null;
+        }
+      } else {
+        if (this.isActive && !this.animFrameId) {
+          this.startEmergencyVehicleAnimation();
+        }
+      }
+    });
+  }
+
+  /**
+   * Debounced invalidateSize call to avoid layout thrashing during fast resize or transitions
+   * @param {number} [delay=150] Delay in milliseconds
+   */
+  debouncedInvalidateSize(delay = 150) {
+    if (this._invalidateTimer) {
+      clearTimeout(this._invalidateTimer);
+    }
+    this._invalidateTimer = setTimeout(() => {
+      this.invalidateSize();
+      this._invalidateTimer = null;
+    }, delay);
   }
 
   updateDeviceMapVisuals(devices) {
@@ -680,10 +796,44 @@ export class MapManager {
    * Main initializer called by App orchestrator
    */
   init() {
+    this.isActive = true;
     this.initAllMaps();
     this._bindZoomControls();
     this._bindLandmarkHUDClose();
     this._bindToolbarAndDrawerHandlers();
+    
+    setTimeout(() => {
+      this.invalidateSize();
+    }, 150);
+  }
+
+  activate() {
+    this.isActive = true;
+    this.initAllMaps();
+    this._bindZoomControls();
+    this._bindLandmarkHUDClose();
+    this._bindToolbarAndDrawerHandlers();
+    
+    setTimeout(() => {
+      this.invalidateSize();
+    }, 150);
+
+    if (!document.hidden && !this.animFrameId) {
+      this.startEmergencyVehicleAnimation();
+    }
+  }
+
+  deactivate() {
+    this.isActive = false;
+    if (this.animFrameId) {
+      cancelAnimationFrame(this.animFrameId);
+      this.animFrameId = null;
+    }
+    if (this._invalidateTimer) {
+      clearTimeout(this._invalidateTimer);
+      this._invalidateTimer = null;
+    }
+    this.stopEmergency112Simulation();
   }
 
   _bindZoomControls() {
@@ -880,16 +1030,19 @@ export class MapManager {
     this.tileLayers.set(containerId, tileLayer);
 
     // 3. Inisialisasi Layer Groups & Marker Cluster Groups untuk kontainer ini
+    const masterCluster = createClusterGroup('master').addTo(map);
+
     const layerGroups = {
       'district-zones': L.layerGroup().addTo(map),
       'map-river': L.layerGroup().addTo(map),
       'road-glows': L.layerGroup().addTo(map),
       'minor-roads': L.layerGroup().addTo(map),
       'density-heat': L.layerGroup(),
-      'warn-points': createClusterGroup('incidents').addTo(map),
-      'landmark-group': createClusterGroup('landmarks').addTo(map),
-      'signal-points': createClusterGroup('signals').addTo(map),
-      'emergency-sim-route': L.layerGroup().addTo(map)
+      'warn-points': L.layerGroup(),
+      'landmark-group': L.layerGroup(),
+      'signal-points': L.layerGroup(),
+      'emergency-sim-route': L.layerGroup().addTo(map),
+      'master-cluster': masterCluster
     };
 
     this.layerGroupsMap.set(containerId, layerGroups);
@@ -918,9 +1071,9 @@ export class MapManager {
     this.drawCorridors(map, layerGroups['road-glows'], layerGroups['minor-roads']);
     this.drawRiver(map, layerGroups['map-river']);
     this.drawDistricts(map, layerGroups['district-zones']);
-    this.drawIncidents(map, layerGroups['warn-points']);
-    this.drawLandmarksAndCctv(map, layerGroups['landmark-group']);
-    this.drawIntersections(map, layerGroups['signal-points']);
+    this.drawIncidents(map, layerGroups['warn-points'], masterCluster);
+    this.drawLandmarksAndCctv(map, layerGroups['landmark-group'], masterCluster);
+    this.drawIntersections(map, layerGroups['signal-points'], masterCluster);
     this.drawDensityHeatmap(map, layerGroups['density-heat']);
     this.setupEmergencyVehicleMarkers(map);
     this.createMapLayerSwitcher(map, containerId);
@@ -943,11 +1096,12 @@ export class MapManager {
     // A. Koridor Arteri Utama (L.geoJSON with Neon Glow & Animated Traffic Dash)
     const corridorGeoJson = L.geoJSON(SURABAYA_CORRIDORS_GEOJSON, {
       style: (feature) => {
-        const isCongested = (feature.properties.speed || 30) < 20 || feature.properties.color === '#ef4444';
+        const speed = feature.properties.speed || 30;
+        const los = getCorridorLOS(speed);
         return {
-          color: isCongested ? '#ef4444' : (feature.properties.color || '#00e5ff'),
+          color: los.color,
           weight: (feature.properties.weight || 5) + 4,
-          opacity: 0.45,
+          opacity: 0.4,
           className: 'corridor-neon-glow',
           lineCap: 'round',
           lineJoin: 'round'
@@ -955,26 +1109,52 @@ export class MapManager {
       },
       onEachFeature: (feature, layer) => {
         const p = feature.properties;
+        const speed = p.speed || 30;
+        const los = getCorridorLOS(speed);
+        const lastUpdatedStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + " WIB";
+
         const popupContent = `
           <div class="ios-popup-card">
             <div class="ios-popup-header">
-              <span class="cctv-live-tag"><span class="live-dot"></span> REALTIME SITS</span>
+              <span class="cctv-live-tag" style="background: ${los.color}22; color: ${los.color}; border: 1px solid ${los.color}44;">
+                <span class="live-dot" style="background: ${los.color};"></span> REALTIME SITS
+              </span>
               <span class="ios-popup-subtitle">KORIDOR GEOSPASIAL</span>
             </div>
-            <h4 class="ios-popup-title">🛣️ ${p.name}</h4>
+            <h4 class="ios-popup-title" style="margin-top: 6px; font-size: 13.5px; font-weight: 700; color: #ffffff;">🛣️ ${p.name}</h4>
+            
+            <div class="vc-progress-container" style="margin-top: 10px; margin-bottom: 10px;">
+              <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); margin-bottom: 4px;">
+                <span>V/C Ratio (Derajat Kejenuhan)</span>
+                <strong style="color: ${los.color}">${(los.vc).toFixed(2)}</strong>
+              </div>
+              <div class="mini-progress-bar" style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; width: 100%;">
+                <div style="width: ${los.vc * 100}%; background: ${los.color}; height: 100%; border-radius: 3px; transition: width 0.5s ease-out;"></div>
+              </div>
+            </div>
+
             <div class="ios-popup-info-grid">
               <div class="ios-info-row">
-                <span class="ios-info-label">Status Koridor:</span>
-                <span class="ios-info-value" style="color:${p.color}; font-weight:800;">${p.status}</span>
+                <span class="ios-info-label">Kecepatan Aktual:</span>
+                <span class="ios-info-value speed-val" style="color: #00e5ff; font-weight:800;">${speed} km/jam</span>
               </div>
               <div class="ios-info-row">
-                <span class="ios-info-label">Kecepatan Rata-Rata:</span>
-                <span class="ios-info-value speed-val" style="color:#00e5ff;">${p.speed} km/jam</span>
+                <span class="ios-info-label">Tingkat Kepadatan:</span>
+                <span class="ios-info-value" style="color: ${los.color}; font-weight: 800;">${los.label}</span>
               </div>
               <div class="ios-info-row">
-                <span class="ios-info-label">Sistem Integrasi:</span>
-                <span class="ios-info-value">Surabaya Integrated Traffic System</span>
+                <span class="ios-info-label">Pembaruan Terakhir:</span>
+                <span class="ios-info-value" style="color: var(--text-muted);">${lastUpdatedStr}</span>
               </div>
+            </div>
+
+            <div class="popup-action-buttons" style="display: flex; gap: 6px; margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px;">
+              <button class="popup-action-btn btn-cctv" onclick="window.handleCorridorCctv('${p.id}')" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 4px; background: rgba(0, 229, 255, 0.15); border: 1px solid rgba(0, 229, 255, 0.4); color: #00e5ff; font-size: 10.5px; font-weight: 700; padding: 6px 8px; border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                📹 Lihat CCTV
+              </button>
+              <button class="popup-action-btn btn-apill" onclick="window.handleCorridorApill('${p.id}')" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 4px; background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); color: #22c55e; font-size: 10.5px; font-weight: 700; padding: 6px 8px; border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                🚦 Atur APILL
+              </button>
             </div>
           </div>
         `;
@@ -985,12 +1165,13 @@ export class MapManager {
     // Layer garis inti (core lines with active flowing dash)
     const coreGeoJson = L.geoJSON(SURABAYA_CORRIDORS_GEOJSON, {
       style: (feature) => {
-        const isCongested = (feature.properties.speed || 30) < 20 || feature.properties.color === '#ef4444';
+        const speed = feature.properties.speed || 30;
+        const los = getCorridorLOS(speed);
         return {
-          color: isCongested ? '#FF453A' : (feature.properties.color || '#00e5ff'),
+          color: los.color,
           weight: feature.properties.weight || 5,
           opacity: 0.95,
-          className: isCongested ? 'corridor-congested-flow' : 'corridor-smooth-flow',
+          className: los.densityClass,
           lineCap: 'round',
           lineJoin: 'round'
         };
@@ -1064,7 +1245,7 @@ export class MapManager {
   /**
    * Render Titik Peringatan Insiden dari GeoJSON Point ke Cluster Group
    */
-  drawIncidents(map, incidentGroup) {
+  drawIncidents(map, incidentGroup, masterCluster) {
     if (!map) return;
 
     const incidentGeoJson = L.geoJSON(SURABAYA_INCIDENTS_GEOJSON, {
@@ -1082,18 +1263,18 @@ export class MapManager {
         layer.bindPopup(`
           <div class="ios-popup-card incident-popup">
             <div class="ios-popup-header alert">
-              <span class="alert-pill">⚠️ INSIDEN LALU LINTAS</span>
+              <span class="alert-pill" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 2px 6px; border-radius: 4px; font-weight: bold;">⚠️ INSIDEN LALU LINTAS</span>
               <span class="ios-popup-subtitle">SIAGA SITS 112</span>
             </div>
             <h4 class="ios-popup-title">${p.name}</h4>
             <div class="ios-popup-info-grid">
               <div class="ios-info-row">
                 <span class="ios-info-label">Jenis Insiden:</span>
-                <span class="ios-info-value highlight-red">${p.jenis}</span>
+                <span class="ios-info-value highlight-red" style="color: #ef4444; font-weight: bold;">${p.jenis}</span>
               </div>
               <div class="ios-info-row">
                 <span class="ios-info-label">Status Penanganan:</span>
-                <span class="ios-info-value highlight-amber">${p.est} (${p.petugas})</span>
+                <span class="ios-info-value highlight-amber" style="color: #f59e0b; font-weight: bold;">${p.est} (${p.petugas})</span>
               </div>
             </div>
           </div>
@@ -1105,14 +1286,15 @@ export class MapManager {
     const layers = [];
     incidentGeoJson.eachLayer(layer => {
       layers.push(layer);
+      if (incidentGroup) incidentGroup.addLayer(layer);
+      if (masterCluster) masterCluster.addLayer(layer);
     });
-    safeAddLayers(incidentGroup, layers);
   }
 
   /**
    * Render CCTV & Landmark dari GeoJSON Point ke Cluster Group
    */
-  drawLandmarksAndCctv(map, landmarkGroup) {
+  drawLandmarksAndCctv(map, landmarkGroup, masterCluster) {
     if (!map) return;
 
     // 1. CCTV Cameras (GeoJSON)
@@ -1175,31 +1357,55 @@ export class MapManager {
     const layers = [];
     cctvGeoJson.eachLayer(layer => {
       layers.push(layer);
+      if (landmarkGroup) landmarkGroup.addLayer(layer);
+      if (masterCluster) masterCluster.addLayer(layer);
     });
     landmarkGeoJson.eachLayer(layer => {
       layers.push(layer);
+      if (landmarkGroup) landmarkGroup.addLayer(layer);
+      if (masterCluster) masterCluster.addLayer(layer);
     });
-
-    safeAddLayers(landmarkGroup, layers);
   }
 
   /**
    * Render Node Sinyal APILL dari GeoJSON Point ke Cluster Group
    */
-  drawIntersections(map, signalGroup) {
+  drawIntersections(map, signalGroup, masterCluster) {
     if (!map) return;
 
     const signalGeoJson = L.geoJSON(SITS_INTERSECTIONS_GEOJSON, {
       pointToLayer: (feature, latlng) => {
         const p = feature.properties;
-        const statusClass = p.status === 'danger' ? 'ripple-danger' : p.status === 'warning' ? 'ripple-warning' : 'ripple-success';
-        const nodeClass = p.status === 'danger' ? 'node-danger' : p.status === 'warning' ? 'node-warning' : 'node-success';
+        
+        // Check if there's a live state in stateStore for this node
+        const liveStateNode = stateStore.getState().intersections?.find(n => n.id === p.id);
+        const stateColor = (liveStateNode ? liveStateNode.state : p.status === 'danger' ? 'red' : p.status === 'warning' ? 'yellow' : 'green').toLowerCase();
+        
+        let rippleClass = 'ripple-success';
+        let nodeClass = 'node-success';
+        let popupColor = '#22c55e';
+        let statusLabel = 'JALAN (HIJAU)';
+        let timerVal = liveStateNode ? liveStateNode.timer : p.defaultGreen;
+        let waitTimeVal = liveStateNode ? liveStateNode.waitTime : p.currentWait;
+        let greenSplitVal = liveStateNode ? liveStateNode.greenSplit : p.defaultGreen;
+        
+        if (stateColor === 'red') {
+          rippleClass = 'ripple-danger';
+          nodeClass = 'node-danger';
+          popupColor = '#ef4444';
+          statusLabel = 'BERHENTI (MERAH)';
+        } else if (stateColor === 'yellow') {
+          rippleClass = 'ripple-warning';
+          nodeClass = 'node-warning';
+          popupColor = '#f59e0b';
+          statusLabel = 'PERSIAPAN (KUNING)';
+        }
 
         const nodeIcon = L.divIcon({
           className: 'custom-signal-div-icon',
           html: `
             <div class="leaflet-signal-node-wrapper" id="signal-marker-${p.id}">
-              <span class="signal-ripple ${statusClass}"></span>
+              <span class="signal-ripple ${rippleClass}"></span>
               <span class="signal-core ${nodeClass}"></span>
             </div>
           `,
@@ -1215,26 +1421,28 @@ export class MapManager {
         marker.bindPopup(`
           <div class="ios-popup-card">
             <div class="ios-popup-header">
-              <span class="cctv-live-tag"><span class="live-dot"></span> NODE APILL</span>
+              <span class="cctv-live-tag" style="background: ${popupColor}22; color: ${popupColor}; border: 1px solid ${popupColor}44;">
+                <span class="live-dot" style="background: ${popupColor};"></span> NODE APILL
+              </span>
               <span class="ios-popup-subtitle">${p.district}</span>
             </div>
-            <h4 class="ios-popup-title">🚦 ${p.name}</h4>
+            <h4 class="ios-popup-title" style="margin-top: 6px; font-size: 13.5px; font-weight: 700; color: #ffffff;">🚦 ${p.name}</h4>
             <div class="ios-popup-info-grid">
               <div class="ios-info-row">
+                <span class="ios-info-label">Sinyal Aktif:</span>
+                <span class="ios-info-value" style="color: ${popupColor}; font-weight: 800; text-transform: uppercase;">${statusLabel}</span>
+              </div>
+              <div class="ios-info-row">
+                <span class="ios-info-label">Durasi Timer Sisa:</span>
+                <span class="ios-info-value speed-val" style="color: #00e5ff; font-weight: 800;">${timerVal} dtk</span>
+              </div>
+              <div class="ios-info-row">
                 <span class="ios-info-label">Fase Hijau Adaptif:</span>
-                <span class="ios-info-value" style="color:${p.color}; font-weight:800;">${p.defaultGreen} dtk</span>
+                <span class="ios-info-value" style="font-weight: 800;">${greenSplitVal} dtk</span>
               </div>
               <div class="ios-info-row">
-                <span class="ios-info-label">Kecepatan Rata-Rata:</span>
-                <span class="ios-info-value speed-val" style="color:#22c55e; font-weight:800;">28 km/jam</span>
-              </div>
-              <div class="ios-info-row">
-                <span class="ios-info-label">Waktu Tunggu Antrean:</span>
-                <span class="ios-info-value">${p.currentWait} dtk</span>
-              </div>
-              <div class="ios-info-row">
-                <span class="ios-info-label">Status Siklus:</span>
-                <span class="ios-info-value" style="color:var(--primary); font-weight:700;">🟢 SIKLUS ADAPTIF AKTIF</span>
+                <span class="ios-info-label">Waktu Tunggu Sektoral:</span>
+                <span class="ios-info-value">${waitTimeVal} dtk</span>
               </div>
             </div>
           </div>
@@ -1247,8 +1455,9 @@ export class MapManager {
     const layers = [];
     signalGeoJson.eachLayer(layer => {
       layers.push(layer);
+      if (signalGroup) signalGroup.addLayer(layer);
+      if (masterCluster) masterCluster.addLayer(layer);
     });
-    safeAddLayers(signalGroup, layers);
   }
 
   /**
@@ -1330,14 +1539,20 @@ export class MapManager {
    * Fisika pergerakan dinormalisasi menggunakan jarak Euclidean sehingga kecepatan visual konstan & stabil.
    */
   startEmergencyVehicleAnimation() {
+    if (this.animFrameId) {
+      cancelAnimationFrame(this.animFrameId);
+      this.animFrameId = null;
+    }
+
     const ambCoords = EMERGENCY_PATHS_GEOJSON.ambulance.geometry.coordinates; // [[lng, lat], ...]
     const fireCoords = EMERGENCY_PATHS_GEOJSON.fire.geometry.coordinates;
 
-    // Kecepatan linear ternormalisasi (derajat geometris per detik)
-    const ambLinearSpeed = 0.0036; // ~60 km/jam visual speed
-    const fireLinearSpeed = 0.0028; // ~50 km/jam visual speed
-
     const animateStep = (timestamp) => {
+      if (!this.isActive || document.hidden) {
+        this.animFrameId = null;
+        return;
+      }
+
       if (!this.lastAnimTime) this.lastAnimTime = timestamp;
       const dt = Math.min(0.1, Math.max(0.001, (timestamp - this.lastAnimTime) / 1000));
       this.lastAnimTime = timestamp;
@@ -1347,56 +1562,53 @@ export class MapManager {
       const ambLinearSpeed = 0.0036 * mult; // 60 km/jam -> ~150 km/jam saat Green Wave
       const fireLinearSpeed = 0.0028 * mult;
 
-      // Jalankan animasi jika document aktif
-      if (!document.hidden) {
-        this.emergencyMarkers.forEach(group => {
-          // --- 1. AMBULANS 02 TWEENING WITH EUCLIDEAN NORMALIZATION ---
-          let p1Amb = ambCoords[group.ambSeg];
-          let p2Amb = ambCoords[group.ambSeg + 1] || ambCoords[0];
-          let distAmb = calculateDistance(p1Amb, p2Amb);
+      this.emergencyMarkers.forEach(group => {
+        // --- 1. AMBULANS 02 TWEENING WITH EUCLIDEAN NORMALIZATION ---
+        let p1Amb = ambCoords[group.ambSeg];
+        let p2Amb = ambCoords[group.ambSeg + 1] || ambCoords[0];
+        let distAmb = calculateDistance(p1Amb, p2Amb);
 
-          // Tambahkan progress sebanding dengan jarak asli segmen
-          group.ambProgress += (dt * ambLinearSpeed) / distAmb;
+        // Tambahkan progress sebanding dengan jarak asli segmen
+        group.ambProgress += (dt * ambLinearSpeed) / distAmb;
 
-          while (group.ambProgress >= 1) {
-            group.ambProgress -= 1;
-            group.ambSeg = (group.ambSeg + 1) % (ambCoords.length - 1);
-            p1Amb = ambCoords[group.ambSeg];
-            p2Amb = ambCoords[group.ambSeg + 1] || ambCoords[0];
-            distAmb = calculateDistance(p1Amb, p2Amb);
-          }
+        while (group.ambProgress >= 1) {
+          group.ambProgress -= 1;
+          group.ambSeg = (group.ambSeg + 1) % (ambCoords.length - 1);
+          p1Amb = ambCoords[group.ambSeg];
+          p2Amb = ambCoords[group.ambSeg + 1] || ambCoords[0];
+          distAmb = calculateDistance(p1Amb, p2Amb);
+        }
 
-          // Linear Interpolation (Lerp)
-          const lngAmb = p1Amb[0] + (p2Amb[0] - p1Amb[0]) * group.ambProgress;
-          const latAmb = p1Amb[1] + (p2Amb[1] - p1Amb[1]) * group.ambProgress;
+        // Linear Interpolation (Lerp)
+        const lngAmb = p1Amb[0] + (p2Amb[0] - p1Amb[0]) * group.ambProgress;
+        const latAmb = p1Amb[1] + (p2Amb[1] - p1Amb[1]) * group.ambProgress;
 
-          if (group.ambulance) {
-            group.ambulance.setLatLng([latAmb, lngAmb]);
-          }
+        if (group.ambulance) {
+          group.ambulance.setLatLng([latAmb, lngAmb]);
+        }
 
-          // --- 2. PEMADAM 04 TWEENING WITH EUCLIDEAN NORMALIZATION ---
-          let p1Fire = fireCoords[group.fireSeg];
-          let p2Fire = fireCoords[group.fireSeg + 1] || fireCoords[0];
-          let distFire = calculateDistance(p1Fire, p2Fire);
+        // --- 2. PEMADAM 04 TWEENING WITH EUCLIDEAN NORMALIZATION ---
+        let p1Fire = fireCoords[group.fireSeg];
+        let p2Fire = fireCoords[group.fireSeg + 1] || fireCoords[0];
+        let distFire = calculateDistance(p1Fire, p2Fire);
 
-          group.fireProgress += (dt * fireLinearSpeed) / distFire;
+        group.fireProgress += (dt * fireLinearSpeed) / distFire;
 
-          while (group.fireProgress >= 1) {
-            group.fireProgress -= 1;
-            group.fireSeg = (group.fireSeg + 1) % (fireCoords.length - 1);
-            p1Fire = fireCoords[group.fireSeg];
-            p2Fire = fireCoords[group.fireSeg + 1] || fireCoords[0];
-            distFire = calculateDistance(p1Fire, p2Fire);
-          }
+        while (group.fireProgress >= 1) {
+          group.fireProgress -= 1;
+          group.fireSeg = (group.fireSeg + 1) % (fireCoords.length - 1);
+          p1Fire = fireCoords[group.fireSeg];
+          p2Fire = fireCoords[group.fireSeg + 1] || fireCoords[0];
+          distFire = calculateDistance(p1Fire, p2Fire);
+        }
 
-          const lngFire = p1Fire[0] + (p2Fire[0] - p1Fire[0]) * group.fireProgress;
-          const latFire = p1Fire[1] + (p2Fire[1] - p1Fire[1]) * group.fireProgress;
+        const lngFire = p1Fire[0] + (p2Fire[0] - p1Fire[0]) * group.fireProgress;
+        const latFire = p1Fire[1] + (p2Fire[1] - p1Fire[1]) * group.fireProgress;
 
-          if (group.fire) {
-            group.fire.setLatLng([latFire, lngFire]);
-          }
-        });
-      }
+        if (group.fire) {
+          group.fire.setLatLng([latFire, lngFire]);
+        }
+      });
 
       this.animFrameId = requestAnimationFrame(animateStep);
     };
@@ -1464,41 +1676,50 @@ export class MapManager {
    * Update visual koridor berdasarkan jam Time-Travel (00:00 - 23:00)
    */
   updateCorridorLoadByHour(hour) {
-    const h = Math.max(0, Math.min(23, Number(hour) || 0));
-    const isPeakMorning = (h >= 7 && h <= 9);
-    const isPeakEvening = (h >= 16 && h <= 19);
-    const isNight = (h >= 22 || h <= 5);
-
-    let color = '#38bdf8';
-    let weightGlow = 8;
-    if (isPeakMorning || isPeakEvening) {
-      color = '#ef4444';
-      weightGlow = 14;
-    } else if (h >= 11 && h <= 14) {
-      color = '#f59e0b';
-      weightGlow = 10;
-    } else if (isNight) {
-      color = '#10b981';
-      weightGlow = 6;
-    }
+    const h = Number(hour);
+    const isPeak = (h >= 7 && h <= 9) || (h >= 16 && h <= 19);
+    const isMid = (h >= 10 && h <= 15) || (h >= 20 && h <= 21);
 
     this.corridorGeoJsonLayers.forEach(({ glow, core }) => {
-      glow.setStyle((feature) => {
-        const isCongested = (isPeakMorning || isPeakEvening) && (feature.properties.id === 'corridor-ayani' || feature.properties.id === 'corridor-darmo');
-        return {
-          color: isCongested ? '#ef4444' : color,
-          weight: isCongested ? weightGlow + 4 : weightGlow,
-          opacity: isCongested ? 0.7 : 0.4
-        };
-      });
-      core.setStyle((feature) => {
-        const isCongested = (isPeakMorning || isPeakEvening) && (feature.properties.id === 'corridor-ayani' || feature.properties.id === 'corridor-darmo');
-        return {
-          color: isCongested ? '#ef4444' : color,
-          weight: isCongested ? 7 : 5,
-          opacity: 0.95
-        };
-      });
+      if (glow && typeof glow.setStyle === 'function') {
+        glow.setStyle((feature) => {
+          const defaultSpeed = feature.properties.speed || 30;
+          let speed = defaultSpeed;
+          if (isPeak) {
+            speed = Math.max(8, Math.round(defaultSpeed * 0.35));
+          } else if (isMid) {
+            speed = Math.max(16, Math.round(defaultSpeed * 0.7));
+          } else {
+            speed = Math.round(defaultSpeed * 1.15);
+          }
+          const los = getCorridorLOS(speed);
+          return {
+            color: los.color,
+            weight: (feature.properties.weight || 5) + 4,
+            opacity: 0.4
+          };
+        });
+      }
+      if (core && typeof core.setStyle === 'function') {
+        core.setStyle((feature) => {
+          const defaultSpeed = feature.properties.speed || 30;
+          let speed = defaultSpeed;
+          if (isPeak) {
+            speed = Math.max(8, Math.round(defaultSpeed * 0.35));
+          } else if (isMid) {
+            speed = Math.max(16, Math.round(defaultSpeed * 0.7));
+          } else {
+            speed = Math.round(defaultSpeed * 1.15);
+          }
+          const los = getCorridorLOS(speed);
+          return {
+            color: los.color,
+            weight: feature.properties.weight || 5,
+            opacity: 0.95,
+            className: los.densityClass
+          };
+        });
+      }
     });
   }
 
@@ -1534,10 +1755,29 @@ export class MapManager {
       const group = groups[layerKey];
       if (!map || !group) return;
 
+      const masterCluster = groups['master-cluster'];
+      const isSubPointLayer = ['warn-points', 'landmark-group', 'signal-points'].includes(layerKey);
+
       if (isVisible) {
-        if (!map.hasLayer(group)) map.addLayer(group);
+        if (isSubPointLayer && masterCluster) {
+          group.eachLayer(layer => {
+            if (!masterCluster.hasLayer(layer)) {
+              masterCluster.addLayer(layer);
+            }
+          });
+        } else {
+          if (!map.hasLayer(group)) map.addLayer(group);
+        }
       } else {
-        if (map.hasLayer(group)) map.removeLayer(group);
+        if (isSubPointLayer && masterCluster) {
+          group.eachLayer(layer => {
+            if (masterCluster.hasLayer(layer)) {
+              masterCluster.removeLayer(layer);
+            }
+          });
+        } else {
+          if (map.hasLayer(group)) map.removeLayer(group);
+        }
       }
     });
   }
@@ -1586,6 +1826,10 @@ export class MapManager {
    */
   drawDensityHeatmap(map, heatmapGroup) {
     if (!map || !heatmapGroup) return;
+
+    if (typeof heatmapGroup.clearLayers === 'function') {
+      heatmapGroup.clearLayers();
+    }
 
     const DENSITY_HEATMAP_POINTS = [
       { name: "Simpang Wonokromo (DTC)", lat: -7.2985, lng: 112.7345, radius: 420, color: "#ef4444", density: 1680, vcr: "0.88", level: "Kritis (88%)" },
@@ -1661,31 +1905,41 @@ export class MapManager {
       const map = this.maps.get(containerId);
       if (!map) return;
 
-      const flowGlow = groups['road-glows'];
-      const minorRoads = groups['minor-roads'];
-      const heatGroup = groups['density-heat'];
-      const signals = groups['signal-points'];
-      const landmarks = groups['landmark-group'];
+      const flowGlow = 'road-glows';
+      const minorRoads = 'minor-roads';
+      const heatGroup = 'density-heat';
+      const signals = 'signal-points';
+      const landmarks = 'landmark-group';
+      const incidents = 'warn-points';
 
       if (mode === 'flow') {
-        if (flowGlow && !map.hasLayer(flowGlow)) map.addLayer(flowGlow);
-        if (minorRoads && !map.hasLayer(minorRoads)) map.addLayer(minorRoads);
-        if (heatGroup && map.hasLayer(heatGroup)) map.removeLayer(heatGroup);
-        if (signals && !map.hasLayer(signals)) map.addLayer(signals);
+        this.toggleLayer(flowGlow, true);
+        this.toggleLayer(minorRoads, true);
+        this.toggleLayer(heatGroup, false);
+        this.toggleLayer(signals, true);
+        this.toggleLayer(landmarks, false);
+        this.toggleLayer(incidents, true);
       } else if (mode === 'heat') {
-        if (heatGroup && !map.hasLayer(heatGroup)) map.addLayer(heatGroup);
-        if (flowGlow && map.hasLayer(flowGlow)) map.removeLayer(flowGlow);
-        if (signals && !map.hasLayer(signals)) map.addLayer(signals);
+        this.toggleLayer(flowGlow, false);
+        this.toggleLayer(minorRoads, false);
+        this.toggleLayer(heatGroup, true);
+        this.toggleLayer(signals, true);
+        this.toggleLayer(landmarks, false);
+        this.toggleLayer(incidents, true);
       } else if (mode === 'nodes') {
-        if (heatGroup && map.hasLayer(heatGroup)) map.removeLayer(heatGroup);
-        if (flowGlow && map.hasLayer(flowGlow)) map.removeLayer(flowGlow);
-        if (signals && !map.hasLayer(signals)) map.addLayer(signals);
-        if (landmarks && !map.hasLayer(landmarks)) map.addLayer(landmarks);
+        this.toggleLayer(flowGlow, false);
+        this.toggleLayer(minorRoads, false);
+        this.toggleLayer(heatGroup, false);
+        this.toggleLayer(signals, true);
+        this.toggleLayer(landmarks, true);
+        this.toggleLayer(incidents, true);
       } else if (mode === 'all') {
-        if (flowGlow && !map.hasLayer(flowGlow)) map.addLayer(flowGlow);
-        if (minorRoads && !map.hasLayer(minorRoads)) map.addLayer(minorRoads);
-        if (heatGroup && !map.hasLayer(heatGroup)) map.addLayer(heatGroup);
-        if (signals && !map.hasLayer(signals)) map.addLayer(signals);
+        this.toggleLayer(flowGlow, true);
+        this.toggleLayer(minorRoads, true);
+        this.toggleLayer(heatGroup, true);
+        this.toggleLayer(signals, true);
+        this.toggleLayer(landmarks, true);
+        this.toggleLayer(incidents, true);
       }
     });
 
@@ -1856,7 +2110,7 @@ export class MapManager {
         const stored = this.intersectionMarkersMap.get(targetProp.id);
         if (stored && stored.marker) {
           try {
-            const group = this.layerGroupsMap.get(containerId)?.['signal-points'];
+            const group = this.layerGroupsMap.get(containerId)?.['master-cluster'];
             if (group && typeof group.zoomToShowLayer === 'function') {
               group.zoomToShowLayer(stored.marker, () => {
                 stored.marker.openPopup();
@@ -2298,6 +2552,13 @@ export class MapManager {
       const incidentGroup = groups['warn-points'];
       if (!map || !incidentGroup) return;
 
+      const masterCluster = groups['master-cluster'];
+      if (masterCluster) {
+        incidentGroup.eachLayer(layer => {
+          masterCluster.removeLayer(layer);
+        });
+      }
+
       incidentGroup.clearLayers();
 
       const layers = [];
@@ -2320,7 +2581,7 @@ export class MapManager {
         const popupContent = `
           <div class="ios-popup-card incident-popup">
             <div class="ios-popup-header alert">
-              <span class="alert-pill">⚠️ INSIDEN ${inc.category ? inc.category.toUpperCase() : 'TRAFFIC'}</span>
+              <span class="alert-pill" style="background: ${severity === 'danger' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)'}; color: ${severity === 'danger' ? '#ef4444' : '#f59e0b'}; padding: 2px 6px; border-radius: 4px; font-weight: bold;">⚠️ INSIDEN ${inc.category ? inc.category.toUpperCase() : 'TRAFFIC'}</span>
               <span class="ios-popup-subtitle">STATUS: ${inc.status}</span>
             </div>
             <h4 class="ios-popup-title">${inc.title}</h4>
@@ -2331,7 +2592,7 @@ export class MapManager {
               </div>
               <div class="ios-info-row">
                 <span class="ios-info-label">Unit Disposisi:</span>
-                <span class="ios-info-value text-primary-2" style="color: #00e5ff;">${inc.assignedUnit || 'Belum Ditugaskan'}</span>
+                <span class="ios-info-value text-primary-2" style="color: #00e5ff; font-weight: bold;">${inc.assignedUnit || 'Belum Ditugaskan'}</span>
               </div>
               <div class="ios-info-row">
                 <span class="ios-info-label">Keterangan:</span>
@@ -2346,7 +2607,98 @@ export class MapManager {
       });
 
       // Use Leaflet's native layer addition or safeAddLayers
-      layers.forEach(l => l.addTo(incidentGroup));
+      layers.forEach(l => {
+        incidentGroup.addLayer(l);
+        if (masterCluster) masterCluster.addLayer(l);
+      });
+    });
+  }
+
+  syncIntersectionsFromState(intersections) {
+    if (!Array.isArray(intersections)) return;
+
+    intersections.forEach(node => {
+      const stored = this.intersectionMarkersMap.get(node.id);
+      if (stored && stored.marker) {
+        const stateColor = (node.state || 'green').toLowerCase(); // 'green' | 'yellow' | 'red'
+        
+        // Map light state to CSS classes
+        let rippleClass = 'ripple-success';
+        let nodeClass = 'node-success';
+        let popupColor = '#22c55e';
+        let statusLabel = 'JALAN (HIJAU)';
+        
+        if (stateColor === 'red') {
+          rippleClass = 'ripple-danger';
+          nodeClass = 'node-danger';
+          popupColor = '#ef4444';
+          statusLabel = 'BERHENTI (MERAH)';
+        } else if (stateColor === 'yellow') {
+          rippleClass = 'ripple-warning';
+          nodeClass = 'node-warning';
+          popupColor = '#f59e0b';
+          statusLabel = 'PERSIAPAN (KUNING)';
+        }
+
+        // 1. Update DOM element directly if it's currently rendered on screen
+        const el = document.getElementById(`signal-marker-${node.id}`);
+        if (el) {
+          const ripple = el.querySelector('.signal-ripple');
+          const core = el.querySelector('.signal-core');
+          if (ripple && core) {
+            ripple.className = `signal-ripple ${rippleClass}`;
+            core.className = `signal-core ${nodeClass}`;
+          }
+        }
+
+        // 2. Always update the divIcon so that if Leaflet redraws/unclusters, it gets the correct classes
+        const updatedIcon = L.divIcon({
+          className: 'custom-signal-div-icon',
+          html: `
+            <div class="leaflet-signal-node-wrapper" id="signal-marker-${node.id}">
+              <span class="signal-ripple ${rippleClass}"></span>
+              <span class="signal-core ${nodeClass}"></span>
+            </div>
+          `,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        });
+        
+        stored.marker.setIcon(updatedIcon);
+
+        // 3. Dynamically update the popup content to reflect current timer and state
+        const p = stored.feature.properties;
+        const popupContent = `
+          <div class="ios-popup-card">
+            <div class="ios-popup-header">
+              <span class="cctv-live-tag" style="background: ${popupColor}22; color: ${popupColor}; border: 1px solid ${popupColor}44;">
+                <span class="live-dot" style="background: ${popupColor};"></span> NODE APILL
+              </span>
+              <span class="ios-popup-subtitle">${p.district}</span>
+            </div>
+            <h4 class="ios-popup-title" style="margin-top: 6px; font-size: 13.5px; font-weight: 700; color: #ffffff;">🚦 ${p.name}</h4>
+            <div class="ios-popup-info-grid">
+              <div class="ios-info-row">
+                <span class="ios-info-label">Sinyal Aktif:</span>
+                <span class="ios-info-value" style="color: ${popupColor}; font-weight: 800; text-transform: uppercase;">${statusLabel}</span>
+              </div>
+              <div class="ios-info-row">
+                <span class="ios-info-label">Durasi Timer Sisa:</span>
+                <span class="ios-info-value speed-val" style="color: #00e5ff; font-weight: 800;">${node.timer} dtk</span>
+              </div>
+              <div class="ios-info-row">
+                <span class="ios-info-label">Fase Hijau Adaptif:</span>
+                <span class="ios-info-value" style="font-weight: 800;">${node.greenSplit || p.defaultGreen} dtk</span>
+              </div>
+              <div class="ios-info-row">
+                <span class="ios-info-label">Waktu Tunggu Sektoral:</span>
+                <span class="ios-info-value">${node.waitTime || p.currentWait} dtk</span>
+              </div>
+            </div>
+          </div>
+        `;
+        stored.marker.setPopupContent(popupContent);
+      }
     });
   }
 
@@ -2484,42 +2836,77 @@ export class MapManager {
   }
 
   /**
-   * Update visualisasi warna/tebal garis koridor pada peta berdasarkan jam Time-Travel (00:00 - 23:00)
-   * Menyesuaikan kondisi jam sibuk pagi (07:00-09:00) dan sore (17:00-19:00)
+   * Navigasi Peta dari Kartu Insiden: flyTo([lat, lng], 17) & buka popup otomatis
+   * @param {string|Array<number>} locationOrCoords - Nama lokasi atau koordinat [lat, lng]
+   * @param {string} [title] - Judul insiden opsional
    */
-  updateCorridorLoadByHour(hour) {
-    const isPeak = (hour >= 6 && hour <= 9) || (hour >= 16 && hour <= 19);
-    const isMid = (hour >= 10 && hour <= 15) || (hour >= 20 && hour <= 21);
+  flyToIncident(locationOrCoords, title = "Insiden Lalu Lintas") {
+    // 1. Pindahkan tampilan ke Tab Peta
+    stateStore.setState({ currentView: 'map' });
+    const mapNav = document.querySelector('[data-view="map"]');
+    if (mapNav) {
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      mapNav.classList.add('active');
+    }
 
-    const color = isPeak ? '#ef4444' : (isMid ? '#f59e0b' : '#10b981');
-    const weight = isPeak ? 8 : (isMid ? 5 : 4);
-    const opacity = isPeak ? 0.95 : (isMid ? 0.8 : 0.7);
+    // 2. Tentukan Koordinat Target
+    let latlng = [-7.2985, 112.7345];
+    if (Array.isArray(locationOrCoords) && locationOrCoords.length === 2 && !isNaN(locationOrCoords[0])) {
+      latlng = locationOrCoords;
+    } else if (typeof locationOrCoords === 'string') {
+      const locLower = locationOrCoords.toLowerCase();
+      if (locLower.includes('wonokromo')) latlng = [-7.2985, 112.7345];
+      else if (locLower.includes('diponegoro')) latlng = [-7.2880, 112.7380];
+      else if (locLower.includes('darmo')) latlng = [-7.2810, 112.7395];
+      else if (locLower.includes('pemuda')) latlng = [-7.2650, 112.7480];
+      else if (locLower.includes('kupang') || locLower.includes('kembang')) latlng = [-7.2680, 112.7280];
+      else if (locLower.includes('manyar')) latlng = [-7.2725, 112.7690];
+      else if (locLower.includes('jemursari')) latlng = [-7.3180, 112.7330];
+      else if (locLower.includes('tunjungan') || locLower.includes('siola')) latlng = [-7.2625, 112.7375];
+      else if (locLower.includes('waru')) latlng = [-7.3510, 112.7290];
+    }
 
-    // Update tracked corridor layers
-    this.corridorGeoJsonLayers.forEach(({ glow, core }) => {
-      if (glow && typeof glow.setStyle === 'function') {
-        glow.setStyle({ color, weight: weight + 4, opacity: opacity * 0.5 });
-      }
-      if (core && typeof core.setStyle === 'function') {
-        core.setStyle({
-          color,
-          weight,
-          opacity,
-          className: isPeak ? 'corridor-congested-flow' : 'corridor-smooth-flow'
-        });
-      }
+    // 3. Eksekusi Animasi map.flyTo([lat, lng], 17) pada seluruh peta aktif
+    this.maps.forEach((map, containerId) => {
+      map.flyTo(latlng, 17, { duration: 1.4, easeLinearity: 0.25 });
+
+      // 4. Buka Popup Detail Insiden Secara Otomatis setelah terbang
+      setTimeout(() => {
+        const incidentGroup = this.layerGroupsMap.get(containerId)?.['warn-points'];
+        let opened = false;
+
+        if (incidentGroup) {
+          incidentGroup.eachLayer(layer => {
+            if (layer.getLatLng && layer.getLatLng().distanceTo(L.latLng(latlng)) < 350) {
+              layer.openPopup();
+              opened = true;
+            }
+          });
+        }
+
+        if (!opened) {
+          const popupContent = `
+            <div class="ios-popup-card incident-popup">
+              <div class="ios-popup-header alert">
+                <span class="alert-pill" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 2px 6px; border-radius: 4px; font-weight: bold;">⚠️ INSIDEN LALU LINTAS</span>
+                <span class="ios-popup-subtitle">SIAGA SITS 112</span>
+              </div>
+              <h4 class="ios-popup-title">${title}</h4>
+              <p style="font-size: 11.5px; color: #cbd5e1; margin-top: 4px; line-height: 1.4;">
+                Lokasi: <strong>${typeof locationOrCoords === 'string' ? locationOrCoords : 'Surabaya'}</strong><br/>
+                Status: Memerlukan penanganan tim siaga SITS Command Center 112.
+              </p>
+            </div>
+          `;
+          L.popup({ maxWidth: 300 })
+            .setLatLng(latlng)
+            .setContent(popupContent)
+            .openOn(map);
+        }
+      }, 800);
     });
 
-    this.layerGroupsMap.forEach(groups => {
-      const roadGroup = groups['road-glows'] || groups['corridors'];
-      if (roadGroup) {
-        roadGroup.eachLayer(layer => {
-          if (typeof layer.setStyle === 'function') {
-            layer.setStyle({ color, weight, opacity });
-          }
-        });
-      }
-    });
+    soundManager.play('click');
   }
 
   /**
@@ -2605,11 +2992,8 @@ export class MapManager {
    * Cleanup resource saat destroy
    */
   destroy() {
-    this.stopEmergency112Simulation();
-    if (this.animFrameId) {
-      cancelAnimationFrame(this.animFrameId);
-      this.animFrameId = null;
-    }
+    this.deactivate();
+    this.disposer.clear();
     this.maps.forEach(map => map.remove());
     this.maps.clear();
     this.tileLayers.clear();

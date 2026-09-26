@@ -1,0 +1,121 @@
+<div class="view-pane" id="view-emergency">
+        <!-- Emergency Response 112 Mission Header / Simulator Hero -->
+        <article class="emergency-simulator-hero glass-panel">
+          <div class="emergency-hero-flex">
+            <div class="emergency-hero-info">
+              <div class="emergency-kicker-row">
+                <span class="badge emergency-kicker-badge">
+                  <span class="signals-status-dot dot-live"></span> SITS EMERGENCY PREEMPTION
+                </span>
+                <span class="unboxed-meta-sep">·</span>
+                <span class="emergency-kicker-sub">Command Center 112 Surabaya</span>
+              </div>
+              <h2 class="emergency-hero-title">
+                Simulasi Koridor Tanggap Darurat 112 (Bundaran Waru → RSUD Dr. Soetomo)
+              </h2>
+              <p class="emergency-hero-desc">
+                Mendemonstrasikan algoritma <strong>Green Wave Clearance</strong> otomatis: saat armada darurat berada pada radius &lt;200 meter dari persimpangan prioritas (Margorejo, Wonokromo, Darmo/Diponegoro), fase lampu lalu lintas otomatis dipaksa <strong>HIJAU PENUH</strong> dan mengunci lajur konflik dengan telemetri spasial real-time.
+              </p>
+            </div>
+            <div class="emergency-hero-actions">
+              <button class="btn btn-danger btn-lg emergency-dispatch-btn" id="btnStart112Sim" type="button">
+                <span class="btn-dot-pulse"></span>
+                <span>Mulai Simulasi Tanggap Darurat 112</span>
+              </button>
+              <button class="btn btn-outline btn-lg emergency-stop-btn" id="btnStop112Sim" type="button">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                <span>Hentikan Simulasi</span>
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <section class="emergency-dashboard">
+          <!-- Emergency Dispatcher Form -->
+          <article class="emergency-dispatcher glass-panel">
+            <div class="section-head">
+              <div>
+                <h2>Emergency Preemption Actuator</h2>
+                <p>Kirim sinyal preemption darurat dan intervensi fase lampu hijau persimpangan SITS.</p>
+              </div>
+            </div>
+            <form id="emergencyActuatorForm" class="actuator-form">
+              <div class="form-group form-group-mb-12">
+                <label class="form-label-muted" for="respType">Tipe Kendaraan Darurat</label>
+                <select id="respType" class="selector select-full">
+                  <option value="Ambulans">✚ Ambulans Medis</option>
+                  <option value="Pemadam">🚒 Pemadam Kebakaran</option>
+                  <option value="Patroli">🚔 Patroli SITS / Dishub</option>
+                </select>
+              </div>
+              
+              <div class="form-group form-group-mb-12">
+                <label class="form-label-muted" for="respRoute">Rute & Koridor Jalan</label>
+                <select id="respRoute" class="selector select-full">
+                  <option value="route-yani-darmo">Jl. Ahmad Yani → Jl. Raya Darmo (RSU Dr. Soetomo)</option>
+                  <option value="route-kertajaya">Jl. Kertajaya → Dharmawangsa (RS Airlangga)</option>
+                  <option value="route-tunjungan">Jl. Tunjungan → Basuki Rahmat (Pusat Kota)</option>
+                </select>
+              </div>
+              
+              <div class="form-group form-group-mb-16">
+                <label class="form-label-muted" for="respName">Identitas Armada / Nomor Lambung</label>
+                <input type="text" id="respName" class="search-box input input-full" value="Ambulans SITS-08" placeholder="Contoh: Ambulans 08, PMK 11" required />
+              </div>
+              
+              <button type="submit" class="btn btn-primary btn-full" id="btnLaunchPreemption">Aktifkan Sinyal Prioritas</button>
+              
+              <!-- Countdown ring indicator (Fitur 16) -->
+              <div id="preemptCountdownContainer" class="preempt-countdown-box-inner is-hidden">
+                <span class="preempt-label-danger">Siklus Preemption Aktif</span>
+                <div class="circular-countdown-wrapper circular-countdown-frame">
+                  <svg viewBox="0 0 36 36" class="circular-countdown-svg-elem">
+                    <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="rgba(239, 68, 68, 0.15)" stroke-width="3" />
+                    <path class="circle-progress" id="preemptProgressCircle" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="var(--danger)" stroke-width="3" stroke-linecap="round" />
+                  </svg>
+                  <div id="preemptCountdownText" class="preempt-countdown-text-elem">15s</div>
+                </div>
+              </div>
+            </form>
+          </article>
+
+          <!-- Active Feed -->
+          <div class="emergency-active-feed glass-panel">
+            <div class="section-head">
+              <div>
+                <h2>Active Emergency Responders Surabaya</h2>
+                <p>Integrasi GPS SITS ambulans & pemadam darurat prioritas.</p>
+              </div>
+              <span class="pill pill-danger" id="activePriorityCount">2 Active priority</span>
+            </div>
+
+            <div class="emergency-list-grid" id="emergencyListGrid">
+              <div class="emergency-card-item pulse-red-border" id="staticPreemptCard1" data-route="route-yani-darmo">
+                <div class="em-header">
+                  <span class="badge-em red">✚ Ambulans 02</span>
+                  <strong class="em-status">PRIORITY GRANTED</strong>
+                </div>
+                <p class="em-route-desc">Rute: Jl. Raya Darmo menuju RSU Dr. Soetomo</p>
+                <div class="em-meta-row">
+                  <div><small>ETA</small><strong class="tabular font-mono">1m 45s</strong></div>
+                  <div><small>Kecepatan</small><strong class="tabular font-mono">68 km/jam</strong></div>
+                  <div><small>Signal Overrides</small><strong class="green-text">Active (Preemption Aktif)</strong></div>
+                </div>
+              </div>
+
+              <div class="emergency-card-item pulse-red-border" id="staticPreemptCard2" data-route="route-yani-darmo">
+                <div class="em-header">
+                  <span class="badge-em orange">🚒 Pemadam 04</span>
+                  <strong class="em-status">PRIORITY GRANTED</strong>
+                </div>
+                <p class="em-route-desc">Rute: Pos Wonokromo menuju Jl. Ahmad Yani Kav 12</p>
+                <div class="em-meta-row">
+                  <div><small>ETA</small><strong class="tabular font-mono">3m 12s</strong></div>
+                  <div><small>Kecepatan</small><strong class="tabular font-mono">72 km/jam</strong></div>
+                  <div><small>Signal Overrides</small><strong class="green-text">Active (Preemption Aktif)</strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>

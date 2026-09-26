@@ -29,6 +29,7 @@ import {
 } from './stateStore.js';
 import { soundManager } from './soundManager.js';
 import { diagnostics } from './diagnostics.js';
+import { authManager } from './authManager.js';
 
 /**
  * Fetch with Deduplication, Timeout & Caching Helper (Phase 8)
@@ -44,11 +45,18 @@ export async function fetchWithCacheAndDedupe(url, options = {}) {
     signal: userSignal,
     method = 'GET',
     body,
-    headers,
+    headers = {},
     forceRefresh = false
   } = options;
 
   const isReadOnly = method.toUpperCase() === 'GET';
+
+  // Inject Authorization Bearer token jika ada
+  const authToken = authManager.getToken();
+  const mergedHeaders = {
+    ...headers,
+    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+  };
 
   if (isReadOnly && ttlMs > 0 && !forceRefresh) {
     const cached = apiCache.get(url);
@@ -73,7 +81,7 @@ export async function fetchWithCacheAndDedupe(url, options = {}) {
       diagnostics.recordApiRequest();
       const res = await fetch(url, {
         method,
-        headers,
+        headers: mergedHeaders,
         body,
         signal: controller.signal
       });
@@ -144,6 +152,17 @@ class SocketClient {
     stateStore.subscribe("state:stale-changed", () => {
       this._updateDomStatusCapsule();
     });
+
+    // Dynamic Auth Token Synchronizer
+    authManager.onAuthChange((user, token) => {
+      if (this.socket) {
+        this.socket.auth = { token: token || null };
+        if (this.socket.connected) {
+          console.info('🔄 [SocketClient] Memperbarui autentikasi socket session...');
+          this.socket.disconnect().connect();
+        }
+      }
+    });
   }
 
   /**
@@ -152,17 +171,21 @@ class SocketClient {
   getSocket() {
     if (this.socket) return this.socket;
 
+    const token = authManager.getToken();
+    const socketOptions = {
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 10000,
+      randomizationFactor: 0.3,
+      timeout: 5000,
+      transports: ['websocket', 'polling'],
+      auth: { token: token || null }
+    };
+
     try {
       if (typeof window.io !== "undefined") {
-        this.socket = window.io({
-          reconnection: true,
-          reconnectionAttempts: Infinity,
-          reconnectionDelay: 1000,
-          reconnectionDelayMax: 10000,
-          randomizationFactor: 0.3,
-          timeout: 5000,
-          transports: ['websocket', 'polling']
-        });
+        this.socket = window.io(socketOptions);
         this._bindStandardEvents();
         this._startHealthWatchdog();
       } else {
@@ -171,14 +194,10 @@ class SocketClient {
         script.src = "/socket.io/socket.io.js";
         script.onload = () => {
           if (typeof window.io !== "undefined" && !this.socket) {
+            const currentToken = authManager.getToken();
             this.socket = window.io({
-              reconnection: true,
-              reconnectionAttempts: Infinity,
-              reconnectionDelay: 1000,
-              reconnectionDelayMax: 10000,
-              randomizationFactor: 0.3,
-              timeout: 5000,
-              transports: ['websocket', 'polling']
+              ...socketOptions,
+              auth: { token: currentToken || null }
             });
             this._bindStandardEvents();
             this._flushPendingListeners();

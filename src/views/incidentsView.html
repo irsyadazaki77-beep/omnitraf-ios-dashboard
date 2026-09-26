@@ -1,0 +1,87 @@
+<div class="view-pane" id="view-incidents">
+        <!-- Section Header / Operations Workspace Summary -->
+        <header class="workspace-header">
+          <div class="workspace-header-title-group">
+            <span class="workspace-header-kicker">SITS SURABAYA · COMPUTER VISION INCIDENT SURVEILLANCE</span>
+            <h1 class="workspace-header-title">Active Traffic Incidents & Road Anomalies</h1>
+            <p class="workspace-header-desc">Deteksi anomali real-time, klasifikasi keparahan insiden, disposisi armada lapangan 112, dan sinkronisasi log penanganan.</p>
+          </div>
+          <div class="workspace-header-summary-strip" aria-label="Ringkasan Status Insiden">
+            <div class="workspace-summary-item">
+              <span class="workspace-summary-label">Peringatan Aktif</span>
+              <div class="workspace-summary-val-row">
+                <span class="signals-status-dot dot-live" style="background: var(--danger); box-shadow: 0 0 6px var(--danger);"></span>
+                <strong class="tabular font-mono text-danger" id="summaryActiveIncidents">2 Insiden</strong>
+                <span class="workspace-summary-sub">Perlu Penanganan</span>
+              </div>
+            </div>
+            <div class="workspace-summary-item">
+              <span class="workspace-summary-label">Waktu Respon Rata-rata</span>
+              <div class="workspace-summary-val-row">
+                <strong class="tabular font-mono text-primary-2">3m 45s</strong>
+                <span class="workspace-summary-sub">Target &lt; 5m</span>
+              </div>
+            </div>
+            <div class="workspace-summary-item hide-mobile">
+              <span class="workspace-summary-label">Status Deteksi CV</span>
+              <div class="workspace-summary-val-row">
+                <strong class="text-success">YOLOv8 Active</strong>
+                <span class="workspace-summary-sub">184 Node SITS</span>
+              </div>
+            </div>
+            <div class="workspace-summary-item hide-mobile">
+              <span class="workspace-summary-label">Disposisi Lapangan</span>
+              <div class="workspace-summary-val-row">
+                <strong class="tabular font-mono text-cyan">Patroli Siaga</strong>
+                <span class="workspace-summary-sub">Command 112</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <article class="incidents-active glass-panel">
+          <div class="section-head">
+            <div>
+              <h2>Daftar Insiden Aktif Surabaya</h2>
+              <p>Klasifikasi hambatan lalu lintas, kecelakaan, dan penyempitan jalur terdeteksi.</p>
+            </div>
+            <span class="pill pill-danger" id="unresolvedAlertsBadge">3 Unresolved Alerts</span>
+          </div>
+
+          <!-- Incident Category Filters -->
+          <div class="incident-filters incident-filter-bar" role="group" aria-label="Filter Kategori Insiden">
+            <button class="filter-chip active" type="button" data-inc-filter="all">Semua Insiden</button>
+            <button class="filter-chip" type="button" data-inc-filter="accident">Kecelakaan</button>
+            <button class="filter-chip" type="button" data-inc-filter="roadblock">Galian & Hambatan</button>
+            <button class="filter-chip" type="button" data-inc-filter="resolved">Arsip Selesai</button>
+          </div>
+          
+          <div class="incident-logs-list">
+            <div class="incident-log-item unresolved">
+              <div class="inc-meta">
+                <span class="inc-type alert-red">⚠️ KECELAKAAN (ACCIDENT-02)</span>
+                <span class="inc-time">5 menit lalu</span>
+              </div>
+              <strong class="inc-title">Tabrakan Ringan di Simpang Darmo - Basra</strong>
+              <p class="inc-desc">Insiden benturan minor dua kendaraan pada lajur kiri. Menghambat arus Jl. Raya Darmo ke arah utara. Rekomendasi AI: perpanjang fase hijau ke arah Basuki Rahmat untuk mengurai antrean.</p>
+              <div class="inc-actions">
+                <button class="btn btn-primary compact resolve-btn" onclick="resolveDynamicIncident(1)">Mark as Resolved</button>
+                <button class="btn btn-ghost compact dispatch-btn" onclick="openIncidentDetail(1)">Disposisi Petugas</button>
+              </div>
+            </div>
+
+            <div class="incident-log-item unresolved">
+              <div class="inc-meta">
+                <span class="inc-type alert-orange">🚧 PENUTUPAN JALUR (ROADBLOCK-01)</span>
+                <span class="inc-time">15 menit lalu</span>
+              </div>
+              <strong class="inc-title">Galian Utilitas Kabel di Jl. Raya Darmo (Depan Al-Falah)</strong>
+              <p class="inc-desc">Pekerjaan utilitas memakan satu lajur frontage road. Mengakibatkan penyempitan arus (bottleneck) menuju Wonokromo.</p>
+              <div class="inc-actions">
+                <button class="btn btn-primary compact resolve-btn" onclick="resolveDynamicIncident(2)">Mark as Resolved</button>
+                <button class="btn btn-ghost compact dispatch-btn" onclick="openIncidentDetail(2)">Disposisi Petugas</button>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>

@@ -27,6 +27,10 @@ export class ReportController {
     this._exposeGlobalBridges();
   }
 
+  activate() {
+    this._bindModalControls();
+  }
+
   _exposeGlobalBridges() {
     window.closeReportModal = () => this.closeReportModal();
     window.generateMobilitySnapshot = (type) => this.generateMobilitySnapshot(type);

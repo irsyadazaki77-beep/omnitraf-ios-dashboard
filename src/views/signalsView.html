@@ -1,0 +1,218 @@
+<div class="view-pane" id="view-signals">
+        <!-- Section Header / Operations Workspace Summary -->
+        <header class="signals-workspace-header">
+          <div class="signals-header-title-group">
+            <span class="signals-header-kicker">SITS ADAPTIVE URBAN MOBILITY · APILL CONTROLLER</span>
+            <h1 class="signals-header-title">Traffic Signals & Intersection Control</h1>
+            <p class="signals-header-desc">Manajemen fase adaptif, alokasi green split, dan manual override simpang prioritas Surabaya.</p>
+          </div>
+          <div class="signals-header-summary-strip" aria-label="Ringkasan Status Sinyal">
+            <div class="signals-summary-item">
+              <span class="signals-summary-label">Persimpangan Terkoneksi</span>
+              <div class="signals-summary-val-row">
+                <span class="signals-status-dot dot-live"></span>
+                <strong class="tabular font-mono">126 / 126</strong>
+                <span class="signals-summary-sub">Online</span>
+              </div>
+            </div>
+            <div class="signals-summary-item">
+              <span class="signals-summary-label">Mode Kontrol</span>
+              <div class="signals-summary-val-row">
+                <strong class="text-primary-2">Auto Adaptif</strong>
+                <span class="signals-summary-sub">Webster C₀</span>
+              </div>
+            </div>
+            <div class="signals-summary-item hide-mobile">
+              <span class="signals-summary-label">Manual Override</span>
+              <div class="signals-summary-val-row">
+                <strong class="text-success tabular font-mono">0 Aktif</strong>
+                <span class="signals-summary-sub">Siaga</span>
+              </div>
+            </div>
+            <div class="signals-summary-item hide-mobile">
+              <span class="signals-summary-label">Telemetri SITS</span>
+              <div class="signals-summary-val-row">
+                <strong class="tabular font-mono text-cyan">18ms</strong>
+                <span class="signals-summary-sub">Realtime Sync</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <!-- Primary Intersection Cards Console Grid -->
+        <section class="signals-console-grid">
+          <!-- Card 1: Simpang Wonokromo -->
+          <article class="widget glass-panel signals-intersection-card">
+            <div class="section-head signals-card-header">
+              <div>
+                <h2>Simpang Wonokromo</h2>
+                <p class="signals-card-meta">DEV-CTRL-01 · Koridor A. Yani – Diponegoro · Rata-rata tunggu: 42s</p>
+              </div>
+              <span class="pill pill-ai signals-badge-adaptive"><span class="signals-status-dot dot-live"></span> Auto Adaptif</span>
+            </div>
+
+            <div class="signal-active-panel">
+              <!-- Focal Point: APILL Geometric Indicator + Primary Timer -->
+              <div class="signal-cycle-indicator">
+                <div class="signals-apill-geometric" aria-hidden="true">
+                  <span class="signals-apill-lens lens-red" title="Fase Merah"></span>
+                  <span class="signals-apill-lens lens-yellow" title="Fase Kuning"></span>
+                  <span class="signals-apill-lens lens-green active" title="Fase Hijau Aktif"></span>
+                </div>
+                <div class="cycle-progress-ring">
+                  <span class="cycle-number" id="cycleVal1">38</span>
+                  <span class="cycle-label">Detik Hijau</span>
+                </div>
+              </div>
+
+              <!-- Product-Grade Sliders & Phase Timeline -->
+              <div class="signal-sliders">
+                <div class="phase-row">
+                  <span>Fase A. Yani (Utara)</span>
+                  <strong>38 dtk</strong>
+                </div>
+                <input class="slider-glow sig-slide" type="range" min="15" max="90" value="38" aria-label="Durasi Hijau Fase A. Yani (Utara)" />
+                
+                <div class="phase-row">
+                  <span>Fase Diponegoro (Barat)</span>
+                  <strong>42 dtk</strong>
+                </div>
+                <input class="slider-glow sig-slide" type="range" min="15" max="90" value="42" aria-label="Durasi Hijau Fase Diponegoro (Barat)" />
+                
+                <!-- Minimal Horizontal Phase Progress Bar -->
+                <div class="phase-timeline-bar" id="signalsPhaseTimeline1" title="Visualisasi Timeline Fase Siklus">
+                  <div class="phase-sec phase-red" style="width: 30%"></div>
+                  <div class="phase-sec phase-yellow" style="width: 10%"></div>
+                  <div class="phase-sec phase-green" style="width: 60%"></div>
+                  <div class="phase-indicator" id="signalsPhaseIndicator1" style="left: 0%"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- High-Impact Semantic Action -->
+            <button class="btn btn-primary compact force-override-btn" type="button">Terapkan Manual Override</button>
+          </article>
+
+          <!-- Card 2: Simpang Tunjungan -->
+          <article class="widget glass-panel signals-intersection-card">
+            <div class="section-head signals-card-header">
+              <div>
+                <h2>Simpang Tunjungan (Siola)</h2>
+                <p class="signals-card-meta">DEV-CTRL-02 · Koridor Tunjungan – Praban · Rata-rata tunggu: 38s</p>
+              </div>
+              <span class="pill pill-ai signals-badge-adaptive"><span class="signals-status-dot dot-live"></span> Auto Adaptif</span>
+            </div>
+
+            <div class="signal-active-panel">
+              <!-- Focal Point: APILL Geometric Indicator + Primary Timer -->
+              <div class="signal-cycle-indicator">
+                <div class="signals-apill-geometric" aria-hidden="true">
+                  <span class="signals-apill-lens lens-red" title="Fase Merah"></span>
+                  <span class="signals-apill-lens lens-yellow" title="Fase Kuning"></span>
+                  <span class="signals-apill-lens lens-green active" title="Fase Hijau Aktif"></span>
+                </div>
+                <div class="cycle-progress-ring">
+                  <span class="cycle-number" id="cycleVal2">28</span>
+                  <span class="cycle-label">Detik Hijau</span>
+                </div>
+              </div>
+
+              <!-- Product-Grade Sliders & Phase Timeline -->
+              <div class="signal-sliders">
+                <div class="phase-row">
+                  <span>Fase Tunjungan (Selatan)</span>
+                  <strong>28 dtk</strong>
+                </div>
+                <input class="slider-glow sig-slide" type="range" min="15" max="90" value="28" aria-label="Durasi Hijau Fase Tunjungan (Selatan)" />
+                
+                <div class="phase-row">
+                  <span>Fase Praban (Barat)</span>
+                  <strong>35 dtk</strong>
+                </div>
+                <input class="slider-glow sig-slide" type="range" min="15" max="90" value="35" aria-label="Durasi Hijau Fase Praban (Barat)" />
+                
+                <!-- Minimal Horizontal Phase Progress Bar -->
+                <div class="phase-timeline-bar" id="signalsPhaseTimeline2" title="Visualisasi Timeline Fase Siklus">
+                  <div class="phase-sec phase-red" style="width: 35%"></div>
+                  <div class="phase-sec phase-yellow" style="width: 10%"></div>
+                  <div class="phase-sec phase-green" style="width: 55%"></div>
+                  <div class="phase-indicator" id="signalsPhaseIndicator2" style="left: 0%"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- High-Impact Semantic Action -->
+            <button class="btn btn-primary compact force-override-btn" type="button">Terapkan Manual Override</button>
+          </article>
+        </section>
+
+        <!-- Monitored Intersections Table & Grid Workspace -->
+        <article class="table-panel glass-panel" id="intersections">
+          <div class="section-head">
+            <div>
+              <h2>Monitored Intersections</h2>
+              <p>Status simpang prioritas Surabaya dan telemetri waktu tunggu real-time.</p>
+            </div>
+            <div class="header-actions-flex">
+              <button class="btn btn-ghost compact" id="btnToggleIntersectionsLayout" type="button">Grid/Tabel</button>
+              <a href="#reports" class="text-link">Lihat Laporan ↗</a>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Persimpangan</th>
+                  <th>Status</th>
+                  <th>Kepadatan</th>
+                  <th>Waktu Tunggu</th>
+                  <th>Trend</th>
+                </tr>
+              </thead>
+              <tbody id="intersectionTable">
+                <tr data-density="high">
+                  <td>Simpang Wonokromo (A. Yani)</td>
+                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Online</td>
+                  <td><span class="tag tag-high">High</span></td>
+                  <td>54 dtk</td>
+                  <td><span class="spark spark-danger"></span></td>
+                </tr>
+                <tr data-density="moderate">
+                  <td>Simpang Darmo (Polisi Istimewa)</td>
+                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Online</td>
+                  <td><span class="tag tag-moderate">Moderate</span></td>
+                  <td>38 dtk</td>
+                  <td><span class="spark spark-warning"></span></td>
+                </tr>
+                <tr data-density="low">
+                  <td>Simpang Kertajaya (Dharmawangsa)</td>
+                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Online</td>
+                  <td><span class="tag tag-low">Low</span></td>
+                  <td>22 dtk</td>
+                  <td><span class="spark spark-success"></span></td>
+                </tr>
+                <tr data-density="moderate">
+                  <td>Simpang Tunjungan (Gedung Siola)</td>
+                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Online</td>
+                  <td><span class="tag tag-moderate">Moderate</span></td>
+                  <td>31 dtk</td>
+                  <td><span class="spark spark-warning"></span></td>
+                </tr>
+                <tr data-density="high">
+                  <td>Simpang Jemursari (A. Yani)</td>
+                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Online</td>
+                  <td><span class="tag tag-high">High</span></td>
+                  <td>59 dtk</td>
+                  <td><span class="spark spark-danger"></span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="empty-search-state is-hidden" id="emptyState">
+            <div class="empty-icon">🔍</div>
+            <h3>Pencarian Tidak Ditemukan</h3>
+            <p>Tidak ada data persimpangan yang sesuai dengan parameter pencarian.</p>
+          </div>
+        </article>
+      </div>

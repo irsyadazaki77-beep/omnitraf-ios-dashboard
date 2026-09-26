@@ -14,6 +14,8 @@ import { commandLayer } from '../core/commandLayer.js';
 export class EmergencyController {
   constructor() {
     this.preemptTimer = null;
+    this.greenWaveCountdownTimer = null;
+    this.remainingGreenWaveSec = 300; // 5 minutes
     this._isInitialized = false;
   }
 
@@ -23,7 +25,169 @@ export class EmergencyController {
 
     this._bindEmergencyActuatorForm();
     this._bind112SimulationButtons();
+    this._bindGreenWaveConfirmModal();
+    this._bindHudRevertButton();
     this._setupStoreListeners();
+  }
+
+  activate() {
+    this._bindEmergencyActuatorForm();
+    this._bind112SimulationButtons();
+    this._bindGreenWaveConfirmModal();
+    this._bindHudRevertButton();
+  }
+
+  /**
+   * Bind Modal Konfirmasi Koridor Darurat 112
+   */
+  _bindGreenWaveConfirmModal() {
+    const modal = document.getElementById("greenWaveConfirmModal");
+    const closeBtn = document.getElementById("closeGreenWaveConfirmModal");
+    const cancelBtn = document.getElementById("btnCancelGreenWaveModal");
+    const confirmBtn = document.getElementById("btnConfirmGreenWaveModal");
+
+    if (!modal) return;
+
+    const closeModal = () => {
+      modal.style.display = "none";
+      modal.classList.remove("show");
+    };
+
+    if (closeBtn) closeBtn.onclick = closeModal;
+    if (cancelBtn) cancelBtn.onclick = closeModal;
+
+    modal.onclick = (e) => {
+      if (e.target === modal) closeModal();
+    };
+
+    if (confirmBtn) {
+      confirmBtn.onclick = async () => {
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = "ACTIVATING...";
+
+        try {
+          await this.activateGreenWaveWithSafetyTimer(300); // 5 menit safety limit
+          closeModal();
+        } catch (err) {
+          console.warn("[EmergencyController] Green wave activation error:", err);
+          if (typeof window.showToast === "function") {
+            window.showToast(`❌ Gagal mengaktifkan Green Wave: ${err.message}`, "danger");
+          }
+        } finally {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = "🚨 Aktifkan Koridor Darurat";
+        }
+      };
+    }
+  }
+
+  openGreenWaveConfirmModal() {
+    const modal = document.getElementById("greenWaveConfirmModal");
+    if (!modal) return;
+
+    modal.style.display = "flex";
+    modal.classList.add("show");
+    soundManager.play('click');
+  }
+
+  /**
+   * Bind Tombol Pembatalan Instan pada Top Red HUD Banner
+   */
+  _bindHudRevertButton() {
+    const revertBtn = document.getElementById("btnRevertEmergencyGw");
+    if (revertBtn) {
+      revertBtn.onclick = () => {
+        this.deactivateGreenWaveToNormal();
+      };
+    }
+  }
+
+  /**
+   * Aktifkan Koridor Darurat 112 & Jalankan Timer Keselamatan Otomatis (Maksimal 5 Menit)
+   */
+  async activateGreenWaveWithSafetyTimer(durationSec = 300) {
+    try {
+      await commandLayer.dispatchCommand({
+        action: 'emergency:activate',
+        targetType: 'emergency',
+        targetId: 'AMB-112',
+        payload: { code: 'AMB-112', route: 'route-yani-darmo' }
+      }, false);
+
+      trafficEngine.setGreenWave(true);
+      this.remainingGreenWaveSec = durationSec;
+
+      // Tampilkan HUD Darurat Merah di Bagian Atas
+      const hud = document.getElementById("emergencyGreenWaveHud");
+      const timerDisplay = document.getElementById("emergencyGwCountdown");
+
+      if (hud) {
+        hud.style.display = "block";
+      }
+
+      soundManager.play('siren');
+
+      if (this.greenWaveCountdownTimer) clearInterval(this.greenWaveCountdownTimer);
+
+      this.greenWaveCountdownTimer = setInterval(() => {
+        this.remainingGreenWaveSec--;
+
+        const mins = Math.floor(this.remainingGreenWaveSec / 60);
+        const secs = this.remainingGreenWaveSec % 60;
+        const formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+        if (timerDisplay) timerDisplay.textContent = formatted;
+
+        if (this.remainingGreenWaveSec <= 0) {
+          // Auto-revert safety trigger hit
+          this.deactivateGreenWaveToNormal(true);
+        }
+      }, 1000);
+
+      if (typeof window.showToast === "function") {
+        window.showToast("🚨 KORIDOR DARURAT 112 AKTIF: Sinyal A. Yani - Darmo HIJAU | Simpang Tegak Lurus MERAH!", "alert");
+      }
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  /**
+   * Kembalikan Koridor Darurat ke Normal Adaptive Mode
+   */
+  async deactivateGreenWaveToNormal(isAutoTimeout = false) {
+    if (this.greenWaveCountdownTimer) {
+      clearInterval(this.greenWaveCountdownTimer);
+      this.greenWaveCountdownTimer = null;
+    }
+
+    const hud = document.getElementById("emergencyGreenWaveHud");
+    if (hud) {
+      hud.style.display = "none";
+    }
+
+    try {
+      await commandLayer.dispatchCommand({
+        action: 'emergency:cancel',
+        targetType: 'emergency',
+        targetId: 'AMB-112',
+        payload: { id: 'AMB-112' }
+      }, false);
+
+      trafficEngine.setGreenWave(false);
+      soundManager.play('success');
+
+      if (typeof window.showToast === "function") {
+        if (isAutoTimeout) {
+          window.showToast("⏱️ Timer Keselamatan 5 Menit Berakhir: Koridor Darurat 112 dinormalisasi otomatis ke mode adaptif.");
+        } else {
+          window.showToast("✓ Koridor Darurat 112 dinormalisasi kembali ke mode adaptif.");
+        }
+      }
+    } catch (err) {
+      console.warn("[EmergencyController] Cancel error:", err);
+      trafficEngine.setGreenWave(false);
+    }
   }
 
   _bindEmergencyActuatorForm() {
@@ -34,42 +198,10 @@ export class EmergencyController {
 
     if (!form) return;
 
-    form.addEventListener("submit", async (e) => {
+    form.addEventListener("submit", (e) => {
       e.preventDefault();
-      const type = respTypeInput ? respTypeInput.value : "Ambulans";
-      const route = respRouteInput ? respRouteInput.value : "route-soetomo";
-      const name = respNameInput && respNameInput.value.trim() ? respNameInput.value.trim() : "AMB-02";
-
-      const submitBtn = form.querySelector("button[type='submit']");
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = "PROCESSING...";
-      }
-
-      try {
-        const response = await commandLayer.dispatchCommand({
-          action: 'emergency:activate',
-          targetType: 'emergency',
-          targetId: name,
-          payload: { code: name, route }
-        }, true); // High risk! Employs confirmation guard.
-
-        if (response && response.success) {
-          if (typeof window.showToast === "function") {
-            window.showToast(`🚨 DISPATCH BERHASIL: Sinyal Prioritas diaktifkan untuk ${name}!`, "success");
-          }
-        }
-      } catch (err) {
-        console.warn("[EmergencyController] Emergency activation error:", err);
-        if (typeof window.showToast === "function") {
-          window.showToast(`❌ Gagal: ${err.message || 'Server sibuk atau tidak merespons.'}`, "danger");
-        }
-      } finally {
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = "Kirim Sinyal Prioritas";
-        }
-      }
+      // Buka modal konfirmasi sebelum pengaktifan
+      this.openGreenWaveConfirmModal();
     });
   }
 
@@ -116,50 +248,19 @@ export class EmergencyController {
     const btnStop = document.getElementById("btnStop112Sim");
 
     if (btnStart) {
-      btnStart.addEventListener("click", async () => {
-        btnStart.disabled = true;
-        if (btnStop) btnStop.disabled = false;
-
+      btnStart.addEventListener("click", () => {
         const curView = stateStore.getState().currentView;
         if (curView === 'emergency') {
           const mapNav = document.querySelector('[data-view="map"]');
           if (mapNav) mapNav.click();
         }
-
-        try {
-          await commandLayer.dispatchCommand({
-            action: 'emergency:activate',
-            targetType: 'emergency',
-            targetId: 'AMB-112',
-            payload: { code: 'AMB-112', route: 'route-soetomo' }
-          }, true); // High risk confirmation modal!
-        } catch (err) {
-          btnStart.disabled = false;
-          if (btnStop) btnStop.disabled = true;
-          if (typeof window.showToast === "function") {
-            window.showToast(`❌ Dispatch Ditolak: ${err.message}`, "danger");
-          }
-        }
+        this.openGreenWaveConfirmModal();
       });
     }
 
     if (btnStop) {
-      btnStop.addEventListener("click", async () => {
-        try {
-          await commandLayer.dispatchCommand({
-            action: 'emergency:cancel',
-            targetType: 'emergency',
-            targetId: 'AMB-112',
-            payload: { id: 'AMB-112' }
-          }, false); // low risk cancel
-          if (btnStart) btnStart.disabled = false;
-          btnStop.disabled = true;
-          soundManager.play('click');
-        } catch (err) {
-          if (typeof window.showToast === "function") {
-            window.showToast(`❌ Gagal membatalkan: ${err.message}`, "danger");
-          }
-        }
+      btnStop.addEventListener("click", () => {
+        this.deactivateGreenWaveToNormal();
       });
     }
   }

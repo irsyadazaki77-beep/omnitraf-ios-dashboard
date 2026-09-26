@@ -23,8 +23,10 @@ export class AnalyticsController {
 
     this._bindSlidersAndSnapshotSync();
     this._bindTrendsTabSwitching();
+    this._bindCorridorDropdown();
     this._bindEsgTargetConfig();
     this._bindEsgCalculator();
+    this._bindEsgMethodologyModal();
     this._bindTestSuiteRunner();
 
     // Subscribe to stateStore updates (telemetry, connection status, stale data)
@@ -38,6 +40,91 @@ export class AnalyticsController {
 
     // Initial render
     this.refreshCurrentHourSnapshot();
+  }
+
+  activate() {
+    this._bindSlidersAndSnapshotSync();
+    this._bindTrendsTabSwitching();
+    this._bindCorridorDropdown();
+    this._bindEsgTargetConfig();
+    this._bindEsgCalculator();
+    this._bindEsgMethodologyModal();
+    this._bindTestSuiteRunner();
+    this.refreshCurrentHourSnapshot();
+  }
+
+  /**
+   * Bind Corridor Selection Dropdown to update prediction chart curves per corridor
+   */
+  _bindCorridorDropdown() {
+    const select = document.getElementById("analyticsCorridorSelect");
+    if (!select) return;
+
+    const pathPrimary = document.getElementById("chartPathPrimary");
+    const pathMuted = document.getElementById("chartPathMuted");
+
+    const CORRIDOR_PATHS = {
+      "corridor-ayani": {
+        primary: "M0 206 C65 200 100 132 158 92 S285 112 352 152 S530 115 760 96",
+        muted: "M0 180 C80 185 155 166 252 120 S410 86 540 104 S650 85 760 72"
+      },
+      "corridor-darmo": {
+        primary: "M0 220 C70 210 120 150 180 110 S300 130 380 160 S550 120 760 110",
+        muted: "M0 200 C80 190 140 140 220 100 S350 110 480 120 S620 90 760 85"
+      },
+      "corridor-margorejo": {
+        primary: "M0 230 C80 220 130 160 200 130 S320 140 400 170 S560 130 760 120",
+        muted: "M0 210 C90 200 150 150 230 110 S360 120 490 130 S630 100 760 95"
+      },
+      "corridor-merr": {
+        primary: "M0 190 C60 180 110 110 170 80 S290 100 370 140 S520 100 760 80",
+        muted: "M0 170 C70 160 130 120 210 90 S340 100 460 110 S600 80 760 65"
+      }
+    };
+
+    select.addEventListener("change", (e) => {
+      const selectedKey = e.target.value;
+      const paths = CORRIDOR_PATHS[selectedKey] || CORRIDOR_PATHS["corridor-ayani"];
+
+      if (pathPrimary && paths.primary) pathPrimary.setAttribute("d", paths.primary);
+      if (pathMuted && paths.muted) pathMuted.setAttribute("d", paths.muted);
+
+      soundManager.play('click');
+      if (typeof window.showToast === "function") {
+        window.showToast(`📊 Kurva Diurnal diperbarui untuk ${e.target.options[e.target.selectedIndex].text}`);
+      }
+    });
+  }
+
+  /**
+   * Bind ESG Methodology Modal Info Button
+   */
+  _bindEsgMethodologyModal() {
+    const btnInfo = document.getElementById("btnEsgMethodology");
+    const modal = document.getElementById("esgMethodologyModal");
+    const closeBtn = document.getElementById("closeEsgMethodologyModal");
+    const understandBtn = document.getElementById("btnUnderstandEsgModal");
+
+    if (!btnInfo || !modal) return;
+
+    const openModal = () => {
+      modal.style.display = "flex";
+      modal.classList.add("show");
+      soundManager.play('click');
+    };
+
+    const closeModal = () => {
+      modal.style.display = "none";
+      modal.classList.remove("show");
+    };
+
+    btnInfo.onclick = openModal;
+    if (closeBtn) closeBtn.onclick = closeModal;
+    if (understandBtn) understandBtn.onclick = closeModal;
+
+    modal.onclick = (e) => {
+      if (e.target === modal) closeModal();
+    };
   }
 
   /**

@@ -1,0 +1,66 @@
+<div class="modal-overlay" id="aiRecommendationModal" role="dialog" aria-modal="true" style="display: none; background: rgba(3, 8, 14, 0.75); backdrop-filter: blur(12px);">
+  <div class="modal-content glass-panel ios-sheet-modal" style="max-width: 520px; width: 92%; border: 1px solid var(--border-glow); background: rgba(13, 22, 38, 0.92); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);">
+    <button class="modal-close" id="closeAiRecModal" aria-label="Tutup modal Rekomendasi AI">&times;</button>
+    
+    <div class="modal-header" style="border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px;">
+      <div class="modal-kicker-row" style="display: flex; align-items: center; gap: 8px;">
+        <span class="pill pill-ai" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">🤖 Webster AI Optimization</span>
+        <span class="unboxed-meta-sep" style="color: var(--text-muted);">·</span>
+        <span class="cctv-live-tag" style="font-size: 11px; color: var(--success);"><span class="live-dot"></span> SITS Surabaya</span>
+      </div>
+      <h2 id="aiRecModalTitle" style="margin: 8px 0 4px 0; font-size: 18px; font-weight: 700; color: var(--text);">Konfirmasi Optimasi Webster: Simpang Wonokromo</h2>
+      <p style="margin: 0; font-size: 12.5px; color: var(--text-muted);">Hasil komputasi volume arus (q) & rekomendasi alokasi waktu hijau (Green Split) adaptif.</p>
+    </div>
+
+    <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px;">
+      <!-- Parameter Metric Comparison Card -->
+      <div class="glass-soft" style="padding: 14px; border-radius: 12px; border: 1px solid var(--border); background: rgba(255, 255, 255, 0.03);">
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
+          
+          <div style="background: rgba(15, 23, 42, 0.6); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);">
+            <span style="font-size: 11px; color: var(--text-muted); display: block;">Volume Kepadatan Arus (q)</span>
+            <strong id="aiRecVolumeQ" style="font-size: 16px; color: var(--cyan); font-family: var(--font-mono, monospace);">2,450 smp/jam</strong>
+            <small style="display: block; font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">Rasio Saturasi (q/s): <span id="aiRecFlowRatio">0.72</span></small>
+          </div>
+
+          <div style="background: rgba(15, 23, 42, 0.6); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);">
+            <span style="font-size: 11px; color: var(--text-muted); display: block;">Estimasi Hemat Waktu Tunggu</span>
+            <strong id="aiRecDelaySaved" style="font-size: 16px; color: var(--success); font-family: var(--font-mono, monospace);">-12.4 dtk/kend</strong>
+            <small style="display: block; font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">Reduksi Tunda Rata-rata</small>
+          </div>
+
+        </div>
+
+        <div style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 11.5px; color: var(--text-muted);">Rasio Hijau Awal vs Webster:</span>
+            <strong id="aiRecSplitDiff" style="font-size: 12.5px; color: var(--primary-2);">35s ➔ 48s (+13s)</strong>
+          </div>
+          
+          <!-- Visual Split Comparison Bar -->
+          <div style="height: 8px; width: 100%; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; display: flex; margin-top: 6px;">
+            <div id="aiRecBarOld" style="width: 38.8%; background: var(--amber); height: 100%; transition: width 0.3s;" title="Split Awal"></div>
+            <div id="aiRecBarNew" style="width: 14.5%; background: var(--success); height: 100%; transition: width 0.3s;" title="Penambahan Webster"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-muted); margin-top: 4px;">
+            <span>Awal: <strong id="aiRecOldText" style="color: var(--amber);">35s (38.8%)</strong></span>
+            <span>Webster: <strong id="aiRecNewText" style="color: var(--success);">48s (53.3%)</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Smooth Transition Notice -->
+      <div style="padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.08); display: flex; gap: 10px; align-items: flex-start;">
+        <span style="font-size: 16px;">🔄</span>
+        <p style="margin: 0; font-size: 11.5px; color: var(--text-muted); line-height: 1.45;">
+          <strong style="color: var(--text);">Smooth Cycle Transition:</strong> Perubahan durasi hijau disinkronkan secara gradual pada awal siklus berikutnya. Fase hijau berjalan saat ini tidak dipotong mendadak.
+        </p>
+      </div>
+    </div>
+
+    <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--border);">
+      <button class="btn btn-ghost" id="btnCancelAiRecModal" type="button" style="padding: 8px 16px; font-size: 12.5px;">Batalkan</button>
+      <button class="btn btn-primary" id="btnConfirmAiRecModal" type="button" style="padding: 8px 18px; font-size: 12.5px; font-weight: 600;">✓ Terapkan Pada Siklus Berikutnya</button>
+    </div>
+  </div>
+</div>

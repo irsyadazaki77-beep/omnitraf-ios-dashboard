@@ -1,0 +1,19 @@
+<div class="modal-overlay" id="cctvZoomModal" role="dialog" aria-modal="true" style="display: none;">
+    <div class="modal-content glass-panel" style="max-width: 700px; width: 90%;">
+      <button class="modal-close" id="closeCctvZoomModal">&times;</button>
+      <div class="modal-header">
+        <h2 id="zoomModalTitle" style="margin: 0; font-size: 16px;">Live CCTV Feed — Bounding Box AI Tracking</h2>
+        <p id="zoomModalDesc" style="margin: 4px 0 0 0;">Pendeteksian objek real-time menggunakan model Computer Vision Edge AI.</p>
+      </div>
+      <div class="modal-body" style="position: relative; display: flex; justify-content: center; align-items: center; padding: 14px 0 0 0;">
+        <div class="zoom-cctv-container" style="position: relative; width: 100%; max-width: 640px; height: 360px; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid var(--border);">
+          <canvas id="cctvZoomCanvas" width="640" height="360" style="width: 100%; height: 100%; display: block;"></canvas>
+          <div class="zoom-scanline"></div>
+          <div class="zoom-noise"></div>
+          <div class="zoom-overlay-text" style="position: absolute; top: 10px; left: 10px; font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--primary-2); text-shadow: 0 0 4px rgba(0,0,0,0.8); z-index: 10;">
+            SITS CCTV FEED // STREAM ACTIVE // OBJECT TRACKING ON
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>

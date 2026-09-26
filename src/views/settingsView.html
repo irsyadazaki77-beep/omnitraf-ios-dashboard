@@ -1,0 +1,85 @@
+<div class="view-pane" id="view-settings">
+        <article class="settings-card glass-panel reveal-card" id="card-settings" style="margin-bottom: 20px;">
+          <div>
+            <p class="eyebrow">SYSTEM SETTINGS</p>
+            <h2>Clean UI Mode</h2>
+            <p>Konfigurasi visual antarmuka dioptimalkan dengan rasio kontras tinggi, peredaman intensitas shadow, dan rendering animasi adaptif.</p>
+          </div>
+          <span class="pill pill-ai">Optimized</span>
+        </article>
+        <article class="settings-expanded-card glass-panel">
+          <h2>Command Center Surabaya System Configuration</h2>
+          <p>Konfigurasi visual antarmuka, umpan balik audio haptic, dan parameter dasar sistem SITS.</p>
+          <div class="settings-options-list">
+            <div class="opt-row">
+              <div>
+                <strong>Mechanical UI Sound Haptics</strong>
+                <p>Umpan balik audio mekanis berfrekuensi tinggi saat berinteraksi dengan elemen kontrol.</p>
+              </div>
+              <span class="settings-desc">Status aktivasi dikontrol melalui ikon audio di topbar.</span>
+            </div>
+            
+            <!-- Volume Control & Alert Tone Selector -->
+            <div class="opt-row">
+              <div>
+                <strong>Volume & Tipe Audio Sintesis</strong>
+                <p>Sesuaikan tingkat kekerasan suara feedback tombol dan pilih tipe nada alert SITS.</p>
+                <div class="settings-volume-row">
+                  <label class="settings-vol-label">Volume: </label>
+                  <input id="audioVolumeRange" type="range" min="0" max="100" value="70" class="settings-vol-range" />
+                  <select id="audioToneSelector" class="selector settings-select-sm">
+                    <option value="click">Mechanical Clicks</option>
+                    <option value="cyber">Cyber Synth</option>
+                    <option value="retro">Retro Beep</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Optional Ambient City Traffic Soundscape -->
+            <div class="opt-row">
+              <div>
+                <strong>City Ambient Traffic Soundscape</strong>
+                <p>Putar efek suara lalu lintas kota cybernetic samar-samar di latar belakang untuk suasana Command Center.</p>
+                <div class="settings-volume-row">
+                  <label class="settings-vol-label">Volume Ambient: </label>
+                  <input id="ambientVolumeRange" type="range" min="0" max="100" value="30" class="settings-vol-range" />
+                </div>
+              </div>
+              <label class="layer-item settings-chk-label">
+                <input type="checkbox" class="layer-toggle-checkbox" id="chkAmbientSoundscape" />
+                <span class="settings-chk-text">Mulai</span>
+              </label>
+            </div>
+
+            <!-- Voice Alert TTS (Fitur 2) -->
+            <div class="opt-row">
+              <div>
+                <strong>AI Voice Broadcast (TTS Alert)</strong>
+                <p>Menyuarakan notifikasi atau peringatan kritis sistem SITS Surabaya menggunakan sintesis suara.</p>
+              </div>
+              <label class="layer-item settings-chk-label">
+                <input type="checkbox" class="layer-toggle-checkbox" id="chkVoiceAlerts" />
+                <span class="settings-chk-text">Nonaktif</span>
+              </label>
+            </div>
+
+            <!-- Keyboard shortcuts visual guide button -->
+            <div class="opt-row">
+              <div>
+                <strong>Pintasan Keyboard (Shortcuts) SITS</strong>
+                <p>Aktifkan panduan visual tombol pintasan keyboard operasional ruang kendali.</p>
+              </div>
+              <button class="btn btn-primary compact" id="btnShowShortcuts" type="button">Tampilkan Panduan Pintasan</button>
+            </div>
+
+            <div class="opt-row">
+              <div>
+                <strong>Sistem Dark Mode Adaptif</strong>
+                <p>Tema gelap kontras tinggi untuk kondisi ruang kendali dengan intensitas cahaya rendah.</p>
+              </div>
+              <span class="settings-desc">Status tema dikontrol melalui ikon kontras di topbar.</span>
+            </div>
+          </div>
+        </article>
+      </div>

@@ -1,0 +1,106 @@
+/* --------------------------------------------------------------------------
+   9. Standardized Badges & Status System
+   -------------------------------------------------------------------------- */
+.pill,
+.badge,
+.tag,
+.status-badge,
+.provenance-badge,
+.cctv-live-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  line-height: 1.35;
+  background: var(--panel-elevated);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.pill-live,
+.tag-low,
+.badge-success,
+.status-badge.green,
+.provenance-badge.live {
+  background: var(--success-soft);
+  color: var(--success);
+  border-color: var(--success-border);
+}
+
+.pill-danger,
+.tag-high,
+.badge-danger,
+.status-badge.red,
+.provenance-badge.offline {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: var(--danger-border);
+}
+
+.pill-ai,
+.tag-moderate,
+.badge-ai,
+.status-badge.yellow,
+.provenance-badge.simulated {
+  background: var(--warning-soft);
+  color: var(--warning);
+  border-color: var(--warning-border);
+}
+
+.provenance-badge.derived {
+  background: var(--primary-soft);
+  color: var(--primary-2);
+  border-color: var(--border-focus);
+}
+
+.provenance-badge.stale {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--text-muted);
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+.provenance-badge.user-triggered {
+  background: rgba(168, 85, 247, 0.12);
+  color: #c084fc;
+  border-color: rgba(168, 85, 247, 0.25);
+}
+
+.pulse-dot,
+.live-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+
+.status-dot-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 10px;
+  height: 10px;
+  position: relative;
+  margin-right: 4px;
+}
+
+.pulse-ring-outer {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-full);
+  border: 1.5px solid currentColor;
+  opacity: 0.4;
+}
+
+.pulse-ring-inner {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+}

@@ -1,0 +1,73 @@
+<div class="modal-overlay" id="signalIntelModal" role="dialog" aria-modal="true" style="display: none;">
+    <div class="modal-content glass-panel ios-sheet-modal" style="max-width: 480px; width: 92%;">
+      <button class="modal-close" id="closeSignalIntelModal" aria-label="Tutup modal Signal Intelligence">&times;</button>
+      <div class="modal-header">
+        <div class="modal-kicker-row">
+          <span class="pill pill-ai">Signal Intelligence</span>
+          <span class="unboxed-meta-sep">·</span>
+          <span class="cctv-live-tag"><span class="live-dot"></span> SITS ATCS</span>
+        </div>
+        <h2 style="margin: 8px 0 2px 0; font-size: 17px; font-weight: 700;">Status Sinyal APILL & Green Wave</h2>
+        <p style="margin: 0; font-size: 12px; color: var(--text-muted);">Sistem otomatisasi sinyal adaptif koridor prioritas Surabaya.</p>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 12px; margin: 16px 0;">
+        <!-- Simpang Wonokromo -->
+        <div class="apill-card glass-soft" style="padding: 14px; border-radius: 12px; border: 1px solid var(--border);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <strong style="font-size: 13px; font-weight: 700;">Simpang Wonokromo (A. Yani)</strong>
+            <span class="status-badge green" id="wonokromoBadge">HIJAU (24s)</span>
+          </div>
+          <div class="apill-lights-row" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center;">
+            <div class="apill-light red" id="wonokromoRed">
+              <span class="apill-light-label">MERAH</span>
+              <strong id="wonokromoRedTime" class="tabular font-mono">0s</strong>
+            </div>
+            <div class="apill-light yellow" id="wonokromoYellow">
+              <span class="apill-light-label">KUNING</span>
+              <strong id="wonokromoYellowTime" class="tabular font-mono">0s</strong>
+            </div>
+            <div class="apill-light green active" id="wonokromoGreen">
+              <span class="apill-light-label">HIJAU</span>
+              <strong id="wonokromoGreenTime" class="tabular font-mono">24s</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Simpang Margorejo -->
+        <div class="apill-card glass-soft" style="padding: 14px; border-radius: 12px; border: 1px solid var(--border);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <strong style="font-size: 13px; font-weight: 700;">Simpang Margorejo (Jemursari)</strong>
+            <span class="status-badge red" id="margorejoBadge">MERAH (12s)</span>
+          </div>
+          <div class="apill-lights-row" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center;">
+            <div class="apill-light red active" id="margorejoRed">
+              <span class="apill-light-label">MERAH</span>
+              <strong id="margorejoRedTime" class="tabular font-mono">12s</strong>
+            </div>
+            <div class="apill-light yellow" id="margorejoYellow">
+              <span class="apill-light-label">KUNING</span>
+              <strong id="margorejoYellowTime" class="tabular font-mono">0s</strong>
+            </div>
+            <div class="apill-light green" id="margorejoGreen">
+              <span class="apill-light-label">HIJAU</span>
+              <strong id="margorejoGreenTime" class="tabular font-mono">0s</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Emergency Green Wave Switch -->
+        <div class="green-wave-box glass-soft" style="padding: 14px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--danger-border); background: var(--danger-soft);">
+          <div>
+            <strong style="font-size: 13px; color: var(--danger); display: flex; align-items: center; gap: 6px;">
+              Emergency Green Wave
+            </strong>
+            <p style="margin: 3px 0 0 0; font-size: 11px; color: var(--text-muted);">Paksa semua lampu koridor A. Yani – Darmo Hijau Permanen</p>
+          </div>
+          <label class="toggle-switch-ios" aria-label="Toggle Emergency Green Wave">
+            <input type="checkbox" id="chkGreenWave" role="switch" aria-checked="false" aria-label="Aktifkan Emergency Green Wave Koridor A. Yani - Darmo" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>

@@ -427,6 +427,7 @@ export class TrafficEngine {
       const newFuel = (curTel.fuelSavedLiters || 580) + 0.08;
       const timeStr = new Date().toLocaleTimeString('id-ID') + ' WIB';
 
+      const nowLocal = Date.now();
       const updatedIntersections = (curState.intersections || []).map(node => {
         const nextNode = { ...node };
 
@@ -437,26 +438,62 @@ export class TrafficEngine {
           return nextNode;
         }
 
-        let curTimer = typeof nextNode.timer === "string" ? (nextNode.greenSplit || 35) : nextNode.timer;
-        curTimer--;
-
-        if (curTimer <= 0) {
-          if (nextNode.state === "green") {
-            nextNode.state = "yellow";
-            curTimer = Math.round(this.yellowDuration);
-          } else if (nextNode.state === "yellow") {
-            nextNode.state = "red";
-            curTimer = nextNode.id === "node-wonokromo" ? this.redDurationBase : 25;
-          } else {
+        if (nextNode.isOverrideActive && nextNode.overrideStartTime && nextNode.overrideDuration > 0) {
+          const rem = nextNode.overrideDuration - Math.floor((nowLocal - nextNode.overrideStartTime) / 1000);
+          if (rem > 0) {
             nextNode.state = "green";
-            curTimer = nextNode.id === "node-wonokromo" ? (curState.greenSplitWonokromo || 35) : (nextNode.greenSplit || 30);
+            nextNode.timer = rem;
+            nextNode.status = `Manual Override (${rem}s)`;
+            return nextNode;
+          } else {
+            nextNode.isOverrideActive = false;
+            nextNode.overrideStartTime = null;
+            nextNode.overrideDuration = 0;
+            nextNode.state = "yellow";
+            nextNode.timer = nextNode.yellowDuration || 3;
+            nextNode.status = "Transisi Setelah Override";
+            nextNode.cycleStartTime = nowLocal + ((nextNode.yellowDuration || 3) * 1000);
+            return nextNode;
           }
         }
 
-        nextNode.timer = curTimer;
-        if (nextNode.state === "red") nextNode.status = curState.isChaosMode ? "Macet Total" : "Padat";
-        else if (nextNode.state === "yellow") nextNode.status = "Transisi";
-        else nextNode.status = curState.isChaosMode ? "Merayap" : "Lancar";
+        if (!nextNode.cycleStartTime) nextNode.cycleStartTime = nowLocal;
+        const yellowDur = nextNode.yellowDuration || 3;
+        const redDur = nextNode.redDuration || 25;
+        const greenDur = nextNode.greenSplit || 35;
+        const totalDur = greenDur + yellowDur + redDur;
+
+        nextNode.yellowDuration = yellowDur;
+        nextNode.redDuration = redDur;
+        nextNode.totalCycleTime = totalDur;
+
+        const elapsedMs = Math.max(0, nowLocal - nextNode.cycleStartTime);
+        const elapsedSec = Math.floor(elapsedMs / 1000);
+        let cycleSec = elapsedSec % totalDur;
+
+        if (cycleSec === 0 && nextNode.pendingGreenSplit) {
+          nextNode.greenSplit = nextNode.pendingGreenSplit;
+          nextNode.pendingGreenSplit = null;
+          nextNode.totalCycleTime = nextNode.greenSplit + yellowDur + redDur;
+        }
+
+        const activeGreen = nextNode.greenSplit || 35;
+        const activeYellow = nextNode.yellowDuration || 3;
+        const activeTotal = activeGreen + activeYellow + (nextNode.redDuration || 25);
+
+        if (cycleSec < activeGreen) {
+          nextNode.state = "green";
+          nextNode.timer = activeGreen - cycleSec;
+          nextNode.status = curState.isChaosMode ? "Merayap" : "Lancar";
+        } else if (cycleSec < activeGreen + activeYellow) {
+          nextNode.state = "yellow";
+          nextNode.timer = (activeGreen + activeYellow) - cycleSec;
+          nextNode.status = "Transisi";
+        } else {
+          nextNode.state = "red";
+          nextNode.timer = activeTotal - cycleSec;
+          nextNode.status = curState.isChaosMode ? "Macet Total" : "Padat";
+        }
 
         return nextNode;
       });
@@ -581,35 +618,14 @@ export class TrafficEngine {
   }
 
   _bindAiRecommendationButtons() {
-    const buttons = document.querySelectorAll('button[data-action="simulate"], button[data-action="apply-ai"], .btn-apply-ai, #btnApplyAiRec');
+    const buttons = document.querySelectorAll('button[data-action="apply-ai"], .btn-apply-ai, #btnApplyAiRec');
     buttons.forEach(btn => {
-      btn.addEventListener("click", async () => {
-        btn.disabled = true;
-        const originalText = btn.textContent;
-        btn.textContent = "PROCESSING...";
-
-        try {
-          const recId = "REC-AI-" + Date.now().toString().slice(-4);
-          await commandLayer.dispatchCommand({
-            action: 'ai:apply-recommendation',
-            targetType: 'intersection',
-            targetId: 'node-wonokromo',
-            payload: { recommendationId: recId }
-          }, false); // low-risk
-          
-          if (typeof window.showToast === "function") {
-            window.showToast("✓ Rekomendasi AI berhasil diterapkan oleh Operator!");
-          }
-        } catch (err) {
-          console.warn("[TrafficEngine] AI recommendation failed:", err);
-          if (typeof window.showToast === "function") {
-            window.showToast(`❌ Gagal: ${err.message}`, "danger");
-          }
-        } finally {
-          btn.disabled = false;
-          btn.textContent = originalText;
-        }
-        soundManager.play('success');
+      btn.addEventListener("click", () => {
+        import('../controllers/signalsController.js').then(({ signalsController }) => {
+          signalsController.openAiRecommendationModal('node-wonokromo', 'Simpang Wonokromo (A. Yani)');
+        }).catch(err => {
+          console.warn('[TrafficEngine] Failed to load signalsController for modal:', err);
+        });
       });
     });
   }

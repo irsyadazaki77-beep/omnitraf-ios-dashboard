@@ -10,8 +10,10 @@
 import { stateStore } from './core/stateStore.js';
 import { soundManager } from './core/soundManager.js';
 import { socketClient } from './core/socketClient.js';
+import { authManager } from './core/authManager.js';
 import { diagnostics } from './core/diagnostics.js';
 import { runReleaseHealthCheck } from './core/healthCheck.js';
+import { viewLoader } from './core/viewLoader.js';
 import { trafficEngine } from './modules/trafficEngine.js';
 import { chatSystem } from './modules/chatSystem.js';
 import { uiMarquee } from './modules/uiMarquee.js';
@@ -35,23 +37,26 @@ export class App {
     this.currentView = 'dashboard';
   }
 
-  init() {
+  async init() {
     if (this.isInitialized) return;
     this.isInitialized = true;
 
     console.info("🚦 [OmniTRAF] Menginisialisasi SITS Command Center Surabaya Kernel...");
 
-    // 0. Global Frontend Error Boundary, Accessibility & Health Check (Phase 9 & 10)
+    // 0. Global Frontend Error Boundary, Accessibility & Health Check
     this._initGlobalErrorBoundary();
     this._initAccessibleModalHandlers();
     runReleaseHealthCheck();
 
-    // 1. Core Network & Socket Infrastructure
+    // 1. Mount Shell Components & Modals (Marquee, Drawer, Modals)
+    await viewLoader.mountShellComponents();
+
+    // 2. Core Network & Socket Infrastructure
     if (socketClient && typeof socketClient.getSocket === 'function') {
       socketClient.getSocket();
     }
 
-    // 2. Core UI & Shell Modules (First Paint Critical Path)
+    // 3. Core UI & Shell Modules (First Paint Critical Path)
     if (soundManager && typeof soundManager.init === 'function') soundManager.init();
     if (uiMarquee && typeof uiMarquee.init === 'function') uiMarquee.init();
     if (chatSystem && typeof chatSystem.init === 'function') chatSystem.init();
@@ -60,16 +65,16 @@ export class App {
     if (pwaController && typeof pwaController.init === 'function') pwaController.init();
     if (trafficEngine && typeof trafficEngine.init === 'function') trafficEngine.init();
 
-    // 3. Lazy View Activator Subscription
-    stateStore.subscribe('state:currentView', ({ value, prev }) => {
-      this._handleViewTransition(value, prev);
+    // 4. Lazy View Activator Subscription
+    stateStore.subscribe('state:currentView', async ({ value, prev }) => {
+      await this._handleViewTransition(value, prev);
     });
 
     // Initial View Activate
-    const initialView = stateStore.getState().currentView || 'dashboard';
-    this._handleViewTransition(initialView, null);
+    const initialView = stateStore.getState().currentView || (window.location.hash.slice(1) || 'dashboard');
+    await this._handleViewTransition(initialView, null);
 
-    // 4. Expose Global Bridges & Terminal Diagnostics
+    // 5. Expose Global Bridges & Terminal Diagnostics
     this._exposeGlobalBridges();
 
     console.info("✓ [OmniTRAF] Kernel SITS Surabaya beroperasi secara optimal.");
@@ -78,22 +83,34 @@ export class App {
   /**
    * Orchestrate Lazy Init & View Lifecycle
    */
-  _handleViewTransition(newView, oldView) {
+  async _handleViewTransition(newView, oldView) {
     this.currentView = newView;
 
     // Deactivate previous controllers if needed
     if (oldView && oldView !== newView) {
-      this._deactivateViewModules(oldView);
+      this._deactivateViewModules(oldView, newView);
     }
 
+    // Lazy load & mount HTML partial into DOM
+    const { isFirstMount } = await viewLoader.mountView(newView);
+
     // Lazy load & activate target view modules
-    this._activateViewModules(newView);
+    this._activateViewModules(newView, isFirstMount);
+
+    // If switching to Map view or Dashboard, trigger Leaflet size invalidation
+    const cleanId = (newView || '').replace('#', '').replace('view-', '');
+    if (cleanId === 'map' || cleanId === 'dashboard') {
+      if (mapManager && typeof mapManager.debouncedInvalidateSize === 'function') {
+        mapManager.debouncedInvalidateSize(120);
+      }
+    }
   }
 
-  _activateViewModules(view) {
+  _activateViewModules(view, isFirstMount = false) {
     diagnostics.recordInit('view:' + view);
+    const cleanView = (view || '').replace('#', '').replace('view-', '');
 
-    switch (view) {
+    switch (cleanView) {
       case 'dashboard':
         this._safeInitAndActivate('mapManager', mapManager);
         this._safeInitAndActivate('cctvController', cctvController);
@@ -118,6 +135,7 @@ export class App {
         this._safeInitAndActivate('incidentController', incidentController);
         break;
 
+      case 'emergency':
       case 'emergencies':
         this._safeInitAndActivate('emergencyController', emergencyController);
         break;
@@ -140,26 +158,34 @@ export class App {
     }
   }
 
-  _deactivateViewModules(view) {
-    switch (view) {
-      case 'cctv':
-        if (cctvController && typeof cctvController.deactivate === 'function') {
-          cctvController.deactivate();
-        }
-        break;
-      case 'analytics':
-      case 'prediction':
-        if (analyticsController && typeof analyticsController.deactivate === 'function') {
-          analyticsController.deactivate();
-        }
-        break;
-      case 'devices':
-        if (deviceController && typeof deviceController.deactivate === 'function') {
-          deviceController.deactivate();
-        }
-        break;
-      default:
-        break;
+  _deactivateViewModules(oldView, newView) {
+    const cleanOld = (oldView || '').replace('#', '').replace('view-', '');
+    const cleanNew = (newView || '').replace('#', '').replace('view-', '');
+
+    // Deactivate CCTV controller if target view doesn't render CCTV canvas
+    if ((cleanOld === 'cctv' || cleanOld === 'dashboard') && (cleanNew !== 'cctv' && cleanNew !== 'dashboard')) {
+      if (cctvController && typeof cctvController.deactivate === 'function') {
+        cctvController.deactivate();
+      }
+    }
+
+    // Deactivate Map Manager if target view doesn't render Leaflet maps
+    if ((cleanOld === 'map' || cleanOld === 'dashboard') && (cleanNew !== 'map' && cleanNew !== 'dashboard')) {
+      if (mapManager && typeof mapManager.deactivate === 'function') {
+        mapManager.deactivate();
+      }
+    }
+
+    if (cleanOld === 'analytics' || cleanOld === 'prediction') {
+      if (analyticsController && typeof analyticsController.deactivate === 'function') {
+        analyticsController.deactivate();
+      }
+    }
+
+    if (cleanOld === 'devices') {
+      if (deviceController && typeof deviceController.deactivate === 'function') {
+        deviceController.deactivate();
+      }
     }
   }
 
@@ -219,8 +245,10 @@ export class App {
       this._showToastNotification(msg, type);
     };
 
-    // Diagnostic console helpers
+    // Diagnostic console helpers & Auth
     window.getDiagnostics = () => diagnostics.getMetrics();
+    window.authManager = authManager;
+    authManager.ensureActiveSession().catch(() => {});
   }
 
   _showToastNotification(msg, type = "normal") {

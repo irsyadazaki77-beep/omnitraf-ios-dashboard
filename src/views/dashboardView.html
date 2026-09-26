@@ -1,0 +1,609 @@
+<div class="view-pane active" id="view-dashboard">
+        <!-- Dashboard Executive Command Header -->
+        <header class="dash-hero-header">
+          <div class="dash-hero-title-group">
+            <span class="eyebrow">SITS ADAPTIVE URBAN MOBILITY CONTROL CENTER</span>
+            <h1 class="dash-hero-title">Dashboard Command Center Surabaya</h1>
+          </div>
+          <div class="dash-hero-status-strip">
+            <div class="dash-status-item">
+              <span class="provenance-badge live" id="dashHeaderProv">SITS GATEWAY LIVE</span>
+            </div>
+            <div class="dash-status-item hide-mobile">
+              <span class="dash-status-label">Uptime:</span>
+              <strong class="tabular text-success" id="dashHeaderUptime">99.7%</strong>
+            </div>
+            <div class="dash-status-item hide-mobile">
+              <span class="dash-status-label">Latency:</span>
+              <strong class="tabular text-primary-2" id="dashHeaderLatency">24ms</strong>
+            </div>
+          </div>
+        </header>
+
+        <!-- Executive Traffic Briefing Container -->
+        <article class="traffic-briefing-card glass-panel reveal-card" id="dashTrafficBriefing" aria-label="Briefing Operasional Lalu Lintas">
+          <div class="briefing-header">
+            <div class="briefing-title-group">
+              <span class="briefing-pulse-dot" id="briefingStatusDot"></span>
+              <h2 class="briefing-title">Briefing Operasional Lalu Lintas Kota</h2>
+              <span class="provenance-badge live" id="briefingProvenance">REALTIME SITS</span>
+            </div>
+            <div class="briefing-timestamp" id="briefingTimestamp">Waktu Lokal: <span id="dashLocalTime">--:-- WIB</span></div>
+          </div>
+          <div class="briefing-grid">
+            <div class="briefing-item briefing-severity-moderate" id="briefingCongestionState">
+              <small class="briefing-label">Status Beban Kota</small>
+              <strong class="briefing-value" id="briefingCongestionVal">68% — Beban Sedang-Tinggi</strong>
+              <span class="briefing-sub" id="briefingCongestionSub">Peak Hour SITS Surabaya</span>
+            </div>
+            <div class="briefing-item" id="briefingAffectedCorridors">
+              <small class="briefing-label">Koridor Terdampak Utama</small>
+              <strong class="briefing-value text-amber" id="briefingCorridorsVal">Ahmad Yani (83%) & Darmo (61%)</strong>
+              <span class="briefing-sub" id="briefingCorridorsSub">Simpang Wonokromo Antrean +180m</span>
+            </div>
+            <div class="briefing-item" id="briefingSignalCondition">
+              <small class="briefing-label">Sistem Kontrol APILL</small>
+              <strong class="briefing-value text-cyan" id="briefingSignalVal">ATCS Adaptif Synchro Active</strong>
+              <span class="briefing-sub" id="briefingSignalSub">126 Simpang Terkoneksi (100%)</span>
+            </div>
+            <div class="briefing-item" id="briefingActiveAlert">
+              <small class="briefing-label">Intervensi / Peringatan Aktif</small>
+              <strong class="briefing-value text-emerald" id="briefingAlertVal">Prioritas Ambulans RSU Dr. Soetomo</strong>
+              <span class="briefing-sub" id="briefingAlertSub">ETA 1m 45s • Rute Darmo Hijau</span>
+            </div>
+          </div>
+        </article>
+
+        <section class="control-strip glass-panel" aria-label="Quick controls">
+          <div class="control-group-left">
+            <div class="search-box-wrapper search-box-wrapper-inner">
+              <div class="search-box">
+                <span>⌕</span>
+                <input id="intersectionSearch" type="search" placeholder="Cari simpang Surabaya..." autocomplete="off" />
+              </div>
+              <!-- Search Autocomplete Suggestions Dropdown -->
+              <div class="search-suggestions glass-panel is-hidden" id="searchSuggestions"></div>
+            </div>
+
+            <div class="filter-group filter-chips ios-segmented-control" aria-label="Density filters">
+              <button class="filter-chip active" type="button" data-filter="all">Semua</button>
+              <button class="filter-chip" type="button" data-filter="high">High</button>
+              <button class="filter-chip" type="button" data-filter="moderate">Moderate</button>
+              <button class="filter-chip" type="button" data-filter="low">Low</button>
+            </div>
+          </div>
+
+          <div class="control-group-right quick-actions">
+            <!-- Simulation Speed Range Control -->
+            <div class="sim-speed-box glass-soft">
+              <label for="simulationSpeedRange" class="sim-speed-label">Speed: <span id="simSpeedVal">1x</span></label>
+              <input id="simulationSpeedRange" type="range" min="0" max="4" value="1" step="1" class="sim-speed-input" />
+            </div>
+            
+            <button class="btn btn-ghost" type="button" data-action="simulate">Simulasi AI</button>
+            <button class="btn btn-ghost" type="button" data-action="export">Export Report</button>
+            <button class="btn btn-primary compact" type="button" data-action="refresh">Refresh Data</button>
+            <button class="btn btn-chaos" type="button" id="btnToggleChaos">⚠️ MODE KEOS</button>
+          </div>
+        </section>
+
+        <!-- Bento Grid Executive Telemetry (Operator-Focused Hierarchy) -->
+        <section class="stat-grid bento-telemetry-grid" aria-label="Key metrics">
+          <!-- Bento Hero 1: Indeks Kemacetan Kota -->
+          <article class="stat-card bento-card bento-hero glass-panel reveal-card" id="bentoCardCongestion">
+            <div class="bento-card-inner">
+              <div class="bento-content-wrap">
+                <div class="bento-header-badge">
+                  <span class="stat-icon amber-tone">↗</span>
+                  <span class="bento-pill-tag">Live Koridor SITS</span>
+                </div>
+                <div class="bento-meta-body">
+                  <p>Indeks Kemacetan Kota</p>
+                  <h2><span class="counter-val" data-counter="68">68</span><span class="denom-val">/100</span></h2>
+                  <span class="metric-warn pill-trend"><span class="trend-arrow">▲</span> Padat • Wonokromo</span>
+                </div>
+              </div>
+              <div class="bento-gauge-wrapper">
+                <svg class="radial-ring-gauge" viewBox="0 0 100 100" width="76" height="76">
+                  <circle class="gauge-track" cx="50" cy="50" r="38" fill="none" stroke-width="6" />
+                  <circle class="gauge-fill-ring amber-glow-ring" cx="50" cy="50" r="38" fill="none" stroke-width="6" stroke-dasharray="238.76" stroke-dashoffset="76.4" stroke-linecap="round" />
+                </svg>
+                <div class="gauge-center-text">
+                  <span class="gauge-center-val">68%</span>
+                  <span class="gauge-center-sub">Beban</span>
+                </div>
+              </div>
+            </div>
+            <div class="stat-progress-bar"><div class="progress-fill amber-bar w-68p"></div></div>
+          </article>
+
+          <!-- Bento Hero 2: Reduksi Emisi CO₂ ESG -->
+          <article class="stat-card bento-card bento-hero glass-panel reveal-card" id="bentoCardCO2">
+            <div class="bento-card-inner">
+              <div class="bento-content-wrap">
+                <div class="bento-header-badge">
+                  <span class="stat-icon green-tone">🌱</span>
+                  <span class="bento-pill-tag green-tag">ESG Urban Impact</span>
+                </div>
+                <div class="bento-meta-body">
+                  <p>Reduksi Emisi CO₂</p>
+                  <h2><span class="counter-val" data-counter="18">18</span><span class="denom-val">%</span></h2>
+                  <span class="metric-up emissions-counter-text pill-trend" id="emissionsCounter">Tereduksi: 184.20 kg</span>
+                </div>
+              </div>
+              <div class="bento-gauge-wrapper">
+                <svg class="radial-ring-gauge" viewBox="0 0 100 100" width="76" height="76">
+                  <circle class="gauge-track" cx="50" cy="50" r="38" fill="none" stroke-width="6" />
+                  <circle class="gauge-fill-ring green-glow-ring" cx="50" cy="50" r="38" fill="none" stroke-width="6" stroke-dasharray="238.76" stroke-dashoffset="195.78" stroke-linecap="round" />
+                </svg>
+                <div class="gauge-center-text">
+                  <span class="gauge-center-val">18%</span>
+                  <span class="gauge-center-sub">Efisiensi</span>
+                </div>
+              </div>
+            </div>
+            <div class="stat-progress-bar"><div class="progress-fill green-bar w-18p"></div></div>
+          </article>
+
+          <!-- Bento 3: Persimpangan Aktif -->
+          <article class="stat-card bento-card glass-panel reveal-card">
+            <div class="bento-card-header-row">
+              <div class="stat-icon blue-tone">⌁</div>
+              <span class="pill pill-live">100% Online</span>
+            </div>
+            <div>
+              <p>Persimpangan SITS Aktif</p>
+              <h2 data-counter="126">126</h2>
+              <span class="metric-up pill-trend">Siklus Adaptif Terkoneksi</span>
+            </div>
+            <div class="stat-progress-bar"><div class="progress-fill blue-bar w-84p"></div></div>
+          </article>
+
+          <!-- Bento 4: Rata-rata Waktu Tunggu -->
+          <article class="stat-card bento-card glass-panel reveal-card">
+            <div class="bento-card-header-row">
+              <div class="stat-icon green-tone">⏱</div>
+              <span class="pill pill-live">-6s vs Rata-rata</span>
+            </div>
+            <div>
+              <p>Rata-rata Waktu Tunggu</p>
+              <h2><span class="counter-val" data-counter="42">42</span><span class="denom-val"> dtk</span></h2>
+              <span class="metric-up pill-trend">Antrean Terkendali</span>
+            </div>
+            <div class="stat-progress-bar"><div class="progress-fill green-bar w-42p"></div></div>
+          </article>
+
+          <!-- Bento 5: Kendaraan Darurat Aktif -->
+          <article class="stat-card bento-card glass-panel reveal-card">
+            <div class="bento-card-header-row">
+              <div class="stat-icon red-tone">✚</div>
+              <span class="pill pill-danger">Prioritas 112</span>
+            </div>
+            <div>
+              <p>Armada Darurat Aktif</p>
+              <h2 data-counter="3">3</h2>
+              <span class="metric-down pill-trend">Green Wave Siaga</span>
+            </div>
+            <div class="stat-progress-bar"><div class="progress-fill red-bar w-30p"></div></div>
+          </article>
+
+          <!-- Bento 6: Kendaraan Hari Ini -->
+          <article class="stat-card bento-card glass-panel reveal-card">
+            <div class="bento-card-header-row">
+              <div class="stat-icon blue-tone">🚗</div>
+              <span class="pill pill-live">SITS Sensor Flow</span>
+            </div>
+            <div>
+              <p>Volume Kendaraan Hari Ini</p>
+              <h2 data-counter="128540">128.540</h2>
+              <span class="metric-up pill-trend">+14.8% vs normal</span>
+            </div>
+            <div class="stat-progress-bar"><div class="progress-fill blue-bar w-72p"></div></div>
+          </article>
+
+          <!-- Bento 7: Prediksi Macet Besok -->
+          <article class="stat-card bento-card glass-panel reveal-card">
+            <div class="bento-card-header-row">
+              <div class="stat-icon amber-tone">🔮</div>
+              <span class="pill pill-ai">Edge AI Model</span>
+            </div>
+            <div>
+              <p>Prediksi Beban Besok</p>
+              <h2>Sedang</h2>
+              <span class="metric-warn pill-trend">Pola Jam Sibuk Siang</span>
+            </div>
+            <div class="stat-progress-bar"><div class="progress-fill amber-bar w-50p"></div></div>
+          </article>
+
+          <!-- Bento 8: Efisiensi Sinyal APILL -->
+          <article class="stat-card bento-card glass-panel reveal-card">
+            <div class="bento-card-header-row">
+              <div class="stat-icon blue-tone">⚡</div>
+              <span class="pill pill-ai">Optimasi ATCS</span>
+            </div>
+            <div>
+              <p>Efisiensi Sinyal APILL</p>
+              <h2><span class="counter-val" data-counter="92">92</span><span class="denom-val">%</span></h2>
+              <span class="metric-up pill-trend">Sinkronisasi Hijau Optimal</span>
+            </div>
+            <div class="stat-progress-bar"><div class="progress-fill blue-bar w-92p"></div></div>
+          </article>
+        </section>
+
+        <section class="dashboard-grid">
+          <!-- Shared map panel -->
+          <article class="map-panel glass-panel">
+            <div class="section-head">
+              <div>
+                <h2>Situational Map Preview</h2>
+                <p>Visualisasi geospasial real-time koridor Ahmad Yani, Wonokromo, Raya Darmo, Kertajaya, dan Tunjungan.</p>
+              </div>
+              <div class="map-head-actions" style="display: flex; align-items: center; gap: 8px;">
+                <span class="pill pill-live">SITS GIS</span>
+                <a href="#map" class="btn btn-primary compact" data-view="map" style="text-decoration: none;">Buka Peta Lengkap ↗</a>
+              </div>
+            </div>
+
+            <!-- Custom Surabaya Topography Map -->
+            <div class="map-box-container map-box-container-inner">
+              <!-- Zoom & Pan Controls overlay -->
+              <div class="map-zoom-controls glass-soft map-zoom-controls-overlay">
+                <button id="btnMapZoomIn" title="Perbesar Peta (+)" class="map-zoom-btn-item" aria-label="Zoom in">+</button>
+                <button id="btnMapZoomOut" title="Perkecil Peta (-)" class="map-zoom-btn-item" aria-label="Zoom out">-</button>
+                <button id="btnMapZoomReset" title="Pusatkan Surabaya" class="map-zoom-btn-reset" aria-label="Reset zoom">⟲</button>
+              </div>
+
+              <!-- Clean SITS Landmark & Node Detail Card -->
+              <div class="landmark-detail-card glass-panel landmark-detail-card-overlay is-hidden" id="landmarkDetailCard">
+                <div class="holo-hud-header">
+                  <div class="holo-scan-badge">
+                    <span class="holo-pulse-dot"></span>
+                    <span class="holo-badge-label">SITS SURABAYA GIS</span>
+                  </div>
+                  <button class="close-landmark-card holo-close-btn" id="btnCloseLandmarkCard" type="button" aria-label="Tutup info node">&times;</button>
+                </div>
+                <div class="holo-hud-body">
+                  <div class="holo-title-row">
+                    <span class="holo-marker-icon">🏛️</span>
+                    <div>
+                      <h4 id="landmarkTitle" class="landmark-title-text">Landmark Kota</h4>
+                      <p id="landmarkDesc" class="landmark-desc-text">Deskripsi koridor landmark.</p>
+                    </div>
+                  </div>
+                  <div class="holo-stats-grid">
+                    <div class="holo-stat-item">
+                      <small>Kondisi Arteri</small>
+                      <strong id="landmarkStatus" class="text-success">Lancar (42 km/jam)</strong>
+                    </div>
+                    <div class="holo-stat-item">
+                      <small>Status Sensor</small>
+                      <strong class="text-cyan">IoT Node Aktif</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="map-box" id="dashboardMapBox" data-density="all"></div>
+
+              <div class="map-overview glass-soft">
+                <h3>Network Load</h3>
+                <strong id="networkLoad">72%</strong>
+                <p>Kemacetan parah terdeteksi di Koridor A. Yani.</p>
+              </div>
+
+              <div class="legend glass-soft">
+                <h3>Legenda Status</h3>
+                <span><i class="legend-line danger"></i>Macet (&lt;15 km/j)</span>
+                <span><i class="legend-line warning"></i>Padat (15-30 km/j)</span>
+                <span><i class="legend-line success"></i>Lancar (&gt;30 km/j)</span>
+                <span><i class="legend-line primary"></i>Normal</span>
+              </div>
+
+              <!-- Map Layer Controls -->
+              <div class="map-layer-deck glass-soft">
+                <h3>Lapisan Peta</h3>
+                <div class="layer-option-list">
+                  <label class="layer-item">
+                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="district-zones" checked />
+                    <span class="layer-label">Wilayah Kota</span>
+                  </label>
+                  <label class="layer-item">
+                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="map-river" checked />
+                    <span class="layer-label">Aliran Sungai</span>
+                  </label>
+                  <label class="layer-item">
+                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="road-glows" checked />
+                    <span class="layer-label">Efek Arus</span>
+                  </label>
+                  <label class="layer-item">
+                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="minor-roads" checked />
+                    <span class="layer-label">Jalan Sekunder</span>
+                  </label>
+                  <label class="layer-item">
+                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="warn-points" checked />
+                    <span class="layer-label">Titik Insiden</span>
+                  </label>
+                  <label class="layer-item">
+                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="landmark-group" checked />
+                    <span class="layer-label">Tempat Penting</span>
+                  </label>
+                  <label class="layer-item">
+                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="compass-rose" checked />
+                    <span class="layer-label">Kompas</span>
+                  </label>
+                  <label class="layer-item">
+                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="map-heatmap" />
+                    <span class="layer-label">Heatmap Kepadatan</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <aside class="right-widgets" aria-label="Operational widgets">
+            <!-- 1. Live Camera Widget -->
+            <article class="widget glass-panel reveal-card" id="widgetLiveCamera">
+              <div class="section-head compact">
+                <div>
+                  <h2 class="widget-title-sm">CCTV Intelligence Summary</h2>
+                  <p class="widget-subtitle-sm">Inferensi Computer Vision Edge AI SITS.</p>
+                </div>
+                <div class="camera-head-actions">
+                  <!-- iOS Segmented Pill Bar Camera Switcher -->
+                  <div class="cctv-mini-switch ios-segmented-cctv-pill" id="dashCctvSwitcher" aria-label="Pilihan CCTV Simpang">
+                    <button class="cctv-mini-btn active" type="button" data-cam="1" data-name="Jl. Ahmad Yani (Wonokromo)" data-sub="Camera 01 • SITS Stable feed">CCTV-01</button>
+                    <button class="cctv-mini-btn" type="button" data-cam="2" data-name="Jl. Raya Darmo (Al-Falah)" data-sub="Camera 02 • SITS Stable feed">CCTV-02</button>
+                    <button class="cctv-mini-btn" type="button" data-cam="3" data-name="Jl. Tunjungan (Siola)" data-sub="Camera 03 • SITS Stable feed">CCTV-03</button>
+                  </div>
+                  <a href="#cctv" class="btn btn-ghost compact" data-view="cctv" style="text-decoration: none;">CCTV Full ↗</a>
+                </div>
+              </div>
+
+              <!-- 16:9 Aspect Ratio Camera Viewport with Crisp Overlays -->
+              <div class="camera-box tactical-camera-box" id="cameraBox">
+                <canvas class="cctv-canvas" id="dashCameraCanvas" width="640" height="360"></canvas>
+                <div class="scan-line"></div>
+                <div class="camera-noise" id="cameraNoise"></div>
+                <div class="camera-badge hud-pill"><span class="rec-dot"></span>REC</div>
+                <div class="camera-grid-overlay"></div>
+                <div class="camera-timestamp cctv-time hud-pill" id="cameraTime">--</div>
+
+                <!-- Official SITS Edge AI Inference Watermark -->
+                <div class="cctv-telemetry-watermark" id="cctvTelemetryWatermark">
+                  <span class="watermark-node">[SITS SURABAYA - NODE 01 | CORRIDOR AHMAD YANI | AI INFERENCE: 58.4 FPS]</span>
+                </div>
+
+                <!-- Bounding Box Overlays -->
+                <div class="cv-rect rect-car" id="rect-dash-1"><span class="cv-tag">Mobil 97%</span></div>
+                <div class="cv-rect rect-motorcycle" id="rect-dash-2"><span class="cv-tag">Motor 94%</span></div>
+
+                <!-- Glitch Overlay -->
+                <div class="cctv-glitch-overlay" id="dashCameraGlitch">
+                  <div class="glitch-static"></div>
+                  <div class="glitch-text">FEED BUFFERING</div>
+                </div>
+
+                <div class="camera-caption">
+                  <strong id="dashCamTitle">Jl. Ahmad Yani (Wonokromo)</strong>
+                  <small id="dashCamSub">Camera 01 • SITS Stable feed</small>
+                </div>
+              </div>
+            </article>
+
+            <!-- 2. AI Recommendation Widget -->
+            <article class="widget glass-panel reveal-card" id="widgetAiRec">
+              <div class="section-head compact">
+                <div>
+                  <h2 class="widget-title-sm">AI Recommendation</h2>
+                  <p class="widget-subtitle-sm">Optimasi siklus adaptif ATCS berbasis Edge AI.</p>
+                </div>
+                <span class="pill pill-ai">🤖 AI Optimization Active</span>
+              </div>
+
+              <div class="ai-rec-card-body">
+                <div class="ai-rec-badge-row">
+                  <span class="ai-rec-tag">
+                    <span class="pulse-dot-ai"></span> Skenario SITS Surabaya
+                  </span>
+                  <span class="ai-confidence-badge">Confidence 94%</span>
+                </div>
+                <p class="ai-rec-text" id="aiRecText">
+                  Deteksi antrean <strong>180m</strong> di <strong>Jl. Raya Darmo</strong>. Rekomendasi penambahan <strong>+15 detik</strong> durasi fase hijau pada <strong>Simpang Darmo–Polisi Istimewa</strong>.
+                </p>
+                <div class="ai-rec-meta-row">
+                  <span>🎯 Dampak: <strong class="text-success">-35% Kepadatan</strong></span>
+                  <span>⏱ Efek: <strong>2 Menit</strong></span>
+                  <span>⚡ Sinyal: <strong class="text-primary-2">Adaptive Green Wave</strong></span>
+                </div>
+              </div>
+
+              <div class="ai-rec-actions">
+                <button class="btn btn-ghost compact" type="button" id="btnDismissAiRec" onclick="dismissAiRecommendation()">Abaikan</button>
+                <button class="btn btn-primary compact" type="button" id="btnApplyAiRec" data-action="apply-ai">Terapkan Rekomendasi</button>
+              </div>
+            </article>
+          </aside>
+        </section>
+
+        <!-- Operations Grid -->
+        <section class="operations-grid">
+          <!-- Signal Phase Control Widget -->
+          <article class="ops-card glass-panel reveal-card" id="card-signals">
+            <div class="section-head compact">
+              <div>
+                <h2>Signal Phase Control</h2>
+                <p>Durasi siklus adaptif Simpang Wonokromo.</p>
+              </div>
+              <span class="pill pill-ai">Auto</span>
+            </div>
+            <div class="phase-control">
+              <div class="phase-row">
+                <span>Green A. Yani (Utara)</span>
+                <strong id="greenValue">42 dtk</strong>
+              </div>
+              <div class="range-container">
+                <input id="greenRange" class="slider-glow" type="range" min="15" max="90" value="42" />
+                <span class="slider-tooltip" id="sliderTooltip">42s</span>
+              </div>
+              <!-- Linear Phase Timeline -->
+              <div class="phase-timeline-bar" id="dashboardPhaseTimeline">
+                <div class="phase-sec phase-red w-35p"></div>
+                <div class="phase-sec phase-yellow w-10p"></div>
+                <div class="phase-sec phase-green w-55p"></div>
+                <div class="phase-indicator pos-0p" id="dashboardPhaseIndicator"></div>
+              </div>
+              <div class="phase-bars">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          </article>
+
+          <!-- District Congestion Leaderboard (Fitur 5) -->
+          <article class="ops-card glass-panel reveal-card" id="widgetLeaderboard">
+            <div class="section-head compact">
+              <div>
+                <h2>Indeks Kepadatan Koridor</h2>
+                <p>Peringkat kemacetan koridor utama (Real-time).</p>
+              </div>
+              <span class="pill pill-live">Peringkat</span>
+            </div>
+            <div class="leaderboard-container leaderboard-flex-col">
+              <div class="leaderboard-item leaderboard-row-item" id="leadRoad-0">
+                <span>1. Jl. Ahmad Yani</span>
+                <strong class="text-danger lead-val">83%</strong>
+              </div>
+              <div class="leaderboard-item leaderboard-row-item" id="leadRoad-1">
+                <span>2. Jl. Raya Darmo</span>
+                <strong class="text-warning lead-val">61%</strong>
+              </div>
+              <div class="leaderboard-item leaderboard-row-item" id="leadRoad-2">
+                <span>3. Jl. Tunjungan</span>
+                <strong class="text-muted lead-val">44%</strong>
+              </div>
+              <div class="leaderboard-item leaderboard-row-item" id="leadRoad-3">
+                <span>4. Jl. Kertajaya</span>
+                <strong class="text-success lead-val">22%</strong>
+              </div>
+              <div class="leaderboard-item leaderboard-row-item" id="leadRoad-4">
+                <span>5. MERR Ir. Soekarno</span>
+                <strong class="text-success lead-val">18%</strong>
+              </div>
+            </div>
+          </article>
+
+          <!-- Emergency Priority Widget -->
+          <article class="ops-card glass-panel reveal-card priority-alert-widget">
+            <div class="section-head compact">
+              <div>
+                <h2>Emergency Priority</h2>
+                <p>Prioritas kendaraan darurat terdeteksi.</p>
+              </div>
+              <span class="pill pill-danger">Aktif</span>
+            </div>
+            <div class="emergency-row">
+              <div class="emergency-icon-container">
+                <div class="emergency-icon pulse-red">✚</div>
+              </div>
+              <div>
+                <strong>Ambulans menuju RSU Dr. Soetomo</strong>
+                <p>ETA 1 menit 45 detik</p>
+                <small>Rute: Jl. Raya Darmo → RSU Dr. Soetomo</small>
+              </div>
+            </div>
+          </article>
+
+          <!-- Export History Logs (Fitur 13) -->
+          <article class="ops-card glass-panel reveal-card" id="widgetExportHistory">
+            <div class="section-head compact">
+              <div>
+                <h2>Riwayat Ekspor Data</h2>
+                <p>Laporan yang diunduh pada sesi operasional ini.</p>
+              </div>
+              <span class="pill">Riwayat</span>
+            </div>
+            <div class="export-history-list export-history-scroll" id="exportHistoryList">
+              <p class="empty-history-text empty-history-notice">Belum ada riwayat unduhan.</p>
+            </div>
+          </article>
+          <article class="ops-card glass-panel reveal-card" id="card-incidents">
+            <div class="section-head compact">
+              <div>
+                <h2>Incident Timeline</h2>
+                <p>Kronologi insiden lalu lintas terdeteksi.</p>
+              </div>
+              <span class="pill pill-danger">3 Alert</span>
+            </div>
+            <div class="timeline-container">
+              <div class="timeline-line">
+                <div class="timeline-line-fill" id="timelineLineFill"></div>
+              </div>
+              <ol class="timeline">
+                <li>
+                  <span class="timeline-dot danger pulse-red-dot"></span>
+                  <div><strong>Kepadatan tinggi</strong><small>Koridor Wonokromo • 3 menit lalu</small></div>
+                </li>
+                <li>
+                  <span class="timeline-dot warning"></span>
+                  <div><strong>Perbaikan marka jalan</strong><small>Kertajaya • 12 menit lalu</small></div>
+                </li>
+                <li>
+                  <span class="timeline-dot success"></span>
+                  <div><strong>Ambulans diberi prioritas</strong><small>Darmo → Dr. Soetomo • selesai</small></div>
+                </li>
+              </ol>
+            </div>
+          </article>
+
+          <article class="ops-card glass-panel reveal-card">
+            <div class="section-head compact">
+              <div>
+                <h2>Corridor Performance</h2>
+                <p>Indeks efisiensi koridor utama.</p>
+              </div>
+              <span class="pill pill-live">Stable</span>
+            </div>
+            <div class="corridor-list">
+              <div><span>Koridor A. Yani - Darmo</span><strong>83%</strong><i style="--value: 83%"></i></div>
+              <div><span>Basuki Rahmat - Tunjungan</span><strong>61%</strong><i style="--value: 61%"></i></div>
+              <div><span>Tol Dupak - Tanjung Perak</span><strong>74%</strong><i style="--value: 74%"></i></div>
+            </div>
+          </article>
+
+          <article class="ops-card glass-panel reveal-card">
+            <div class="section-head compact">
+              <div>
+                <h2>System Health</h2>
+                <p>Status operasional infrastruktur IoT.</p>
+              </div>
+              <span class="pill pill-ai">Healthy</span>
+            </div>
+            <div class="health-grid">
+              <div class="health-item">
+                <strong id="sitsUptimeVal" data-counter="99">99.7%</strong>
+                <span>Uptime SITS</span>
+              </div>
+              <div class="health-item">
+                <strong id="sitsCctvCount" data-counter="184">184</strong>
+                <span>CCTV Surabaya</span>
+              </div>
+              <div class="health-item">
+                <strong id="sitsIotCount" data-counter="312">312</strong>
+                <span>Sensor IoT</span>
+              </div>
+              <div class="health-item latency-health">
+                <div class="latency-meta">
+                  <strong id="latencyVal">24ms</strong>
+                  <span>Latency API</span>
+                </div>
+                <div class="latency-sparkline">
+                  <svg viewBox="0 0 100 30" width="100%" height="24">
+                    <path class="latency-path" id="latencyPath" d="M0,25 Q15,20 30,22 T60,18 T90,24 T100,15" fill="none" stroke="var(--primary-2)" stroke-width="2" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+      </div>

@@ -1,0 +1,377 @@
+/* --------------------------------------------------------------------------
+   13. View 3: Live CCTV & Edge Computer Vision Intelligence
+   -------------------------------------------------------------------------- */
+.cctv-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 2200px;
+  margin: 0 auto;
+}
+
+/* Multi-Camera Fast Switcher Tab Bar */
+.cctv-cam-switcher-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+  -webkit-overflow-scrolling: touch;
+}
+
+.cctv-cam-switcher-bar::-webkit-scrollbar {
+  height: 3px;
+}
+
+.cctv-cam-switcher-bar::-webkit-scrollbar-thumb {
+  background: var(--border-emphasis);
+  border-radius: var(--radius-full);
+}
+
+.cctv-cam-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--duration-fast) var(--ease);
+}
+
+.cctv-cam-tab:hover {
+  color: var(--text);
+  background: var(--panel-elevated);
+}
+
+.cctv-cam-tab.active {
+  background: var(--primary) !important;
+  border-color: var(--primary-hover) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+/* Unified CCTV Control Toolbar */
+.cctv-unified-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.cctv-toolbar-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cctv-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  background: var(--panel-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease);
+  white-space: nowrap;
+}
+
+.cctv-toolbar-btn:hover {
+  border-color: var(--border-emphasis);
+  background: var(--panel-soft);
+}
+
+.cctv-toolbar-btn:active {
+  transform: scale(0.98);
+}
+
+.cctv-toolbar-btn.btn-primary {
+  background: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary-hover);
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.3);
+}
+
+.cctv-toolbar-btn.btn-primary:hover {
+  background: var(--primary-hover);
+}
+
+/* Threshold Pill Slider */
+.cctv-threshold-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 4px 10px;
+  font-size: 11.5px;
+}
+
+.threshold-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.threshold-label strong {
+  color: var(--primary-2);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.cctv-range-slider {
+  accent-color: var(--primary);
+  width: 90px;
+  height: 4px;
+  cursor: pointer;
+}
+
+/* Camera Grid Architecture */
+.cctv-feed-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.cctv-feed-grid.grid-1x3 {
+  grid-template-columns: 1fr;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.cctv-feed-grid.grid-focus {
+  grid-template-columns: 1fr;
+}
+
+/* Camera Card Surface */
+.camera-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 14px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease);
+}
+
+.camera-card:hover {
+  border-color: var(--border-emphasis);
+  box-shadow: var(--shadow-md);
+}
+
+.camera-card.camera-card-spotlight {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-soft), var(--shadow-md);
+}
+
+/* Camera Card Header */
+.camera-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.camera-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.camera-id-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--panel-elevated);
+  border: 1px solid var(--border);
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  color: var(--primary-2);
+  flex-shrink: 0;
+  letter-spacing: 0.04em;
+}
+
+.camera-street-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.camera-actions-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Canvas Viewport Box */
+.cv-box-container {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  background: #040810;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.6);
+}
+
+.cctv-canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Quiet HUD Overlay Elements */
+.hud-pill {
+  position: absolute;
+  background: rgba(8, 12, 20, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-xs);
+  padding: 3px 8px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: #ffffff;
+  z-index: 10;
+}
+
+.camera-timestamp {
+  top: 10px;
+  left: 10px;
+  letter-spacing: 0.02em;
+}
+
+.camera-badge {
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.rec-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+/* Bottom Telemetry Strip Overlay */
+.camera-hud-bottom {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 10;
+  flex-wrap: wrap;
+}
+
+.hud-metric-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(8, 12, 20, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-xs);
+  padding: 3px 8px;
+  font-size: 9.5px;
+  font-family: var(--font-mono);
+  color: #ffffff;
+}
+
+.hud-metric-label {
+  color: var(--text-dim);
+}
+
+.hud-metric-val {
+  color: var(--primary-2);
+  font-weight: 700;
+}
+
+.hud-engine {
+  margin-left: auto;
+  color: var(--text-muted);
+}
+
+.hud-metric-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+/* Offline / Glitch Overlay */
+.cctv-glitch-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 12, 20, 0.92);
+  backdrop-filter: blur(12px);
+  color: var(--danger);
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  z-index: 20;
+}
+
+.cctv-glitch-overlay.show {
+  display: flex;
+}
+
+/* CCTV Responsive */
+/* View 3: CCTV Matrix */
+  .cctv-feed-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .cctv-feed-card {
+    border-radius: var(--radius-lg);
+  }

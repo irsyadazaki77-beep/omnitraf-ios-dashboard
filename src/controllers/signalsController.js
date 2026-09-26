@@ -16,6 +16,7 @@ export class SignalsController {
   constructor() {
     this.isGridView = false;
     this._isInitialized = false;
+    this._currentTargetNode = 'node-wonokromo';
   }
 
   init() {
@@ -27,8 +28,21 @@ export class SignalsController {
     this._bindWebsterCalculator();
     this._bindIntersectionLayoutToggle();
     this._bindForceOverrideButtons();
+    this._bindAiRecommendationButtons();
+    this._bindManualOverrideModal();
     this._bindTableSearchAndClick();
     this._setupStoreSubscriptions();
+  }
+
+  activate() {
+    this._bindDashboardSignalSlider();
+    this._bindSignalsViewSliders();
+    this._bindWebsterCalculator();
+    this._bindIntersectionLayoutToggle();
+    this._bindForceOverrideButtons();
+    this._bindAiRecommendationButtons();
+    this._bindManualOverrideModal();
+    this._bindTableSearchAndClick();
   }
 
   _setupStoreSubscriptions() {
@@ -45,6 +59,32 @@ export class SignalsController {
       if (tooltip) tooltip.textContent = `${value}s`;
 
       this._updateDashboardTimeline(value);
+    });
+
+    stateStore.subscribe('traffic:update', () => {
+      this._updateActiveOverrideBadges();
+    });
+  }
+
+  _updateActiveOverrideBadges() {
+    const intersections = stateStore.getState().intersections || [];
+    intersections.forEach((node, idx) => {
+      const cards = document.querySelectorAll("#view-signals .signals-intersection-card");
+      const card = cards[idx];
+      if (!card) return;
+
+      const overrideBtn = card.querySelector(".force-override-btn");
+      if (!overrideBtn) return;
+
+      if (node.isOverrideActive && typeof node.timer === "number") {
+        overrideBtn.textContent = `🛠️ Override Aktif (${node.timer}s tersisa)`;
+        overrideBtn.classList.add("btn-danger");
+        overrideBtn.style.background = "var(--danger)";
+      } else if (!overrideBtn.disabled) {
+        overrideBtn.textContent = "Terapkan Manual Override";
+        overrideBtn.classList.remove("btn-danger");
+        overrideBtn.style.background = "";
+      }
     });
   }
 
@@ -93,7 +133,7 @@ export class SignalsController {
           payload: { value: val }
         }, false); // low-risk
         if (typeof window.showToast === "function") {
-          window.showToast(`✓ Durasi Green Split Simpang Wonokromo disetel ke ${val}s.`);
+          window.showToast(`✓ Penyesuaian Green Split Wonokromo (${val}s) dijadwalkan pada siklus berikutnya.`);
         }
       } catch (err) {
         if (typeof window.showToast === "function") {
@@ -161,49 +201,238 @@ export class SignalsController {
   }
 
   /**
-   * 3. Manual Override Buttons
+   * 3. Manual Override Trigger Buttons -> Open Safeguard Modal
    */
   _bindForceOverrideButtons() {
     document.querySelectorAll(".force-override-btn").forEach((btn, idx) => {
-      btn.addEventListener("click", async () => {
+      btn.addEventListener("click", () => {
         const nodeIds = ["node-wonokromo", "node-tunjungan", "node-darmo", "node-margorejo"];
-        const targetId = nodeIds[idx] || "node-wonokromo";
-        const card = btn.closest(".widget");
-        const name = card ? (card.querySelector("h2")?.textContent || targetId) : targetId;
+        const nodeNames = [
+          "Simpang Wonokromo (Jl. Ahmad Yani)",
+          "Simpang Tunjungan (Gedung Siola)",
+          "Simpang Raya Darmo (Polisi Istimewa)",
+          "Simpang Margorejo (Jl. Jemursari)"
+        ];
+        
+        this._currentTargetNode = nodeIds[idx] || "node-wonokromo";
+        const targetName = nodeNames[idx] || "Simpang Wonokromo (A. Yani)";
 
-        btn.disabled = true;
-        btn.textContent = "PROCESSING...";
+        this.openManualOverrideModal(this._currentTargetNode, targetName);
+      });
+    });
+  }
+
+  /**
+   * Bind events inside Manual Override Modal
+   */
+  _bindManualOverrideModal() {
+    const modal = document.getElementById("manualOverrideModal");
+    const closeBtn = document.getElementById("closeOverrideModal");
+    const cancelBtn = document.getElementById("btnCancelOverrideModal");
+    const confirmBtn = document.getElementById("btnConfirmOverrideModal");
+    const slider = document.getElementById("overrideDurationSlider");
+    const valDisplay = document.getElementById("overrideDurationVal");
+
+    if (!modal) return;
+
+    const closeModal = () => {
+      modal.style.display = "none";
+      modal.classList.remove("show");
+    };
+
+    if (closeBtn) closeBtn.onclick = closeModal;
+    if (cancelBtn) cancelBtn.onclick = closeModal;
+
+    modal.onclick = (e) => {
+      if (e.target === modal) closeModal();
+    };
+
+    if (slider) {
+      slider.oninput = (e) => {
+        const val = parseInt(e.target.value, 10);
+        if (valDisplay) valDisplay.textContent = val;
+        this._updateOverrideSafetyWarning(val);
+      };
+    }
+
+    if (confirmBtn) {
+      confirmBtn.onclick = async () => {
+        const dur = slider ? parseInt(slider.value, 10) : 45;
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = "EXECUTING...";
 
         try {
+          soundManager.play('alert');
           await commandLayer.dispatchCommand({
             action: 'signal:override',
             targetType: 'intersection',
-            targetId,
-            payload: { duration: 45 }
-          }, true); // High risk! Matches security prompt requirement.
+            targetId: this._currentTargetNode || 'node-wonokromo',
+            payload: { duration: dur }
+          }, true); // High risk confirmation
 
-          btn.textContent = "✓ Override Aktif (45s)";
-          btn.classList.add("btn-danger");
-          soundManager.play('alert');
+          closeModal();
           if (typeof window.showToast === "function") {
-            window.showToast(`🛠️ Manual Override Aktif: ${name} dikunci HIJAU 45 detik!`, "warning");
+            window.showToast(`🛠️ Manual Override Aktif: Sinyal dikunci HIJAU selama ${dur} detik!`, "warning");
           }
         } catch (err) {
           console.warn("[SignalsController] Override failed:", err);
-          btn.textContent = "Terapkan Manual Override";
-          btn.classList.remove("btn-danger");
           if (typeof window.showToast === "function") {
             window.showToast(`❌ Override Ditolak: ${err.message}`, "danger");
           }
         } finally {
-          setTimeout(() => {
-            btn.disabled = false;
-            btn.textContent = "Terapkan Manual Override";
-            btn.classList.remove("btn-danger");
-          }, 5000);
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = "Eksekusi Lock HIJAU";
         }
+      };
+    }
+  }
+
+  openManualOverrideModal(nodeId = 'node-wonokromo', nodeName = 'Simpang Wonokromo (Jl. Ahmad Yani)') {
+    this._currentTargetNode = nodeId;
+    const modal = document.getElementById("manualOverrideModal");
+    const nodeNameEl = document.getElementById("overrideNodeName");
+    const slider = document.getElementById("overrideDurationSlider");
+    const valDisplay = document.getElementById("overrideDurationVal");
+
+    if (!modal) return;
+
+    if (nodeNameEl) nodeNameEl.textContent = nodeName;
+    if (slider) {
+      slider.value = 45;
+      if (valDisplay) valDisplay.textContent = 45;
+      this._updateOverrideSafetyWarning(45);
+    }
+
+    modal.style.display = "flex";
+    modal.classList.add("show");
+    soundManager.play('click');
+  }
+
+  _updateOverrideSafetyWarning(val) {
+    const warningBox = document.getElementById("overrideSafetyWarning");
+    const icon = document.getElementById("overrideWarningIcon");
+    const title = document.getElementById("overrideWarningTitle");
+    const text = document.getElementById("overrideWarningText");
+
+    if (!warningBox) return;
+
+    if (val < 20) {
+      warningBox.style.borderColor = "rgba(239, 68, 68, 0.5)";
+      warningBox.style.background = "rgba(239, 68, 68, 0.12)";
+      if (icon) icon.textContent = "⚠️";
+      if (title) {
+        title.textContent = "PERINGATAN KESELAMATAN (PEDESTRIAN HAZARD)";
+        title.style.color = "#f87171";
+      }
+      if (text) {
+        text.textContent = `Durasi ${val} detik terlalu pendek (< 20s). Berisiko membahayakan pejalan kaki yang belum selesai menyeberang di zebra cross.`;
+      }
+    } else if (val > 60) {
+      warningBox.style.borderColor = "rgba(245, 158, 11, 0.5)";
+      warningBox.style.background = "rgba(245, 158, 11, 0.12)";
+      if (icon) icon.textContent = "⚠️";
+      if (title) {
+        title.textContent = "PERINGATAN ANTREAN PARAH (SPILLBACK RISK)";
+        title.style.color = "#fbbf24";
+      }
+      if (text) {
+        text.textContent = `Durasi ${val} detik melebihi 60 detik. Berpotensi memicu penumpukan antrean panjang pada lengan simpang yang tertahan (fase Merah).`;
+      }
+    } else {
+      warningBox.style.borderColor = "var(--success-border)";
+      warningBox.style.background = "var(--success-soft)";
+      if (icon) icon.textContent = "✅";
+      if (title) {
+        title.textContent = "DURASI AMAN STANDAR DISHUB";
+        title.style.color = "var(--success)";
+      }
+      if (text) {
+        text.textContent = `Durasi ${val} detik berada pada rentang aman baku Dishub SITS Surabaya (20s - 60s) tanpa mengorbankan keselamatan penyeberang jalan.`;
+      }
+    }
+  }
+
+  /**
+   * Bind AI Recommendation Confirmation Modal
+   */
+  _bindAiRecommendationButtons() {
+    const buttons = document.querySelectorAll('button[data-action="simulate"], button[data-action="apply-ai"], .btn-apply-ai, #btnApplyAiRec');
+    buttons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        this.openAiRecommendationModal('node-wonokromo', 'Simpang Wonokromo (A. Yani)');
       });
     });
+
+    const modal = document.getElementById("aiRecommendationModal");
+    const closeBtn = document.getElementById("closeAiRecModal");
+    const cancelBtn = document.getElementById("btnCancelAiRecModal");
+    const confirmBtn = document.getElementById("btnConfirmAiRecModal");
+
+    if (!modal) return;
+
+    const closeModal = () => {
+      modal.style.display = "none";
+      modal.classList.remove("show");
+    };
+
+    if (closeBtn) closeBtn.onclick = closeModal;
+    if (cancelBtn) cancelBtn.onclick = closeModal;
+
+    modal.onclick = (e) => {
+      if (e.target === modal) closeModal();
+    };
+
+    if (confirmBtn) {
+      confirmBtn.onclick = async () => {
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = "APPLYING...";
+
+        try {
+          await commandLayer.dispatchCommand({
+            action: 'ai:apply-recommendation',
+            targetType: 'intersection',
+            targetId: this._currentTargetNode || 'node-wonokromo',
+            payload: { targetSplit: 48 }
+          }, false); // low-risk
+
+          closeModal();
+          soundManager.play('success');
+          if (typeof window.showToast === "function") {
+            window.showToast("✨ Rekomendasi Webster AI Disetujui: Green Split disesuaikan ke 48s pada siklus berikutnya!");
+          }
+        } catch (err) {
+          console.warn("[SignalsController] AI recommendation failed:", err);
+          if (typeof window.showToast === "function") {
+            window.showToast(`❌ Gagal: ${err.message}`, "danger");
+          }
+        } finally {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = "✓ Terapkan Pada Siklus Berikutnya";
+        }
+      };
+    }
+  }
+
+  openAiRecommendationModal(nodeId = 'node-wonokromo', nodeName = 'Simpang Wonokromo (A. Yani)') {
+    this._currentTargetNode = nodeId;
+    const modal = document.getElementById("aiRecommendationModal");
+    const title = document.getElementById("aiRecModalTitle");
+    const volQ = document.getElementById("aiRecVolumeQ");
+    const flowRatio = document.getElementById("aiRecFlowRatio");
+    const delaySaved = document.getElementById("aiRecDelaySaved");
+    const splitDiff = document.getElementById("aiRecSplitDiff");
+
+    if (!modal) return;
+
+    if (title) title.textContent = `Konfirmasi Optimasi Webster: ${nodeName}`;
+    if (volQ) volQ.textContent = "2,450 smp/jam";
+    if (flowRatio) flowRatio.textContent = "0.72";
+    if (delaySaved) delaySaved.textContent = "-12.4 dtk/kend";
+    if (splitDiff) splitDiff.textContent = "35s ➔ 48s (+13s)";
+
+    modal.style.display = "flex";
+    modal.classList.add("show");
+    soundManager.play('click');
   }
 
   /**

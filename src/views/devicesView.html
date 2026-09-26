@@ -1,0 +1,214 @@
+<div class="view-pane" id="view-devices">
+        <!-- Section Header / Operations Workspace Summary -->
+        <header class="workspace-header">
+          <div class="workspace-header-title-group">
+            <span class="workspace-header-kicker">SITS SURABAYA · EDGE AI INFRASTRUCTURE</span>
+            <h1 class="workspace-header-title">Edge AI Nodes & Hardware Monitoring</h1>
+            <p class="workspace-header-desc">Pemantauan kesehatan komputasi Edge AI Nvidia Jetson, latensi jaringan, temperatur operasi, dan konfigurasi node IoT Surabaya.</p>
+          </div>
+          <div class="workspace-header-summary-strip" aria-label="Ringkasan Status Perangkat">
+            <div class="workspace-summary-item">
+              <span class="workspace-summary-label">Total Node Terhubung</span>
+              <div class="workspace-summary-val-row">
+                <span class="signals-status-dot dot-live"></span>
+                <strong class="tabular font-mono">4 Perangkat</strong>
+                <span class="workspace-summary-sub">Online</span>
+              </div>
+            </div>
+            <div class="workspace-summary-item">
+              <span class="workspace-summary-label">Status Kesehatan Node</span>
+              <div class="workspace-summary-val-row">
+                <strong class="text-success" id="nodeStatusSummary">4 Online</strong>
+                <span class="workspace-summary-sub">100% Siap</span>
+              </div>
+            </div>
+            <div class="workspace-summary-item hide-mobile">
+              <span class="workspace-summary-label">Beban Rata-rata GPU</span>
+              <div class="workspace-summary-val-row">
+                <strong class="tabular font-mono text-primary-2" id="nodeGpuSummary">38% Load</strong>
+                <span class="workspace-summary-sub">Stabil</span>
+              </div>
+            </div>
+            <div class="workspace-summary-item hide-mobile">
+              <span class="workspace-summary-label">Temperatur Rata-rata</span>
+              <div class="workspace-summary-val-row">
+                <strong class="tabular font-mono text-warning" id="nodeTempSummary">58°C</strong>
+                <span class="workspace-summary-sub">Optimal</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <section class="device-management-layout device-mgmt-grid-wrapper">
+          <article class="devices-list-panel glass-panel">
+            <div class="section-head">
+              <div>
+                <h2>Daftar Node Edge AI SITS Surabaya</h2>
+                <p>Unit pemrosesan Edge AI Nvidia Jetson pada SITS Surabaya. Klik baris untuk membuka parameter konfigurasi.</p>
+              </div>
+              <button class="btn btn-ghost compact" id="btnPingAll" type="button">Ping All Nodes</button>
+            </div>
+            
+            <div class="table-wrap">
+              <table class="devices-table">
+                <thead>
+                  <tr>
+                    <th>Device ID</th>
+                    <th>Nama Node / Lokasi</th>
+                    <th>Tipe Hardware</th>
+                    <th>Status Koneksi</th>
+                    <th>Beban CPU/GPU</th>
+                    <th>Temperatur</th>
+                    <th>Latensi</th>
+                    <th>Riwayat Latensi</th>
+                    <th>Inference Rate</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="deviceTableBody">
+                  <tr class="clickable-device-row" data-device="NODE-EDGE-01">
+                    <td><strong>NODE-EDGE-01</strong></td>
+                    <td>Jl. Ahmad Yani (Wonokromo) Node AI</td>
+                    <td>Jetson Orin Nano</td>
+                    <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span><span class="status-online-text">ONLINE</span></td>
+                    <td>
+                      <div class="diag-bar-wrap">
+                        <div class="diag-bar-track">
+                          <div class="diag-bar-fill load-green" style="width: 48%;"></div>
+                        </div>
+                        <span class="diag-val">48%</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="diag-temp-wrap">
+                        <div class="diag-temp-bar">
+                          <div class="diag-temp-fill temp-cool-fill" style="width: 42%;"></div>
+                        </div>
+                        <span class="badge-temp temp-cool">42°C</span>
+                      </div>
+                    </td>
+                    <td class="device-ping">12 ms</td>
+                    <td class="device-ping-spark"><svg viewBox="0 0 50 15" width="50" height="15"><path d="M0,10 Q10,12 20,8 T40,6 T50,8" fill="none" stroke="var(--primary-2)" stroke-width="1.5"/></svg></td>
+                    <td>28 fps (CV Stream)</td>
+                    <td><button class="btn btn-ghost compact ping-device-btn">Ping</button></td>
+                  </tr>
+                  <tr class="clickable-device-row" data-device="NODE-EDGE-02">
+                    <td><strong>NODE-EDGE-02</strong></td>
+                    <td>Jl. Raya Darmo (Taman Bungkul) Node AI</td>
+                    <td>Jetson Orin Nano</td>
+                    <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span><span class="status-online-text">ONLINE</span></td>
+                    <td>
+                      <div class="diag-bar-wrap">
+                        <div class="diag-bar-track">
+                          <div class="diag-bar-fill load-green" style="width: 52%;"></div>
+                        </div>
+                        <span class="diag-val">52%</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="diag-temp-wrap">
+                        <div class="diag-temp-bar">
+                          <div class="diag-temp-fill temp-cool-fill" style="width: 45%;"></div>
+                        </div>
+                        <span class="badge-temp temp-cool">45°C</span>
+                      </div>
+                    </td>
+                    <td class="device-ping">14 ms</td>
+                    <td class="device-ping-spark"><svg viewBox="0 0 50 15" width="50" height="15"><path d="M0,12 Q10,6 20,9 T40,11 T50,6" fill="none" stroke="var(--primary-2)" stroke-width="1.5"/></svg></td>
+                    <td>29 fps (CV Stream)</td>
+                    <td><button class="btn btn-ghost compact ping-device-btn">Ping</button></td>
+                  </tr>
+                  <tr class="clickable-device-row" data-device="NODE-EDGE-03">
+                    <td><strong>NODE-EDGE-03</strong></td>
+                    <td>Jl. Tunjungan Node AI</td>
+                    <td>Jetson Xavier NX</td>
+                    <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span><span class="status-online-text">ONLINE</span></td>
+                    <td>
+                      <div class="diag-bar-wrap">
+                        <div class="diag-bar-track">
+                          <div class="diag-bar-fill load-orange" style="width: 74%;"></div>
+                        </div>
+                        <span class="diag-val">74%</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="diag-temp-wrap">
+                        <div class="diag-temp-bar">
+                          <div class="diag-temp-fill temp-warm-fill" style="width: 68%;"></div>
+                        </div>
+                        <span class="badge-temp temp-warm">68°C</span>
+                      </div>
+                    </td>
+                    <td class="device-ping">18 ms</td>
+                    <td class="device-ping-spark"><svg viewBox="0 0 50 15" width="50" height="15"><path d="M0,8 Q10,10 20,12 T40,5 T50,10" fill="none" stroke="var(--primary-2)" stroke-width="1.5"/></svg></td>
+                    <td>25 fps (CV Stream)</td>
+                    <td><button class="btn btn-ghost compact ping-device-btn">Ping</button></td>
+                  </tr>
+                  <tr class="clickable-device-row" data-device="NODE-CTRL-01">
+                    <td><strong>NODE-CTRL-01</strong></td>
+                    <td>SITS Controller 01 (Wonokromo)</td>
+                    <td>Edge PLC Siemens</td>
+                    <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span><span class="status-online-text">ONLINE</span></td>
+                    <td>
+                      <div class="diag-bar-wrap">
+                        <div class="diag-bar-track">
+                          <div class="diag-bar-fill load-green" style="width: 32%;"></div>
+                        </div>
+                        <span class="diag-val">32%</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="diag-temp-wrap">
+                        <div class="diag-temp-bar">
+                          <div class="diag-temp-fill temp-cool-fill" style="width: 38%;"></div>
+                        </div>
+                        <span class="badge-temp temp-cool">38°C</span>
+                      </div>
+                    </td>
+                    <td class="device-ping">8 ms</td>
+                    <td class="device-ping-spark"><svg viewBox="0 0 50 15" width="50" height="15"><path d="M0,6 Q10,8 20,5 T40,7 T50,4" fill="none" stroke="var(--success)" stroke-width="1.5"/></svg></td>
+                    <td>Active Telemetry</td>
+                    <td><button class="btn btn-ghost compact ping-device-btn">Ping</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <!-- Slide-out Device Configuration Editor Drawer -->
+          <aside class="device-config-drawer glass-panel" id="deviceDrawerConfig">
+            <button class="close-drawer" id="closeDeviceDrawer" type="button" aria-label="Tutup drawer">&times;</button>
+            <h3>Node Parameters</h3>
+            <p>Konfigurasi parameter telemetri dan Edge AI node.</p>
+            <form id="deviceConfigForm" class="cfg-form-gap">
+              <div class="form-group cfg-form-group">
+                <label class="cfg-label" for="cfgDeviceName">Device Name</label>
+                <input type="text" id="cfgDeviceName" class="search-box input cfg-input-readonly" readonly />
+              </div>
+              <div class="form-group cfg-form-group">
+                <label class="cfg-label" for="cfgDeviceFps">Frame Rate Limit (FPS)</label>
+                <input type="number" id="cfgDeviceFps" class="search-box input cfg-input-readonly" min="5" max="60" value="30" />
+              </div>
+              <div class="form-group cfg-form-group">
+                <label class="cfg-label" for="cfgDeviceResolution">Camera Resolution</label>
+                <select id="cfgDeviceResolution" class="selector cfg-select-box">
+                  <option value="1080p">1920x1080 (Full HD)</option>
+                  <option value="720p">1280x720 (HD)</option>
+                  <option value="4k">3840x2160 (4K UHD)</option>
+                </select>
+              </div>
+              <div class="device-diagnostics-metrics glass-soft cfg-diagnostics-box">
+                <div>Suhu GPU: <span id="diagTemp">--</span></div>
+                <div>GPU Load: <span id="diagGpu">--</span></div>
+                <div>RAM Node: <span id="diagRam">--</span></div>
+                <div>Fan Speed: <span id="diagFan">--</span></div>
+              </div>
+              <div class="form-group cfg-form-group">
+                <label class="cfg-label">Grafik Latensi Jaringan (Canvas)</label>
+                <canvas id="deviceLatencyCanvas" width="260" height="80" class="cfg-latency-canvas"></canvas>
+              </div>
+              <button class="btn btn-primary btn-full" type="submit">Simpan Konfigurasi</button>
+            </form>
+          </aside>
+        </section>
+      </div>

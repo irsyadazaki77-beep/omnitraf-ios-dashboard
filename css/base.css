@@ -1,0 +1,287 @@
+/* --------------------------------------------------------------------------
+   2. Global Reset & Base Typography Math
+   -------------------------------------------------------------------------- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background-color: var(--bg-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-emphasis) transparent;
+}
+
+/* Universal Minimalist Scrollbar Engine (2026 SaaS Polish) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-emphasis) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-emphasis);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-color: var(--bg-base);
+  color: var(--text);
+}
+
+/* Tabular Numerals Math Rule: Prevents layout shift on digit transitions */
+.tabular,
+[data-counter],
+.counter-val,
+.denom-val,
+.metric-value,
+.cycle-number,
+.hud-metric-val,
+.clock-text,
+.device-ping,
+.diag-val,
+.badge-temp,
+.time-label-row,
+.gauge-center-val,
+table td:nth-child(n+3),
+.camera-timestamp {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Technical Monospace Elements */
+code, pre, kbd, .mono-text, .log-line, .json-box, .status-badge, .pill, .hud-pill, .terminal-body, .api-pre-content, .provenance-badge {
+  font-family: var(--font-mono);
+}
+
+/* --------------------------------------------------------------------------
+   2B. Design System Standardized Utility Layer (.ui-* Classes)
+   -------------------------------------------------------------------------- */
+.ui-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
+}
+
+.ui-card:hover {
+  border-color: var(--border-emphasis);
+}
+
+.ui-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.ui-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
+.ui-meta {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  background: var(--panel-elevated);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--panel-elevated);
+  color: var(--text);
+  transition: all var(--duration-fast) var(--ease);
+}
+
+.ui-btn:hover {
+  border-color: var(--border-emphasis);
+  background: var(--panel);
+}
+
+.ui-input {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text);
+  background: var(--panel-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
+}
+
+.ui-input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.ui-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  width: 100%;
+  margin: 12px 0;
+}
+
+.ui-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--panel-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+}
+
+.ui-modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  box-shadow: var(--shadow-modal);
+}
+
+.surface-grid {
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body.theme-light .surface-grid {
+  background-image: radial-gradient(rgba(0, 0, 0, 0.035) 1px, transparent 1px);
+}
+
+.ambient,
+.ambient-particle-container {
+  display: none !important;
+}
+
+/* System Announcement Ticker */
+.system-marquee {
+  position: relative;
+  z-index: var(--z-marquee);
+  height: 28px;
+  background: #060910;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+body.theme-light .system-marquee {
+  background: #f1f5f9;
+}
+
+.marquee-content {
+  display: flex;
+  align-items: center;
+  gap: 36px;
+  white-space: nowrap;
+  animation: marqueeScroll 45s linear infinite;
+  padding-left: 100%;
+}
+
+.marquee-content span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@keyframes marqueeScroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
+}
+
+/* --------------------------------------------------------------------------
+   22. Accessibility, Focus Ring & Motion Governance (WCAG 2.1 AA)
+   -------------------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--primary, #2563eb) !important;
+  outline-offset: 2px !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--primary, #2563eb) !important;
+  outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .marquee-content {
+    animation: none !important;
+  }
+  .ambient-particle-container,
+  .ambient {
+    display: none !important;
+  }
+}

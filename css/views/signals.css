@@ -1,0 +1,652 @@
+/* --------------------------------------------------------------------------
+   14. View 4: Signals & Intersection Tables (Modern 2026 Mobility Experience)
+   -------------------------------------------------------------------------- */
+.signals-workspace-header {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.signals-header-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.signals-header-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--primary-2);
+  text-transform: uppercase;
+  font-family: var(--font-sans);
+}
+
+.signals-header-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.signals-header-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.5;
+  max-width: 720px;
+}
+
+.signals-header-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.signals-summary-item {
+  background: var(--panel-glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  backdrop-filter: blur(12px);
+  transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
+}
+
+.signals-summary-item:hover {
+  border-color: var(--border-emphasis);
+}
+
+.signals-summary-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.signals-summary-val-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.signals-summary-sub {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.signals-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+}
+
+.signals-status-dot.dot-live {
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+}
+
+/* Primary Console Grid */
+.signals-console-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.signals-intersection-card {
+  background: var(--panel-glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 20px 22px;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
+}
+
+.signals-intersection-card:hover {
+  border-color: var(--border-emphasis);
+  box-shadow: var(--shadow-md);
+}
+
+.signals-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 0;
+}
+
+.signals-card-header h2 {
+  font-size: 16.5px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 3px 0;
+  letter-spacing: -0.01em;
+}
+
+.signals-card-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.signals-badge-adaptive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--primary-soft);
+  color: var(--primary-2);
+  border: 1px solid var(--primary-border);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Signal Active Focal Panel */
+.signal-active-panel {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 18px;
+  align-items: stretch;
+  background: var(--panel-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin: 0;
+}
+
+.signal-cycle-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 10px;
+  gap: 8px;
+  text-align: center;
+  box-shadow: var(--shadow-xs);
+}
+
+.signals-apill-geometric {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+}
+
+.signals-apill-lens {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  opacity: 0.25;
+  transition: opacity var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
+}
+
+.signals-apill-lens.lens-red { background: var(--danger); }
+.signals-apill-lens.lens-yellow { background: var(--warning); }
+.signals-apill-lens.lens-green { background: var(--success); }
+
+.signals-apill-lens.lens-green.active {
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+}
+
+.signals-apill-lens.lens-red.active {
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.7);
+}
+
+.signals-apill-lens.lens-yellow.active {
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.7);
+}
+
+.cycle-progress-ring {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.cycle-number {
+  font-size: 38px;
+  font-weight: 800;
+  color: var(--success);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  margin-bottom: 2px;
+}
+
+.cycle-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Green Split Sliders */
+.signal-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
+}
+
+.phase-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 1px;
+}
+
+.phase-row span {
+  color: var(--text);
+}
+
+.phase-row strong {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--primary-2);
+  background: var(--panel-glass);
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+}
+
+.sig-slide,
+.slider-glow {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--panel-elevated);
+  outline: none;
+  margin: 3px 0 6px 0;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease);
+}
+
+.sig-slide::-webkit-slider-thumb,
+.slider-glow::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid var(--primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.sig-slide::-webkit-slider-thumb:hover,
+.slider-glow::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+.sig-slide::-moz-range-thumb,
+.slider-glow::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid var(--primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.sig-slide:focus-visible,
+.slider-glow:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Minimal Horizontal Phase Timeline */
+.phase-timeline-bar {
+  display: flex;
+  height: 6px;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3);
+  margin: 6px 0 0 0;
+  position: relative;
+  border: 1px solid var(--border);
+}
+
+.phase-sec.phase-red {
+  background: var(--danger);
+  opacity: 0.75;
+}
+
+.phase-sec.phase-yellow {
+  background: var(--warning);
+  opacity: 0.8;
+}
+
+.phase-sec.phase-green {
+  background: var(--success);
+  opacity: 0.95;
+}
+
+.phase-indicator {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: #ffffff;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+  border-radius: 1px;
+}
+
+/* Manual Override High-Impact Action Button */
+.force-override-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 9px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  border-radius: var(--radius-md);
+  background: var(--panel-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease);
+  min-height: 40px;
+}
+
+.force-override-btn:hover {
+  background: var(--panel-soft);
+  border-color: var(--primary-border);
+  color: var(--primary-2);
+}
+
+.force-override-btn.btn-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: var(--danger-border);
+}
+
+.force-override-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Signal Intel Modal Styling */
+.apill-light {
+  padding: 10px;
+  border-radius: var(--radius-md);
+  background: var(--panel-inset);
+  border: 1px solid var(--border);
+  transition: all var(--duration-fast) var(--ease);
+}
+
+.apill-light-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.apill-light.red.active {
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
+}
+
+.apill-light.red.active strong {
+  color: var(--danger);
+}
+
+.apill-light.yellow.active {
+  background: var(--warning-soft);
+  border-color: var(--warning-border);
+}
+
+.apill-light.yellow.active strong {
+  color: var(--warning);
+}
+
+.apill-light.green.active {
+  background: var(--success-soft);
+  border-color: var(--success-border);
+}
+
+.apill-light.green.active strong {
+  color: var(--success);
+}
+
+.unboxed-meta-sep {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.modal-kicker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Operator Confirmation Modal Guard */
+#operatorConfirmModal .modal-content {
+  background: var(--panel-glass) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid var(--border-emphasis) !important;
+  border-radius: var(--radius-xl) !important;
+  box-shadow: var(--shadow-modal) !important;
+  padding: 24px !important;
+  max-width: 480px !important;
+}
+
+#operatorConfirmModal #confirmModalTitle {
+  font-family: var(--font-sans) !important;
+  letter-spacing: -0.01em !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+}
+
+#operatorConfirmModal #confirmModalLevel {
+  font-family: var(--font-sans) !important;
+  font-size: 10.5px !important;
+  letter-spacing: 0.06em !important;
+  color: var(--danger) !important;
+}
+
+#operatorConfirmModal #btnConfirmProceed {
+  background: var(--danger) !important;
+  border-color: var(--danger) !important;
+  color: #ffffff !important;
+  font-family: var(--font-sans) !important;
+  font-weight: 600 !important;
+  font-size: 12.5px !important;
+  border-radius: var(--radius-md) !important;
+  padding: 8px 18px !important;
+  transition: all var(--duration-fast) var(--ease) !important;
+}
+
+#operatorConfirmModal #btnConfirmProceed:hover {
+  background: var(--danger-hover) !important;
+  border-color: var(--danger-hover) !important;
+}
+
+#operatorConfirmModal #btnConfirmCancel {
+  background: var(--panel-elevated) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+  font-family: var(--font-sans) !important;
+  font-weight: 600 !important;
+  font-size: 12.5px !important;
+  border-radius: var(--radius-md) !important;
+  padding: 8px 16px !important;
+  transition: all var(--duration-fast) var(--ease) !important;
+}
+
+#operatorConfirmModal #btnConfirmCancel:hover {
+  background: var(--panel-soft) !important;
+  border-color: var(--border-emphasis) !important;
+}
+
+/* Light Theme Optical Refinements for Signals */
+body.theme-light .signals-apill-geometric,
+[data-theme="light"] .signals-apill-geometric {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+body.theme-light .phase-timeline-bar,
+[data-theme="light"] .phase-timeline-bar {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+body.theme-light .phase-indicator,
+[data-theme="light"] .phase-indicator {
+  background: #0f172a;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.4);
+}
+
+body.theme-light .signals-workspace-header .signals-summary-item,
+[data-theme="light"] .signals-workspace-header .signals-summary-item {
+  background: #ffffff;
+  border-color: var(--border);
+  box-shadow: var(--shadow-xs);
+}
+
+body.theme-light .signals-intersection-card,
+[data-theme="light"] .signals-intersection-card {
+  background: #ffffff;
+  border-color: var(--border);
+  box-shadow: var(--shadow-xs);
+}
+
+body.theme-light .signal-active-panel,
+[data-theme="light"] .signal-active-panel {
+  background: var(--panel-inset);
+  border-color: var(--border-subtle);
+}
+
+body.theme-light .signal-cycle-indicator,
+[data-theme="light"] .signal-cycle-indicator {
+  background: #ffffff;
+  border-color: var(--border);
+}
+
+body.theme-light .phase-row strong,
+[data-theme="light"] .phase-row strong {
+  background: #ffffff;
+  border-color: var(--border);
+}
+
+body.theme-light .force-override-btn,
+[data-theme="light"] .force-override-btn {
+  background: #f8fafc;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+body.theme-light .force-override-btn:hover,
+[data-theme="light"] .force-override-btn:hover {
+  background: #f1f5f9;
+  border-color: var(--primary-border);
+  color: var(--primary);
+}
+
+body.theme-light .table-panel,
+[data-theme="light"] .table-panel {
+  background: #ffffff;
+  border-color: var(--border);
+}
+
+body.theme-light thead th,
+[data-theme="light"] thead th {
+  background: #f8fafc;
+}
+
+body.theme-light #operatorConfirmModal .modal-content,
+[data-theme="light"] #operatorConfirmModal .modal-content {
+  background: #ffffff !important;
+  color: var(--text) !important;
+}
+
+body.theme-light #operatorConfirmModal #confirmModalTitle,
+[data-theme="light"] #operatorConfirmModal #confirmModalTitle {
+  color: #0f172a !important;
+}
+
+/* Responsive Viewport Optimizations for Signals */
+@media (max-width: 900px) {
+  .signals-header-summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .signals-header-summary-strip {
+    grid-template-columns: 1fr;
+  }
+  .signal-active-panel {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .signal-cycle-indicator {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 12px 16px;
+  }
+  .cycle-number {
+    font-size: 32px;
+  }
+}
+
+/* Signals Responsive */
+/* View 4: Signals APILL */
+  .signals-console-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .apill-card {
+    padding: 14px;
+  }
+
+  .apill-timer-hero {
+    font-size: 32px;
+  }

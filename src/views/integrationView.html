@@ -1,0 +1,90 @@
+<div class="view-pane" id="view-integration">
+        <section class="integration-board">
+          <div class="integration-status-grid">
+            <article class="widget glass-panel">
+              <h3>ATCS SITS Surabaya Connector</h3>
+              <p>Status: <strong class="green-text">SYNCED (RTSP Active)</strong></p>
+              <small>Sinkronisasi data real-time dengan pusat kendali Dinas Perhubungan Kota Surabaya.</small>
+            </article>
+            <article class="widget glass-panel">
+              <h3>Surabaya Smart City Hub</h3>
+              <p>Status: <strong class="green-text">WEBHOOK ACTIVE</strong></p>
+              <small>API Webhook telemetri kepadatan aktif.</small>
+            </article>
+          </div>
+
+          <!-- Webhook scrolling terminal logs -->
+          <article class="terminal-logs-card glass-panel">
+            <div class="section-head compact">
+              <div>
+                <h2>Live Webhook & API Gateway Event Stream</h2>
+                <p>Aliran payload JSON telemetri SITS yang diintegrasikan ke API Smart City Kota Surabaya secara real-time.</p>
+              </div>
+              <span class="badge-terminal">Terminal Stream Active</span>
+            </div>
+            <div class="terminal-body-wrapper">
+              <div class="terminal-scanline"></div>
+              <div class="terminal-body" id="terminalLogs">
+                <div class="terminal-line">[12:51:30] Webhook push to Surabaya City Hub: status 200 OK</div>
+                <div class="terminal-line">[12:51:24] Computer vision inference completed on NODE-EDGE-01 (Wonokromo)</div>
+                <div class="terminal-line">[12:51:18] Amber phase request sent to NODE-CTRL-01... success</div>
+              </div>
+              <!-- Retro terminal input bar -->
+              <div class="terminal-input-bar terminal-input-bar-wrap">
+                <span class="terminal-prompt-text">SITS:~$</span>
+                <input type="text" id="terminalCommandInput" class="terminal-input-field" placeholder="Ketik perintah (contoh: /help, /clear, /ping)..." autocomplete="off" />
+              </div>
+            </div>
+          </article>
+
+          <!-- REST API Gateway Explorer Playground -->
+          <article class="api-playground-card glass-panel api-card-top-margin">
+            <div class="section-head compact">
+              <div>
+                <h2>REST API Gateway Sandbox</h2>
+                <p>Simulasikan dan uji permintaan API SITS Dinas Perhubungan Kota Surabaya.</p>
+              </div>
+              <span class="badge-terminal">REST Explorer</span>
+            </div>
+            
+            <div class="api-explorer-layout api-explorer-grid">
+              <div class="api-form-panel">
+                <div class="form-group api-form-mb">
+                  <label class="form-label-muted">HTTP Method & Endpoint</label>
+                  <div class="header-actions-flex">
+                    <span class="api-method-badge" id="apiMethod">GET</span>
+                    <select id="apiEndpoint" class="selector api-endpoint-select">
+                      <option value="/sits/api/v1/telemetry">/sits/api/v1/telemetry</option>
+                      <option value="/sits/api/v1/incidents">/sits/api/v1/incidents</option>
+                      <option value="/sits/api/v1/preemption">/sits/api/v1/preemption</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="api-request-preview api-form-mb">
+                  <div class="notif-card-header">
+                    <label class="form-label-muted">Request Payload Editor (JSON)</label>
+                    <span id="apiJsonValidateTag" class="api-json-tag">JSON VALID</span>
+                  </div>
+                  <div class="payload-box api-payload-box">
+                    <textarea id="apiPayloadEditor" class="api-textarea" spellcheck="false">{}</textarea>
+                  </div>
+                </div>
+                <button class="btn btn-primary btn-api-send" id="btnSendApiRequest">Kirim Payload API</button>
+              </div>
+              
+              <div class="api-response-panel api-response-panel-wrap">
+                <div class="notif-card-header">
+                  <label class="form-label-muted">Response Payload (JSON)</label>
+                  <span id="apiStatusBadge" class="api-status-badge">STATUS: 200 OK</span>
+                </div>
+                <div class="api-response-body api-response-box">
+                  <pre id="apiResponseContent" class="api-pre-content">{
+  "status": "ready",
+  "message": "Pusat Kendali SITS Surabaya operasional"
+}</pre>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+      </div>

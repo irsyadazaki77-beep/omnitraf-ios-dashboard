@@ -1,0 +1,183 @@
+<div class="modal-overlay" id="engineInfoModal" role="dialog" aria-modal="true" aria-labelledby="engineModalTitle" style="display: none;">
+    <div class="modal-content glass-panel engine-modal-content" style="max-width: 860px; width: 94vw; max-height: 90vh; overflow-y: auto; padding: 28px;">
+      <button class="modal-close" id="closeEngineModal" aria-label="Tutup modal informasi arsitektur">&times;</button>
+      
+      <div class="modal-header" id="engineModalTitle" style="border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 32px; background: rgba(0, 122, 255, 0.15); border: 1px solid rgba(0, 122, 255, 0.3); border-radius: 12px; padding: 6px 12px;">🧠</span>
+          <div>
+            <h2 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.5px;">OmniTRAF Engine Architecture & ESG Scientific Modeling</h2>
+            <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--text-muted);">
+              Sistem Manajemen Mobilitas Cerdas Terintegrasi ATCS SITS Surabaya — Edge AI, Sinyal Adaptif, & Formula Reduksi Emisi Karbon
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="engine-modal-body" style="display: flex; flex-direction: column; gap: 20px;">
+        <!-- 1. Pipeline Arsitektur Data Edge AI & YOLOv8 LERP -->
+        <section class="engine-section glass-soft" style="padding: 16px 20px; border-radius: 14px; border: 1px solid var(--border);">
+          <h3 style="margin: 0 0 8px 0; font-size: 14px; color: var(--primary); display: flex; align-items: center; gap: 8px;">
+            <span>⚡</span> 1. Pipeline Data Edge AI & Inferensi YOLOv8 dengan 60 FPS LERP (Canvas API)
+          </h3>
+          <p style="font-size: 12px; color: var(--text); line-height: 1.6; margin: 0 0 10px 0;">
+            OmniTRAF mengakuisisi stream video 184 node CCTV ATCS SITS Kota Surabaya via RTSP/HLS. Pemrosesan deteksi objek dilakukan di level Edge Gateway menggunakan model <strong>YOLOv8s INT8 TensorRT</strong> dan tracking multi-objek <strong>ByteTrack (Kalman Filter)</strong>.
+          </p>
+          <div style="background: rgba(0,0,0,0.25); border-radius: 10px; padding: 12px 16px; font-family: 'Share Tech Mono', monospace; font-size: 11.5px; color: #38bdf8; line-height: 1.5; overflow-x: auto; margin-bottom: 12px;">
+            [184 CCTV RTSP SITS] ──► [Edge AI TensorRT YOLOv8] ──► [WebSocket Telemetry 300ms] ──► [Client 60 FPS LERP Canvas API]
+          </div>
+          <div style="padding: 10px 14px; background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; border-radius: 6px; font-size: 11.5px; line-height: 1.6; color: #cbd5e1;">
+            <strong>Arsitektur 60 FPS Linear Interpolation (LERP):</strong><br/>
+            Untuk menghemat bandwidth jaringan tanpa mengorbankan fluiditas tampilan, server mengirimkan pembaruan koordinat bounding box setiap 300ms. Browser menginterpolasi posisi koordinat secara linier:
+            <code style="background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px; color: #38bdf8; font-family: 'Share Tech Mono', monospace;">pos_t = pos_current + (pos_target - pos_current) × (dt × 12.0)</code> pada loop <strong>Canvas 2D Context API 60 Hz</strong>, menghasilkan animasi kendaraan yang sangat halus tanpa lonjakan GPU (zero-bottleneck).
+          </div>
+        </section>
+
+        <!-- 2. Optimasi Sinyal Adaptif -->
+        <section class="engine-section glass-soft" style="padding: 16px 20px; border-radius: 14px; border: 1px solid var(--border);">
+          <h3 style="margin: 0 0 8px 0; font-size: 14px; color: var(--success); display: flex; align-items: center; gap: 8px;">
+            <span>🚥</span> 2. Optimasi Sinyal Adaptif (Dynamic Webster Minimum Delay Method)
+          </h3>
+          <p style="font-size: 12px; color: var(--text); line-height: 1.6; margin: 0 0 10px 0;">
+            Algoritma SITS menghitung alokasi Green Split secara dinamis berdasarkan derajat kejenuhan antrean ($x_i = q_i / (s_i \cdot \lambda_i)$). Mengadaptasi formula klasik Webster untuk meminimalkan keterlambatan total persimpangan:
+          </p>
+          <div style="background: rgba(0,0,0,0.25); border-radius: 10px; padding: 12px 16px; font-family: 'Share Tech Mono', monospace; font-size: 13px; color: #4ade80;">
+            C₀ = (1.5 × L + 5) / (1 - Y) &nbsp;&nbsp;|&nbsp;&nbsp; gᵢ = (C₀ - L) × (yᵢ / Y)
+          </div>
+
+          <!-- Interactive Webster Sandbox -->
+          <div style="margin-top: 14px; padding: 14px; background: rgba(0,0,0,0.3); border-radius: 10px; border: 1px solid rgba(74, 222, 128, 0.2);">
+            <div style="font-size: 12px; font-weight: 700; color: #4ade80; margin-bottom: 8px;">🧪 Webster Method Live Calculator Sandbox</div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; align-items: end;">
+              <div>
+                <label style="font-size: 11px; color: #94a3b8; display: block; margin-bottom: 4px;">Total Lost Time (L, detik):</label>
+                <input type="number" id="websterLostTime" value="12" min="4" max="30" style="width: 100%; padding: 6px 10px; background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #fff; font-size: 12px;" />
+              </div>
+              <div>
+                <label style="font-size: 11px; color: #94a3b8; display: block; margin-bottom: 4px;">Rasio Arus Total (Y = Σyᵢ):</label>
+                <input type="number" id="websterFlowRatio" value="0.72" step="0.01" min="0.10" max="0.95" style="width: 100%; padding: 6px 10px; background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #fff; font-size: 12px;" />
+              </div>
+              <div style="background: rgba(74, 222, 128, 0.1); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(74, 222, 128, 0.3);">
+                <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase;">Siklus Optimum (C₀):</div>
+                <strong id="websterOptCycleResult" style="font-size: 18px; color: #4ade80;">82 detik</strong>
+              </div>
+            </div>
+            <div id="websterCalcSteps" style="font-size: 11px; font-family: 'Share Tech Mono', monospace; color: #a3e635; margin-top: 8px;">
+              C₀ = (1.5 × 12 + 5) / (1 - 0.72) = 23 / 0.28 = 82s
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. Formula Ilmiah Reduksi Karbon ESG -->
+        <section class="engine-section glass-soft" style="padding: 16px 20px; border-radius: 14px; border: 1px solid var(--border);">
+          <h3 style="margin: 0 0 8px 0; font-size: 14px; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+            <span>🌱</span> 3. Metodologi Ilmiah Estimasi Reduksi Emisi Karbon (ESG Score)
+          </h3>
+          <p style="font-size: 12px; color: var(--text); line-height: 1.6; margin: 0 0 10px 0;">
+            Reduksi emisi dihitung transparan mengacu pada <em>IPCC 2006 Guidelines for National Greenhouse Gas Inventories</em> dan siklus uji perkotaan Dishub Surabaya. Menghitung penghematan konsumsi bahan bakar saat mesin kendaraan diam (idling) akibat antrean lampu merah:
+          </p>
+          <div style="background: rgba(0,0,0,0.25); border-radius: 10px; padding: 14px 16px; font-family: 'Share Tech Mono', monospace; font-size: 12px; color: #a5f3fc; line-height: 1.6;">
+            <strong>Formula Reduksi CO₂ Harian:</strong><br/>
+            ΔCO₂ (kg) = Σ (Δt_idle × N_kendaraan × SFC_idle × EF_fuel)
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 12px;">
+            <div style="padding: 8px 12px; background: rgba(255,255,255,0.04); border-radius: 8px;">
+              <small style="color: var(--text-muted); display: block;">Δt_idle (Pengurangan Antrean)</small>
+              <strong style="color: var(--text); font-size: 12px;">-6.4 detik / kendaraan</strong>
+            </div>
+            <div style="padding: 8px 12px; background: rgba(255,255,255,0.04); border-radius: 8px;">
+              <small style="color: var(--text-muted); display: block;">SFC_idle (Idle Fuel Rate)</small>
+              <strong style="color: var(--text); font-size: 12px;">0.28 L / jam antrean</strong>
+            </div>
+            <div style="padding: 8px 12px; background: rgba(255,255,255,0.04); border-radius: 8px;">
+              <small style="color: var(--text-muted); display: block;">EF_fuel (Faktor Emisi BBM)</small>
+              <strong style="color: var(--text); font-size: 12px;">2.31 kg CO₂ / Liter BBM</strong>
+            </div>
+            <div style="padding: 8px 12px; background: rgba(255,255,255,0.04); border-radius: 8px;">
+              <small style="color: var(--text-muted); display: block;">Dampak Kota Surabaya</small>
+              <strong style="color: var(--success); font-size: 12px;">~1.420 kg CO₂ &amp; 580L BBM / hari</strong>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. Protokol Koridor Darurat (Green Wave) -->
+        <section class="engine-section glass-soft" style="padding: 16px 20px; border-radius: 14px; border: 1px solid var(--border);">
+          <h3 style="margin: 0 0 8px 0; font-size: 14px; color: var(--danger); display: flex; align-items: center; gap: 8px;">
+            <span>🚨</span> 4. Protokol Preemption Koridor Darurat 112 (Emergency Green Wave)
+          </h3>
+          <p style="font-size: 12px; color: var(--text); line-height: 1.6; margin: 0;">
+            Saat armada Ambulans RSU Dr. Soetomo atau Pemadam Kebakaran 112 meminta prioritas rute, sistem mengunci seluruh fase sinyal APILL pada koridor target ke <strong>HIJAU PERMANEN (Green Wave Locked)</strong>. Integrasi geofencing GPS mendeteksi armada hingga radius 200 meter di setiap persimpangan, memangkas waktu tanggap darurat perkotaan hingga <strong>42% lebih cepat</strong>.
+          </p>
+        </section>
+
+        <!-- 5. Standar ISO Smart Transport System -->
+        <section class="engine-section glass-soft" style="padding: 16px 20px; border-radius: 14px; border: 1px solid var(--border);">
+          <h3 style="margin: 0 0 8px 0; font-size: 14px; color: #eab308; display: flex; align-items: center; gap: 8px;">
+            <span>🌐</span> 5. Kepatuhan Standar ISO Smart Transportation Kota Cerdas
+          </h3>
+          <p style="font-size: 12px; color: var(--text); line-height: 1.6; margin: 0 0 10px 0;">
+            Arsitektur OmniTRAF Surabaya dirancang mengacu pada standar internasional transportasi cerdas:
+          </p>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
+            <div style="background: rgba(0,0,0,0.25); padding: 10px; border-radius: 8px; border-left: 3px solid #eab308;">
+              <strong style="font-size: 12px; color: #fef08a;">ISO 37120 (Sustainable Cities)</strong>
+              <p style="font-size: 11px; color: #94a3b8; margin: 4px 0 0 0;">Indikator mobilitas perkotaan: rasio waktu tempuh komuter, akses transit publik, dan reduksi korban insiden.</p>
+            </div>
+            <div style="background: rgba(0,0,0,0.25); padding: 10px; border-radius: 8px; border-left: 3px solid #38bdf8;">
+              <strong style="font-size: 12px; color: #bae6fd;">ISO 37122 (Smart Cities Indicators)</strong>
+              <p style="font-size: 11px; color: #94a3b8; margin: 4px 0 0 0;">Pengendali APILL real-time terkoneksi, telemetri bus terbuka, dan preemption armada tanggap darurat.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="modal-footer" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 11.5px; color: var(--text-muted);">SITS Smart City Innovation Showcase &copy; Pemerintah Kota Surabaya</span>
+        <button class="btn btn-primary" type="button" onclick="document.getElementById('engineInfoModal').style.display='none';document.getElementById('engineInfoModal').classList.remove('show');">Mengerti &amp; Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PIP Camera Hover Overlay -->
+  <div class="pip-camera-card glass-panel" id="pipCameraCard">
+    <div class="pip-header">
+      <span class="pip-live-indicator">● LIVE SITS FEED</span>
+      <strong id="pipNodeName">Simpang Wonokromo</strong>
+    </div>
+    <div class="pip-body">
+      <div class="pip-visual-container">
+        <canvas id="pipCanvas" width="180" height="110"></canvas>
+        <div class="pip-scanline"></div>
+        <div class="pip-grid"></div>
+        <div class="pip-badge">EDGE AI</div>
+      </div>
+      <div class="pip-meta-grid">
+        <div class="pip-meta-item"><small>Status</small><strong id="pipStatus" class="green-text">Online</strong></div>
+        <div class="pip-meta-item"><small>Rate</small><strong>30 FPS</strong></div>
+        <div class="pip-meta-item"><small>Kepadatan</small><strong id="pipVolume">Medium</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite">
+    <span class="toast-icon">✓</span>
+    <span class="toast-message">Notifikasi</span>
+    <div class="toast-progress"></div>
+  </div>
+
+  <!-- Custom Map Tooltip -->
+  <div class="map-tooltip" id="mapTooltip"></div>
+
+  <!-- Floating info quick tour tooltip -->
+  <div class="quick-tour-tooltip glass-panel" id="quickTourTooltip" style="display: none;">
+    <h3>SITS Command Center Guide</h3>
+    <p>Dashboard ini mengoptimalkan lampu lalu lintas secara adaptif berbasis AI.</p>
+    <ul>
+      <li><strong>Mode Keos</strong> menyimulasikan gridlock parah.</li>
+      <li><strong>Sinyal SITS</strong> menampilkan latensi transmisi.</li>
+      <li><strong>Preemption</strong> memberikan prioritas darurat.</li>
+    </ul>
+    <button class="btn btn-primary compact" id="btnCloseTour" type="button">Tutup Panduan</button>
+  </div>
+
+  <!-- Incident Detailed Modal Viewer -->

@@ -1,0 +1,45 @@
+<div class="modal-overlay" id="esgMethodologyModal" role="dialog" aria-modal="true" style="display: none; background: rgba(3, 8, 14, 0.78); backdrop-filter: blur(12px);">
+  <div class="modal-content glass-panel ios-sheet-modal" style="max-width: 540px; width: 92%; border: 1px solid var(--border-glow); background: rgba(13, 22, 38, 0.95); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);">
+    <button class="modal-close" id="closeEsgMethodologyModal" aria-label="Tutup modal Metodologi ESG">&times;</button>
+    
+    <div class="modal-header" style="border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px;">
+      <div class="modal-kicker-row" style="display: flex; align-items: center; gap: 8px;">
+        <span class="pill pill-ai" style="background: rgba(16, 185, 129, 0.18); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35);">🌱 ESG Green Mobility</span>
+        <span class="unboxed-meta-sep" style="color: var(--text-muted);">·</span>
+        <span style="font-size: 11px; color: var(--text-muted);">IPCC 2006 Guidelines</span>
+      </div>
+      <h2 style="margin: 8px 0 4px 0; font-size: 18px; font-weight: 700; color: var(--text);">Metodologi & Formula Perhitungan ESG</h2>
+      <p style="margin: 0; font-size: 12.5px; color: var(--text-muted);">Dasar ilmiah perhitungan emisi CO₂, efisiensi konsumsi BBM, dan dampak ekonomi SITS Surabaya.</p>
+    </div>
+
+    <div class="modal-body" style="display: flex; flex-direction: column; gap: 12px;">
+      <div class="glass-soft" style="padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: rgba(15, 23, 42, 0.6);">
+        <strong style="font-size: 12.5px; color: var(--cyan); display: block; margin-bottom: 4px;">1. Penghematan Bahan Bakar Minyak (BBM)</strong>
+        <p style="margin: 0; font-size: 11.5px; color: #e2e8f0; font-family: var(--font-mono, monospace); line-height: 1.5; background: rgba(0,0,0,0.35); padding: 8px; border-radius: 6px;">
+          Penghematan BBM = Penurunan Waktu Tunda (Jam) × 0.28 L/jam (Idling Factor)
+        </p>
+        <span style="display: block; font-size: 10.5px; color: var(--text-muted); margin-top: 4px;">*Faktor idling 0.28 Liter/jam mewakili konsumsi stasioner rata-rata kendaraan campuran (PKJI/HCM).</span>
+      </div>
+
+      <div class="glass-soft" style="padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: rgba(15, 23, 42, 0.6);">
+        <strong style="font-size: 12.5px; color: var(--success); display: block; margin-bottom: 4px;">2. Reduksi Emisi Karbon (CO₂)</strong>
+        <p style="margin: 0; font-size: 11.5px; color: #e2e8f0; font-family: var(--font-mono, monospace); line-height: 1.5; background: rgba(0,0,0,0.35); padding: 8px; border-radius: 6px;">
+          Reduksi CO₂ = Liter BBM Terselamatkan × 2.31 kg CO₂/Liter
+        </p>
+        <span style="display: block; font-size: 10.5px; color: var(--text-muted); margin-top: 4px;">*Mengacu pada Pedoman Emisi GRK IPCC 2006 untuk bensin/diesel sektor transportasi jalan raya.</span>
+      </div>
+
+      <div class="glass-soft" style="padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: rgba(15, 23, 42, 0.6);">
+        <strong style="font-size: 12.5px; color: var(--amber); display: block; margin-bottom: 4px;">3. Valuasi Ekonomis & Subsidi BBM</strong>
+        <p style="margin: 0; font-size: 11.5px; color: #e2e8f0; font-family: var(--font-mono, monospace); line-height: 1.5; background: rgba(0,0,0,0.35); padding: 8px; border-radius: 6px;">
+          Valuasi Ekonomi = Liter BBM × Rp 14.500 (Rata-rata Harga BBM)
+        </p>
+        <span style="display: block; font-size: 10.5px; color: var(--text-muted); margin-top: 4px;">*Ekuivalensi penyerapan pohon: 1 Pohon Dewasa ≅ 20 kg CO₂/tahun (0.05 tree-year/kg CO₂).</span>
+      </div>
+    </div>
+
+    <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border);">
+      <button class="btn btn-primary" id="btnUnderstandEsgModal" type="button" style="padding: 8px 18px; font-size: 12.5px; font-weight: 600;">✓ Paham & Tutup</button>
+    </div>
+  </div>
+</div>

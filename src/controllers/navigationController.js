@@ -46,39 +46,18 @@ export class NavigationController {
       let cleanId = (targetViewId || "dashboard").replace('#', '').replace('view-', '');
       if (!cleanId || cleanId === "about-engine") return;
 
-      const targetPane = document.getElementById(`view-${cleanId}`) || document.getElementById(cleanId);
-      if (!targetPane) return;
-
-      views.forEach(v => {
-        v.classList.remove("active");
-        v.style.display = "none";
-      });
-
-      targetPane.classList.add("active");
-      targetPane.style.display = "block";
-
       // Sync active state on navigation elements
       document.querySelectorAll("[data-view]").forEach(link => {
         const v = link.dataset.view?.replace('view-', '');
-        if (v === cleanId) {
+        if (v === cleanId || (cleanId === 'emergencies' && v === 'emergency')) {
           link.classList.add("active");
         } else {
           link.classList.remove("active");
         }
       });
 
+      // Trigger stateStore update which invokes app._handleViewTransition & viewLoader.mountView
       stateStore.setState({ currentView: cleanId });
-
-      // If switching to Map view or Dashboard, trigger Leaflet size invalidation
-      if (cleanId === "map" || cleanId === "dashboard") {
-        setTimeout(() => {
-          if (mapManager && typeof mapManager.invalidateSize === 'function') {
-            mapManager.invalidateSize();
-          } else if (mapManager?.maps) {
-            mapManager.maps.forEach(m => m.invalidateSize());
-          }
-        }, 120);
-      }
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
       closeMobileSidebar();

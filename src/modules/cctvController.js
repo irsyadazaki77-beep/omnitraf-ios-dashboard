@@ -9,14 +9,15 @@ import { stateStore } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
 import { socketClient } from '../core/socketClient.js';
 import { commandLayer } from '../core/commandLayer.js';
+import { Disposer } from '../core/disposer.js';
 
 // Color map for YOLOv8 object classes
 const CLASS_COLORS = {
-  car: '#00e5ff',        // Cyan
-  bus: '#eab308',        // Yellow
-  truck: '#10b981',      // Emerald Green
-  motorcycle: '#8b5cf6', // Purple
-  ambulance: '#ef4444',  // Bright Red
+  car: '#00e5ff',        // Mobil (Biru Cyan)
+  motorcycle: '#ffbf00', // Motor (Kuning Amber)
+  bus: '#8b5cf6',        // Bus/Truk (Ungu)
+  truck: '#8b5cf6',      // Bus/Truk (Ungu)
+  ambulance: '#ff3b30',  // Armada Darurat 112 (Merah Terang dengan Pulsasi)
   person: '#ff007c'      // Magenta
 };
 
@@ -27,6 +28,8 @@ export class CctvCanvasRenderer {
     this.canvas = document.getElementById(canvasId);
     this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
     this.trackedBoxes = new Map();
+    this.boxPool = []; // Reusable object pool to prevent garbage collection spikes
+    this.lanesNorm = [0.12, 0.36, 0.64, 0.88];
     this.isVisible = true;
 
     // Smoothing & validation history
@@ -49,6 +52,7 @@ export class CctvCanvasRenderer {
   /**
    * Menerima target bounding box baru dari pipeline data terstruktur
    * dan mencatat target koordinat untuk diinterpolasi secara mulus di loop render 60 FPS.
+   * Menggunakan object pooling agar tidak ada alokasi memori baru berulang saat 60 FPS.
    * @param {Array} boxes Bounding boxes YOLOv8
    */
   updateBoxes(boxes) {
@@ -56,13 +60,13 @@ export class CctvCanvasRenderer {
     const activeIds = new Set();
     const alpha = 0.35; // Smoothing factor untuk tracking & confidence
 
-    incomingList.forEach((box, index) => {
-      const boxId = box.trackId || box.id || `box-${index}`;
+    for (let i = 0; i < incomingList.length; i++) {
+      const box = incomingList[i];
+      const boxId = box.trackId || box.id || `box-${i}`;
       activeIds.add(boxId);
 
-      if (this.trackedBoxes.has(boxId)) {
-        const existing = this.trackedBoxes.get(boxId);
-        
+      const existing = this.trackedBoxes.get(boxId);
+      if (existing) {
         // Smoothing bounding box target (Lerp smoothing)
         existing.targetX = box.x;
         existing.targetY = box.y;
@@ -80,30 +84,55 @@ export class CctvCanvasRenderer {
           existing.y = existing.targetY;
           existing.w = existing.targetW;
           existing.h = existing.targetH;
+          if (existing.trail) existing.trail = []; // Reset trail on snap
         }
       } else {
-        // Objek baru pertama kali terdeteksi (Inisialisasi)
-        this.trackedBoxes.set(boxId, {
-          id: boxId,
-          x: box.x,
-          y: box.y,
-          w: box.w,
-          h: box.h,
-          targetX: box.x,
-          targetY: box.y,
-          targetW: box.w,
-          targetH: box.h,
-          class: box.class,
-          confidence: box.confidence,
-          speedKmh: box.speedKmh
-        });
+        // Recycle existing object from pool or create once
+        let newBox = this.boxPool.pop();
+        if (!newBox) {
+          newBox = {
+            id: boxId,
+            x: box.x,
+            y: box.y,
+            w: box.w,
+            h: box.h,
+            targetX: box.x,
+            targetY: box.y,
+            targetW: box.w,
+            targetH: box.h,
+            class: box.class,
+            confidence: box.confidence,
+            speedKmh: box.speedKmh,
+            trail: [],
+            localSpeedKmh: box.speedKmh || 40
+          };
+        } else {
+          newBox.id = boxId;
+          newBox.x = box.x;
+          newBox.y = box.y;
+          newBox.w = box.w;
+          newBox.h = box.h;
+          newBox.targetX = box.x;
+          newBox.targetY = box.y;
+          newBox.targetW = box.w;
+          newBox.targetH = box.h;
+          newBox.class = box.class;
+          newBox.confidence = box.confidence;
+          newBox.speedKmh = box.speedKmh;
+          newBox.trail = [];
+          newBox.localSpeedKmh = box.speedKmh || 40;
+        }
+        this.trackedBoxes.set(boxId, newBox);
       }
-    });
+    }
 
-    // Hapus bounding box yang sudah tidak ada di frame terkini
-    for (const id of this.trackedBoxes.keys()) {
+    // Kembalikan bounding box kadaluarsa ke object pool
+    for (const [id, box] of this.trackedBoxes.entries()) {
       if (!activeIds.has(id)) {
         this.trackedBoxes.delete(id);
+        if (this.boxPool.length < 60) {
+          this.boxPool.push(box);
+        }
       }
     }
   }
@@ -157,29 +186,62 @@ export class CctvCanvasRenderer {
     ctx.stroke();
 
     // Perspective Lane Guidelines
-    const lanesX = [w * 0.12, w * 0.36, w * 0.64, w * 0.88];
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.setLineDash([4, 4]);
-    lanesX.forEach(lx => {
+    for (let i = 0; i < this.lanesNorm.length; i++) {
+      const lx = w * this.lanesNorm[i];
       ctx.beginPath();
       ctx.moveTo(vx, vy);
       ctx.lineTo(lx, h);
       ctx.stroke();
-    });
+    }
     ctx.setLineDash([]); // Reset dash
 
-    // 3. Render Real-Time Bounding Boxes dengan Lerp Interpolation
+    // 3. Render Real-Time Bounding Boxes dengan Lerp Interpolation & Signal Sync
     if (showBoxes && !isPaused && this.trackedBoxes.size > 0) {
-      const lerpFactor = Math.min(1, dt * 10);
+      // Stable dt-damping factor to eliminate jitter completely
+      const lerpFactor = 1 - Math.exp(-12 * dt);
+
+      // Determine intersection signalState for speed and movement sync
+      const CAMERA_TO_NODE_MAP = {
+        'dashCameraCanvas': 'node-wonokromo',
+        'cctvCanvas1': 'node-wonokromo',
+        'cctvCanvas2': 'node-darmo',
+        'cctvCanvas3': 'node-wonokromo', // fallback
+        'cctvCanvas4': 'node-margorejo',
+        'cctvZoomCanvas': 'node-wonokromo'
+      };
+
+      const targetCamId = this.canvasId;
+      const nodeId = CAMERA_TO_NODE_MAP[targetCamId] || 'node-wonokromo';
+      const state = stateStore.getState();
+      const node = state.intersections?.find(n => n.id === nodeId);
+      const signalState = node ? node.state : 'green'; // 'red', 'yellow', 'green'
 
       this.trackedBoxes.forEach(box => {
-        // Update posisi & ukuran secara halus (Lerp)
-        box.x += (box.targetX - box.x) * lerpFactor;
-        box.y += (box.targetY - box.y) * lerpFactor;
-        box.w += (box.targetW - box.w) * lerpFactor;
-        box.h += (box.targetH - box.h) * lerpFactor;
+        const targetSpeed = box.speedKmh || 45;
+        if (typeof box.localSpeedKmh === 'undefined') {
+          box.localSpeedKmh = targetSpeed;
+        }
 
-        // Map normalized server coordinates (0..1) to actual pixel dimensions
+        // Adjust speed based on APILL signalState (slow down on RED, speed up on GREEN/YELLOW)
+        if (signalState === 'red') {
+          box.localSpeedKmh = Math.max(0, box.localSpeedKmh - dt * 25); // stopped gradually
+        } else {
+          box.localSpeedKmh = Math.min(targetSpeed, box.localSpeedKmh + dt * 35); // speed up dynamically
+        }
+
+        // Speed ratio affects the motion speed on the canvas
+        const speedRatio = targetSpeed > 0 ? (box.localSpeedKmh / targetSpeed) : 1;
+        const clampedRatio = Math.max(0, Math.min(1, speedRatio));
+
+        // Update positions using stable LERP factor scaled by speedRatio to come to a perfect stop
+        box.x += (box.targetX - box.x) * lerpFactor * clampedRatio;
+        box.y += (box.targetY - box.y) * lerpFactor * clampedRatio;
+        box.w += (box.targetW - box.w) * lerpFactor * clampedRatio;
+        box.h += (box.targetH - box.h) * lerpFactor * clampedRatio;
+
+        // Map normalized coordinates (0..1) to actual canvas dimensions
         const px = box.x * w;
         const py = box.y * h;
         const pw = box.w * w;
@@ -188,21 +250,70 @@ export class CctvCanvasRenderer {
         const classKey = (box.class || 'car').toLowerCase();
         const color = CLASS_COLORS[classKey] || '#00e5ff';
 
-        // Bounding Box Fill Overlay
-        ctx.fillStyle = `${color}18`; // 10% opacity
+        // Update and Render motion trail
+        if (!box.trail) {
+          box.trail = [];
+        }
+
+        const cx = px + pw / 2;
+        const cy = py + ph; // Ground/bottom center
+
+        if (box.localSpeedKmh > 1) {
+          box.trail.push({ x: cx, y: cy });
+          if (box.trail.length > 12) {
+            box.trail.shift();
+          }
+        } else if (box.trail.length > 0) {
+          // Slow decay when stopped
+          if (Math.random() < 0.15) {
+            box.trail.shift();
+          }
+        }
+
+        // Draw motion trail with beautiful color gradient segment by segment
+        if (box.trail.length > 1) {
+          ctx.save();
+          for (let j = 0; j < box.trail.length - 1; j++) {
+            const pt1 = box.trail[j];
+            const pt2 = box.trail[j + 1];
+            const alpha = (j / box.trail.length) * 0.45; // max 45% opacity
+            ctx.beginPath();
+            ctx.moveTo(pt1.x, pt1.y);
+            ctx.lineTo(pt2.x, pt2.y);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1 + (j / box.trail.length) * 2;
+            ctx.globalAlpha = alpha;
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        // Bounding Box Fill Overlay & Pulsing for Emergency Vehicles (Armada Darurat 112)
+        const isEmergency = classKey === 'ambulance' || classKey === 'emergency';
+        let fillOpacity = '12'; // default ~7% opacity
+        let strokeWidth = 2;
+        let finalColor = color;
+
+        if (isEmergency) {
+          const pulse = Math.sin(Date.now() / 120); // Fast pulse
+          strokeWidth = 2.5 + pulse * 1.0; // dynamic thickness
+          const fillVal = Math.round(18 + pulse * 10);
+          fillOpacity = Math.max(8, Math.min(40, fillVal)).toString(16).padStart(2, '0');
+        }
+
+        ctx.fillStyle = `${finalColor}${fillOpacity}`;
         ctx.fillRect(px, py, pw, ph);
 
         // Main Bounding Box Stroke
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = finalColor;
+        ctx.lineWidth = strokeWidth;
         ctx.strokeRect(px, py, pw, ph);
 
         // YOLOv8 Corner Accent HUD Bracket Style
         const bracketLen = Math.min(8, Math.min(pw, ph) * 0.3);
-        ctx.lineWidth = 3;
-
-        // Top-Left corner bracket
+        ctx.lineWidth = strokeWidth + 1;
         ctx.beginPath();
+        // Top-Left corner bracket
         ctx.moveTo(px, py + bracketLen);
         ctx.lineTo(px, py);
         ctx.lineTo(px + bracketLen, py);
@@ -213,17 +324,17 @@ export class CctvCanvasRenderer {
         ctx.stroke();
 
         // Label Tag Fill (Class Name + Confidence Score + Speed)
-        const labelText = `${classKey.toUpperCase()} ${box.confidence || 95}% (${box.speedKmh || 40}km/h)`;
-        const tagW = labelText.length * 5.8 + 10;
+        const labelText = `${classKey === 'ambulance' ? 'DARURAT 112' : classKey.toUpperCase()} ${box.confidence || 95}% (${Math.round(box.localSpeedKmh)}km/h)`;
+        ctx.font = 'bold 9px "Share Tech Mono", monospace';
+        const tagW = ctx.measureText(labelText).width + 8;
         const tagH = 15;
 
         const tagY = py - tagH >= 0 ? py - tagH : py;
-        ctx.fillStyle = color;
+        ctx.fillStyle = finalColor;
         ctx.fillRect(px, tagY, tagW, tagH);
 
         // Label Text
         ctx.fillStyle = '#000000';
-        ctx.font = 'bold 9px "Share Tech Mono", monospace';
         ctx.fillText(labelText, px + 4, tagY + 11);
       });
     }
@@ -241,17 +352,44 @@ export class CctvCanvasRenderer {
       }
     }
 
-    // 5. Camera HUD Overlay (Watermark timestamp & SITS Edge AI Tag)
-    ctx.fillStyle = 'rgba(5, 11, 20, 0.85)';
-    ctx.fillRect(8, 8, 230, 22);
-    ctx.strokeStyle = 'rgba(0, 229, 255, 0.3)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(8, 8, 230, 22);
+    // 5. Camera HUD Overlay (Watermark timestamp & SITS Edge AI Tag Standardized OSD)
+    const CAM_CODES = {
+      'dashCameraCanvas': 'CAM-01',
+      'cctvCanvas1': 'CAM-01',
+      'cctvCanvas2': 'CAM-02',
+      'cctvCanvas3': 'CAM-03',
+      'cctvCanvas4': 'CAM-04',
+      'cctvZoomCanvas': 'CAM-ZOOM'
+    };
 
-    ctx.fillStyle = '#00e5ff';
+    const CAM_NAMES_OSD = {
+      'dashCameraCanvas': 'SIMPANG WONOKROMO UTARA',
+      'cctvCanvas1': 'SIMPANG WONOKROMO UTARA',
+      'cctvCanvas2': 'KORIDOR RAYA DARMO',
+      'cctvCanvas3': 'BUNDARAN WARU',
+      'cctvCanvas4': 'SIMPANG MARGOREJO JEMURSARI',
+      'cctvZoomCanvas': 'ZOOM FEED VIEW'
+    };
+
+    const camCode = CAM_CODES[this.canvasId] || 'CAM-01';
+    const camName = CAM_NAMES_OSD[this.canvasId] || this.cameraName.toUpperCase();
+    const inferenceMs = (diagnostics.averageLatencyMs || 14.2).toFixed(1);
+    
+    // Construct Standardized OSD string
+    const osdText = `[${camCode}] ${camName} | LIVE 1080p | ${this.renderFps.toFixed(1)} FPS | INFERENCE: ${inferenceMs}ms`;
+
     ctx.font = 'bold 9.5px "Share Tech Mono", monospace';
-    const nowStr = new Date().toLocaleTimeString('id-ID', { hour12: false }) + ' WIB';
-    ctx.fillText(`SITS • ${this.cameraName.substring(0, 18)} • ${nowStr}`, 12, 23);
+    const textWidth = ctx.measureText(osdText).width;
+    const bannerW = textWidth + 16;
+
+    ctx.fillStyle = 'rgba(5, 11, 20, 0.85)';
+    ctx.fillRect(8, 8, bannerW, 22);
+    ctx.strokeStyle = isChaosMode ? 'rgba(239, 68, 68, 0.4)' : 'rgba(0, 229, 255, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(8, 8, bannerW, 22);
+
+    ctx.fillStyle = isChaosMode ? '#ef4444' : '#00e5ff';
+    ctx.fillText(osdText, 16, 23);
 
     // Live REC dot & AI Inference indicator
     ctx.fillStyle = isChaosMode ? '#ef4444' : '#10b981';
@@ -361,6 +499,8 @@ export class CctvController {
     this.observer = null;
     this.lastFrameTime = 0;
     this.activeCamId = 'cctvCanvas1';
+    this.isActive = false;
+    this.disposer = new Disposer('CctvController');
 
     // Advanced Pipeline properties
     this.camerasRegistry = new Map([
@@ -418,21 +558,37 @@ export class CctvController {
     };
 
     this._setupStoreListeners();
+    this._setupVisibilityListener();
+  }
+
+  _setupVisibilityListener() {
+    this.disposer.addEventListener(document, 'visibilitychange', () => {
+      if (document.hidden) {
+        if (this.animFrameId) {
+          cancelAnimationFrame(this.animFrameId);
+          this.animFrameId = null;
+        }
+      } else {
+        if (this.isActive && !this.animFrameId) {
+          this._startAnimationLoop();
+        }
+      }
+    });
   }
 
   _setupStoreListeners() {
-    stateStore.subscribe('state:isChaosMode', ({ value }) => {
+    this.disposer.addStoreSubscription(stateStore, 'state:isChaosMode', ({ value }) => {
       this.updateGlitchOverlays(value);
     });
 
-    stateStore.subscribe('state:cctvBoxesVisible', ({ value }) => {
+    this.disposer.addStoreSubscription(stateStore, 'state:cctvBoxesVisible', ({ value }) => {
       const btnToggleCV = document.getElementById("btnToggleCVBoxes");
       if (btnToggleCV) {
         btnToggleCV.textContent = value ? "Sembunyikan Overlay AI" : "Tampilkan Overlay AI";
       }
     });
 
-    stateStore.subscribe('state:cctvPaused', ({ value }) => {
+    this.disposer.addStoreSubscription(stateStore, 'state:cctvPaused', ({ value }) => {
       const btnPlayPause = document.getElementById("btnPlayPauseCctv");
       if (btnPlayPause) {
         btnPlayPause.innerHTML = value ? '<span class="btn-icon">▶</span> Putar' : '<span class="btn-icon">⏸</span> Jeda';
@@ -445,6 +601,7 @@ export class CctvController {
    */
   init() {
     console.info("🚀 [CctvController] Menginisialisasi High-Fidelity Edge AI Pipeline & Renderer...");
+    this.isActive = true;
 
     this.camerasRegistry.forEach((val, id) => {
       const el = document.getElementById(id);
@@ -468,6 +625,31 @@ export class CctvController {
     this._startHealthTelemetryWatchdog();
   }
 
+  activate() {
+    this.isActive = true;
+    this.camerasRegistry.forEach((val, id) => {
+      const el = document.getElementById(id);
+      if (el && !this.renderers.has(id)) {
+        const renderer = new CctvCanvasRenderer(id, val.name);
+        this.renderers.set(id, renderer);
+      }
+    });
+    this._bindControls();
+    this._bindMultiCameraSwitcher();
+
+    if (!document.hidden && !this.animFrameId) {
+      this._startAnimationLoop();
+    }
+  }
+
+  deactivate() {
+    this.isActive = false;
+    if (this.animFrameId) {
+      cancelAnimationFrame(this.animFrameId);
+      this.animFrameId = null;
+    }
+  }
+
   /**
    * Menghubungkan ke Socket.io stream server untuk event `cctv:vision-update`
    * Memproses frame melalui pipeline terstruktur: ingestion → validation → tracking → metrics → stateStore → UI
@@ -477,7 +659,7 @@ export class CctvController {
     this.lastProcessedSeq = 0;
     this.lastReceivedTime = Date.now();
 
-    socketClient.on('cctv:vision-update', (framePayload) => {
+    this.disposer.addSocketListener(socketClient, 'cctv:vision-update', (framePayload) => {
       this._ingestFramePipeline(framePayload, 'server');
     });
 
@@ -493,7 +675,9 @@ export class CctvController {
       ]);
     });
 
-    setInterval(() => {
+    this.disposer.setInterval(() => {
+      if (!this.isActive || document.hidden) return;
+
       const connStatus = stateStore.getState().connectionStatus;
       // Do not run local simulation if online and connected
       if (connStatus === 'connected' || connStatus === 'resyncing') {
@@ -852,7 +1036,8 @@ export class CctvController {
    * Terintegrasi secara penuh dengan status kesehatan hardware Edge Node di StateStore.
    */
   _startHealthTelemetryWatchdog() {
-    setInterval(() => {
+    this.disposer.setInterval(() => {
+      if (!this.isActive || document.hidden) return;
       const now = Date.now();
       const state = stateStore.getState();
       const devices = state.devices || [];
@@ -1151,15 +1336,20 @@ export class CctvController {
   }
 
   _startAnimationLoop() {
+    if (this.animFrameId) {
+      cancelAnimationFrame(this.animFrameId);
+      this.animFrameId = null;
+    }
+
     this.lastFrameTime = performance.now();
 
     const render = (currentTime) => {
-      this.animFrameId = requestAnimationFrame(render);
-
-      if (document.hidden) {
-        this.lastFrameTime = currentTime;
+      if (!this.isActive || document.hidden) {
+        this.animFrameId = null;
         return;
       }
+
+      this.animFrameId = requestAnimationFrame(render);
 
       // Delta time calculation for smooth 60fps independent interpolation
       const dt = Math.min(0.1, Math.max(0.001, (currentTime - this.lastFrameTime) / 1000));
@@ -1197,8 +1387,8 @@ export class CctvController {
   }
 
   _startWatermarkClock() {
-    setInterval(() => {
-      if (document.hidden) return;
+    this.disposer.setInterval(() => {
+      if (!this.isActive || document.hidden) return;
 
       const now = new Date();
       const timeStr = now.toLocaleTimeString('id-ID', { hour12: false }) + ' WIB';
@@ -1209,9 +1399,8 @@ export class CctvController {
   }
 
   destroy() {
-    if (this.animFrameId) {
-      cancelAnimationFrame(this.animFrameId);
-    }
+    this.deactivate();
+    this.disposer.clear();
     if (this.observer) {
       this.observer.disconnect();
     }

@@ -188,9 +188,9 @@ export const SURABAYA_CORRIDORS_GEOJSON = {
       properties: {
         id: "corridor-darmo-yani",
         name: "Jl. Ahmad Yani - Raya Darmo (Koridor Utama SITS)",
-        status: "Padat Rayap / Macet (14 km/jam)",
+        status: "Gridlock / Macet Total (LOS F)",
         speed: 14,
-        color: "#ef4444",
+        color: "#7f1d1d",
         weight: 6,
         isEmergencyCorridor: true
       }
@@ -209,9 +209,9 @@ export const SURABAYA_CORRIDORS_GEOJSON = {
       properties: {
         id: "corridor-basuki-tunjungan",
         name: "Jl. Basuki Rahmat - Tunjungan",
-        status: "Lancar (38 km/jam)",
+        status: "Padat Lancar (LOS C)",
         speed: 38,
-        color: "#3b82f6",
+        color: "#eab308",
         weight: 5
       }
     },
@@ -229,9 +229,9 @@ export const SURABAYA_CORRIDORS_GEOJSON = {
       properties: {
         id: "corridor-pemuda",
         name: "Jl. Tunjungan - Pemuda - Embong Malang",
-        status: "Ramai Lancar (29 km/jam)",
+        status: "Padat (LOS D/E)",
         speed: 29,
-        color: "#3b82f6",
+        color: "#f97316",
         weight: 5
       }
     },
@@ -248,7 +248,7 @@ export const SURABAYA_CORRIDORS_GEOJSON = {
       properties: {
         id: "corridor-kertajaya",
         name: "Jl. Kertajaya - Manyar",
-        status: "Sangat Lancar (45 km/jam)",
+        status: "Lancar (LOS A/B)",
         speed: 45,
         color: "#22c55e",
         weight: 5
@@ -259,7 +259,7 @@ export const SURABAYA_CORRIDORS_GEOJSON = {
       geometry: {
         type: "LineString",
         coordinates: [
-          [112.7345, -7.2985], // Wonokromo
+          [112.7435, -7.3100], // Jagir Wonokromo (dummy) atau Wonokromo
           [112.7160, -7.2895], // TVRI / Mayjen Sungkono
           [112.6970, -7.2875]  // Adityawarman / Ciputra World
         ]
@@ -267,9 +267,9 @@ export const SURABAYA_CORRIDORS_GEOJSON = {
       properties: {
         id: "corridor-sungkono",
         name: "Jl. Mayjen Sungkono - Adityawarman",
-        status: "Padat Merayap (18 km/jam)",
+        status: "Padat (LOS D/E)",
         speed: 18,
-        color: "#f59e0b",
+        color: "#f97316",
         weight: 5
       }
     },
@@ -287,7 +287,7 @@ export const SURABAYA_CORRIDORS_GEOJSON = {
       properties: {
         id: "corridor-merr",
         name: "MERR Dr. Ir. H. Soekarno (Middle East Ring Road)",
-        status: "Sangat Lancar (52 km/jam)",
+        status: "Lancar (LOS A/B)",
         speed: 52,
         color: "#22c55e",
         weight: 6

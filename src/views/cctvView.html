@@ -1,0 +1,243 @@
+<div class="view-pane" id="view-cctv">
+        <section class="cctv-dashboard">
+          <!-- Multi-Camera Fast Switcher Tabs -->
+          <div class="cctv-cam-switcher-bar">
+            <button class="cctv-cam-tab active" data-cam="cctvCanvas1" data-title="Simpang Wonokromo (Frontage A. Yani)">Cam 01: Simpang Wonokromo</button>
+            <button class="cctv-cam-tab" data-cam="cctvCanvas2" data-title="Koridor Raya Darmo">Cam 02: Koridor Raya Darmo</button>
+            <button class="cctv-cam-tab" data-cam="cctvCanvas3" data-title="Bundaran Waru (Gerbang Kota)">Cam 03: Bundaran Waru</button>
+            <button class="cctv-cam-tab" data-cam="cctvCanvas4" data-title="Simpang Margorejo - Jemursari">Cam 04: Simpang Margorejo</button>
+          </div>
+
+          <!-- Unified CCTV Control Bar -->
+          <div class="cctv-unified-toolbar glass-panel">
+            <div class="cctv-toolbar-section cctv-toolbar-left">
+              <!-- Matrix View Selector -->
+              <div class="ios-segmented-control matrix-selector" role="group" aria-label="Layout Grid Kamera">
+                <button class="matrix-btn active" data-grid="grid-2x2" title="Grid 2x2">⊞ Grid</button>
+                <button class="matrix-btn" data-grid="grid-1x3" title="Kolom 1x3">☰ Stack</button>
+                <button class="matrix-btn" data-grid="grid-focus" title="Fokus Utama">🔍 Fokus</button>
+              </div>
+              
+              <!-- Play/Pause Simulation Control -->
+              <button class="cctv-toolbar-btn" id="btnPlayPauseCctv" title="Jeda/Putar CCTV">
+                <span class="btn-icon">⏸</span> Jeda
+              </button>
+
+              <!-- Snapshot Evidence Button -->
+              <button class="cctv-toolbar-btn btn-primary" id="btnCaptureSnapshot" title="Ambil Bukti Pelanggaran (Snapshot AI) - ETLE / SITS">
+                <span class="btn-icon">📸</span> Snapshot Bukti ETLE
+              </button>
+              
+              <!-- Color Filter Selectors -->
+              <div class="ios-segmented-control cctv-filter-selector" role="group" aria-label="Filter Mode">
+                <button class="filter-mode-btn active" data-filter="none">Default</button>
+                <button class="filter-mode-btn" data-filter="mono">Mono</button>
+                <button class="filter-mode-btn" data-filter="night">Night</button>
+                <button class="filter-mode-btn" data-filter="thermal">Thermal</button>
+              </div>
+            </div>
+
+            <div class="cctv-toolbar-section cctv-toolbar-right">
+              <!-- Confidence Score Threshold Slider -->
+              <div class="cctv-threshold-pill" title="Ambang batas deteksi Computer Vision">
+                <label for="cctvThresholdRange" class="threshold-label">
+                  <span class="threshold-tag">Threshold:</span>
+                  <strong id="thresholdVal">85%</strong>
+                </label>
+                <input id="cctvThresholdRange" class="cctv-range-slider" type="range" min="50" max="95" value="85" />
+              </div>
+              
+              <!-- Toggle Bounding Box Button -->
+              <button class="cctv-toolbar-btn" id="btnToggleCVBoxes" title="Toggle Visual Bounding Box AI">
+                <span class="btn-icon">▣</span> Overlay AI
+              </button>
+            </div>
+          </div>
+
+          <div class="cctv-feed-grid">
+            <!-- CCTV 01 -->
+            <div class="camera-card glass-panel" data-cam-id="cctvCanvas1">
+              <div class="camera-card-header">
+                <div class="camera-title-wrap">
+                  <span class="camera-id-badge">CAM 01</span>
+                  <h3 class="camera-street-name">Simpang Wonokromo (Frontage A. Yani)</h3>
+                </div>
+                <div class="camera-actions-wrap">
+                  <button class="btn btn-primary compact btn-cam-snapshot" data-cam="cctvCanvas1" title="Capture Snapshot Bukti Pelanggaran"><span class="btn-icon">📸</span> Bukti</button>
+                  <span class="pill pill-live"><span class="pulse-dot"></span>Active</span>
+                </div>
+              </div>
+              <div class="camera-box cv-box-container">
+                <canvas class="cctv-canvas" id="cctvCanvas1" width="640" height="360"></canvas>
+                
+                <!-- HUD Top: Modern semi-transparent dark pills -->
+                <div class="camera-timestamp cctv-time hud-pill">--</div>
+                <div class="camera-badge hud-pill"><span class="rec-dot"></span>REC</div>
+
+                <!-- Glitch Overlay -->
+                <div class="cctv-glitch-overlay" id="cctvGlitch1">
+                  <div class="glitch-text">HOST NOT REACHABLE (504)</div>
+                </div>
+
+                <!-- HUD Bottom: Real-time Performance Metrics -->
+                <div class="camera-hud-bottom">
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">FPS:</span>
+                    <span class="hud-metric-val">30.0</span>
+                  </div>
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">LAT:</span>
+                    <span class="hud-metric-val">18ms</span>
+                  </div>
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">VRAM:</span>
+                    <span class="hud-metric-val">412MB</span>
+                  </div>
+                  <div class="hud-metric-pill hud-engine hide-mobile">
+                    <span class="hud-metric-dot"></span>
+                    <span class="hud-metric-val">YOLOv8 · 1080p</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- CCTV 02 -->
+            <div class="camera-card glass-panel" data-cam-id="cctvCanvas2">
+              <div class="camera-card-header">
+                <div class="camera-title-wrap">
+                  <span class="camera-id-badge">CAM 02</span>
+                  <h3 class="camera-street-name">Koridor Raya Darmo</h3>
+                </div>
+                <div class="camera-actions-wrap">
+                  <button class="btn btn-primary compact btn-cam-snapshot" data-cam="cctvCanvas2" title="Capture Snapshot Bukti Pelanggaran"><span class="btn-icon">📸</span> Bukti</button>
+                  <span class="pill pill-live"><span class="pulse-dot"></span>Active</span>
+                </div>
+              </div>
+              <div class="camera-box cv-box-container">
+                <canvas class="cctv-canvas" id="cctvCanvas2" width="640" height="360"></canvas>
+                
+                <!-- HUD Top: Modern semi-transparent dark pills -->
+                <div class="camera-timestamp cctv-time hud-pill">--</div>
+                <div class="camera-badge hud-pill"><span class="rec-dot"></span>REC</div>
+
+                <!-- Glitch Overlay -->
+                <div class="cctv-glitch-overlay" id="cctvGlitch2">
+                  <div class="glitch-text">RTSP DISCONNECTED</div>
+                </div>
+
+                <!-- HUD Bottom: Real-time Performance Metrics -->
+                <div class="camera-hud-bottom">
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">FPS:</span>
+                    <span class="hud-metric-val">29.8</span>
+                  </div>
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">LAT:</span>
+                    <span class="hud-metric-val">22ms</span>
+                  </div>
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">VRAM:</span>
+                    <span class="hud-metric-val">398MB</span>
+                  </div>
+                  <div class="hud-metric-pill hud-engine hide-mobile">
+                    <span class="hud-metric-dot"></span>
+                    <span class="hud-metric-val">YOLOv8 · 1080p</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- CCTV 03 -->
+            <div class="camera-card glass-panel" data-cam-id="cctvCanvas3">
+              <div class="camera-card-header">
+                <div class="camera-title-wrap">
+                  <span class="camera-id-badge">CAM 03</span>
+                  <h3 class="camera-street-name">Bundaran Waru (Gerbang Kota)</h3>
+                </div>
+                <div class="camera-actions-wrap">
+                  <button class="btn btn-primary compact btn-cam-snapshot" data-cam="cctvCanvas3" title="Capture Snapshot Bukti Pelanggaran"><span class="btn-icon">📸</span> Bukti</button>
+                  <span class="pill pill-live"><span class="pulse-dot"></span>Active</span>
+                </div>
+              </div>
+              <div class="camera-box cv-box-container">
+                <canvas class="cctv-canvas" id="cctvCanvas3" width="640" height="360"></canvas>
+                
+                <!-- HUD Top: Modern semi-transparent dark pills -->
+                <div class="camera-timestamp cctv-time hud-pill">--</div>
+                <div class="camera-badge hud-pill"><span class="rec-dot"></span>REC</div>
+
+                <!-- Glitch Overlay -->
+                <div class="cctv-glitch-overlay" id="cctvGlitch3">
+                  <div class="glitch-text">BUFFER ERROR (999ms)</div>
+                </div>
+
+                <!-- HUD Bottom: Real-time Performance Metrics -->
+                <div class="camera-hud-bottom">
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">FPS:</span>
+                    <span class="hud-metric-val">30.0</span>
+                  </div>
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">LAT:</span>
+                    <span class="hud-metric-val">17ms</span>
+                  </div>
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">VRAM:</span>
+                    <span class="hud-metric-val">415MB</span>
+                  </div>
+                  <div class="hud-metric-pill hud-engine hide-mobile">
+                    <span class="hud-metric-dot"></span>
+                    <span class="hud-metric-val">YOLOv8 · 1080p</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- CCTV 04 -->
+            <div class="camera-card glass-panel" data-cam-id="cctvCanvas4">
+              <div class="camera-card-header">
+                <div class="camera-title-wrap">
+                  <span class="camera-id-badge">CAM 04</span>
+                  <h3 class="camera-street-name">Simpang Margorejo - Jemursari</h3>
+                </div>
+                <div class="camera-actions-wrap">
+                  <button class="btn btn-primary compact btn-cam-snapshot" data-cam="cctvCanvas4" title="Capture Snapshot Bukti Pelanggaran"><span class="btn-icon">📸</span> Bukti</button>
+                  <span class="pill pill-live"><span class="pulse-dot"></span>Active</span>
+                </div>
+              </div>
+              <div class="camera-box cv-box-container">
+                <canvas class="cctv-canvas" id="cctvCanvas4" width="640" height="360"></canvas>
+                
+                <!-- HUD Top: Modern semi-transparent dark pills -->
+                <div class="camera-timestamp cctv-time hud-pill">--</div>
+                <div class="camera-badge hud-pill"><span class="rec-dot"></span>REC</div>
+
+                <!-- Glitch Overlay -->
+                <div class="cctv-glitch-overlay" id="cctvGlitch4">
+                  <div class="glitch-text">HOST NOT REACHABLE</div>
+                </div>
+
+                <!-- HUD Bottom: Real-time Performance Metrics -->
+                <div class="camera-hud-bottom">
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">FPS:</span>
+                    <span class="hud-metric-val">29.9</span>
+                  </div>
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">LAT:</span>
+                    <span class="hud-metric-val">20ms</span>
+                  </div>
+                  <div class="hud-metric-pill">
+                    <span class="hud-metric-label">VRAM:</span>
+                    <span class="hud-metric-val">405MB</span>
+                  </div>
+                  <div class="hud-metric-pill hud-engine hide-mobile">
+                    <span class="hud-metric-dot"></span>
+                    <span class="hud-metric-val">YOLOv8 · 1080p</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>

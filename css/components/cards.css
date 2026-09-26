@@ -1,0 +1,70 @@
+/* --------------------------------------------------------------------------
+   7. Standard Surface Hierarchy & Card Architecture
+   -------------------------------------------------------------------------- */
+.glass-panel,
+.glass-soft,
+.widget,
+.ops-card,
+.summary-card,
+.map-panel,
+.table-panel,
+.analytics-hero-card,
+.settings-card,
+.settings-expanded-card,
+.camera-card,
+.trend-panel,
+.esg-monitor-card,
+.esg-configurator-card,
+.esg-calculator-card,
+.prediction-panel,
+.emergency-dispatcher,
+.emergency-active-feed,
+.devices-list-panel,
+.device-config-drawer,
+.terminal-logs-card,
+.api-playground-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
+}
+
+.glass-panel:hover,
+.widget:hover,
+.ops-card:hover {
+  border-color: var(--border-emphasis);
+}
+
+/* Section Header Typographic Hierarchy */
+.section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.section-head h2 {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.section-head p {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--primary-2);
+  margin-bottom: 2px;
+  display: block;
+}

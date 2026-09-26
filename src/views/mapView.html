@@ -1,0 +1,176 @@
+<div class="view-pane" id="view-map">
+        <article class="spatial-map-workspace">
+          <!-- Minimal Context Header Bar -->
+          <header class="map-workspace-header">
+            <div class="map-header-brand">
+              <span class="map-header-dot"></span>
+              <h1 class="map-header-title">Surabaya Spatial Intelligence</h1>
+              <span class="provenance-badge live" id="fullMapProvenance"><span class="live-dot"></span> SITS GATEWAY LIVE</span>
+            </div>
+            <div class="map-header-meta">
+              <span class="map-meta-item hide-mobile">Koridor Utama: <strong>A. Yani · Darmo · Tunjungan · Kertajaya · MERR</strong></span>
+              <span class="map-meta-divider hide-mobile">·</span>
+              <span class="map-event-chip" id="fullMapEventChip" title="Total insiden & darurat aktif di Surabaya">
+                <span class="event-chip-dot"></span>
+                <span id="fullMapEventText">3 Event Aktif</span>
+              </span>
+            </div>
+          </header>
+
+          <!-- Main Map Viewport Canvas Wrapper -->
+          <div class="map-container-wrapper" id="fullMapContainerWrapper">
+            <!-- Leaflet Map Container -->
+            <div id="map-surabaya"></div>
+
+            <!-- Floating Top Toolbar Group (Apple-like Spatial Control Bar) -->
+            <div class="map-spatial-toolbar" id="fullMapToolbar" role="toolbar" aria-label="Kontrol Utama Peta">
+              <!-- Navigation Controls Group -->
+              <div class="toolbar-button-group">
+                <button class="spatial-tool-btn" id="btnFullMapZoomIn" type="button" aria-label="Zoom in (+)" title="Perbesar Peta (+)">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+                <button class="spatial-tool-btn" id="btnFullMapZoomOut" type="button" aria-label="Zoom out (-)" title="Perkecil Peta (-)">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+                <button class="spatial-tool-btn" id="btnFullMapReset" type="button" aria-label="Reset view" title="Pusatkan Surabaya">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"></circle><line x1="12" y1="2" x2="12" y2="5"></line><line x1="12" y1="19" x2="12" y2="22"></line><line x1="2" y1="12" x2="5" y2="12"></line><line x1="19" y1="12" x2="22" y2="12"></line></svg>
+                </button>
+              </div>
+
+              <div class="toolbar-divider"></div>
+
+              <!-- Mode / Layer Quick Toggles -->
+              <div class="toolbar-button-group">
+                <button class="spatial-tool-btn active" id="btnMapModeFlow" data-layer-mode="flow" type="button" title="Arus Koridor Lalu Lintas">
+                  <span class="tool-dot dot-flow"></span>
+                  <span class="tool-label hide-mobile">Arus</span>
+                </button>
+                <button class="spatial-tool-btn" id="btnMapModeHeat" data-layer-mode="heat" type="button" title="Heatmap Kepadatan Arus">
+                  <span class="tool-dot dot-heat"></span>
+                  <span class="tool-label hide-mobile">Heatmap</span>
+                </button>
+                <button class="spatial-tool-btn" id="btnMapModeNodes" data-layer-mode="nodes" type="button" title="SITS Persimpangan & Node">
+                  <span class="tool-dot dot-node"></span>
+                  <span class="tool-label hide-mobile">Nodes</span>
+                </button>
+                <button class="spatial-tool-btn map-layer-toggle-btn" id="btnToggleFullMapLayers" type="button" aria-label="Buka Kontrol Lapisan" title="Kontrol Lapisan Detail">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+                  <span class="tool-label hide-mobile">Lapisan</span>
+                </button>
+              </div>
+
+              <div class="toolbar-divider"></div>
+
+              <!-- View Actions -->
+              <div class="toolbar-button-group">
+                <button class="spatial-tool-btn" id="btnFullMapFullscreen" type="button" aria-label="Layar penuh" title="Toggle Fullscreen Workspace">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Slide-in Layer Drawer Deck -->
+            <div class="map-layer-deck glass-panel" id="fullMapLayerDeck">
+              <div class="layer-deck-header">
+                <div class="layer-deck-title">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+                  <h3>Lapisan Spasial Detail</h3>
+                </div>
+                <button class="layer-deck-close-btn" id="btnCloseFullMapLayers" type="button" aria-label="Tutup panel lapisan">&times;</button>
+              </div>
+              <div class="layer-option-list">
+                <label class="layer-item">
+                  <input type="checkbox" class="layer-toggle-checkbox" data-layer="district-zones" checked />
+                  <span class="layer-label">Wilayah Kota Surabaya</span>
+                </label>
+                <label class="layer-item">
+                  <input type="checkbox" class="layer-toggle-checkbox" data-layer="map-river" checked />
+                  <span class="layer-label">Aliran Sungai Kalimas</span>
+                </label>
+                <label class="layer-item">
+                  <input type="checkbox" class="layer-toggle-checkbox" data-layer="road-glows" checked />
+                  <span class="layer-label">Efek Arus Arteri Utama</span>
+                </label>
+                <label class="layer-item">
+                  <input type="checkbox" class="layer-toggle-checkbox" data-layer="minor-roads" checked />
+                  <span class="layer-label">Jalan Sekunder</span>
+                </label>
+                <label class="layer-item">
+                  <input type="checkbox" class="layer-toggle-checkbox" data-layer="warn-points" checked />
+                  <span class="layer-label">Titik Insiden Lalu Lintas</span>
+                </label>
+                <label class="layer-item">
+                  <input type="checkbox" class="layer-toggle-checkbox" data-layer="landmark-group" checked />
+                  <span class="layer-label">CCTV & Landmark SITS</span>
+                </label>
+                <label class="layer-item">
+                  <input type="checkbox" class="layer-toggle-checkbox" data-layer="signal-points" checked />
+                  <span class="layer-label">Node APILL & Sinyal Adaptif</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Compact Minimalist Floating Legend (Bottom-Left) -->
+            <div class="map-floating-legend" id="fullMapLegend" aria-label="Legenda Status Lalu Lintas">
+              <div class="legend-items-row" id="legendItemsRow">
+                <span class="legend-chip"><span class="legend-dot dot-success"></span>Lancar (&gt;30 km/j)</span>
+                <span class="legend-chip"><span class="legend-dot dot-warning"></span>Padat (15-30 km/j)</span>
+                <span class="legend-chip"><span class="legend-dot dot-danger"></span>Macet (&lt;15 km/j)</span>
+                <span class="legend-chip"><span class="legend-symbol">⚠️</span>Insiden</span>
+                <span class="legend-chip"><span class="legend-symbol">🚑</span>Prioritas 112</span>
+              </div>
+              <button class="legend-toggle-btn" id="btnToggleLegendCollapse" type="button" aria-label="Sembunyikan/Tampilkan Legenda" title="Toggle Legenda">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button>
+            </div>
+
+            <!-- Custom Right-Click Context Menu -->
+            <div class="map-spatial-context-menu" id="mapContextMenu" role="menu" aria-hidden="true">
+              <button class="context-menu-item" type="button" data-action="center-here">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"></circle><line x1="12" y1="2" x2="12" y2="5"></line><line x1="12" y1="19" x2="12" y2="22"></line><line x1="2" y1="12" x2="5" y2="12"></line><line x1="19" y1="12" x2="22" y2="22"></line></svg>
+                <span>Pusatkan Kamera Di Sini</span>
+              </button>
+              <button class="context-menu-item" type="button" data-action="filter-incidents">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                <span>Insiden Sekitar Sini</span>
+              </button>
+              <button class="context-menu-item" type="button" data-action="filter-cctv">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2"></rect></svg>
+                <span>CCTV Terdekat</span>
+              </button>
+              <button class="context-menu-item" type="button" data-action="sim-112">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+                <span>Simulasi Emergency 112</span>
+              </button>
+              <div class="context-menu-divider"></div>
+              <button class="context-menu-item" type="button" data-action="copy-coords">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Salin Koordinat Spasial</span>
+              </button>
+            </div>
+
+            <!-- Interactive Vehicle & Incident Popover (Kept for backwards compatibility) -->
+            <div class="map-interactive-popover glass-panel is-hidden" id="mapVehiclePopover">
+              <button class="popover-close-btn" id="btnCloseVehiclePopover" type="button" aria-label="Tutup info">&times;</button>
+              <div class="popover-header">
+                <span class="popover-badge" id="popoverBadge">🚑 PRIORITAS SITS</span>
+                <h4 id="popoverTitle">Ambulans 02</h4>
+              </div>
+              <div class="popover-content">
+                <div class="popover-metric">
+                  <span class="popover-label">Kecepatan:</span>
+                  <strong class="popover-value text-accent" id="popoverSpeed">58 km/jam</strong>
+                </div>
+                <div class="popover-metric">
+                  <span class="popover-label">Status Rute:</span>
+                  <span class="popover-value" id="popoverRoute">Koridor Darmo - Sinyal Prioritas Aktif</span>
+                </div>
+                <div class="popover-metric">
+                  <span class="popover-label">Estimasi Tiba (ETA):</span>
+                  <strong class="popover-value text-warning" id="popoverEta">1m 45s</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>

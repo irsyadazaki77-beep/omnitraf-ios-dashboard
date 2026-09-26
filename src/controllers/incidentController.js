@@ -25,6 +25,49 @@ export class IncidentController {
     this._bindIncidentFilterChips();
     this._bindExportCsv();
     this._setupStoreListeners();
+    this._registerGlobalHandlers();
+  }
+
+  activate() {
+    this._bindContextMenu();
+    this._bindIncidentModal();
+    this._bindIncidentFilterChips();
+    this._bindExportCsv();
+    this._registerGlobalHandlers();
+  }
+
+  _registerGlobalHandlers() {
+    if (typeof window === 'undefined') return;
+
+    window.resolveDynamicIncident = (id) => this.resolveIncident(id);
+    window.dispatchIncident = (id) => this.dispatchIncident(id);
+    window.openIncidentOnMap = (loc, title) => mapManager.flyToIncident(loc, title);
+    window.openIncidentDetail = (id, loc, time, desc) => this.openIncidentDetail(id, loc, time, desc);
+  }
+
+  /**
+   * Dispatch Tim Lapangan (Transition from BARU -> DITANGANI)
+   */
+  async dispatchIncident(id) {
+    try {
+      await commandLayer.dispatchCommand({
+        action: 'incident:acknowledge',
+        targetType: 'incident',
+        targetId: id,
+        payload: {
+          status: 'DISPATCHED/RESPONDING',
+          assignedUnit: 'Patroli Dishub & Tim 112 Surabaya',
+          notes: 'Tim lapangan & armada derek telah didisposisikan ke lokasi.'
+        }
+      }, false); // low risk
+
+      window.showToast(`🚨 Tim Lapangan & SITS 112 didisposisikan ke lokasi insiden #${id}.`, 'success');
+      soundManager.play('alert');
+    } catch (err) {
+      console.warn("[IncidentController] Dispatch error:", err);
+      window.showToast(`❌ Gagal mendisposisi petugas: ${err.message}`, "danger");
+      soundManager.play('alert');
+    }
   }
 
   /**
@@ -156,27 +199,35 @@ export class IncidentController {
 
     btnExport.addEventListener("click", () => {
       const incidents = [
-        { time: new Date().toLocaleTimeString('id-ID'), loc: "Simpang Wonokromo (Bemo)", type: "Antrean Padat Koridor", status: "Ditangani SITS", officer: "Regu Patroli Dishub Timur" },
+        { time: new Date().toLocaleTimeString('id-ID'), loc: "Simpang Wonokromo (Bemo)", type: "Antrean Padat Koridor", status: "Ditangani SITS 112", officer: "Regu Patroli Dishub Timur" },
         { time: "18:24:10", loc: "Jl. Darmo (Taman Bungkul)", type: "Volume Tinggi Jam Pulang", status: "Fase Hijau +12s", officer: "Operator ATCS Ruang Kontrol" },
         { time: "17:45:00", loc: "Margorejo Indah", type: "Pohon Tumbang Sebagian", status: "Selesai Ditangani", officer: "DLH & Satlantas Polrestabes" },
         { time: "16:30:15", loc: "Bundaran Waru (Masuk Kota)", type: "Penyempitan Lajur Tol", status: "Normal Kembali", officer: "PJR Polda Jatim" },
         { time: "15:10:02", loc: "Jl. Pemuda - Simpang Yos Sudarso", type: "Prioritas Rombongan Dinas", status: "Selesai", officer: "Satlantas Polrestabes Surabaya" }
       ];
 
-      let csvContent = "data:text/csv;charset=utf-8,Waktu,Lokasi,Tipe Insiden,Status Penanganan,Petugas\n";
+      const csvHeader = "Waktu Laporkan,Lokasi Persimpangan,Tipe Insiden / Hambatan,Status Penanganan SITS,Unit Disposisi Petugas\n";
+      let csvRows = "";
       incidents.forEach(inc => {
-        csvContent += `"${inc.time}","${inc.loc}","${inc.type}","${inc.status}","${inc.officer}"\n`;
+        csvRows += `"${inc.time}","${inc.loc}","${inc.type}","${inc.status}","${inc.officer}"\n`;
       });
 
-      const encodedUri = encodeURI(csvContent);
+      // Include UTF-8 BOM (\uFEFF) so Excel opens Indonesian accents and characters cleanly
+      const bom = "\uFEFF";
+      const blob = new Blob([bom + csvHeader + csvRows], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+
       const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
+      link.setAttribute("href", url);
       link.setAttribute("download", `OmniTRAF-SITS-Log-Insiden-${new Date().toISOString().slice(0, 10)}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
+      URL.revokeObjectURL(url);
 
-      window.showToast("✓ Berkas CSV Log Insiden berhasil diunduh.");
+      if (typeof window.showToast === "function") {
+        window.showToast("✓ Berkas CSV Log Insiden SITS Surabaya (UTF-8 Excel) berhasil diunduh.");
+      }
       soundManager.play('success');
     });
   }
@@ -247,6 +298,75 @@ export class IncidentController {
   _setupStoreListeners() {
     stateStore.subscribe('state:incidents', ({ value }) => {
       this._renderIncidentListUI(value);
+      this._renderNotificationDrawer(value);
+    });
+  }
+
+  _renderNotificationDrawer(incidents) {
+    const notifContainer = document.getElementById("notifListContainer");
+    if (!notifContainer) return;
+
+    const list = Array.isArray(incidents) ? incidents : [];
+    if (list.length === 0) return;
+
+    notifContainer.innerHTML = "";
+
+    list.forEach(inc => {
+      const isResolved = ["RESOLVED", "ARCHIVED"].includes(inc.status);
+      const isDispatched = ["DISPATCHED", "RESPONDING", "DISPATCHED/RESPONDING", "ACKNOWLEDGED"].includes(inc.status);
+
+      let badgeClass = "red";
+      let badgeLabel = "⚠️ BARU (Open)";
+      if (isDispatched) {
+        badgeClass = "yellow";
+        badgeLabel = "🚔 DITANGANI (Dispatched)";
+      } else if (isResolved) {
+        badgeClass = "green";
+        badgeLabel = "✅ SELESAI (Resolved)";
+      }
+
+      let responseTimeStr = "";
+      if (inc.reportedAt) {
+        const startMs = new Date(inc.reportedAt).getTime();
+        const endMs = inc.resolvedAt ? new Date(inc.resolvedAt).getTime() : Date.now();
+        const diffMin = Math.max(1, Math.round((endMs - startMs) / 60000));
+        responseTimeStr = `${diffMin} menit`;
+      }
+
+      const card = document.createElement("article");
+      card.className = "notif-item-card glass-soft";
+      card.style.cssText = "padding: 12px; border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px;";
+
+      card.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span class="status-badge ${badgeClass}">${badgeLabel}</span>
+          <small style="font-size: 10px; color: var(--text-muted);">${inc.reportedAt ? new Date(inc.reportedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : 'Baru saja'}</small>
+        </div>
+        <strong style="font-size: 12.5px; color: var(--text);">${inc.title} - ${inc.location}</strong>
+        <p style="margin: 0; font-size: 11px; color: var(--text-muted); line-height: 1.4;">${inc.notes || 'Hambatan lajur terdeteksi SITS 112.'}</p>
+        
+        ${isResolved ? `
+          <div style="font-size: 10.5px; color: var(--success); font-weight: 600;">
+            ✓ Selesai Ditangani | Response Time: ${responseTimeStr || '3 menit'}
+          </div>
+        ` : ''}
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.06);">
+          <button class="btn btn-ghost compact btn-map-shortcut" style="padding: 4px 8px; font-size: 10.5px;" onclick="openIncidentOnMap('${inc.location.replace(/'/g, "\\'")}', '${inc.title.replace(/'/g, "\\'")}')">
+            📍 Buka di Peta
+          </button>
+          
+          ${!isResolved ? `
+            ${!isDispatched ? `
+              <button class="btn btn-primary compact" style="padding: 4px 8px; font-size: 10.5px;" onclick="dispatchIncident('${inc.id}')">🚀 Dispatch</button>
+            ` : `
+              <button class="btn btn-success compact" style="padding: 4px 8px; font-size: 10.5px; background: var(--success); border-color: var(--success);" onclick="resolveDynamicIncident('${inc.id}')">✓ Selesaikan</button>
+            `}
+          ` : ''}
+        </div>
+      `;
+
+      notifContainer.appendChild(card);
     });
   }
 
@@ -277,42 +397,63 @@ export class IncidentController {
 
     list.forEach(inc => {
       const isResolved = ["RESOLVED", "ARCHIVED"].includes(inc.status);
-      const isAcknowledged = inc.status === "ACKNOWLEDGED";
-      const isResponding = ["DISPATCHED", "RESPONDING", "DISPATCHED/RESPONDING"].includes(inc.status);
+      const isDispatched = ["DISPATCHED", "RESPONDING", "DISPATCHED/RESPONDING", "ACKNOWLEDGED"].includes(inc.status);
       
       const item = document.createElement("div");
       item.className = `incident-log-item ${isResolved ? 'resolved' : 'unresolved'}`;
       item.id = `incident-${inc.id}`;
 
-      let badgeColor = "alert-red";
-      if (inc.severity === "warning") badgeColor = "alert-orange";
-      if (isResolved) badgeColor = "alert-green";
+      let statusBadgeHtml = `<span class="pill inc-badge-new" style="font-size: 11px; padding: 3px 8px;">⚠️ BARU (Open)</span>`;
+      if (isDispatched) {
+        statusBadgeHtml = `<span class="pill inc-badge-dispatched" style="font-size: 11px; padding: 3px 8px;">🚔 DITANGANI (${inc.assignedUnit || 'Patroli 112'})</span>`;
+      } else if (isResolved) {
+        statusBadgeHtml = `<span class="pill inc-badge-resolved" style="font-size: 11px; padding: 3px 8px;">✅ SELESAI (Resolved)</span>`;
+      }
 
-      let statusLabel = inc.status;
-      if (isResolved) statusLabel = "SELESAI (RESOLVED)";
-      else if (isAcknowledged) statusLabel = "DIKONFIRMASI (ACKNOWLEDGED)";
-      else if (isResponding) statusLabel = "PROSES DISPOSISI (DISPATCHED)";
+      let responseTimeStr = "";
+      if (inc.reportedAt) {
+        const startMs = new Date(inc.reportedAt).getTime();
+        const endMs = inc.resolvedAt ? new Date(inc.resolvedAt).getTime() : Date.now();
+        const diffMin = Math.max(1, Math.round((endMs - startMs) / 60000));
+        responseTimeStr = `${diffMin} menit`;
+      }
 
       item.innerHTML = `
-        <div class="inc-meta">
-          <span class="inc-type ${badgeColor}">⚠️ ${statusLabel} (#${inc.id})</span>
-          <span class="inc-time">${inc.reportedAt ? new Date(inc.reportedAt).toLocaleTimeString('id-ID') : 'Baru saja'}</span>
+        <div class="inc-meta" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          ${statusBadgeHtml}
+          <span class="inc-time" style="font-size: 11px; color: var(--text-muted);">${inc.reportedAt ? new Date(inc.reportedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : 'Baru saja'}</span>
         </div>
-        <strong>${inc.title} - ${inc.location}</strong>
-        <p>${inc.notes || 'Hambatan lajur terdeteksi oleh sistem SITS.'}</p>
-        <div class="inc-meta-row" style="margin-top: 8px; display: flex; gap: 16px; font-size: 11px; color: #94a3b8;">
-          <div>Kategori: <strong class="text-slate-300">${inc.category ? inc.category.toUpperCase() : 'UMUM'}</strong></div>
-          <div>Unit Tugas: <strong class="text-sky-400">${inc.assignedUnit || 'Belum Ditugaskan'}</strong></div>
+        <strong style="font-size: 14px; color: var(--text);">${inc.title} - ${inc.location}</strong>
+        <p style="margin: 6px 0; font-size: 12px; color: var(--text-muted); line-height: 1.45;">${inc.notes || 'Hambatan lajur terdeteksi oleh sistem SITS Command Center 112.'}</p>
+        
+        <div class="inc-meta-row" style="margin-top: 8px; display: flex; gap: 16px; font-size: 11px; color: #94a3b8; background: rgba(255,255,255,0.02); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+          <div>Kategori: <strong style="color: var(--text);">${inc.category ? inc.category.toUpperCase() : 'UMUM'}</strong></div>
+          <div>Unit Disposisi: <strong style="color: var(--cyan);">${inc.assignedUnit || 'Belum Ditugaskan'}</strong></div>
+          ${isResolved ? `<div>Durasi Respon: <strong style="color: var(--success);">${responseTimeStr || '3 menit'}</strong></div>` : `<div>Durasi Berjalan: <strong style="color: var(--amber);">${responseTimeStr || '1 menit'}</strong></div>`}
         </div>
-        <div class="inc-actions" style="margin-top: 10px; display: flex; gap: 8px;">
+
+        <div class="inc-actions" style="margin-top: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+          <button class="btn btn-ghost compact btn-map-shortcut" style="padding: 5px 12px; font-size: 11.5px;" onclick="openIncidentOnMap('${inc.location.replace(/'/g, "\\'")}', '${inc.title.replace(/'/g, "\\'")}')">
+            📍 Buka di Peta
+          </button>
+
           ${!isResolved ? `
-            ${!isAcknowledged && !isResponding ? `
-              <button class="btn btn-primary compact acknowledge-btn" style="background: #1e3a8a; border-color: #3b82f6; padding: 4px 8px; font-size: 11px;" onclick="acknowledgeIncident('${inc.id}')">Acknowledge</button>
-            ` : ''}
-            <button class="btn btn-ghost compact dispatch-btn" style="background: rgba(56, 189, 248, 0.1); border-color: rgba(56, 189, 248, 0.3); padding: 4px 8px; font-size: 11px;" onclick="openIncidentDetail('${inc.id}', '${inc.location.replace(/'/g, "\\'")}', '${inc.reportedAt}', '${inc.notes ? inc.notes.replace(/'/g, "\\'") : ''}')">Disposisi Petugas</button>
-            <button class="btn btn-primary compact resolve-btn" style="padding: 4px 8px; font-size: 11px;" onclick="resolveDynamicIncident('${inc.id}')">Mark as Resolved</button>
+            ${!isDispatched ? `
+              <button class="btn btn-primary compact dispatch-btn" style="padding: 5px 12px; font-size: 11.5px;" onclick="dispatchIncident('${inc.id}')">
+                🚀 Kirim Tim Lapangan (Dispatch)
+              </button>
+            ` : `
+              <button class="btn btn-success compact resolve-btn" style="padding: 5px 12px; font-size: 11.5px; background: var(--success); border-color: var(--success);" onclick="resolveDynamicIncident('${inc.id}')">
+                ✓ Selesaikan Insiden
+              </button>
+            `}
+            <button class="btn btn-ghost compact" style="padding: 5px 10px; font-size: 11px; color: var(--text-muted);" onclick="openIncidentDetail('${inc.id}', '${inc.location.replace(/'/g, "\\'")}', '${inc.reportedAt}', '${inc.notes ? inc.notes.replace(/'/g, "\\'") : ''}')">
+              📋 Kronologi & Disposisi
+            </button>
           ` : `
-            <span class="text-emerald-400 font-semibold" style="display: flex; align-items: center; gap: 4px; font-size: 11.5px;">✓ Insiden Selesai ditangani SITS pada ${inc.resolvedAt ? new Date(inc.resolvedAt).toLocaleTimeString('id-ID') : ''}</span>
+            <span class="text-emerald-400 font-semibold" style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--success);">
+              ✓ Selesai Ditangani SITS | Response Time: ${responseTimeStr || '3 menit'}
+            </span>
           `}
         </div>
       `;

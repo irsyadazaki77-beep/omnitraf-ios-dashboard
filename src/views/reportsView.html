@@ -1,0 +1,224 @@
+<div class="view-pane" id="view-reports">
+        <!-- Section Header / Operations Workspace Summary -->
+        <header class="workspace-header">
+          <div class="workspace-header-title-group">
+            <span class="workspace-header-kicker">SITS SURABAYA · EXECUTIVE MOBILITY SYNTHESIS</span>
+            <h1 class="workspace-header-title">Mobility Snapshots & Official Reports</h1>
+            <p class="workspace-header-desc">Kompilasi analitik operasional, ringkasan kinerja lampu lalu lintas adaptif, dan ekspor dokumen kedinasan Pemerintah Kota Surabaya.</p>
+          </div>
+          <div class="workspace-header-summary-strip" aria-label="Ringkasan Status Laporan">
+            <div class="workspace-summary-item">
+              <span class="workspace-summary-label">Format Dokumen</span>
+              <div class="workspace-summary-val-row">
+                <span class="signals-status-dot dot-live"></span>
+                <strong class="tabular font-mono text-cyan">PDF · CSV · JSON</strong>
+                <span class="workspace-summary-sub">Standar Dishub</span>
+              </div>
+            </div>
+            <div class="workspace-summary-item">
+              <span class="workspace-summary-label">Kompilasi Harian</span>
+              <div class="workspace-summary-val-row">
+                <strong class="text-success">Siap Diekspor</strong>
+                <span class="workspace-summary-sub">Real-time Sync</span>
+              </div>
+            </div>
+            <div class="workspace-summary-item hide-mobile">
+              <span class="workspace-summary-label">Verifikasi Sistem</span>
+              <div class="workspace-summary-val-row">
+                <strong class="tabular font-mono text-primary-2">ISO 37120 / 37122</strong>
+                <span class="workspace-summary-sub">Terakreditasi</span>
+              </div>
+            </div>
+            <div class="workspace-summary-item hide-mobile">
+              <span class="workspace-summary-label">Indeks SPM Kota</span>
+              <div class="workspace-summary-val-row">
+                <strong class="tabular font-mono text-success">98.4% Sesuai</strong>
+                <span class="workspace-summary-sub">Waktu Tunggu &lt; 60s</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <section class="reports-manager-grid">
+          <!-- Primary Daily Mobility Snapshot Card -->
+          <article class="report-card glass-panel reveal-card">
+            <div class="report-card-content">
+              <div class="report-kicker-row">
+                <span class="badge badge-primary-soft">REPORT CENTER</span>
+                <span class="unboxed-meta-sep">·</span>
+                <span class="report-kicker-meta">Snapshot Harian</span>
+              </div>
+              <h2 class="report-card-title">Daily Mobility Snapshot</h2>
+              <p class="report-card-desc">Ringkasan harian performa lalu lintas Kota Surabaya siap pakai untuk pimpinan, stakeholder, dan evaluasi SPM Dishub.</p>
+            </div>
+            <button class="btn btn-primary compact report-action-btn" type="button" data-action="download-report">Generate Report</button>
+          </article>
+
+          <!-- Weekly & Synthesis Snapshots List -->
+          <article class="reports-generator glass-panel">
+            <div class="section-head">
+              <div>
+                <h2>Mobility Snapshots & PDF Report</h2>
+                <p>Unduh kompilasi data performa operasional lalu lintas SITS untuk laporan analisis dinas.</p>
+              </div>
+            </div>
+            <div class="report-snapshots-list">
+              <div class="report-snapshot-item">
+                <div class="snap-info">
+                  <strong>Daily Mobility Report Surabaya — 30-05-2026 (Today)</strong>
+                  <p>Kompilasi telemetri 126 persimpangan, indeks kemacetan harian, serta log preemption kendaraan darurat.</p>
+                </div>
+                <button class="btn btn-primary compact" data-action="download-report" data-report-type="Daily Mobility">Generate & Download</button>
+              </div>
+              <div class="report-snapshot-item">
+                <div class="snap-info">
+                  <strong>Weekly Traffic Synthesis Surabaya — Week 21</strong>
+                  <p>Kompilasi performa mingguan sistem adaptif SITS, perbandingan SPM, dan reduksi emisi karbon.</p>
+                </div>
+                <button class="btn btn-ghost compact" data-action="download-report" data-report-type="Weekly Synthesis">Generate & Download</button>
+              </div>
+            </div>
+          </article>
+
+          <!-- Enterprise Reporting Engine (Dishub Surabaya) -->
+          <article class="reports-enterprise glass-panel">
+            <div class="section-head">
+              <div>
+                <h2>Enterprise Reporting Engine (Dinas Perhubungan Kota Surabaya)</h2>
+                <p>Ekspor log insiden real-time ke format spreadsheet CSV, cetak format resmi dokumen kedinasan PDF, atau salin payload telemetri API.</p>
+              </div>
+              <span class="badge badge-primary-soft">Government Ready</span>
+            </div>
+            
+            <div class="reports-enterprise-actions">
+              <button class="btn btn-primary" id="btnExportCsv" type="button">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                <span>Export CSV Data Insiden</span>
+              </button>
+              <button class="btn btn-outline" id="btnPrintExecutive" type="button">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                <span>Cetak Laporan Eksekutif (PDF)</span>
+              </button>
+              <button class="btn btn-secondary" id="btnCopyTelemetryJson" type="button">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Salin Data Telemetri (JSON API)</span>
+              </button>
+            </div>
+          </article>
+        </section>
+
+        <!-- Official Executive Print Document Template (Rendered only on print / @media print) -->
+        <div id="executivePrintDoc" class="print-only-container" style="display: none;">
+          <div class="print-letterhead" style="display: flex; align-items: center; gap: 16px; border-bottom: 3px double #000; padding-bottom: 12px; margin-bottom: 16px;">
+            <div class="print-logo-col">
+              <img src="/assets/omnitraf-logo-original.png" alt="SITS Logo" style="height: 65px; width: auto;" />
+            </div>
+            <div class="print-title-col">
+              <h1 style="font-size: 15pt; font-weight: 800; margin: 0; text-transform: uppercase; color: #000; font-family: serif;">PEMERINTAH KOTA SURABAYA</h1>
+              <h2 style="font-size: 13pt; font-weight: 700; margin: 2px 0; text-transform: uppercase; color: #000; font-family: serif;">DINAS PERHUBUNGAN</h2>
+              <h3 style="font-size: 11pt; font-weight: 700; margin: 0; color: #1e3a8a; font-family: sans-serif;">SITS COMMAND CENTER (SURABAYA INTELLIGENT TRANSPORT SYSTEM)</h3>
+              <p style="font-size: 8.5pt; margin: 3px 0 0 0; color: #334155;">Jl. Dukuh Menanggal X No. 1, Gayungan, Surabaya | Telp (031) 8292123 | Email: sits@surabaya.go.id</p>
+            </div>
+          </div>
+
+          <div style="text-align: center; margin-bottom: 20px;">
+            <h3 style="font-size: 13pt; font-weight: 800; margin: 0; text-decoration: underline; text-transform: uppercase; color: #000;">LAPORAN EKSEKUTIF MOBILITAS & KINERJA APILL ADAPTIF</h3>
+            <p style="font-size: 9.5pt; margin: 4px 0; color: #475569;">Nomor Dokumen: SITS-EKS/2026/09/REC-8842 &nbsp;|&nbsp; Tanggal Pengesahan: <span id="printDateStr">26 September 2026</span></p>
+          </div>
+
+          <h4 style="font-size: 10.5pt; margin-bottom: 6px; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 4px; color: #000;">I. RINGKASAN CAPAIAN PERFORMA UTAMA (KPI) & DOKUMEN SPM DISHUB</h4>
+          <table class="print-summary-table" style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9.5pt; color: #000;">
+            <thead>
+              <tr style="background: #e2e8f0; border: 1px solid #000;">
+                <th style="padding: 6px; text-align: left; border: 1px solid #000;">Indikator Performa Utama</th>
+                <th style="padding: 6px; text-align: center; border: 1px solid #000;">Capaian Hari Ini</th>
+                <th style="padding: 6px; text-align: center; border: 1px solid #000;">Target SPM Dishub</th>
+                <th style="padding: 6px; text-align: center; border: 1px solid #000;">Status Evaluasi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border: 1px solid #000;">
+                <td style="padding: 6px; border: 1px solid #000;">Total Volume Kendaraan Terlayani</td>
+                <td style="padding: 6px; text-align: center; font-weight: bold; border: 1px solid #000;" id="printVolVal">128.540 kendaraan</td>
+                <td style="padding: 6px; text-align: center; border: 1px solid #000;">110.000 kendaraan</td>
+                <td style="padding: 6px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">✓ Optimal (+16.8%)</td>
+              </tr>
+              <tr style="border: 1px solid #000;">
+                <td style="padding: 6px; border: 1px solid #000;">Rata-rata Waktu Tunggu Simpang (Wait Time)</td>
+                <td style="padding: 6px; text-align: center; font-weight: bold; border: 1px solid #000;" id="printWaitVal">28.4 detik/kend</td>
+                <td style="padding: 6px; text-align: center; border: 1px solid #000;">&lt; 45.0 detik</td>
+                <td style="padding: 6px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">✓ Memenuhi SPM</td>
+              </tr>
+              <tr style="border: 1px solid #000;">
+                <td style="padding: 6px; border: 1px solid #000;">Reduksi Emisi Karbon Dioksida (CO₂)</td>
+                <td style="padding: 6px; text-align: center; font-weight: bold; border: 1px solid #000;" id="printCo2Val">1.420 kg CO₂</td>
+                <td style="padding: 6px; text-align: center; border: 1px solid #000;">1.000 kg CO₂</td>
+                <td style="padding: 6px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">✓ Melampaui Target</td>
+              </tr>
+              <tr style="border: 1px solid #000;">
+                <td style="padding: 6px; border: 1px solid #000;">Total Insiden Lalu Lintas Tertangani (SITS 112)</td>
+                <td style="padding: 6px; text-align: center; font-weight: bold; border: 1px solid #000;" id="printIncVal">12 Insiden Selesai</td>
+                <td style="padding: 6px; text-align: center; border: 1px solid #000;">100% Resolved</td>
+                <td style="padding: 6px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">✓ 100% Selesai</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h4 style="font-size: 10.5pt; margin-bottom: 6px; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 4px; color: #000;">II. STATUS OPERASIONAL KORIDOR UTAMA SURABAYA</h4>
+          <table class="print-corridor-table" style="width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 9pt; color: #000;">
+            <thead>
+              <tr style="background: #e2e8f0; border: 1px solid #000;">
+                <th style="padding: 5px; text-align: left; border: 1px solid #000;">Koridor Utama</th>
+                <th style="padding: 5px; text-align: center; border: 1px solid #000;">Volume Arus</th>
+                <th style="padding: 5px; text-align: center; border: 1px solid #000;">Kecepatan Rerata</th>
+                <th style="padding: 5px; text-align: center; border: 1px solid #000;">Metode Sinyal</th>
+                <th style="padding: 5px; text-align: center; border: 1px solid #000;">Status Terakhir</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border: 1px solid #000;">
+                <td style="padding: 5px; border: 1px solid #000;">Koridor A. Yani / Wonokromo</td>
+                <td style="padding: 5px; text-align: center; border: 1px solid #000;">3.120 smp/jam</td>
+                <td style="padding: 5px; text-align: center; border: 1px solid #000;">38 km/jam</td>
+                <td style="padding: 5px; text-align: center; border: 1px solid #000;">Webster Optimised (48s)</td>
+                <td style="padding: 5px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">Lancar Terkendali</td>
+              </tr>
+              <tr style="border: 1px solid #000;">
+                <td style="padding: 5px; border: 1px solid #000;">Koridor Raya Darmo</td>
+                <td style="padding: 5px; text-align: center; border: 1px solid #000;">2.640 smp/jam</td>
+                <td style="padding: 5px; text-align: center; border: 1px solid #000;">42 km/jam</td>
+                <td style="padding: 5px; text-align: center; border: 1px solid #000;">Green Wave Sync</td>
+                <td style="padding: 5px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">Bebas Hambatan</td>
+              </tr>
+              <tr style="border: 1px solid #000;">
+                <td style="padding: 5px; border: 1px solid #000;">Koridor Margorejo - Jemursari</td>
+                <td style="padding: 5px; text-align: center; border: 1px solid #000;">1.980 smp/jam</td>
+                <td style="padding: 5px; text-align: center; border: 1px solid #000;">35 km/jam</td>
+                <td style="padding: 5px; text-align: center; border: 1px solid #000;">SITS Adaptive</td>
+                <td style="padding: 5px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">Lancar Teratur</td>
+              </tr>
+              <tr style="border: 1px solid #000;">
+                <td style="padding: 5px; border: 1px solid #000;">Koridor MERR Kertajaya</td>
+                <td style="padding: 5px; text-align: center; border: 1px solid #000;">2.850 smp/jam</td>
+                <td style="padding: 5px; text-align: center; border: 1px solid #000;">48 km/jam</td>
+                <td style="padding: 5px; text-align: center; border: 1px solid #000;">ATCS Standar</td>
+                <td style="padding: 5px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">Optimal</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Signature Approval Blocks -->
+          <div class="print-signatures" style="display: flex; justify-content: space-between; margin-top: 35px; font-size: 9.5pt; color: #000; page-break-inside: avoid;">
+            <div style="text-align: center; width: 45%;">
+              <p style="margin-bottom: 55px;">Operator Jaga ATCS SITS Surabaya,<br/><br/><br/></p>
+              <strong style="text-decoration: underline;">RACHMAT PRATAMA, S.STP</strong><br/>
+              <span>NIP. 19880412 201212 1 002</span>
+            </div>
+            <div style="text-align: center; width: 45%;">
+              <p style="margin-bottom: 55px;">Mengetahui,<br/>Supervisor SITS Command Center 112,<br/><br/><br/></p>
+              <strong style="text-decoration: underline;">IR. H. BAMBANG SURYADI, M.T.</strong><br/>
+              <span>NIP. 19750815 200003 1 004</span>
+            </div>
+          </div>
+        </div>
+      </div>

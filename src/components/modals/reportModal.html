@@ -1,0 +1,101 @@
+<div class="modal-overlay" id="reportModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" style="display: none;">
+    <div class="modal-content glass-panel" id="reportModalContent" style="max-width: 680px; width: 94vw; max-height: 90vh; overflow-y: auto; transition: max-width 0.3s ease;">
+      <button class="modal-close" id="closeModal" onclick="closeReportModal()" aria-label="Tutup modal">&times;</button>
+      
+      <!-- State 1: Generating Loader -->
+      <div id="reportLoaderState">
+        <div id="modalTitle" class="modal-header">
+          <h2>Generating Mobility Snapshot Surabaya</h2>
+          <p>Mengompilasi data telemetri, status sensor SITS, dan modul analitik kecerdasan buatan...</p>
+        </div>
+        <div class="modal-body" style="display: flex; flex-direction: column; align-items: center; padding: 10px 0;">
+          <div class="radial-loader">
+            <svg viewBox="0 0 100 100">
+              <circle class="loader-bg" cx="50" cy="50" r="42" />
+              <circle class="loader-progress" id="modalLoaderCircle" cx="50" cy="50" r="42" stroke-dasharray="264" stroke-dashoffset="264" />
+            </svg>
+            <div class="loader-percentage" id="loaderPercentage">0%</div>
+          </div>
+          <div class="loader-status" id="loaderStatus" style="margin-top: 14px; font-size: 13px; color: var(--text-muted); text-align: center;">Mengunggah data telemetri persimpangan SITS...</div>
+          <button class="btn btn-ghost compact" id="btnCancelReportGen" onclick="closeReportModal()" type="button" style="margin-top: 18px;">Batal</button>
+        </div>
+      </div>
+
+      <!-- State 2: Error State (Fallback & Retry) -->
+      <div id="reportErrorState" class="is-hidden" style="display: none; text-align: center; padding: 24px 12px;">
+        <div style="font-size: 42px; margin-bottom: 12px;">⚠️</div>
+        <h3 style="color: var(--danger); font-size: 18px; font-weight: 800; margin-bottom: 8px;">Gagal Menyusun Mobility Snapshot</h3>
+        <p id="reportErrorMessage" style="font-size: 13px; color: var(--text-muted); max-width: 480px; margin: 0 auto 20px auto; line-height: 1.5;">
+          Terjadi kendala saat menyambung ke server telemetri SITS.
+        </p>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+          <button class="btn btn-ghost" id="btnCancelReportError" onclick="closeReportModal()" type="button">Tutup</button>
+          <button class="btn btn-primary" id="btnRetryReportGen" type="button">Coba Lagi</button>
+        </div>
+      </div>
+
+      <!-- State 3: Tangible Executive Document Preview -->
+      <div id="reportDocPreviewState" class="is-hidden" style="display: none;">
+        <div class="doc-preview-wrapper">
+          <!-- Kop Resmi -->
+          <div class="doc-preview-header">
+            <div class="doc-preview-gov">PEMERINTAH KOTA SURABAYA — DINAS PERHUBUNGAN</div>
+            <h3 class="doc-preview-org">UPTD SITS SURABAYA INTELLIGENT TRANSPORT SYSTEM</h3>
+            <p class="doc-preview-sub">Laporan Eksekutif Kinerja & Evaluasi Mobilitas Perkotaan Surabaya</p>
+            <div id="repPreviewDocId" class="doc-preview-docid">
+              DOC-ID: SITS-EKS-2026/09/REC-0841 • TERVERIFIKASI SISTEM
+            </div>
+          </div>
+
+          <!-- Ringkasan Data -->
+          <div class="doc-preview-grid">
+            <div class="doc-kpi-card">
+              <span class="doc-kpi-label">Volume Kendaraan</span>
+              <strong id="repPreviewVolume" class="doc-kpi-val tabular font-mono">128.540</strong>
+              <small class="doc-kpi-sub">Kendaraan / Hari</small>
+            </div>
+            <div class="doc-kpi-card">
+              <span class="doc-kpi-label">Rata-rata Waktu Tunggu</span>
+              <strong id="repPreviewWait" class="doc-kpi-val doc-kpi-success tabular font-mono">48 detik</strong>
+              <small class="doc-kpi-sub">SPM &lt; 60 detik (Optimal)</small>
+            </div>
+            <div class="doc-kpi-card">
+              <span class="doc-kpi-label">Reduksi Emisi CO₂</span>
+              <strong id="repPreviewCo2" class="doc-kpi-val doc-kpi-primary tabular font-mono">1.420 kg</strong>
+              <small class="doc-kpi-sub">Penghematan BBM 428 L</small>
+            </div>
+            <div class="doc-kpi-card">
+              <span class="doc-kpi-label">Insiden Teratasi</span>
+              <strong id="repPreviewIncidents" class="doc-kpi-val doc-kpi-purple tabular font-mono">12 insiden</strong>
+              <small class="doc-kpi-sub">100% Selesai Ditangani</small>
+            </div>
+          </div>
+
+          <!-- Preview Canvas Grafik Tren Mobilitas -->
+          <div id="reportCanvasContainer" class="report-canvas-container">
+            <div class="report-canvas-label">
+              Visualisasi Snapshot Tren Mobilitas Koridor (Canvas 2D)
+            </div>
+            <canvas id="reportPreviewCanvas" width="600" height="200" class="report-preview-canvas"></canvas>
+          </div>
+
+          <!-- Rincian Catatan Analisis -->
+          <div class="doc-analysis-box">
+            <strong>Catatan Analisis Algoritma AI OmniTRAF:</strong>
+            Koridor Ahmad Yani – Raya Darmo menunjukkan efisiensi koordinasi Green Wave sebesar 84%. Tidak tercatat antrean ekstrim melebihi ambang batas SPM Dishub. Integrasi aktuator preemption darurat 112 beroperasi dengan latensi respon rata-rata 380 milidetik.
+          </div>
+        </div>
+
+        <!-- Tombol Aksi Bawah Dokumen -->
+        <div class="doc-preview-actions">
+          <button class="btn btn-ghost" id="btnClosePreviewDoc" onclick="closeReportModal()" type="button">Tutup Pratinjau</button>
+          <button class="btn btn-primary" id="btnPrintReportDoc" type="button">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+            <span>Cetak / Simpan PDF</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- About OmniTRAF Engine: Architecture & Scientific ESG Carbon Calculator Modal -->

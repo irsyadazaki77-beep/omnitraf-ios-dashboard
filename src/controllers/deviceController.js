@@ -9,6 +9,7 @@ import { soundManager } from '../core/soundManager.js';
 import { SYSTEM_CONFIG } from '../config/systemConfig.js';
 import { stateStore, updateDeviceState } from '../core/stateStore.js';
 import { socketClient } from '../core/socketClient.js';
+import { authManager } from '../core/authManager.js';
 
 export class DeviceController {
   constructor() {
@@ -49,6 +50,16 @@ export class DeviceController {
     this._bindDrawerEvents();
 
     // Jalankan render awal
+    this.render();
+  }
+
+  activate() {
+    this.canvas = document.getElementById("deviceLatencyCanvas") || document.getElementById("latencySparkCanvas");
+    if (this.canvas) {
+      this.ctx = this.canvas.getContext("2d");
+    }
+    this._bindTableEvents();
+    this._bindDrawerEvents();
     this.render();
   }
 
@@ -541,9 +552,13 @@ export class DeviceController {
       }
 
       try {
+        const token = authManager.getToken();
         const res = await fetch("/api/devices/config", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { "Authorization": `Bearer ${token}` } : {})
+          },
           body: JSON.stringify(payload)
         });
 
@@ -553,7 +568,7 @@ export class DeviceController {
           soundManager.play('success');
           closeDrawer();
         } else {
-          throw new Error(data?.error?.message || "Validation failed");
+          throw new Error(data?.error?.message || data?.message || "Validation failed");
         }
       } catch (err) {
         window.showToast(`❌ Gagal menyimpan konfigurasi: ${err.message}`, "danger");
@@ -576,13 +591,17 @@ export class DeviceController {
 
   async _handleFaultInjectionClick(deviceId, faultType) {
     try {
+      const token = authManager.getToken();
       const res = await fetch("/api/devices/fault", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           deviceId,
           type: faultType,
-          actor: "Zaki Putra (Operator)"
+          actor: authManager.getUser()?.name || "Administrator SITS"
         })
       });
 

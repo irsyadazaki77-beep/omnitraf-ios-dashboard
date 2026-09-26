@@ -1,0 +1,161 @@
+/* ==========================================================================
+   OmniTRAF Surabaya - SITS Intelligent Traffic Operations Platform
+   Master Design System & Visual Hierarchy Polish (Phase 11A)
+   Design Language: Apple HIG + Enterprise Command Center + Smart City GIS + Minimal Futuristic
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Central Design System Tokens (Dark Theme Baseline & Semantic Mapping)
+   -------------------------------------------------------------------------- */
+:root {
+  /* Surfaces & Structural Planes (60% Canvas / 30% Structural Surfaces) */
+  --bg-base: #080c14;
+  --bg-subtle: #0d131f;
+  --bg-canvas: #080c14;
+  --bg-top: #080c14;
+  --bg-bottom: #0e1626;
+
+  --panel: #0f172a;
+  --panel-elevated: #162035;
+  --panel-soft: rgba(22, 32, 53, 0.75);
+  --panel-glass: rgba(15, 23, 42, 0.88);
+  --panel-glass-subtle: rgba(15, 23, 42, 0.65);
+  --panel-inset: #090e18;
+
+  /* Hairline Borders & Structural Dividers (1px hairline depth) */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-emphasis: rgba(255, 255, 255, 0.16);
+  --border-focus: #2563eb;
+  --border-glow: rgba(37, 99, 235, 0.28);
+
+  /* Typography & High-Contrast Hierarchy (WCAG 2.1 AA Compliant) */
+  --text: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --text-inverse: #080c14;
+
+  /* 10% Intent-Driven Accent Palette (Cobalt, Cyan & Azure) */
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-active: #1e40af;
+  --primary-soft: rgba(37, 99, 235, 0.12);
+  --primary-border: rgba(37, 99, 235, 0.28);
+
+  --primary-2: #0284c7;
+  --primary-2-hover: #0369a1;
+  --primary-2-soft: rgba(2, 132, 199, 0.12);
+  --primary-2-border: rgba(2, 132, 199, 0.28);
+
+  --cyan: #06b6d4;
+  --cyan-soft: rgba(6, 182, 212, 0.12);
+  --cyan-border: rgba(6, 182, 212, 0.28);
+
+  /* Semantic Operations & Telemetry Status */
+  --success: #10b981;
+  --success-hover: #059669;
+  --success-soft: rgba(16, 185, 129, 0.12);
+  --success-border: rgba(16, 185, 129, 0.25);
+
+  --warning: #f59e0b;
+  --warning-hover: #d97706;
+  --warning-soft: rgba(245, 158, 11, 0.12);
+  --warning-border: rgba(245, 158, 11, 0.25);
+
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+  --danger-soft: rgba(239, 68, 68, 0.12);
+  --danger-border: rgba(239, 68, 68, 0.25);
+
+  --info: #3b82f6;
+  --info-soft: rgba(59, 130, 246, 0.12);
+  --info-border: rgba(59, 130, 246, 0.25);
+
+  /* Geometry, Radius & Elevation Scale */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-full: 9999px;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 10px -2px rgba(0, 0, 0, 0.35), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.45), 0 4px 8px -2px rgba(0, 0, 0, 0.25);
+  --shadow-modal: 0 24px 48px -8px rgba(0, 0, 0, 0.65), 0 8px 16px -4px rgba(0, 0, 0, 0.35);
+  --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.25);
+
+  /* Standardized Transitions & Interaction Timing */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 140ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+
+  /* Typography Families */
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'Share Tech Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Z-Index Hierarchy */
+  --z-base: 1;
+  --z-nav: 20;
+  --z-topbar: 25;
+  --z-sidebar: 30;
+  --z-marquee: 40;
+  --z-map-ctrl: 999;
+  --z-tab-bar: 1000;
+  --z-drawer: 5000;
+  --z-modal: 10000;
+  --z-toast: 10001;
+  --z-tour: 99999;
+}
+
+/* --------------------------------------------------------------------------
+   Light Mode Semantic Token Mapping
+   -------------------------------------------------------------------------- */
+body.theme-light,
+[data-theme="light"] {
+  --bg-base: #f8fafc;
+  --bg-subtle: #f1f5f9;
+  --bg-canvas: #f8fafc;
+  --bg-top: #ffffff;
+  --bg-bottom: #e2e8f0;
+
+  --panel: #ffffff;
+  --panel-elevated: #f8fafc;
+  --panel-soft: #f1f5f9;
+  --panel-glass: rgba(255, 255, 255, 0.94);
+  --panel-glass-subtle: rgba(255, 255, 255, 0.85);
+  --panel-inset: #f1f5f9;
+
+  --border: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --border-emphasis: #cbd5e1;
+  --border-focus: #2563eb;
+  --border-glow: rgba(37, 99, 235, 0.16);
+
+  --text: #0f172a;
+  --text-muted: #475569;
+  --text-dim: #94a3b8;
+  --text-inverse: #ffffff;
+
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-active: #1e40af;
+  --primary-soft: rgba(37, 99, 235, 0.08);
+  --primary-border: rgba(37, 99, 235, 0.2);
+
+  --primary-2: #0284c7;
+  --primary-2-hover: #0369a1;
+  --primary-2-soft: rgba(2, 132, 199, 0.08);
+  --primary-2-border: rgba(2, 132, 199, 0.2);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 10px -2px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.09), 0 4px 8px -2px rgba(0, 0, 0, 0.05);
+  --shadow-modal: 0 24px 48px -8px rgba(0, 0, 0, 0.15), 0 8px 16px -4px rgba(0, 0, 0, 0.08);
+  --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.04);
+}

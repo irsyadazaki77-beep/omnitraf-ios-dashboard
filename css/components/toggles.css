@@ -1,0 +1,119 @@
+/* --------------------------------------------------------------------------
+   10. Form Controls, Range Sliders & iOS Toggles
+   -------------------------------------------------------------------------- */
+input[type="text"],
+input[type="search"],
+input[type="number"],
+select,
+textarea {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text);
+  background: var(--panel-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  outline: none;
+  transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
+}
+
+input[type="text"]:focus,
+input[type="search"]:focus,
+input[type="number"]:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+/* iOS Segmented Controls */
+.ios-segmented-control {
+  display: inline-flex;
+  align-items: center;
+  background: var(--panel-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+}
+
+.segmented-btn,
+.matrix-btn,
+.filter-mode-btn,
+.filter-chip,
+.time-range-seg-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease);
+  white-space: nowrap;
+}
+
+.segmented-btn.active,
+.matrix-btn.active,
+.filter-mode-btn.active,
+.filter-chip.active,
+.time-range-seg-btn.active {
+  background: var(--panel-elevated);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: var(--shadow-xs);
+}
+
+/* iOS Toggle Switch */
+.toggle-switch-ios {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.toggle-switch-ios input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: var(--panel-inset);
+  border: 1px solid var(--border);
+  transition: background-color var(--duration-normal) var(--ease);
+  border-radius: var(--radius-full);
+}
+
+.toggle-slider::before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #ffffff;
+  transition: transform var(--duration-normal) var(--ease);
+  border-radius: var(--radius-full);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.toggle-switch-ios input:checked + .toggle-slider {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.toggle-switch-ios input:checked + .toggle-slider::before {
+  transform: translateX(18px);
+}
+
+/* Range Inputs */
+input[type="range"] {
+  accent-color: var(--primary);
+  cursor: pointer;
+}

@@ -1,0 +1,55 @@
+<div class="view-pane" id="view-prediction">
+        <article class="prediction-panel glass-panel">
+          <div class="section-head">
+            <div>
+              <h2>AI Hour-by-Hour Congestion Forecasting</h2>
+              <p>Gunakan slider kronologis untuk mensimulasikan proyeksi kepadatan lalu lintas esok hari.</p>
+            </div>
+            <div class="prediction-status-badge">Prediksi Besok: <strong id="predTomorrowStatus">Sedang</strong></div>
+          </div>
+
+          <div class="prediction-slider-box">
+            <div class="time-label-row">
+              <span id="sliderTimeLabel">08:00 WIB</span>
+              <span class="risk-label" id="sliderRiskLabel">Status: High Risk Kemacetan</span>
+            </div>
+            <div class="forecast-waveform-wrapper">
+              <svg class="forecast-waveform-svg" viewBox="0 0 100 20" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="waveformGrad" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stop-color="var(--primary-2)" stop-opacity="0.15" />
+                    <stop offset="100%" stop-color="var(--primary-2)" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
+                <path d="M0,18 Q15,18 25,12 T33,3 T40,16 T50,15 T62,10 T70,3 T80,14 T100,18" fill="none" stroke="rgba(0, 229, 255, 0.25)" stroke-width="1.5" />
+                <path d="M0,18 Q15,18 25,12 T33,3 T40,16 T50,15 T62,10 T70,3 T80,14 T100,18 L100,20 L0,20 Z" fill="url(#waveformGrad)" />
+              </svg>
+              <input class="slider-glow" id="predictionTimeSlider" type="range" min="0" max="23" value="8" />
+            </div>
+            <div class="timeline-ticks">
+              <span>00:00</span><span>04:00</span><span>08:00</span><span>12:00</span><span>16:00</span><span>20:00</span><span>23:00</span>
+            </div>
+          </div>
+
+          <!-- Live AI Prediction Metrics Row -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 16px 0;">
+            <div style="background: rgba(15, 23, 42, 0.6); padding: 12px 14px; border-radius: 10px; border-left: 3px solid var(--primary-2);">
+              <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Estimasi Kecepatan Arteri</div>
+              <div id="predictSpeedVal" style="font-size: 22px; font-weight: 800; color: #fff; margin-top: 4px;">14 km/jam</div>
+            </div>
+            <div style="background: rgba(15, 23, 42, 0.6); padding: 12px 14px; border-radius: 10px; border-left: 3px solid var(--danger);">
+              <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Probabilitas Kemacetan</div>
+              <div id="predictProbVal" style="font-size: 22px; font-weight: 800; color: #ef4444; margin-top: 4px;">88%</div>
+            </div>
+            <div style="background: rgba(15, 23, 42, 0.6); padding: 12px 14px; border-radius: 10px; border-left: 3px solid #10b981; grid-column: span 2;">
+              <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Rekomendasi AI SITS</div>
+              <div id="predictRecText" style="font-size: 13px; font-weight: 600; color: #38bdf8; margin-top: 4px;">Aktifkan Koridor Hijau A. Yani - Wonokromo & Alihkan beban lalu lintas ke MERR.</div>
+            </div>
+          </div>
+
+          <div class="prediction-map-preview">
+            <p class="map-preview-tag">Simulasi Sebaran Heatmap Prediksi:</p>
+            <div class="preview-map-box" id="predictionMapPlaceholder"></div>
+          </div>
+        </article>
+      </div>

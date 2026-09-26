@@ -1,0 +1,35 @@
+<div class="modal-overlay" id="incidentDetailModal" role="dialog" aria-modal="true" aria-labelledby="incModalTitle">
+    <div class="modal-content glass-panel inc-modal-panel">
+      <button class="modal-close" id="closeIncidentModal" aria-label="Tutup detail insiden">&times;</button>
+      <div id="incModalTitle" class="modal-header inc-modal-header">
+        <h2 id="incModalHeading">Detail Insiden</h2>
+        <span id="incModalBadge" class="pill pill-danger">Alert</span>
+      </div>
+      <div class="modal-body inc-modal-body">
+        <div class="inc-details-box glass-soft">
+          <div class="inc-detail-caption">Lokasi &amp; Waktu</div>
+          <div class="inc-detail-loc-time">
+            <strong id="incModalLocation">Jl. Raya Darmo</strong> <span class="inc-sep">·</span> <span id="incModalTime">10 menit lalu</span>
+          </div>
+          
+          <div class="inc-detail-caption inc-desc-label">Deskripsi Kronologi</div>
+          <p id="incModalDesc" class="inc-desc-text">Tabrakan beruntun di lajur kanan...</p>
+        </div>
+        
+        <div class="inc-simulated-cctv glass-soft">
+          <div class="scan-line"></div>
+          <div class="camera-noise"></div>
+          <div class="inc-cctv-overlay">
+            <span class="inc-cctv-dot"></span>
+            <span class="inc-cctv-tag">LIVE INTERSECTION MOCK FEED</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer inc-modal-footer">
+        <button class="btn btn-ghost compact" id="btnIncidentClose">Tutup</button>
+        <button class="btn btn-primary compact" id="btnIncidentDispatch">Disposisi Petugas</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Keyboard Shortcuts Visual Guide Modal -->
