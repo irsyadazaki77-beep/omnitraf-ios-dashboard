@@ -185,6 +185,7 @@ export class MapManager {
     this.isActive = false;
     this._invalidateTimer = null;
     this.disposer = new Disposer('MapManager');
+    this.activationDisposer = new Disposer('MapManager-activation');
 
     /** Store references to corridor GeoJSON layers across map instances */
     this.corridorGeoJsonLayers = [];
@@ -754,7 +755,7 @@ export class MapManager {
       if (dev.deviceId === 'NODE-EDGE-01') nodeId = 'node-wonokromo';
       else if (dev.deviceId === 'NODE-EDGE-02') nodeId = 'node-darmo';
       else if (dev.deviceId === 'NODE-EDGE-03') nodeId = 'node-tunjungan';
-      else if (dev.deviceId === 'NODE-CTRL-01') nodeId = 'node-margorejo';
+      else if (dev.deviceId === 'NODE-CTRL-01') nodeId = 'node-jemursari';
 
       if (!nodeId) return;
 
@@ -796,19 +797,13 @@ export class MapManager {
    * Main initializer called by App orchestrator
    */
   init() {
-    this.isActive = true;
-    this.initAllMaps();
-    this._bindZoomControls();
-    this._bindLandmarkHUDClose();
-    this._bindToolbarAndDrawerHandlers();
-    
-    setTimeout(() => {
-      this.invalidateSize();
-    }, 150);
+    // Left empty since activate() manages dynamic bindings cleanly on activation
   }
 
   activate() {
     this.isActive = true;
+    this.activationDisposer.clear(); // Ensure deterministic cleanup first
+
     this.initAllMaps();
     this._bindZoomControls();
     this._bindLandmarkHUDClose();
@@ -834,6 +829,7 @@ export class MapManager {
       this._invalidateTimer = null;
     }
     this.stopEmergency112Simulation();
+    this.activationDisposer.clear();
   }
 
   _bindZoomControls() {
@@ -842,21 +838,21 @@ export class MapManager {
     const zoomResetBtns = document.querySelectorAll("#btnMapZoomReset, #btnFullMapReset, .btn-zoom-reset");
 
     zoomInBtns.forEach(btn => {
-      btn.addEventListener("click", () => {
+      this.activationDisposer.addEventListener(btn, "click", () => {
         this.maps.forEach(map => map.zoomIn());
         soundManager.play('click');
       });
     });
 
     zoomOutBtns.forEach(btn => {
-      btn.addEventListener("click", () => {
+      this.activationDisposer.addEventListener(btn, "click", () => {
         this.maps.forEach(map => map.zoomOut());
         soundManager.play('click');
       });
     });
 
     zoomResetBtns.forEach(btn => {
-      btn.addEventListener("click", () => {
+      this.activationDisposer.addEventListener(btn, "click", () => {
         this.maps.forEach(map => map.setView([SURABAYA_CENTER.lat, SURABAYA_CENTER.lng], SURABAYA_CENTER.zoom));
         soundManager.play('click');
       });
@@ -867,7 +863,7 @@ export class MapManager {
     // Fullscreen toggle
     const fsBtn = document.getElementById('btnFullMapFullscreen');
     if (fsBtn) {
-      fsBtn.addEventListener('click', () => {
+      this.activationDisposer.addEventListener(fsBtn, 'click', () => {
         const target = document.getElementById('fullMapContainerWrapper') || document.getElementById('view-map');
         if (target) {
           if (!document.fullscreenElement) {
@@ -886,7 +882,7 @@ export class MapManager {
     const layerDeck = document.getElementById('fullMapLayerDeck');
 
     if (toggleLayerBtn && layerDeck) {
-      toggleLayerBtn.addEventListener('click', (e) => {
+      this.activationDisposer.addEventListener(toggleLayerBtn, 'click', (e) => {
         e.stopPropagation();
         layerDeck.classList.toggle('open');
         soundManager.play('click');
@@ -894,7 +890,7 @@ export class MapManager {
     }
 
     if (closeLayerBtn && layerDeck) {
-      closeLayerBtn.addEventListener('click', () => {
+      this.activationDisposer.addEventListener(closeLayerBtn, 'click', () => {
         layerDeck.classList.remove('open');
         soundManager.play('click');
       });
@@ -904,7 +900,7 @@ export class MapManager {
     const legendToggleBtn = document.getElementById('btnToggleLegendCollapse');
     const legendItemsRow = document.getElementById('legendItemsRow');
     if (legendToggleBtn && legendItemsRow) {
-      legendToggleBtn.addEventListener('click', () => {
+      this.activationDisposer.addEventListener(legendToggleBtn, 'click', () => {
         legendItemsRow.classList.toggle('collapsed');
         legendToggleBtn.classList.toggle('rotated');
         soundManager.play('click');
@@ -914,7 +910,7 @@ export class MapManager {
     // Layer mode quick buttons
     const modeBtns = document.querySelectorAll('.spatial-tool-btn[data-layer-mode], .map-layer-pill-btn[data-layer-mode]');
     modeBtns.forEach(btn => {
-      btn.addEventListener('click', (e) => {
+      this.activationDisposer.addEventListener(btn, 'click', (e) => {
         e.stopPropagation();
         const mode = btn.dataset.layerMode;
         if (mode) this.setMapLayerMode(mode);
@@ -924,7 +920,7 @@ export class MapManager {
 
     // Layer checkboxes inside drawer
     document.querySelectorAll('.layer-toggle-checkbox').forEach(chk => {
-      chk.addEventListener('change', (e) => {
+      this.activationDisposer.addEventListener(chk, 'change', (e) => {
         const layerKey = e.target.dataset.layer;
         if (layerKey) {
           this.toggleLayer(layerKey, e.target.checked);
@@ -937,7 +933,7 @@ export class MapManager {
     const contextMenu = document.getElementById('mapContextMenu');
     if (contextMenu) {
       contextMenu.querySelectorAll('.context-menu-item').forEach(item => {
-        item.addEventListener('click', (e) => {
+        this.activationDisposer.addEventListener(item, 'click', (e) => {
           e.stopPropagation();
           const action = item.dataset.action;
           contextMenu.style.display = 'none';
@@ -964,7 +960,7 @@ export class MapManager {
         });
       });
 
-      document.addEventListener('click', () => {
+      this.activationDisposer.addEventListener(document, 'click', () => {
         contextMenu.style.display = 'none';
       });
     }
@@ -974,7 +970,7 @@ export class MapManager {
     const closeBtn = document.getElementById("btnCloseLandmarkCard");
     const card = document.getElementById("landmarkDetailCard");
     if (closeBtn && card) {
-      closeBtn.addEventListener("click", () => {
+      this.activationDisposer.addEventListener(closeBtn, "click", () => {
         card.classList.add("is-hidden");
         soundManager.play('click');
       });
@@ -2128,7 +2124,7 @@ export class MapManager {
 
   /**
    * Simulasi Rute Tanggap Darurat 112 (Bundaran Waru -> RSUD Dr. Soetomo)
-   * Dilengkapi deteksi radius 200m untuk Green Wave Clearance otomatis di Margorejo, Wonokromo, & Darmo.
+   * Dilengkapi deteksi radius 200m untuk Green Wave Clearance otomatis di Jemursari, Wonokromo, & Darmo.
    */
   startEmergency112Simulation(onUpdate, onComplete) {
     this.stopEmergency112Simulation();
@@ -2136,8 +2132,8 @@ export class MapManager {
     const ROUTE_POINTS = [
       { name: "Bundaran Waru", lat: -7.3510, lng: 112.7290 },
       { name: "Jl. Ahmad Yani (DOLOG)", lat: -7.3450, lng: 112.7300 },
-      { name: "Simpang Margorejo", lat: -7.3180, lng: 112.7330, isIntersection: true, id: "node-margorejo" },
-      { name: "Simpang Jemursari", lat: -7.3100, lng: 112.7335, isIntersection: true, id: "node-jemursari" },
+      { name: "Simpang Jemursari", lat: -7.3180, lng: 112.7330, isIntersection: true, id: "node-jemursari" },
+      { name: "Simpang Jemursari Waypoint", lat: -7.3100, lng: 112.7335 },
       { name: "Simpang Wonokromo (DTC)", lat: -7.2985, lng: 112.7345, isIntersection: true, id: "node-wonokromo" },
       { name: "Marmoyo / KBD", lat: -7.2920, lng: 112.7370 },
       { name: "Simpang Raya Darmo - Diponegoro", lat: -7.2810, lng: 112.7395, isIntersection: true, id: "node-darmo" },
@@ -2350,8 +2346,8 @@ export class MapManager {
       "route-soetomo": [
         { name: "Bundaran Waru", lat: -7.3510, lng: 112.7290 },
         { name: "Jl. Ahmad Yani (DOLOG)", lat: -7.3450, lng: 112.7300 },
-        { name: "Simpang Margorejo", lat: -7.3180, lng: 112.7330, isIntersection: true, id: "node-margorejo" },
-        { name: "Simpang Jemursari", lat: -7.3100, lng: 112.7335 },
+        { name: "Simpang Jemursari", lat: -7.3180, lng: 112.7330, isIntersection: true, id: "node-jemursari" },
+        { name: "Simpang Jemursari Waypoint", lat: -7.3100, lng: 112.7335 },
         { name: "Simpang Wonokromo (DTC)", lat: -7.2985, lng: 112.7345, isIntersection: true, id: "node-wonokromo" },
         { name: "Marmoyo / KBD", lat: -7.2920, lng: 112.7370 },
         { name: "Simpang Raya Darmo - Diponegoro", lat: -7.2810, lng: 112.7395, isIntersection: true, id: "node-darmo" },
@@ -2362,8 +2358,8 @@ export class MapManager {
       "route-yani-darmo": [
         { name: "Bundaran Waru", lat: -7.3510, lng: 112.7290 },
         { name: "Jl. Ahmad Yani (DOLOG)", lat: -7.3450, lng: 112.7300 },
-        { name: "Simpang Margorejo", lat: -7.3180, lng: 112.7330, isIntersection: true, id: "node-margorejo" },
-        { name: "Simpang Jemursari", lat: -7.3100, lng: 112.7335 },
+        { name: "Simpang Jemursari", lat: -7.3180, lng: 112.7330, isIntersection: true, id: "node-jemursari" },
+        { name: "Simpang Jemursari Waypoint", lat: -7.3100, lng: 112.7335 },
         { name: "Simpang Wonokromo (DTC)", lat: -7.2985, lng: 112.7345, isIntersection: true, id: "node-wonokromo" },
         { name: "Marmoyo / KBD", lat: -7.2920, lng: 112.7370 },
         { name: "Simpang Raya Darmo - Diponegoro", lat: -7.2810, lng: 112.7395, isIntersection: true, id: "node-darmo" },
@@ -2740,7 +2736,7 @@ export class MapManager {
             </div>
             <div class="efh-stat efh-stat-wide">
               <small>STATUS CLEARANCE SIMPANG</small>
-              <strong id="efh-node" class="efh-val-node">Simpang Margorejo: PREEMPTING</strong>
+              <strong id="efh-node" class="efh-val-node">Simpang Jemursari: PREEMPTING</strong>
             </div>
           </div>
           <div class="efh-progress-bar">
@@ -2878,7 +2874,18 @@ export class MapManager {
         if (incidentGroup) {
           incidentGroup.eachLayer(layer => {
             if (layer.getLatLng && layer.getLatLng().distanceTo(L.latLng(latlng)) < 350) {
-              layer.openPopup();
+              const masterCluster = this.layerGroupsMap.get(containerId)?.['master-cluster'];
+              if (masterCluster && typeof masterCluster.zoomToShowLayer === 'function') {
+                try {
+                  masterCluster.zoomToShowLayer(layer, () => {
+                    layer.openPopup();
+                  });
+                } catch {
+                  layer.openPopup();
+                }
+              } else {
+                layer.openPopup();
+              }
               opened = true;
             }
           });

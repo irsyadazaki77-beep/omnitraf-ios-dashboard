@@ -178,7 +178,7 @@ export const SURABAYA_CORRIDORS_GEOJSON = {
         type: "LineString",
         coordinates: [
           [112.7300, -7.3450], // Waru / Bundaran DOLOG
-          [112.7315, -7.3320], // Margorejo
+          [112.7315, -7.3320], // Jemursari Waypoint
           [112.7330, -7.3180], // Jemursari
           [112.7345, -7.2985], // Wonokromo
           [112.7370, -7.2920], // Marmoyo
@@ -523,7 +523,7 @@ export const SITS_CCTV_CAMERAS_GEOJSON = {
       },
       properties: {
         id: "cam-ayani",
-        name: "CCTV A. Yani (Margorejo)",
+        name: "CCTV A. Yani (Jemursari)",
         status: "Padat Merayap",
         statusClass: "badge-danger",
         ruas: "Selatan ke Utara (Lajur Utama)",
@@ -588,7 +588,7 @@ export const EMERGENCY_PATHS_GEOJSON = {
       type: "LineString",
       coordinates: [
         [112.7300, -7.3450], // DOLOG
-        [112.7315, -7.3320], // Margorejo
+        [112.7315, -7.3320], // Jemursari Waypoint
         [112.7330, -7.3180], // Jemursari
         [112.7345, -7.2985], // Wonokromo
         [112.7370, -7.2920], // Marmoyo

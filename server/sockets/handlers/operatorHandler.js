@@ -1,5 +1,6 @@
 import { ROLES } from '../../config/constants.js';
 import { backendState } from '../../services/stateManager.js';
+import { dbManager } from '../../db/database.js';
 
 export function checkSocketRole(socket, allowedRoles, eventName, callback) {
   const userRole = socket.user?.role || ROLES.VIEWER;
@@ -27,6 +28,27 @@ export function checkSocketRole(socket, allowedRoles, eventName, callback) {
 }
 
 export function registerOperatorHandlers(io, socket) {
+  // Check the status of a command (reconnection / resync helper)
+  socket.on('command:status', (data, callback) => {
+    const { commandId, idempotencyKey, correlationId } = data || {};
+    const cmds = backendState.processedCommands;
+    const cached = cmds && (
+      (idempotencyKey && cmds.get(idempotencyKey)) ||
+      (commandId && cmds.get(commandId)) ||
+      (correlationId && cmds.get(correlationId))
+    );
+
+    if (cached) {
+      if (typeof callback === 'function') {
+        callback({ success: true, status: 'SERVER_APPLIED', resultingState: cached.resultingState });
+      }
+    } else {
+      if (typeof callback === 'function') {
+        callback({ success: true, status: 'NOT_FOUND' });
+      }
+    }
+  });
+
   // Centralized Operator Command Gateway
   socket.on('operator:command', (data, callback) => {
     const { cmd, correlationId } = data || {};
@@ -35,12 +57,52 @@ export function registerOperatorHandlers(io, socket) {
       return;
     }
 
-    const { action, targetId, payload, source } = cmd;
+    const { action, targetId, payload, source, commandId, idempotencyKey } = cmd;
 
-    // RBAC check
-    const isAdminAction = ['chaos:toggle', 'green-wave:toggle'].includes(action);
+    // RBAC check: ADMIN required for critical infrastructure modifications
+    const isAdminAction = ['chaos:toggle', 'green-wave:toggle', 'device:config', 'device:fault'].includes(action);
     const requiredRoles = isAdminAction ? [ROLES.ADMIN] : [ROLES.OPERATOR, ROLES.ADMIN];
-    if (!checkSocketRole(socket, requiredRoles, action, callback)) {
+    if (!checkSocketRole(socket, requiredRoles, action, (rejection) => {
+      if (typeof callback === 'function') {
+        callback({
+          success: false,
+          commandId: commandId || cmd.commandId,
+          correlationId: correlationId || cmd.correlationId,
+          status: 'REJECTED',
+          result: 'FORBIDDEN',
+          timestamp: Date.now(),
+          code: 'FORBIDDEN',
+          error: {
+            code: 'FORBIDDEN',
+            message: rejection.message || rejection.error,
+            details: { requiredRoles, currentRole: socket.user?.role || ROLES.VIEWER }
+          },
+          message: rejection.message || rejection.error
+        });
+      }
+    })) {
+      return;
+    }
+
+    // Idempotency check: if already processed, return the cached state
+    const idempKey = idempotencyKey || commandId || `IDEMP-${action}-${targetId || 'global'}-${JSON.stringify(payload)}`;
+    if (backendState.processedCommands && backendState.processedCommands.has(idempKey)) {
+      console.info(`🔄 [Idempotency Backend] Returning cached response for command: ${idempKey}`);
+      const cached = backendState.processedCommands.get(idempKey);
+      if (typeof callback === 'function') {
+        callback({
+          success: true,
+          commandId: commandId || cmd.commandId,
+          correlationId: correlationId || cmd.correlationId,
+          status: 'SERVER_APPLIED',
+          result: 'SUCCESS',
+          timestamp: Date.now(),
+          resultingState: cached.resultingState,
+          data: cached.resultingState,
+          isIdempotentReplay: true,
+          error: null
+        });
+      }
       return;
     }
 
@@ -59,7 +121,8 @@ export function registerOperatorHandlers(io, socket) {
       }
       else if (action === 'ai:apply-recommendation') {
         const intersectionId = targetId || "node-wonokromo";
-        const res = backendState.applyAiRecommendation(intersectionId);
+        const targetSplit = payload ? payload.targetSplit : null;
+        const res = backendState.applyAiRecommendation(intersectionId, targetSplit);
         resultingState = res.state;
         io.emit('traffic:update', resultingState);
         backendState.signalSequence++;
@@ -111,6 +174,11 @@ export function registerOperatorHandlers(io, socket) {
             activeEmergencies: res.state.activeEmergencies
           }
         });
+        io.emit('emergency:dispatch-alert', {
+          code: res.emergencyItem.vehicleId,
+          vehicle: res.emergencyItem.vehicleType,
+          route
+        });
         io.emit('system:toast', {
           message: `🚨 Prioritas Darurat Aktif: ${code} di rute ${route.replace('route-', '').toUpperCase()} (Preemption Berpola Aktif).`,
           type: 'alert'
@@ -160,12 +228,20 @@ export function registerOperatorHandlers(io, socket) {
       }
       else if (action === 'incident:acknowledge') {
         const id = targetId;
-        const inc = backendState.updateIncidentStatus(id, "ACKNOWLEDGED");
+        const inc = backendState.updateIncidentStatus(id, "ACKNOWLEDGED", payload?.assignedUnit, payload?.notes);
+        resultingState = backendState.state;
+      }
+      else if (action === 'incident:dispatch') {
+        const id = targetId;
+        const status = payload?.status || "DISPATCHED/RESPONDING";
+        const assignedUnit = payload?.assignedUnit || "Patroli Dishub & Tim 112 Surabaya";
+        const notes = payload?.notes || "Tim lapangan & armada derek telah didisposisikan ke lokasi.";
+        const inc = backendState.updateIncidentStatus(id, status, assignedUnit, notes);
         resultingState = backendState.state;
       }
       else if (action === 'incident:resolve') {
         const id = targetId;
-        const inc = backendState.updateIncidentStatus(id, "RESOLVED");
+        const inc = backendState.updateIncidentStatus(id, "RESOLVED", payload?.assignedUnit, payload?.notes || "Insiden diselesaikan via Operator Console");
         resultingState = backendState.state;
       }
       else if (action === 'siren:mute') {
@@ -182,8 +258,153 @@ export function registerOperatorHandlers(io, socket) {
           timestamp: new Date().toISOString()
         });
         resultingState = backendState.state;
+      }
+      else if (action === 'device:config') {
+        const { deviceId, fps, resolution, mode, greenWaveSync } = payload || {};
+        const dev = backendState.devicesRegistry.find(d => d.deviceId === deviceId);
+        if (!dev) {
+          throw new Error(`Perangkat dengan ID ${deviceId} tidak ditemukan.`);
+        }
+
+        const actionId = `ACT-CFG-${Date.now()}`;
+        const previousState = {
+          fps: dev.fps,
+          resolution: dev.resolution,
+          mode: dev.mode || 'Adaptive AI (YOLOv8)',
+          greenWaveSync: dev.greenWaveSync ?? true
+        };
+
+        if (fps !== undefined) {
+          const fpsVal = parseInt(fps, 10);
+          if (isNaN(fpsVal) || fpsVal < 5 || fpsVal > 60) {
+            throw new Error("Frame Rate Limit (FPS) harus berupa angka antara 5 dan 60.");
+          }
+          dev.fps = fpsVal;
+        }
+        if (resolution !== undefined) {
+          const validRes = ['720p', '1080p', '4k'];
+          if (!validRes.includes(resolution)) {
+            throw new Error("Resolusi kamera tidak valid. Harus salah satu dari: 720p, 1080p, 4k.");
+          }
+          dev.resolution = resolution;
+        }
+        if (mode !== undefined) dev.mode = mode;
+        if (greenWaveSync !== undefined) dev.greenWaveSync = !!greenWaveSync;
+        dev.updatedAt = new Date().toISOString();
+
+        try {
+          dbManager.upsertDeviceTelemetry(dev, true);
+        } catch (persistErr) {
+          dev.fps = previousState.fps;
+          dev.resolution = previousState.resolution;
+          dev.mode = previousState.mode;
+          dev.greenWaveSync = previousState.greenWaveSync;
+          throw new Error(`Gagal menyimpan konfigurasi perangkat ke SQLite: ${persistErr.message}`);
+        }
+
+        backendState.deviceSequence++;
+        resultingState = backendState.state;
+
+        const newState = {
+          fps: dev.fps,
+          resolution: dev.resolution,
+          mode: dev.mode,
+          greenWaveSync: dev.greenWaveSync
+        };
+
+        io.emit('device:config-transition', {
+          actionId,
+          deviceId,
+          status: 'REQUESTED',
+          timestamp: Date.now(),
+          actor: socket.user?.name || "Operator SITS",
+          previousState,
+          newState
+        });
+
+        io.emit('device:config-transition', {
+          actionId,
+          deviceId,
+          status: 'APPLIED',
+          timestamp: Date.now(),
+          actor: socket.user?.name || "Operator SITS",
+          previousState,
+          newState
+        });
+
+        io.emit('device:update', {
+          seq: backendState.deviceSequence,
+          timestamp: Date.now(),
+          source: 'server',
+          deviceId,
+          deviceData: dev
+        });
+
+        if (!backendState.deviceAuditTrail) backendState.deviceAuditTrail = [];
+        backendState.deviceAuditTrail.unshift({
+          actionId,
+          deviceId,
+          requestedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          actor: socket.user?.name || "Operator SITS",
+          previousState,
+          newState,
+          result: "SUCCESS",
+          status: "APPLIED"
+        });
+      }
+      else if (action === 'device:fault') {
+        const { deviceId, type, duration } = payload || {};
+        const dev = backendState.devicesRegistry.find(d => d.deviceId === deviceId);
+        if (!dev) {
+          throw new Error(`Perangkat dengan ID ${deviceId} tidak ditemukan.`);
+        }
+
+        const validFaults = ["recover", "clear", "latency_spike", "packet_loss", "low_fps", "thermal_warning", "heartbeat_timeout"];
+        if (!validFaults.includes(type)) {
+          throw new Error(`Tipe gangguan tidak valid. Harus salah satu dari: ${validFaults.join(", ")}`);
+        }
+
+        if (type === "recover" || type === "clear") {
+          delete backendState.activeFaults[deviceId];
+          dev.consecutiveFailures = 0;
+          dev.errorCount = 0;
+        } else {
+          backendState.activeFaults[deviceId] = {
+            type,
+            duration: duration || 30000,
+            timestamp: Date.now()
+          };
+        }
+
+        backendState.tickDevices();
+        backendState.deviceSequence++;
+        resultingState = backendState.state;
+
+        io.emit('device:update', {
+          seq: backendState.deviceSequence,
+          timestamp: Date.now(),
+          source: 'server',
+          deviceId,
+          deviceData: dev
+        });
       } else {
         throw new Error(`Aksi '${action}' tidak dikenali oleh system core.`);
+      }
+
+      // Save to processed commands history for idempotency
+      if (!backendState.processedCommands) {
+        backendState.processedCommands = new Map();
+      }
+      const record = { success: true, resultingState, commandId, correlationId, action, timestamp: Date.now() };
+      backendState.processedCommands.set(idempKey, record);
+      if (commandId) backendState.processedCommands.set(commandId, record);
+      if (correlationId) backendState.processedCommands.set(correlationId, record);
+
+      // Keep processed commands map bounded
+      if (backendState.processedCommands.size > 250) {
+        const firstKey = backendState.processedCommands.keys().next().value;
+        backendState.processedCommands.delete(firstKey);
       }
 
       const serverAuditLog = {
@@ -207,8 +428,23 @@ export function registerOperatorHandlers(io, socket) {
       };
       io.emit('audit:log', clientAuditLog);
 
+      const ackResponse = {
+        success: true,
+        commandId: commandId || cmd.commandId,
+        correlationId: correlationId || cmd.correlationId,
+        action,
+        status: 'SERVER_APPLIED',
+        result: 'SUCCESS',
+        timestamp: Date.now(),
+        resultingState,
+        data: resultingState,
+        error: null
+      };
+
+      io.emit('command:ack', ackResponse);
+
       if (typeof callback === 'function') {
-        callback({ success: true, resultingState });
+        callback(ackResponse);
       }
     } catch (err) {
       console.error(`❌ [Command Error]:`, err);
@@ -224,8 +460,27 @@ export function registerOperatorHandlers(io, socket) {
       };
       io.emit('audit:log', errAuditLog);
 
+      const errResponse = {
+        success: false,
+        commandId: commandId || cmd?.commandId,
+        correlationId: correlationId || cmd?.correlationId,
+        action,
+        status: 'REJECTED',
+        result: 'FAILED',
+        timestamp: Date.now(),
+        code: 'EXECUTION_FAIL',
+        message: err.message,
+        error: {
+          code: 'EXECUTION_FAIL',
+          message: err.message,
+          details: {}
+        }
+      };
+
+      io.emit('command:ack', errResponse);
+
       if (typeof callback === 'function') {
-        callback({ success: false, error: err.message });
+        callback(errResponse);
       }
     }
   });

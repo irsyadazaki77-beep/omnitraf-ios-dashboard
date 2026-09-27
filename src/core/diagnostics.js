@@ -1,9 +1,10 @@
 /**
- * OmniTRAF Surabaya - Internal Runtime Diagnostics & Disposer Registry (Phase 8)
- * Lightweight telemetry tracker for performance metrics:
+ * OmniTRAF Surabaya - Internal Runtime Diagnostics & Reliability Registry (Phase 18 Hardened)
+ * Telemetry tracker for performance, realtime ordering, connection health & lifecycle metrics:
+ * - lastEventTimestamp, lastAcceptedSequence per domain, lastDroppedEvent
+ * - reconnectCount, resyncCount, resyncFailureCount, heartbeatLatencyMs, staleDurationMs
+ * - cctvDroppedFrames, pendingCommandCount, duplicateEventCount
  * - initCount, activeTimers, activeSocketListeners, activeAnimationFrames
- * - domUpdateCount, cctvDroppedFrames, apiRequestCount, apiErrorCount
- * - lastRenderDuration, memory indicators
  */
 
 class DiagnosticsManager {
@@ -18,6 +19,25 @@ class DiagnosticsManager {
     this.apiErrorCount = 0;
     this.lastRenderDuration = 0;
     this.startTime = Date.now();
+
+    // Phase 18 Realtime Reliability & Ordering Diagnostics
+    this.lastEventTimestamp = 0;
+    this.lastAcceptedSequence = {
+      traffic: 0,
+      cctv: 0,
+      incident: 0,
+      emergency: 0,
+      signal: 0,
+      device: 0
+    };
+    this.lastDroppedEvent = null;
+    this.reconnectCount = 0;
+    this.resyncCount = 0;
+    this.resyncFailureCount = 0;
+    this.heartbeatLatencyMs = 12;
+    this.staleDurationMs = 0;
+    this.pendingCommandCount = 0;
+    this.duplicateEventCount = 0;
 
     // Attach to window for debug / terminal access
     if (typeof window !== 'undefined') {
@@ -39,6 +59,51 @@ class DiagnosticsManager {
 
   removeSocketListener(count = 1) {
     this.activeSocketListenersCount = Math.max(0, this.activeSocketListenersCount - count);
+  }
+
+  recordAcceptedEvent(topic, seq, timestamp = Date.now()) {
+    this.lastEventTimestamp = timestamp;
+    if (topic && this.lastAcceptedSequence[topic] !== undefined) {
+      this.lastAcceptedSequence[topic] = Math.max(this.lastAcceptedSequence[topic], seq || 0);
+    }
+  }
+
+  recordDroppedEvent(topic, seq, reason = 'out_of_order') {
+    this.lastDroppedEvent = {
+      topic,
+      seq,
+      reason,
+      timestamp: Date.now()
+    };
+  }
+
+  recordDuplicateEvent(topic, seq) {
+    this.duplicateEventCount++;
+    this.recordDroppedEvent(topic, seq, 'duplicate');
+  }
+
+  recordReconnect() {
+    this.reconnectCount++;
+  }
+
+  recordResyncAttempt() {
+    this.resyncCount++;
+  }
+
+  recordResyncFailure() {
+    this.resyncFailureCount++;
+  }
+
+  recordHeartbeatLatency(latencyMs) {
+    this.heartbeatLatencyMs = Math.max(1, Math.round(latencyMs));
+  }
+
+  recordStaleDuration(durationMs) {
+    this.staleDurationMs = Math.max(0, Math.round(durationMs));
+  }
+
+  recordPendingCommandCount(count) {
+    this.pendingCommandCount = Math.max(0, count);
   }
 
   setInterval(fn, ms) {
@@ -140,7 +205,19 @@ class DiagnosticsManager {
       apiErrorCount: this.apiErrorCount,
       lastRenderDurationMs: `${this.lastRenderDuration}ms`,
       memoryMB: `${this.getMemoryUsageMB()} MB`,
-      uptimeSec: `${uptimeSec}s`
+      uptimeSec: `${uptimeSec}s`,
+
+      // Realtime Reliability Snapshot
+      lastEventTimestamp: this.lastEventTimestamp,
+      lastAcceptedSequence: { ...this.lastAcceptedSequence },
+      lastDroppedEvent: this.lastDroppedEvent ? { ...this.lastDroppedEvent } : null,
+      reconnectCount: this.reconnectCount,
+      resyncCount: this.resyncCount,
+      resyncFailureCount: this.resyncFailureCount,
+      heartbeatLatencyMs: this.heartbeatLatencyMs,
+      staleDurationMs: this.staleDurationMs,
+      pendingCommandCount: this.pendingCommandCount,
+      duplicateEventCount: this.duplicateEventCount
     };
   }
 

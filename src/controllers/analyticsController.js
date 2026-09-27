@@ -1,5 +1,5 @@
 /**
- * OmniTRAF Surabaya - Traffic Analytics & AI Prediction Controller (Phase 5)
+ * OmniTRAF Surabaya - Traffic Analytics & AI Prediction Controller
  * Controls 24-Hour Time-Travel Simulator, AI Congestion Forecasting,
  * Single Forecast Snapshot Sync, Scenario Comparison (Baseline vs AI Optimized),
  * Corridor-Level Analytics, ESG Green Mobility Monitor, and Model Test Suite.
@@ -9,40 +9,24 @@ import { soundManager } from '../core/soundManager.js';
 import { mapManager } from '../modules/mapManager.js';
 import { stateStore } from '../core/stateStore.js';
 import { generateForecastSnapshot, runForecastTestSuite, MODEL_VERSION } from '../modules/forecastEngine.js';
+import { Disposer } from '../core/disposer.js';
 
 export class AnalyticsController {
   constructor() {
     this.forecastCache = new Map();
     this.currentHour = 8;
     this._isInitialized = false;
+    this.disposer = new Disposer('AnalyticsController');
   }
 
   init() {
     if (this._isInitialized) return;
     this._isInitialized = true;
-
-    this._bindSlidersAndSnapshotSync();
-    this._bindTrendsTabSwitching();
-    this._bindCorridorDropdown();
-    this._bindEsgTargetConfig();
-    this._bindEsgCalculator();
-    this._bindEsgMethodologyModal();
-    this._bindTestSuiteRunner();
-
-    // Subscribe to stateStore updates (telemetry, connection status, stale data)
-    stateStore.subscribe("traffic:update", () => {
-      this.refreshCurrentHourSnapshot();
-    });
-
-    stateStore.subscribe("state:stale-changed", () => {
-      this.refreshCurrentHourSnapshot();
-    });
-
-    // Initial render
-    this.refreshCurrentHourSnapshot();
   }
 
   activate() {
+    this.deactivate(); // Ensure clean slate before binding
+
     this._bindSlidersAndSnapshotSync();
     this._bindTrendsTabSwitching();
     this._bindCorridorDropdown();
@@ -50,7 +34,23 @@ export class AnalyticsController {
     this._bindEsgCalculator();
     this._bindEsgMethodologyModal();
     this._bindTestSuiteRunner();
+    this._setupStoreListeners();
+
     this.refreshCurrentHourSnapshot();
+  }
+
+  deactivate() {
+    this.disposer.clear();
+  }
+
+  _setupStoreListeners() {
+    this.disposer.addStoreSubscription(stateStore, "traffic:update", () => {
+      this.refreshCurrentHourSnapshot();
+    });
+
+    this.disposer.addStoreSubscription(stateStore, "state:stale-changed", () => {
+      this.refreshCurrentHourSnapshot();
+    });
   }
 
   /**
@@ -72,7 +72,7 @@ export class AnalyticsController {
         primary: "M0 220 C70 210 120 150 180 110 S300 130 380 160 S550 120 760 110",
         muted: "M0 200 C80 190 140 140 220 100 S350 110 480 120 S620 90 760 85"
       },
-      "corridor-margorejo": {
+      "corridor-jemursari": {
         primary: "M0 230 C80 220 130 160 200 130 S320 140 400 170 S560 130 760 120",
         muted: "M0 210 C90 200 150 150 230 110 S360 120 490 130 S630 100 760 95"
       },
@@ -82,7 +82,7 @@ export class AnalyticsController {
       }
     };
 
-    select.addEventListener("change", (e) => {
+    this.disposer.addEventListener(select, "change", (e) => {
       const selectedKey = e.target.value;
       const paths = CORRIDOR_PATHS[selectedKey] || CORRIDOR_PATHS["corridor-ayani"];
 
@@ -118,26 +118,32 @@ export class AnalyticsController {
       modal.classList.remove("show");
     };
 
-    btnInfo.onclick = openModal;
-    if (closeBtn) closeBtn.onclick = closeModal;
-    if (understandBtn) understandBtn.onclick = closeModal;
+    this.disposer.addEventListener(btnInfo, "click", openModal);
+    if (closeBtn) this.disposer.addEventListener(closeBtn, "click", closeModal);
+    if (understandBtn) this.disposer.addEventListener(understandBtn, "click", closeModal);
 
-    modal.onclick = (e) => {
+    this.disposer.addEventListener(modal, "click", (e) => {
       if (e.target === modal) closeModal();
-    };
+    });
   }
 
   /**
    * Refreshes the forecast snapshot for current selected hour and updates all UI cards simultaneously
    */
   async refreshCurrentHourSnapshot(hour = this.currentHour, isUserAction = false) {
-    this.currentHour = Math.round(Math.max(0, Math.min(23, Number(hour) || 0)));
+    const targetHour = Math.round(Math.max(0, Math.min(23, Number(hour) || 0)));
+    this.currentHour = targetHour;
+    
+    // Increment request token for out-of-order sequence check
+    this._forecastRequestToken = (this._forecastRequestToken || 0) + 1;
+    const currentToken = this._forecastRequestToken;
+
     const currentState = stateStore.getState();
 
     // Generate snapshot locally or fetch from backend API
     let snapshot = null;
     try {
-      const res = await fetch(`/api/prediction/v1/forecast?hour=${this.currentHour}`);
+      const res = await fetch(`/api/prediction/v1/forecast?hour=${targetHour}`);
       if (res.ok) {
         const json = await res.json();
         if (json && json.success) {
@@ -148,8 +154,14 @@ export class AnalyticsController {
       // Fallback
     }
 
+    // Guard check: discard response if user already slid to a newer hour
+    if (currentToken !== this._forecastRequestToken) {
+      console.warn(`[AnalyticsController] Discarding stale forecast response for hour ${targetHour} due to newer request active.`);
+      return;
+    }
+
     if (!snapshot) {
-      snapshot = generateForecastSnapshot(this.currentHour, {
+      snapshot = generateForecastSnapshot(targetHour, {
         ...currentState,
         isTimeTravel: isUserAction
       });
@@ -455,22 +467,22 @@ export class AnalyticsController {
     const predSlider = document.getElementById("predictionTimeSlider");
 
     if (ttSlider) {
-      ttSlider.addEventListener("input", (e) => {
+      this.disposer.addEventListener(ttSlider, "input", (e) => {
         const hour = parseInt(e.target.value, 10) || 0;
         this.refreshCurrentHourSnapshot(hour, false);
       });
-      ttSlider.addEventListener("change", (e) => {
+      this.disposer.addEventListener(ttSlider, "change", (e) => {
         const hour = parseInt(e.target.value, 10) || 0;
         this.refreshCurrentHourSnapshot(hour, true);
       });
     }
 
     if (predSlider) {
-      predSlider.addEventListener("input", (e) => {
+      this.disposer.addEventListener(predSlider, "input", (e) => {
         const hour = parseInt(e.target.value, 10) || 0;
         this.refreshCurrentHourSnapshot(hour, false);
       });
-      predSlider.addEventListener("change", (e) => {
+      this.disposer.addEventListener(predSlider, "change", (e) => {
         const hour = parseInt(e.target.value, 10) || 0;
         this.refreshCurrentHourSnapshot(hour, true);
       });
@@ -506,7 +518,7 @@ export class AnalyticsController {
     };
 
     buttons.forEach(btn => {
-      btn.addEventListener("click", () => {
+      this.disposer.addEventListener(btn, "click", () => {
         buttons.forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
 
@@ -531,7 +543,7 @@ export class AnalyticsController {
 
     if (!form) return;
 
-    form.addEventListener("submit", (e) => {
+    this.disposer.addEventListener(form, "submit", (e) => {
       e.preventDefault();
       const targetVal = Math.max(500, parseInt(input?.value, 10) || 2000);
       const currentSavedCo2 = stateStore.getState().telemetry?.co2SavedKg || 1420;
@@ -571,7 +583,7 @@ export class AnalyticsController {
       if (calcMoneySaved) calcMoneySaved.textContent = `Rp ${money.toLocaleString('id-ID')}`;
     };
 
-    slider.addEventListener("input", (e) => {
+    this.disposer.addEventListener(slider, "input", (e) => {
       const val = parseInt(e.target.value, 10) || 0;
       recalculate(val);
     });
@@ -595,7 +607,7 @@ export class AnalyticsController {
     }
 
     if (runnerBtn) {
-      runnerBtn.addEventListener("click", async () => {
+      this.disposer.addEventListener(runnerBtn, "click", async () => {
         runnerBtn.disabled = true;
         runnerBtn.textContent = "⏳ Memproses 15 Skenario Uji...";
 

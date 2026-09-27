@@ -71,9 +71,11 @@ export function initializeSocketServer(httpServer) {
         socket.user = decoded;
         return next();
       }
+      // Explicit token supplied but invalid/expired: do NOT silently downgrade to viewer
+      return next(new Error('AUTHENTICATION_FAILED: Token tidak valid atau telah kedaluwarsa.'));
     }
 
-    // Default viewer role if no valid token
+    // Default public viewer role ONLY when no token was provided at all
     socket.user = {
       id: 'usr-anonymous',
       username: 'anonymous',
@@ -89,8 +91,13 @@ export function initializeSocketServer(httpServer) {
 
     // Send initial full canonical state snapshot
     socket.emit('traffic:init', {
-      ...backendState.state,
+      state: backendState.state,
       seq: backendState.sequence,
+      cctvSeq: backendState.cctvSequence,
+      incidentSeq: backendState.incidentSequence,
+      emergencySeq: backendState.emergencySequence,
+      signalSeq: backendState.signalSequence,
+      deviceSeq: backendState.deviceSequence,
       timestampMs: backendState.lastUpdated,
       source: 'server'
     });
@@ -100,8 +107,13 @@ export function initializeSocketServer(httpServer) {
     socket.on('state:resync', (data, callback) => {
       const snapshot = backendState.getSnapshot();
       socket.emit('traffic:init', {
-        ...backendState.state,
+        state: backendState.state,
         seq: backendState.sequence,
+        cctvSeq: backendState.cctvSequence,
+        incidentSeq: backendState.incidentSequence,
+        emergencySeq: backendState.emergencySequence,
+        signalSeq: backendState.signalSequence,
+        deviceSeq: backendState.deviceSequence,
         timestampMs: backendState.lastUpdated,
         source: 'server'
       });

@@ -1,4 +1,5 @@
 import { backendState } from '../services/stateManager.js';
+import { createApiResponse, createApiErrorResponse } from '../middlewares/errorHandler.js';
 
 export function executeTerminalCommand(req, res) {
   const { command, actor } = req.body || {};
@@ -12,7 +13,12 @@ export function executeTerminalCommand(req, res) {
   let color = "var(--text)";
 
   if (!cmd) {
-    return res.json({ success: false, error: "Empty command" });
+    return res.status(400).json(createApiErrorResponse(
+      400,
+      "VALIDATION_ERROR",
+      "Perintah terminal tidak boleh kosong.",
+      { field: "command" }
+    ));
   }
 
   const allowedCommands = ['/help', 'help', '/status', 'status', '/ping', 'ping', '/telemetry', 'telemetry', '/nodes', 'nodes', '/chaos', 'chaos', '/clear', 'clear', '/perf', 'perf', '/sys-metrics'];
@@ -33,13 +39,27 @@ export function executeTerminalCommand(req, res) {
     backendState.auditLogs.unshift(auditRecord);
     if (backendState.auditLogs.length > 150) backendState.auditLogs.pop();
 
-    return res.json({
+    return res.status(422).json({
       success: false,
+      type: "terminal_command_rejected",
+      code: "COMMAND_NOT_PERMITTED",
+      message: `Perintah '${cmd}' tidak aman atau tidak diizinkan.`,
+      timestamp: Date.now(),
       executionId,
       command: cmd,
-      timestamp: time,
       output: responseLines,
-      color: "var(--danger)"
+      color: "var(--danger)",
+      data: {
+        executionId,
+        command: cmd,
+        output: responseLines,
+        color: "var(--danger)"
+      },
+      error: {
+        code: "COMMAND_NOT_PERMITTED",
+        message: `Perintah '${cmd}' tidak aman atau tidak diizinkan.`,
+        details: { allowedCommands }
+      }
     });
   }
 
@@ -97,7 +117,7 @@ export function executeTerminalCommand(req, res) {
     responseLines = [
       `Daftar Edge Cluster Nodes Active:`,
       `  [NODE-01] Wonokromo  (Status: ${backendState.state.intersections[0].status})`,
-      `  [NODE-02] Margorejo  (Status: ${backendState.state.intersections[1].status})`,
+      `  [NODE-02] Jemursari  (Status: ${backendState.state.intersections[1].status})`,
       `  [NODE-03] Raya Darmo (Status: ${backendState.state.intersections[2].status})`,
       `  [NODE-04] Tunjungan  (Status: ${backendState.state.intersections[3].status})`,
       `  [NODE-05] MERR       (Status: ${backendState.state.intersections[4].status})`
@@ -134,12 +154,21 @@ export function executeTerminalCommand(req, res) {
     });
   }
 
-  res.json({
-    success: true,
-    executionId,
-    command: cmd,
-    timestamp: time,
-    output: responseLines,
-    color: color
-  });
+  res.status(200).json(createApiResponse({
+    type: "terminal_command_success",
+    data: {
+      executionId,
+      command: cmd,
+      timestamp: time,
+      output: responseLines,
+      color
+    },
+    extra: {
+      executionId,
+      command: cmd,
+      timestamp: time,
+      output: responseLines,
+      color
+    }
+  }));
 }

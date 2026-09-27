@@ -10,6 +10,7 @@ import { socketClient } from '../core/socketClient.js';
 import { trafficEngine } from '../modules/trafficEngine.js';
 import { mapManager } from '../modules/mapManager.js';
 import { commandLayer } from '../core/commandLayer.js';
+import { Disposer } from '../core/disposer.js';
 
 export class EmergencyController {
   constructor() {
@@ -17,24 +18,49 @@ export class EmergencyController {
     this.greenWaveCountdownTimer = null;
     this.remainingGreenWaveSec = 300; // 5 minutes
     this._isInitialized = false;
+    this.disposer = new Disposer('EmergencyController');
   }
 
   init() {
     if (this._isInitialized) return;
     this._isInitialized = true;
+  }
+
+  activate() {
+    this.deactivate(); // Ensure clean slate before binding
 
     this._bindEmergencyActuatorForm();
     this._bind112SimulationButtons();
     this._bindGreenWaveConfirmModal();
     this._bindHudRevertButton();
     this._setupStoreListeners();
+
+    // Initial sync / render immediately on activation
+    const state = stateStore.getState();
+    this._renderEmergencyListUI(state.activeEmergencies);
+
+    // Also trigger the state setup for greenWaveActive if it is active initially
+    const isGw = state.greenWaveActive;
+    const hud = document.getElementById("emergencyGreenWaveHud");
+    const chkGreenWave = document.getElementById("chkGreenWave");
+    if (chkGreenWave) {
+      chkGreenWave.checked = !!isGw;
+    }
+    if (hud) {
+      hud.style.display = isGw ? "block" : "none";
+    }
   }
 
-  activate() {
-    this._bindEmergencyActuatorForm();
-    this._bind112SimulationButtons();
-    this._bindGreenWaveConfirmModal();
-    this._bindHudRevertButton();
+  deactivate() {
+    if (this.greenWaveCountdownTimer) {
+      clearInterval(this.greenWaveCountdownTimer);
+      this.greenWaveCountdownTimer = null;
+    }
+    if (this.preemptTimer) {
+      clearInterval(this.preemptTimer);
+      this.preemptTimer = null;
+    }
+    this.disposer.clear();
   }
 
   /**
@@ -53,15 +79,15 @@ export class EmergencyController {
       modal.classList.remove("show");
     };
 
-    if (closeBtn) closeBtn.onclick = closeModal;
-    if (cancelBtn) cancelBtn.onclick = closeModal;
+    if (closeBtn) this.disposer.addEventListener(closeBtn, "click", closeModal);
+    if (cancelBtn) this.disposer.addEventListener(cancelBtn, "click", closeModal);
 
-    modal.onclick = (e) => {
+    this.disposer.addEventListener(modal, "click", (e) => {
       if (e.target === modal) closeModal();
-    };
+    });
 
     if (confirmBtn) {
-      confirmBtn.onclick = async () => {
+      this.disposer.addEventListener(confirmBtn, "click", async () => {
         confirmBtn.disabled = true;
         confirmBtn.textContent = "ACTIVATING...";
 
@@ -77,7 +103,7 @@ export class EmergencyController {
           confirmBtn.disabled = false;
           confirmBtn.textContent = "🚨 Aktifkan Koridor Darurat";
         }
-      };
+      });
     }
   }
 
@@ -96,56 +122,31 @@ export class EmergencyController {
   _bindHudRevertButton() {
     const revertBtn = document.getElementById("btnRevertEmergencyGw");
     if (revertBtn) {
-      revertBtn.onclick = () => {
+      this.disposer.addEventListener(revertBtn, "click", () => {
         this.deactivateGreenWaveToNormal();
-      };
+      });
     }
   }
 
   /**
-   * Aktifkan Koridor Darurat 112 & Jalankan Timer Keselamatan Otomatis (Maksimal 5 Menit)
+   * Aktifkan Koridor Darurat 112
    */
   async activateGreenWaveWithSafetyTimer(durationSec = 300) {
     try {
+      const respType = document.getElementById("respType")?.value || "Ambulans";
+      const respRoute = document.getElementById("respRoute")?.value || "route-yani-darmo";
+      const respName = document.getElementById("respName")?.value || "AMB-112";
+
       await commandLayer.dispatchCommand({
         action: 'emergency:activate',
         targetType: 'emergency',
-        targetId: 'AMB-112',
-        payload: { code: 'AMB-112', route: 'route-yani-darmo' }
+        targetId: respName,
+        payload: { code: respName, route: respRoute, type: respType }
       }, false);
 
-      trafficEngine.setGreenWave(true);
       this.remainingGreenWaveSec = durationSec;
-
-      // Tampilkan HUD Darurat Merah di Bagian Atas
-      const hud = document.getElementById("emergencyGreenWaveHud");
-      const timerDisplay = document.getElementById("emergencyGwCountdown");
-
-      if (hud) {
-        hud.style.display = "block";
-      }
-
-      soundManager.play('siren');
-
-      if (this.greenWaveCountdownTimer) clearInterval(this.greenWaveCountdownTimer);
-
-      this.greenWaveCountdownTimer = setInterval(() => {
-        this.remainingGreenWaveSec--;
-
-        const mins = Math.floor(this.remainingGreenWaveSec / 60);
-        const secs = this.remainingGreenWaveSec % 60;
-        const formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-
-        if (timerDisplay) timerDisplay.textContent = formatted;
-
-        if (this.remainingGreenWaveSec <= 0) {
-          // Auto-revert safety trigger hit
-          this.deactivateGreenWaveToNormal(true);
-        }
-      }, 1000);
-
       if (typeof window.showToast === "function") {
-        window.showToast("🚨 KORIDOR DARURAT 112 AKTIF: Sinyal A. Yani - Darmo HIJAU | Simpang Tegak Lurus MERAH!", "alert");
+        window.showToast(`🚨 PRIORITAS DARURAT AKTIF: Sinyal rute ${respRoute.replace('route-', '').toUpperCase()} dikunci Hijau!`, "alert");
       }
     } catch (err) {
       throw err;
@@ -156,49 +157,49 @@ export class EmergencyController {
    * Kembalikan Koridor Darurat ke Normal Adaptive Mode
    */
   async deactivateGreenWaveToNormal(isAutoTimeout = false) {
-    if (this.greenWaveCountdownTimer) {
-      clearInterval(this.greenWaveCountdownTimer);
-      this.greenWaveCountdownTimer = null;
-    }
-
-    const hud = document.getElementById("emergencyGreenWaveHud");
-    if (hud) {
-      hud.style.display = "none";
-    }
-
     try {
-      await commandLayer.dispatchCommand({
-        action: 'emergency:cancel',
-        targetType: 'emergency',
-        targetId: 'AMB-112',
-        payload: { id: 'AMB-112' }
-      }, false);
+      const activeEmergencies = stateStore.getState().activeEmergencies || [];
+      const respName = document.getElementById("respName")?.value || "AMB-112";
+      
+      // Cancel specifically respName, but if there are others, cancel them all to clear zombies
+      const idsToCancel = new Set([respName, 'AMB-112']);
+      activeEmergencies.forEach(e => {
+        if (e.id) idsToCancel.add(e.id);
+        if (e.vehicleId) idsToCancel.add(e.vehicleId);
+      });
 
-      trafficEngine.setGreenWave(false);
+      for (const id of idsToCancel) {
+        try {
+          await commandLayer.dispatchCommand({
+            action: 'emergency:cancel',
+            targetType: 'emergency',
+            targetId: id,
+            payload: { id }
+          }, false);
+        } catch (e) {
+          // Ignore failures for IDs that don't exist on backend
+        }
+      }
+
       soundManager.play('success');
 
       if (typeof window.showToast === "function") {
         if (isAutoTimeout) {
-          window.showToast("⏱️ Timer Keselamatan 5 Menit Berakhir: Koridor Darurat 112 dinormalisasi otomatis ke mode adaptif.");
+          window.showToast("⏱️ Timer Keselamatan 5 Menit Berakhir: Koridor Darurat dinormalisasi otomatis.");
         } else {
-          window.showToast("✓ Koridor Darurat 112 dinormalisasi kembali ke mode adaptif.");
+          window.showToast("✓ Seluruh Koridor Darurat dinormalisasi kembali ke mode adaptif.");
         }
       }
     } catch (err) {
       console.warn("[EmergencyController] Cancel error:", err);
-      trafficEngine.setGreenWave(false);
     }
   }
 
   _bindEmergencyActuatorForm() {
     const form = document.getElementById("emergencyActuatorForm");
-    const respTypeInput = document.getElementById("respType");
-    const respRouteInput = document.getElementById("respRoute");
-    const respNameInput = document.getElementById("respName");
-
     if (!form) return;
 
-    form.addEventListener("submit", (e) => {
+    this.disposer.addEventListener(form, "submit", (e) => {
       e.preventDefault();
       // Buka modal konfirmasi sebelum pengaktifan
       this.openGreenWaveConfirmModal();
@@ -220,8 +221,12 @@ export class EmergencyController {
     const maxSeconds = 15;
     if (countdownText) countdownText.textContent = `${seconds}s`;
 
-    if (this.preemptTimer) clearInterval(this.preemptTimer);
-    this.preemptTimer = setInterval(() => {
+    if (this.preemptTimer) {
+      clearInterval(this.preemptTimer);
+      this.preemptTimer = null;
+    }
+
+    this.preemptTimer = this.disposer.setInterval(() => {
       seconds--;
       if (countdownText) countdownText.textContent = `${seconds}s`;
       if (progressCircle) {
@@ -231,6 +236,7 @@ export class EmergencyController {
 
       if (seconds <= 0) {
         clearInterval(this.preemptTimer);
+        this.preemptTimer = null;
         if (countdownContainer) {
           countdownContainer.classList.add("is-hidden");
           countdownContainer.style.display = "none";
@@ -248,7 +254,7 @@ export class EmergencyController {
     const btnStop = document.getElementById("btnStop112Sim");
 
     if (btnStart) {
-      btnStart.addEventListener("click", () => {
+      this.disposer.addEventListener(btnStart, "click", () => {
         const curView = stateStore.getState().currentView;
         if (curView === 'emergency') {
           const mapNav = document.querySelector('[data-view="map"]');
@@ -259,7 +265,7 @@ export class EmergencyController {
     }
 
     if (btnStop) {
-      btnStop.addEventListener("click", () => {
+      this.disposer.addEventListener(btnStop, "click", () => {
         this.deactivateGreenWaveToNormal();
       });
     }
@@ -267,8 +273,44 @@ export class EmergencyController {
 
   _setupStoreListeners() {
     // Listen to changes in activeEmergencies to render the list dynamically in the UI panel!
-    stateStore.subscribe('state:activeEmergencies', ({ value }) => {
+    this.disposer.addStoreSubscription(stateStore, 'state:activeEmergencies', ({ value }) => {
       this._renderEmergencyListUI(value);
+    });
+
+    // Reactive Green Wave HUD and local timer sync
+    this.disposer.addStoreSubscription(stateStore, 'state:greenWaveActive', ({ value }) => {
+      const hud = document.getElementById("emergencyGreenWaveHud");
+      const timerDisplay = document.getElementById("emergencyGwCountdown");
+      const chkGreenWave = document.getElementById("chkGreenWave");
+
+      if (chkGreenWave) {
+        chkGreenWave.checked = !!value;
+      }
+
+      if (value) {
+        if (hud) hud.style.display = "block";
+        soundManager.play('siren');
+        
+        if (!this.greenWaveCountdownTimer) {
+          this.remainingGreenWaveSec = 300;
+          this.greenWaveCountdownTimer = this.disposer.setInterval(() => {
+            this.remainingGreenWaveSec--;
+            const mins = Math.max(0, Math.floor(this.remainingGreenWaveSec / 60));
+            const secs = Math.max(0, this.remainingGreenWaveSec % 60);
+            const formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            if (timerDisplay) timerDisplay.textContent = formatted;
+            if (this.remainingGreenWaveSec <= 0) {
+              this.deactivateGreenWaveToNormal(true);
+            }
+          }, 1000);
+        }
+      } else {
+        if (hud) hud.style.display = "none";
+        if (this.greenWaveCountdownTimer) {
+          clearInterval(this.greenWaveCountdownTimer);
+          this.greenWaveCountdownTimer = null;
+        }
+      }
     });
   }
 

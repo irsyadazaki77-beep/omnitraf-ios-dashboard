@@ -18,9 +18,13 @@ export function registerChaosHandlers(io, socket) {
     if (typeof callback === 'function') {
       callback({
         success: true,
+        status: 'SERVER_APPLIED',
+        result: 'SUCCESS',
+        timestamp: Date.now(),
         isChaosMode: newState.isChaosMode,
         chaosLevel: newState.chaosLevel,
-        seq: backendState.sequence
+        seq: backendState.sequence,
+        error: null
       });
     }
   });

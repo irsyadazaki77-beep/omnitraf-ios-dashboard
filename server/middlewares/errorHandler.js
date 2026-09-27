@@ -1,8 +1,9 @@
 /**
- * Standardized Error Response Contract Helper & Sanitizers
+ * Standardized API Response & Error Contract Helpers & Sanitizers (Phase 16)
  */
 
 export function createApiErrorResponse(statusCode, code, message, details = {}, type = "error") {
+  const normalizedDetails = details || {};
   return {
     success: false,
     type,
@@ -11,8 +12,39 @@ export function createApiErrorResponse(statusCode, code, message, details = {}, 
     code,
     message,
     retryable: statusCode >= 500 || statusCode === 429,
-    details
+    data: null,
+    error: {
+      code,
+      message,
+      details: normalizedDetails
+    },
+    details: normalizedDetails
   };
+}
+
+export function createApiResponse({
+  success = true,
+  type = 'success',
+  data = null,
+  sequence = null,
+  extra = {}
+} = {}) {
+  const resObj = {
+    success: true,
+    type,
+    timestamp: Date.now(),
+    data,
+    error: null,
+    extra: extra || {},
+    ...extra
+  };
+
+  if (sequence !== null && sequence !== undefined) {
+    resObj.sequence = sequence;
+    resObj.version = sequence;
+  }
+
+  return resObj;
 }
 
 export function sanitizeCsvCell(value) {

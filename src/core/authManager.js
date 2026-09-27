@@ -22,8 +22,13 @@ class AuthManager {
         const storedUser = localStorage.getItem(USER_STORAGE_KEY);
 
         if (storedToken && storedUser) {
-          this.token = storedToken;
-          this.user = JSON.parse(storedUser);
+          if (this.isTokenExpired(storedToken)) {
+            console.warn('[AuthManager] Sesi tersimpan telah kedaluwarsa. Membersihkan...');
+            this.logout();
+          } else {
+            this.token = storedToken;
+            this.user = JSON.parse(storedUser);
+          }
         }
       }
     } catch (e) {
@@ -32,13 +37,54 @@ class AuthManager {
   }
 
   /**
+   * Mengecek apakah JWT token telah kedaluwarsa
+   * @param {string} token
+   * @returns {boolean}
+   */
+  isTokenExpired(token) {
+    if (!token) return true;
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return true;
+      const base64Url = parts[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+
+      const payload = JSON.parse(jsonPayload);
+      if (payload && typeof payload.exp === 'number') {
+        const nowSec = Math.floor(Date.now() / 1000);
+        // Berikan toleransi waktu 10 detik
+        return payload.exp < (nowSec + 10);
+      }
+      return false;
+    } catch (e) {
+      return true;
+    }
+  }
+
+  /**
    * Mengambil token autentikasi saat ini
    * @returns {string|null}
    */
   getToken() {
-    if (this.token) return this.token;
+    if (this.token) {
+      if (this.isTokenExpired(this.token)) {
+        this.logout();
+        return null;
+      }
+      return this.token;
+    }
     if (typeof window !== 'undefined') {
-      return localStorage.getItem(AUTH_STORAGE_KEY);
+      const storedToken = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (storedToken) {
+        if (this.isTokenExpired(storedToken)) {
+          this.logout();
+          return null;
+        }
+        return storedToken;
+      }
     }
     return null;
   }
@@ -78,15 +124,16 @@ class AuthManager {
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data?.error || data?.message || 'Login gagal.');
+        const errorMsg = data?.error?.message || data?.message || (typeof data?.error === 'string' ? data.error : 'Login gagal.');
+        throw new Error(errorMsg);
       }
 
-      this.token = data.token;
-      this.user = data.user;
+      this.token = data.data?.token || data.token;
+      this.user = data.data?.user || data.user;
 
       if (typeof window !== 'undefined') {
-        localStorage.setItem(AUTH_STORAGE_KEY, data.token);
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+        localStorage.setItem(AUTH_STORAGE_KEY, this.token);
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(this.user));
       }
 
       this._notifyListeners();

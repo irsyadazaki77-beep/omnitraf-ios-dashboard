@@ -32,8 +32,12 @@ import { diagnostics } from './diagnostics.js';
 import { authManager } from './authManager.js';
 
 /**
- * Fetch with Deduplication, Timeout & Caching Helper (Phase 8)
- * Deduplicates in-flight GET requests, adds bounded timeouts, and caches read-only endpoints.
+ * Fetch with Deduplication, Timeout & Caching Helper (Phase 16 Hardened)
+ * - Ensures mutations (POST/PUT/PATCH/DELETE) are never cached.
+ * - Preserves Authorization headers from explicit options or authManager.
+ * - Safely handles non-JSON (PDF, HTML, plaintext) responses without JSON parsing crashes.
+ * - Extracts deterministic structured error messages and error codes on HTTP non-2xx responses.
+ * - Fully cleans up timers and abort listeners.
  */
 const pendingRequests = new Map();
 const apiCache = new Map();
@@ -41,7 +45,7 @@ const apiCache = new Map();
 export async function fetchWithCacheAndDedupe(url, options = {}) {
   const {
     ttlMs = 0,
-    timeoutMs = 5000,
+    timeoutMs = 6000,
     signal: userSignal,
     method = 'GET',
     body,
@@ -49,15 +53,26 @@ export async function fetchWithCacheAndDedupe(url, options = {}) {
     forceRefresh = false
   } = options;
 
-  const isReadOnly = method.toUpperCase() === 'GET';
+  const upperMethod = method.toUpperCase();
+  const isReadOnly = upperMethod === 'GET' || upperMethod === 'HEAD';
 
-  // Inject Authorization Bearer token jika ada
+  // Ensure Authorization header is preserved or securely injected
   const authToken = authManager.getToken();
+  const hasAuthHeader = Object.keys(headers).some(k => k.toLowerCase() === 'authorization');
   const mergedHeaders = {
     ...headers,
-    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+    ...(!hasAuthHeader && authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
   };
 
+  // Add JSON Content-Type if sending stringified or object body
+  if (body && typeof body === 'object' && !(body instanceof FormData) && !(body instanceof Blob)) {
+    const hasContentType = Object.keys(mergedHeaders).some(k => k.toLowerCase() === 'content-type');
+    if (!hasContentType) {
+      mergedHeaders['Content-Type'] = 'application/json';
+    }
+  }
+
+  // 1. Check read-only cache
   if (isReadOnly && ttlMs > 0 && !forceRefresh) {
     const cached = apiCache.get(url);
     if (cached && Date.now() < cached.expiresAt) {
@@ -65,45 +80,96 @@ export async function fetchWithCacheAndDedupe(url, options = {}) {
     }
   }
 
+  // 2. Check in-flight request deduplication for read-only calls
   if (isReadOnly && pendingRequests.has(url)) {
     return pendingRequests.get(url);
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let timer = null;
+
+  if (timeoutMs > 0) {
+    timer = setTimeout(() => {
+      controller.abort(new Error(`Request timeout after ${timeoutMs}ms: ${upperMethod} ${url}`));
+    }, timeoutMs);
+  }
+
+  const onUserAbort = () => {
+    controller.abort(userSignal.reason || new Error(`Request aborted by caller`));
+  };
 
   if (userSignal) {
-    userSignal.addEventListener('abort', () => controller.abort());
+    if (userSignal.aborted) {
+      controller.abort(userSignal.reason);
+    } else {
+      userSignal.addEventListener('abort', onUserAbort, { once: true });
+    }
   }
 
   const fetchPromise = (async () => {
     try {
       diagnostics.recordApiRequest();
+
+      const finalBody = (body && typeof body === 'object' && !(body instanceof FormData) && !(body instanceof Blob))
+        ? JSON.stringify(body)
+        : body;
+
       const res = await fetch(url, {
-        method,
+        method: upperMethod,
         headers: mergedHeaders,
-        body,
+        body: finalBody,
         signal: controller.signal
       });
-      clearTimeout(timer);
+
+      if (timer) clearTimeout(timer);
+      if (userSignal) userSignal.removeEventListener('abort', onUserAbort);
+
+      const contentType = res.headers.get('content-type') || '';
+      let data = null;
+
+      if (contentType.includes('application/json')) {
+        try {
+          data = await res.json();
+        } catch (jsonErr) {
+          throw new Error(`Gagal mem-parsing JSON dari server (HTTP ${res.status}): ${jsonErr.message}`);
+        }
+      } else if (contentType.includes('application/pdf') || contentType.includes('application/octet-stream')) {
+        data = await res.blob();
+      } else {
+        data = await res.text();
+      }
 
       if (!res.ok) {
         diagnostics.recordApiError();
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      }
+        const serverMsg = (data && typeof data === 'object')
+          ? (data.error?.message || data.message || data.error || `HTTP ${res.status}`)
+          : (typeof data === 'string' && data.length < 200 ? data : `HTTP ${res.status}: ${res.statusText}`);
 
-      const data = await res.json();
+        if (res.status === 401) {
+          console.error('🔒 [API] Sesi tidak valid atau telah kedaluwarsa (401). Membersihkan sesi...');
+          authManager.logout();
+        }
+
+        const err = new Error(serverMsg);
+        err.status = res.status;
+        err.statusCode = res.status;
+        err.code = (data && typeof data === 'object' && (data.error?.code || data.code)) || `HTTP_${res.status}`;
+        err.data = data;
+        err.details = (data && typeof data === 'object' && (data.error?.details || data.details)) || null;
+        throw err;
+      }
 
       if (isReadOnly && ttlMs > 0) {
         apiCache.set(url, {
           data,
-          expiresAt: Date.now() + ttlMs
+          expiresAt: Date.now() + Math.max(500, ttlMs)
         });
       }
 
       return data;
     } catch (err) {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
+      if (userSignal) userSignal.removeEventListener('abort', onUserAbort);
       diagnostics.recordApiError();
       throw err;
     } finally {
@@ -133,6 +199,10 @@ class SocketClient {
     this.watchdogInterval = null;
     this.heartbeatInterval = null;
     this.isResyncing = false;
+    this._resyncPromise = null;
+    this._resyncBuffer = [];
+    this._pendingPingTimestamp = null;
+    this._missedHeartbeats = 0;
 
     this._setupInternalListeners();
   }
@@ -235,6 +305,11 @@ class SocketClient {
       });
 
       this.requestResync();
+
+      // Trigger command reconciliation if available
+      if (window.commandLayer && typeof window.commandLayer.reconcilePendingCommands === 'function') {
+        window.commandLayer.reconcilePendingCommands();
+      }
     });
 
     // 2. Reconnecting / Reconnect Attempts
@@ -257,6 +332,33 @@ class SocketClient {
     // 3. Connection Error
     this.socket.on('connect_error', (err) => {
       this.connectionAttemptCount++;
+      if (err && err.message && err.message.includes('AUTHENTICATION_FAILED')) {
+        console.error('🔒 [SocketClient] Autentikasi ditolak server:', err.message);
+        setConnectionLifecycle('auth_failed', {
+          connectionAttemptCount: this.connectionAttemptCount,
+          isStaleData: true,
+          authError: err.message
+        });
+
+        // Hapus token kedaluwarsa/tidak valid dari client, lalu coba dapatkan sesi baru
+        console.warn('🔑 [SocketClient] Mencoba memulihkan sesi dengan melakukan re-login otomatis...');
+        authManager.logout();
+        
+        setTimeout(() => {
+          authManager.ensureActiveSession()
+            .then((freshToken) => {
+              if (freshToken && this.socket) {
+                console.info('🔑 [SocketClient] Sesi baru berhasil didapatkan. Menghubungkan kembali socket...');
+                this.socket.auth = { token: freshToken };
+                this.socket.connect();
+              }
+            })
+            .catch((e) => {
+              console.error('❌ [SocketClient] Gagal memulihkan sesi otomatis setelah ditolak:', e.message);
+            });
+        }, 1000);
+        return;
+      }
       setConnectionLifecycle('reconnecting', {
         connectionAttemptCount: this.connectionAttemptCount,
         isStaleData: true
@@ -270,6 +372,9 @@ class SocketClient {
         lastDisconnectedAt: Date.now(),
         isStaleData: true
       });
+      if (window.commandLayer && typeof window.commandLayer.handleDisconnect === 'function') {
+        window.commandLayer.handleDisconnect();
+      }
     });
 
     // 5. Canonical State Inflow Pipeline ke StateStore
@@ -284,10 +389,18 @@ class SocketClient {
     });
 
     this.socket.on('traffic:update', (data) => {
+      if (this.isResyncing) {
+        this._resyncBuffer.push({ topic: 'traffic', payload: data, fn: () => updateTrafficState(data, 'server') });
+        return;
+      }
       updateTrafficState(data, 'server');
     });
 
     this.socket.on('cctv:vision-update', (data) => {
+      if (this.isResyncing) {
+        this._resyncBuffer.push({ topic: 'cctv', payload: data, fn: () => updateCctvVisionState(data, 'server') });
+        return;
+      }
       updateCctvVisionState(data, 'server');
     });
 
@@ -297,6 +410,10 @@ class SocketClient {
         payload.seq = data.seq || payload.seq;
         payload.timestamp = data.timestamp || payload.timestamp || Date.now();
         payload.source = data.source || payload.source || 'server';
+        if (this.isResyncing) {
+          this._resyncBuffer.push({ topic: 'incident', payload, fn: () => updateIncidentState(data.id, payload, 'server') });
+          return;
+        }
         updateIncidentState(data.id, payload, 'server');
       }
     });
@@ -307,6 +424,10 @@ class SocketClient {
         payload.seq = data.seq || payload.seq;
         payload.timestamp = data.timestamp || payload.timestamp || Date.now();
         payload.source = data.source || payload.source || 'server';
+        if (this.isResyncing) {
+          this._resyncBuffer.push({ topic: 'emergency', payload, fn: () => updateEmergencyState(payload, 'server') });
+          return;
+        }
         updateEmergencyState(payload, 'server');
       }
     });
@@ -317,6 +438,10 @@ class SocketClient {
         payload.seq = data.seq || payload.seq;
         payload.timestamp = data.timestamp || payload.timestamp || Date.now();
         payload.source = data.source || payload.source || 'server';
+        if (this.isResyncing) {
+          this._resyncBuffer.push({ topic: 'signal', payload, fn: () => updateSignalState(data.nodeId, payload, 'server') });
+          return;
+        }
         updateSignalState(data.nodeId, payload, 'server');
       }
     });
@@ -327,24 +452,50 @@ class SocketClient {
         payload.seq = data.seq || payload.seq;
         payload.timestamp = data.timestamp || payload.timestamp || Date.now();
         payload.source = data.source || payload.source || 'server';
+        if (this.isResyncing) {
+          this._resyncBuffer.push({ topic: 'device', payload, fn: () => updateDeviceState(data.deviceId, payload, 'server') });
+          return;
+        }
         updateDeviceState(data.deviceId, payload, 'server');
+      }
+    });
+
+    this.socket.on('device:config-transition', (data) => {
+      if (data) {
+        stateStore.publish('device:config-transition', createEventEnvelope('device:config-transition', data, 'server'));
       }
     });
 
     this.socket.on('incident:resolved', (data) => {
       if (data && data.id) {
-        updateIncidentState(data.id, {
+        const payload = {
+          seq: data.seq,
+          timestamp: data.timestamp || Date.now(),
+          source: data.source || 'server',
           status: 'RESOLVED',
-          resolvedAt: data.timestamp,
+          resolvedAt: data.timestamp ? new Date(data.timestamp).toISOString() : new Date().toISOString(),
           resolvedBy: data.resolvedBy || 'SITS Command Center'
-        }, 'server');
+        };
+        if (this.isResyncing) {
+          this._resyncBuffer.push({ topic: 'incident', payload, fn: () => updateIncidentState(data.id, payload, 'server') });
+          return;
+        }
+        updateIncidentState(data.id, payload, 'server');
       }
     });
 
     // 6. Heartbeat Pong Listener
     this.socket.on('heartbeat:pong', (data) => {
+      this._pendingPingTimestamp = null;
+      this._missedHeartbeats = 0;
       if (data && data.clientTimestamp) {
-        this.lastLatencyMs = Math.max(1, Date.now() - data.clientTimestamp);
+        const rtt = Math.max(1, Date.now() - data.clientTimestamp);
+        this.lastLatencyMs = Math.round(this.lastLatencyMs * 0.7 + rtt * 0.3);
+        if (this.lastLatencyMs > 200) {
+          setConnectionLifecycle('degraded', { latencyMs: this.lastLatencyMs });
+        } else if (stateStore.getState().connectionStatus === 'degraded') {
+          setConnectionLifecycle('connected', { latencyMs: this.lastLatencyMs });
+        }
       }
       this._updatePerformanceChip();
     });
@@ -376,13 +527,16 @@ class SocketClient {
     if (this.watchdogInterval) clearInterval(this.watchdogInterval);
     if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
 
+    this._pendingPingTimestamp = null;
+    this._missedHeartbeats = 0;
+
     // Watchdog cek kesegaran data setiap 1000ms
     this.watchdogInterval = setInterval(() => {
       const state = stateStore.getState();
       const lastTelemetry = state.lastTelemetryAt || 0;
       const now = Date.now();
 
-      if (state.connectionStatus === 'connected') {
+      if (state.connectionStatus === 'connected' || state.connectionStatus === 'degraded') {
         // Jika tidak ada data telemetri masuk > 3500ms padahal connected, tandai stale
         if (lastTelemetry > 0 && (now - lastTelemetry) > 3500) {
           markStaleData(true);
@@ -393,45 +547,123 @@ class SocketClient {
     // Heartbeat ping berkala setiap 5000ms saat terkoneksi
     this.heartbeatInterval = setInterval(() => {
       if (this.isConnected()) {
-        this.socket.emit('heartbeat:ping', { timestamp: Date.now() });
+        if (this._pendingPingTimestamp && (Date.now() - this._pendingPingTimestamp) > 4000) {
+          this._missedHeartbeats++;
+          console.warn(`⚠️ [SocketClient] Missed heartbeat pong (#${this._missedHeartbeats})`);
+          if (this._missedHeartbeats >= 2) {
+            console.warn(`⚠️ [SocketClient] Half-open connection detected (2 missed pings). Marking degraded/reconnecting.`);
+            setConnectionLifecycle('degraded', { isStaleData: true });
+            markStaleData(true);
+          }
+        }
+
+        const now = Date.now();
+        this._pendingPingTimestamp = now;
+        this.socket.emit('heartbeat:ping', { timestamp: now });
       }
     }, 5000);
   }
 
   /**
-   * Meminta Sinkronisasi State Kanonikal Penuh dari Server (Idempotent)
+   * Meminta Sinkronisasi State Kanonikal Penuh dari Server (Single-Flight, Bounded Timeout, Idempotent)
    */
-  async requestResync() {
-    if (this.isResyncing) return;
-    this.isResyncing = true;
+  requestResync() {
+    if (this._resyncPromise) {
+      return this._resyncPromise;
+    }
 
-    try {
-      if (this.isConnected()) {
-        this.socket.emit('state:resync', {}, (response) => {
-          this.isResyncing = false;
-          if (response && response.success && response.state) {
-            applyServerSnapshot(response.state, 'server');
+    this._resyncPromise = (async () => {
+      this.isResyncing = true;
+      try {
+        if (this.isConnected()) {
+          const res = await new Promise((resolve) => {
+            const timer = setTimeout(() => {
+              resolve({ success: false, status: 'TIMEOUT', error: 'Socket resync timed out' });
+            }, 4000);
+
+            try {
+              this.socket.emit('state:resync', {}, (response) => {
+                clearTimeout(timer);
+                resolve(response || { success: false, status: 'TIMEOUT' });
+              });
+            } catch (err) {
+              clearTimeout(timer);
+              resolve({ success: false, status: 'SERVER_UNAVAILABLE', error: err.message });
+            }
+          });
+
+          if (res && res.success && (res.state || res.data)) {
+            applyServerSnapshot(res.state || res.data, 'server');
+            this._flushResyncBuffer();
             setConnectionLifecycle('connected', {
               isStaleData: false,
               lastTelemetryAt: Date.now()
             });
-          }
-        });
-      } else {
-        // HTTP REST Snapshot Fallback
-        const res = await fetch('/api/state/snapshot', { cache: 'no-store' });
-        if (res.ok) {
-          const json = await res.json();
-          if (json && json.success && json.state) {
-            applyServerSnapshot(json.state, 'server');
+            return { status: 'SUCCESS', source: 'socket', snapshot: res };
           }
         }
+
+        // HTTP REST Snapshot Fallback
+        try {
+          const res = await fetch('/api/state/snapshot', { cache: 'no-store' });
+          if (res.ok) {
+            const json = await res.json();
+            const payload = json.data || json.state || json;
+            if (payload && (payload.intersections || payload.telemetry || payload.seq !== undefined)) {
+              applyServerSnapshot(json, 'server');
+              this._flushResyncBuffer();
+              setConnectionLifecycle('connected', {
+                isStaleData: false,
+                lastTelemetryAt: Date.now()
+              });
+              return { status: 'SUCCESS', source: 'rest', snapshot: json };
+            }
+            return { status: 'INVALID_SNAPSHOT', source: 'rest', error: 'Malformed snapshot payload' };
+          } else {
+            return { status: 'SERVER_UNAVAILABLE', source: 'rest', httpStatus: res.status };
+          }
+        } catch (restErr) {
+          return { status: 'SERVER_UNAVAILABLE', source: 'rest', error: restErr.message };
+        }
+      } catch (err) {
+        console.warn("[SocketClient] Resync attempt notice:", err);
+        return { status: 'TIMEOUT', error: err.message };
+      } finally {
         this.isResyncing = false;
+        this._resyncPromise = null;
       }
-    } catch (err) {
-      console.warn("[SocketClient] Resync attempt notice:", err);
-      this.isResyncing = false;
-    }
+    })();
+
+    return this._resyncPromise;
+  }
+
+  _flushResyncBuffer() {
+    if (!this._resyncBuffer || this._resyncBuffer.length === 0) return;
+    const buffer = [...this._resyncBuffer];
+    this._resyncBuffer = [];
+    const currentState = stateStore.getState();
+
+    buffer.forEach(({ topic, payload, fn }) => {
+      const seq = payload?.seq || payload?.sequence || 0;
+      const seqPropMap = {
+        'traffic': 'lastReceivedSequence',
+        'cctv': 'lastReceivedCctvSequence',
+        'incident': 'lastReceivedIncidentSequence',
+        'emergency': 'lastReceivedEmergencySequence',
+        'signal': 'lastReceivedSignalSequence',
+        'device': 'lastReceivedDeviceSequence'
+      };
+      const prop = seqPropMap[topic] || 'lastReceivedSequence';
+      const baselineSeq = currentState[prop] || 0;
+
+      if (seq > baselineSeq) {
+        try {
+          fn();
+        } catch (e) {
+          console.warn(`[SocketClient] Error applying buffered event for ${topic}:`, e);
+        }
+      }
+    });
   }
 
   /**
@@ -584,6 +816,20 @@ class SocketClient {
       sseDot.style.background = "var(--warning)";
       sseDot.style.boxShadow = "0 0 6px var(--warning)";
       if (sitsStatusText) sitsStatusText.textContent = "Init";
+
+    } else if (status === 'degraded') {
+      sseText.textContent = "SITS Degraded (Latency Tinggi)";
+      sseDot.style.background = "var(--warning)";
+      sseDot.style.boxShadow = "0 0 6px var(--warning)";
+      if (offlineBanner) offlineBanner.classList.add("is-hidden");
+      if (sitsStatusText) sitsStatusText.textContent = "Degraded";
+
+    } else if (status === 'auth_failed') {
+      sseText.textContent = "Sesi Berakhir (Auth Failed)";
+      sseDot.style.background = "var(--danger)";
+      sseDot.style.boxShadow = "0 0 6px var(--danger)";
+      if (offlineBanner) offlineBanner.classList.remove("is-hidden");
+      if (sitsStatusText) sitsStatusText.textContent = "Auth";
 
     } else { // 'offline' | 'fallback'
       sseText.textContent = "Offline (Data Tersimpan)";

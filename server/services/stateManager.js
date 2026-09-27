@@ -1,4 +1,16 @@
 import { ROUTES_DB } from '../config/constants.js';
+
+const isTest = typeof global.it === 'function' || 
+               typeof global.test === 'function' || 
+               process.env.NODE_ENV === 'test' || 
+               (process.env.DB_PATH && process.env.DB_PATH.includes('test')) ||
+               process.env.PORT === '0';
+
+if (isTest) {
+  console.log = () => {};
+  console.warn = () => {};
+}
+
 import { dbManager } from '../db/database.js';
 
 export class BackendStateManager {
@@ -14,6 +26,7 @@ export class BackendStateManager {
     this.co2SavedKg = 1420;
     this.fuelSavedLiters = 580;
     this.io = null;
+    this.processedCommands = new Map();
 
     this.auditLogs = [
       {
@@ -84,10 +97,10 @@ export class BackendStateManager {
       },
       {
         deviceId: "NODE-EDGE-03",
-        deviceName: "Jl. Tunjungan Node AI",
+        deviceName: "Bundaran Waru Node AI",
         type: "Jetson Xavier NX",
-        location: "Jl. Tunjungan",
-        coordinates: [-7.2585, 112.7388],
+        location: "Bundaran Waru",
+        coordinates: [-7.3510, 112.7290],
         status: "ONLINE",
         lastSeenAt: new Date().toISOString(),
         lastHeartbeatAt: new Date().toISOString(),
@@ -147,6 +160,7 @@ export class BackendStateManager {
       seq: this.sequence,
       timestamp: this._getWibTimeString(),
       timestampMs: this.lastUpdated,
+      source: 'server',
       networkLoad: 72,
       avgWaitTime: 42,
       congestionIndex: 62,
@@ -169,7 +183,7 @@ export class BackendStateManager {
       // APILL Timers per Intersection
       intersections: [
         { id: "node-wonokromo", name: "Simpang Wonokromo", state: "green", timer: 35, greenSplit: 35, redDuration: 25, yellowDuration: 3, totalCycleTime: 63, cycleStartTime: Date.now(), waitTime: 42, status: "Normal", pendingGreenSplit: null, overrideStartTime: null, overrideDuration: 0 },
-        { id: "node-margorejo", name: "Simpang Margorejo", state: "red", timer: 25, greenSplit: 28, redDuration: 25, yellowDuration: 3, totalCycleTime: 56, cycleStartTime: Date.now(), waitTime: 36, status: "Lancar", pendingGreenSplit: null, overrideStartTime: null, overrideDuration: 0 },
+        { id: "node-jemursari", name: "Simpang Jemursari", state: "red", timer: 25, greenSplit: 28, redDuration: 25, yellowDuration: 3, totalCycleTime: 56, cycleStartTime: Date.now(), waitTime: 36, status: "Lancar", pendingGreenSplit: null, overrideStartTime: null, overrideDuration: 0 },
         { id: "node-darmo", name: "Simpang Raya Darmo", state: "green", timer: 42, greenSplit: 42, redDuration: 25, yellowDuration: 3, totalCycleTime: 70, cycleStartTime: Date.now(), waitTime: 28, status: "Lancar", pendingGreenSplit: null, overrideStartTime: null, overrideDuration: 0 },
         { id: "node-tunjungan", name: "Simpang Tunjungan", state: "yellow", timer: 3, greenSplit: 30, redDuration: 25, yellowDuration: 3, totalCycleTime: 58, cycleStartTime: Date.now(), waitTime: 48, status: "Padat", pendingGreenSplit: null, overrideStartTime: null, overrideDuration: 0 },
         { id: "node-merr", name: "Simpang MERR Kertajaya", state: "green", timer: 45, greenSplit: 45, redDuration: 25, yellowDuration: 3, totalCycleTime: 73, cycleStartTime: Date.now(), waitTime: 22, status: "Lancar", pendingGreenSplit: null, overrideStartTime: null, overrideDuration: 0 }
@@ -232,76 +246,192 @@ export class BackendStateManager {
     this.yellowDuration = 3;
     this.redDurationBase = 25;
     this.resolutionInterval = null;
+    this.isHydrated = false;
+    this._initPromise = null;
 
-    // Inisialisasi Lapisan Persistensi SQLite
-    this._initPersistence();
+    // Trigger asynchronous initialization
+    this.init().catch(err => {
+      console.error('❌ [State Manager] Inisialisasi awal database gagal:', err.message);
+    });
   }
 
-  async _initPersistence() {
-    try {
-      await dbManager.init();
+  async init() {
+    if (this.isHydrated) return this;
+    if (this._initPromise) return this._initPromise;
 
-      // 1. Hydrate Incidents dari Database
-      const dbIncidents = dbManager.getAllIncidents();
-      if (dbIncidents && dbIncidents.length > 0) {
-        this.state.incidents = dbIncidents;
-        console.log(`🗄️ [State Manager] Memuat ${dbIncidents.length} insiden aktif/riwayat dari SQLite.`);
-      } else {
-        this.state.incidents.forEach(inc => dbManager.upsertIncident(inc));
-      }
+    this._initPromise = (async () => {
+      try {
+        await dbManager.init();
 
-      // 2. Hydrate Audit Logs dari Database
-      const dbLogs = dbManager.getAllAuditLogs(100);
-      if (dbLogs && dbLogs.length > 0) {
-        this.auditLogs = dbLogs;
-      } else {
-        this.auditLogs.forEach(log => dbManager.insertAuditLog(log));
-      }
-
-      // 3. Hydrate Signal Configs
-      const dbSignals = dbManager.getAllSignalConfigs();
-      if (dbSignals && dbSignals.length > 0) {
-        dbSignals.forEach(cfg => {
-          const node = this.state.intersections.find(n => n.id === cfg.node_id);
-          if (node) {
-            node.greenSplit = cfg.green_split;
+        // 0. Restore & Protect Sequence Monotonicity Across Restarts
+        const savedSeq = dbManager.getMetadata('last_persisted_sequence');
+        if (savedSeq) {
+          const parsed = parseInt(savedSeq, 10);
+          if (!isNaN(parsed) && parsed >= this.sequence) {
+            this.sequence = parsed + 10;
+            this.incidentSequence = this.sequence;
+            this.emergencySequence = this.sequence;
+            this.signalSequence = this.sequence;
+            this.deviceSequence = this.sequence;
+            this.state.seq = this.sequence;
+            console.log(`🗄️ [State Manager] Sequence dikalibrasi ulang dari baseline database: ${this.sequence}`);
           }
-          if (cfg.node_id === 'node-wonokromo') {
-            this.state.greenSplitWonokromo = cfg.green_split;
-          }
-        });
-      } else {
-        this.state.intersections.forEach(node => {
-          dbManager.upsertSignalConfig(node.id, {
-            greenSplit: node.greenSplit || 35,
-            cycleTime: 90,
-            mode: 'ADAPTIVE_AI'
+        }
+
+        // 1. Deterministic Hydration: Incidents (Database is authoritative)
+        const incRes = dbManager.getAllIncidents();
+        const dbIncidents = Array.isArray(incRes) ? incRes : (incRes?.data || []);
+        if (dbIncidents && dbIncidents.length > 0) {
+          const incidentMap = new Map();
+          dbIncidents.forEach(inc => incidentMap.set(String(inc.id), inc));
+
+          // Merge any pre-configured seed not yet present in SQLite
+          (this.state.incidents || []).forEach(seed => {
+            if (!incidentMap.has(String(seed.id))) {
+              try {
+                dbManager.upsertIncident(seed);
+                incidentMap.set(String(seed.id), seed);
+              } catch (_) {}
+            }
           });
-        });
-      }
+          this.state.incidents = Array.from(incidentMap.values());
+          console.log(`🗄️ [State Manager] Memuat & memulihkan ${this.state.incidents.length} insiden dari SQLite.`);
+        } else {
+          // Fresh database: persist initial seed incidents
+          this.state.incidents.forEach(inc => {
+            try { dbManager.upsertIncident(inc); } catch (_) {}
+          });
+        }
 
-      // 4. Hydrate Device Telemetry
-      const dbDevices = dbManager.getAllDeviceTelemetry();
-      if (dbDevices && dbDevices.length > 0) {
-        dbDevices.forEach(dbDev => {
-          const idx = this.devicesRegistry.findIndex(d => d.deviceId === dbDev.deviceId);
-          if (idx >= 0) {
-            this.devicesRegistry[idx] = { ...this.devicesRegistry[idx], ...dbDev };
+        // 2. Deterministic Hydration: Audit Logs (Deduplicated with Stable Identifiers)
+        const logRes = dbManager.getAllAuditLogs(100);
+        const dbLogs = Array.isArray(logRes) ? logRes : (logRes?.data || []);
+        if (dbLogs && dbLogs.length > 0) {
+          const knownCorrs = new Set();
+          const mergedLogs = [];
+          dbLogs.forEach(l => {
+            const key = l.correlationId || `${l.timestamp}-${l.action}-${l.entity}`;
+            if (!knownCorrs.has(key)) {
+              knownCorrs.add(key);
+              mergedLogs.push(l);
+            }
+          });
+          this.auditLogs = mergedLogs;
+        } else {
+          this.auditLogs.forEach(log => {
+            try { dbManager.insertAuditLog(log); } catch (_) {}
+          });
+        }
+
+        // 3. Hydrate Signal Configs
+        const sigRes = dbManager.getAllSignalConfigs();
+        const dbSignals = Array.isArray(sigRes) ? sigRes : (sigRes?.data || []);
+        if (dbSignals && dbSignals.length > 0) {
+          dbSignals.forEach(cfg => {
+            const node = this.state.intersections.find(n => n.id === cfg.node_id);
+            if (node) {
+              node.greenSplit = Number(cfg.green_split) || 35;
+            }
+            if (cfg.node_id === 'node-wonokromo') {
+              this.state.greenSplitWonokromo = Number(cfg.green_split) || 35;
+            }
+          });
+        } else {
+          this.state.intersections.forEach(node => {
+            try {
+              dbManager.upsertSignalConfig(node.id, {
+                greenSplit: node.greenSplit || 35,
+                cycleTime: 90,
+                mode: 'ADAPTIVE_AI'
+              });
+            } catch (_) {}
+          });
+        }
+
+        // 4. Hydrate Device Configs & Recover with Safe Defaults
+        const devRes = dbManager.getAllDeviceTelemetry();
+        const dbDevices = Array.isArray(devRes) ? devRes : (devRes?.data || []);
+        if (dbDevices && dbDevices.length > 0) {
+          dbDevices.forEach(dbDev => {
+            const idx = this.devicesRegistry.findIndex(d => d.deviceId === dbDev.deviceId);
+            if (idx >= 0) {
+              this.devicesRegistry[idx] = {
+                ...this.devicesRegistry[idx],
+                fps: dbDev.fps !== undefined && dbDev.fps !== null ? Number(dbDev.fps) : this.devicesRegistry[idx].fps,
+                resolution: dbDev.resolution || this.devicesRegistry[idx].resolution,
+                mode: dbDev.mode || this.devicesRegistry[idx].mode,
+                greenWaveSync: dbDev.greenWaveSync !== undefined && dbDev.greenWaveSync !== null ? !!dbDev.greenWaveSync : this.devicesRegistry[idx].greenWaveSync
+              };
+            }
+          });
+        } else {
+          this.devicesRegistry.forEach(dev => {
+            try { dbManager.upsertDeviceTelemetry(dev); } catch (_) {}
+          });
+        }
+
+        // 5. Emergency Recovery Guard: Do not leave orphaned active dispatches after crash
+        if (Array.isArray(this.state.activeEmergencies)) {
+          let hadActiveEmergency = false;
+          this.state.activeEmergencies.forEach(emg => {
+            if (["REQUESTED", "VERIFIED", "DISPATCHED", "EN_ROUTE"].includes(emg.status)) {
+              emg.status = "CANCELLED_UPON_RESTART";
+              emg.notes = "Server direstart saat dispatch armada berlangsung. Jalur sinyal dikembalikan ke siklus adaptif aman.";
+              emg.updatedAt = new Date().toISOString();
+              hadActiveEmergency = true;
+            }
+          });
+
+          if (hadActiveEmergency) {
+            this.state.greenWaveActive = false;
+            this.recordAuditLog({
+              operator: "SITS Crash Recovery",
+              action: "EMERGENCY_RECOVERY_RESET",
+              entity: "Active Emergencies",
+              result: "RECOVERED (Reset to safe baseline)",
+              timestamp: new Date().toISOString()
+            });
           }
-        });
-      } else {
-        this.devicesRegistry.forEach(dev => dbManager.upsertDeviceTelemetry(dev));
+        }
+
+        this.isHydrated = true;
+        return this;
+      } catch (err) {
+        console.error('❌ [State Manager] Gagal menginisialisasi SQLite persistence:', err);
+        throw err;
+      } finally {
+        this._initPromise = null;
       }
-    } catch (err) {
-      console.error('❌ [State Manager] Gagal menginisialisasi SQLite persistence:', err);
-    }
+    })();
+
+    return this._initPromise;
   }
 
   recordAuditLog(logEntry) {
     if (!logEntry) return;
-    this.auditLogs.unshift(logEntry);
-    if (this.auditLogs.length > 200) this.auditLogs.pop();
-    dbManager.insertAuditLog(logEntry);
+
+    const nowIso = new Date().toISOString();
+    const stableCorrId = logEntry.correlationId || logEntry.commandId || `AUD-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    const normalizedLog = {
+      ...logEntry,
+      correlationId: stableCorrId,
+      timestamp: logEntry.timestamp || nowIso
+    };
+
+    // Deduplication check: Avoid adding exact duplicate correlation
+    const existingIdx = this.auditLogs.findIndex(l => l.correlationId && l.correlationId === stableCorrId);
+    if (existingIdx >= 0) {
+      this.auditLogs[existingIdx] = normalizedLog;
+    } else {
+      this.auditLogs.unshift(normalizedLog);
+      if (this.auditLogs.length > 200) this.auditLogs.pop();
+    }
+
+    try {
+      dbManager.insertAuditLog(normalizedLog);
+    } catch (e) {
+      console.error("❌ [Audit Log] Gagal menyimpan log audit:", e.message);
+    }
   }
 
   setIo(ioInstance) {
@@ -439,7 +569,17 @@ export class BackendStateManager {
         existingInc.title = `Kegagalan Jaringan SITS: Edge Node ${id} ${newLevel}`;
         existingInc.updatedAt = nowStr;
         existingInc.notes = `Koneksi terputus. consecutiveFailures: ${dev.consecutiveFailures}. Terakhir aktif: ${dev.lastHeartbeatAt}.`;
-        if (this.io) this.io.emit('incident:update', { id: existingInc.id, payload: existingInc });
+        this.incidentSequence++;
+        if (this.io) {
+          this.io.emit('incident:update', {
+            id: existingInc.id,
+            seq: this.incidentSequence,
+            incidentSeq: this.incidentSequence,
+            timestamp: Date.now(),
+            source: 'server',
+            payload: existingInc
+          });
+        }
       } else {
         const newInc = {
           id: `INC-${id}`,
@@ -457,7 +597,17 @@ export class BackendStateManager {
           notes: `Perangkat ${id} kehilangan koneksi. Status: ${newLevel}.`
         };
         this.state.incidents.unshift(newInc);
-        if (this.io) this.io.emit('incident:update', { id: newInc.id, payload: newInc });
+        this.incidentSequence++;
+        if (this.io) {
+          this.io.emit('incident:update', {
+            id: newInc.id,
+            seq: this.incidentSequence,
+            incidentSeq: this.incidentSequence,
+            timestamp: Date.now(),
+            source: 'server',
+            payload: newInc
+          });
+        }
       }
 
       if (this.io) {
@@ -472,7 +622,17 @@ export class BackendStateManager {
         existingInc.title = `Anomali Edge Node SITS: ${id} Terdegradasi`;
         existingInc.updatedAt = nowStr;
         existingInc.notes = `Kinerja menurun. Temp: ${dev.temperatureC}°C, FPS: ${dev.fps}, Latency: ${dev.latencyMs}ms.`;
-        if (this.io) this.io.emit('incident:update', { id: existingInc.id, payload: existingInc });
+        this.incidentSequence++;
+        if (this.io) {
+          this.io.emit('incident:update', {
+            id: existingInc.id,
+            seq: this.incidentSequence,
+            incidentSeq: this.incidentSequence,
+            timestamp: Date.now(),
+            source: 'server',
+            payload: existingInc
+          });
+        }
       } else {
         const newInc = {
           id: `INC-${id}`,
@@ -490,7 +650,17 @@ export class BackendStateManager {
           notes: `Kinerja ${id} terdegradasi. Temp: ${dev.temperatureC}°C, FPS: ${dev.fps}, Latency: ${dev.latencyMs}ms.`
         };
         this.state.incidents.unshift(newInc);
-        if (this.io) this.io.emit('incident:update', { id: newInc.id, payload: newInc });
+        this.incidentSequence++;
+        if (this.io) {
+          this.io.emit('incident:update', {
+            id: newInc.id,
+            seq: this.incidentSequence,
+            incidentSeq: this.incidentSequence,
+            timestamp: Date.now(),
+            source: 'server',
+            payload: newInc
+          });
+        }
       }
 
       if (this.io) {
@@ -505,7 +675,17 @@ export class BackendStateManager {
         existingInc.updatedAt = nowStr;
         existingInc.resolvedAt = nowStr;
         existingInc.notes += ` [PULIH] Node kembali ke status HEALTHY pada ${nowStr}.`;
-        if (this.io) this.io.emit('incident:update', { id: existingInc.id, payload: existingInc });
+        this.incidentSequence++;
+        if (this.io) {
+          this.io.emit('incident:update', {
+            id: existingInc.id,
+            seq: this.incidentSequence,
+            incidentSeq: this.incidentSequence,
+            timestamp: Date.now(),
+            source: 'server',
+            payload: existingInc
+          });
+        }
         
         if (this.io) {
           this.io.emit('system:toast', {
@@ -527,6 +707,11 @@ export class BackendStateManager {
   getSnapshot() {
     return {
       seq: this.sequence,
+      cctvSeq: this.cctvSequence,
+      incidentSeq: this.incidentSequence,
+      emergencySeq: this.emergencySequence,
+      signalSeq: this.signalSequence,
+      deviceSeq: this.deviceSequence,
       timestamp: this.lastUpdated,
       isoTime: new Date().toISOString(),
       source: 'server',
@@ -741,7 +926,7 @@ export class BackendStateManager {
         return;
       }
 
-      if (this.state.greenWaveActive && (node.id === "node-wonokromo" || node.id === "node-margorejo" || node.id === "node-darmo")) {
+      if (this.state.greenWaveActive && (node.id === "node-wonokromo" || node.id === "node-jemursari" || node.id === "node-darmo")) {
         node.state = "green";
         node.timer = "∞";
         node.status = "Green Wave";
@@ -888,7 +1073,7 @@ export class BackendStateManager {
     this.state.greenWaveActive = !!active;
     if (active) {
       this.state.intersections.forEach(node => {
-        if (node.id === "node-wonokromo" || node.id === "node-margorejo" || node.id === "node-darmo") {
+        if (node.id === "node-wonokromo" || node.id === "node-jemursari" || node.id === "node-darmo") {
           node.state = "green";
           node.timer = "∞";
           node.status = "Green Wave";
@@ -961,6 +1146,15 @@ export class BackendStateManager {
       return inc;
     }
 
+    const previousSnapshot = {
+      status: inc.status,
+      updatedAt: inc.updatedAt,
+      acknowledgedAt: inc.acknowledgedAt,
+      resolvedAt: inc.resolvedAt,
+      assignedUnit: inc.assignedUnit,
+      notes: inc.notes
+    };
+
     inc.status = newStatus;
     inc.updatedAt = new Date().toISOString();
     if (newStatus === "ACKNOWLEDGED") {
@@ -975,14 +1169,24 @@ export class BackendStateManager {
     this.state.seq = this.sequence;
     this.state.timestampMs = Date.now();
 
-    // Persist ke Database SQLite
-    dbManager.upsertIncident(inc);
+    // Persist ke Database SQLite with immediate atomic save and rollback guard
+    try {
+      dbManager.upsertIncident(inc, true);
+    } catch (err) {
+      // Rollback in-memory mutation
+      Object.assign(inc, previousSnapshot);
+      this.sequence--;
+      this.state.seq = this.sequence;
+      console.error(`❌ [State Manager] Rollback insiden #${id} karena persistence failure:`, err.message);
+      throw new Error(`PERSISTENCE_FAILED: Gagal menyimpan status insiden #${id} ke SQLite (${err.message})`);
+    }
 
     const logEntry = {
       operator: "Operator SITS 112 Surabaya",
       action: `TRANSITION_${newStatus}`,
       entity: `Incident ${id}`,
       result: `SUCCESS (dari ${oldStatus} ke ${newStatus})`,
+      correlationId: `STATUS-${id}-${newStatus}-${Date.now()}`,
       timestamp: new Date().toISOString()
     };
     this.recordAuditLog(logEntry);

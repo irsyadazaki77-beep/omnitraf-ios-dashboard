@@ -40,8 +40,8 @@ export const ROUTES_DB = {
   "route-soetomo": [
     { name: "Bundaran Waru", lat: -7.3510, lng: 112.7290 },
     { name: "Jl. Ahmad Yani (DOLOG)", lat: -7.3450, lng: 112.7300 },
-    { name: "Simpang Margorejo", lat: -7.3180, lng: 112.7330, isIntersection: true, id: "node-margorejo" },
-    { name: "Simpang Jemursari", lat: -7.3100, lng: 112.7335 },
+    { name: "Simpang Jemursari", lat: -7.3180, lng: 112.7330, isIntersection: true, id: "node-jemursari" },
+    { name: "Simpang Jemursari Waypoint", lat: -7.3100, lng: 112.7335 },
     { name: "Simpang Wonokromo (DTC)", lat: -7.2985, lng: 112.7345, isIntersection: true, id: "node-wonokromo" },
     { name: "Marmoyo / KBD", lat: -7.2920, lng: 112.7370 },
     { name: "Simpang Raya Darmo - Diponegoro", lat: -7.2810, lng: 112.7395, isIntersection: true, id: "node-darmo" },
@@ -52,8 +52,8 @@ export const ROUTES_DB = {
   "route-yani-darmo": [
     { name: "Bundaran Waru", lat: -7.3510, lng: 112.7290 },
     { name: "Jl. Ahmad Yani (DOLOG)", lat: -7.3450, lng: 112.7300 },
-    { name: "Simpang Margorejo", lat: -7.3180, lng: 112.7330, isIntersection: true, id: "node-margorejo" },
-    { name: "Simpang Jemursari", lat: -7.3100, lng: 112.7335 },
+    { name: "Simpang Jemursari", lat: -7.3180, lng: 112.7330, isIntersection: true, id: "node-jemursari" },
+    { name: "Simpang Jemursari Waypoint", lat: -7.3100, lng: 112.7335 },
     { name: "Simpang Wonokromo (DTC)", lat: -7.2985, lng: 112.7345, isIntersection: true, id: "node-wonokromo" },
     { name: "Marmoyo / KBD", lat: -7.2920, lng: 112.7370 },
     { name: "Simpang Raya Darmo - Diponegoro", lat: -7.2810, lng: 112.7395, isIntersection: true, id: "node-darmo" },

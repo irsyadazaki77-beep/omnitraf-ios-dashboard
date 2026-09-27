@@ -162,7 +162,7 @@ export const INITIAL_STATE = {
   // Intersections APILL
   intersections: [
     { id: "node-wonokromo", name: "Simpang Wonokromo", state: "green", timer: 35, greenSplit: 35, waitTime: 42, status: "Normal" },
-    { id: "node-margorejo", name: "Simpang Margorejo", state: "red", timer: 25, greenSplit: 28, waitTime: 36, status: "Lancar" },
+    { id: "node-jemursari", name: "Simpang Jemursari", state: "red", timer: 25, greenSplit: 28, waitTime: 36, status: "Lancar" },
     { id: "node-darmo", name: "Simpang Raya Darmo", state: "green", timer: 28, greenSplit: 42, waitTime: 28, status: "Lancar" },
     { id: "node-tunjungan", name: "Simpang Tunjungan", state: "yellow", timer: 3, greenSplit: 30, waitTime: 48, status: "Padat" },
     { id: "node-merr", name: "Simpang MERR Kertajaya", state: "green", timer: 45, greenSplit: 45, waitTime: 22, status: "Lancar" }
@@ -240,10 +240,10 @@ export const INITIAL_STATE = {
     },
     {
       deviceId: "NODE-EDGE-03",
-      deviceName: "Jl. Tunjungan Node AI",
+      deviceName: "Bundaran Waru Node AI",
       type: "Jetson Xavier NX",
-      location: "Jl. Tunjungan",
-      coordinates: [-7.2585, 112.7388],
+      location: "Bundaran Waru",
+      coordinates: [-7.3510, 112.7290],
       status: "ONLINE",
       lastSeenAt: new Date().toISOString(),
       lastHeartbeatAt: new Date().toISOString(),
@@ -529,20 +529,25 @@ export const stateStore = new StateStore();
 
 /**
  * Mengatur Status Lifecycle Koneksi & Sinkronisasi Metadata
- * @param {'connecting'|'connected'|'reconnecting'|'offline'|'resyncing'|'fallback'} status
+ * @param {'connecting'|'connected'|'reconnecting'|'offline'|'resyncing'|'fallback'|'auth_failed'|'degraded'} status
  * @param {Object} [metadata={}]
  */
 export function setConnectionLifecycle(status, metadata = {}) {
   const currentState = stateStore.getState();
   const updates = {
     connectionStatus: status,
-    sseConnected: status === 'connected' || status === 'resyncing',
+    sseConnected: status === 'connected' || status === 'resyncing' || status === 'degraded',
     ...metadata
   };
 
   if (status === 'connected') {
     updates.lastConnectedAt = updates.lastConnectedAt || Date.now();
     updates.isStaleData = false;
+  } else if (status === 'degraded') {
+    updates.isStaleData = false;
+  } else if (status === 'auth_failed') {
+    updates.lastDisconnectedAt = updates.lastDisconnectedAt || Date.now();
+    updates.isStaleData = true;
   } else if (status === 'offline' || status === 'fallback') {
     updates.lastDisconnectedAt = updates.lastDisconnectedAt || Date.now();
     updates.isStaleData = true;
@@ -568,16 +573,29 @@ export function markStaleData(isStale) {
 }
 
 /**
- * Menerapkan Snapshot Server Kanonikal Penuh secara Atomik (Phase 2 Resynchronization)
+ * Menerapkan Snapshot Server Kanonikal Penuh secara Atomik (Phase 18 Hardened Resynchronization)
  * @param {Object} serverState
  * @param {string} [source='server']
  */
 export function applyServerSnapshot(serverState, source = 'server') {
   if (!serverState || typeof serverState !== 'object') return;
 
-  const rawState = serverState.state || serverState;
-  const seq = serverState.seq || rawState.seq || 0;
-  const timestampMs = serverState.timestamp || rawState.timestampMs || Date.now();
+  const rawState = serverState.state || serverState.data || serverState;
+  const seq = serverState.seq ?? serverState.sequence ?? rawState.seq ?? rawState.sequence ?? 0;
+  const cctvSeq = serverState.cctvSeq ?? rawState.cctvSeq ?? serverState.cctvSequence ?? rawState.cctvSequence ?? seq;
+  const incidentSeq = serverState.incidentSeq ?? rawState.incidentSeq ?? serverState.incidentSequence ?? rawState.incidentSequence ?? seq;
+  const emergencySeq = serverState.emergencySeq ?? rawState.emergencySeq ?? serverState.emergencySequence ?? rawState.emergencySequence ?? seq;
+  const signalSeq = serverState.signalSeq ?? rawState.signalSeq ?? serverState.signalSequence ?? rawState.signalSequence ?? seq;
+  const deviceSeq = serverState.deviceSeq ?? rawState.deviceSeq ?? serverState.deviceSequence ?? rawState.deviceSequence ?? seq;
+  const timestampMs = serverState.timestamp ?? serverState.timestampMs ?? rawState.timestampMs ?? rawState.timestamp ?? Date.now();
+  const serverSessionId = serverState.serverSessionId || rawState.serverSessionId || null;
+
+  const currentStore = stateStore.getState();
+  const isNewEpoch = serverSessionId && currentStore.serverSessionId && serverSessionId !== currentStore.serverSessionId;
+
+  if (isNewEpoch) {
+    console.info(`🔄 [StateStore] Sesi server / epoch baru terdeteksi (${serverSessionId}). Mereset baseline ordering.`);
+  }
 
   const updates = {
     isChaosMode: !!rawState.isChaosMode,
@@ -585,17 +603,37 @@ export function applyServerSnapshot(serverState, source = 'server') {
     greenWaveActive: !!rawState.greenWaveActive,
     greenSplitWonokromo: rawState.greenSplitWonokromo || 35,
     isStaleData: false,
+    serverSessionId: serverSessionId || currentStore.serverSessionId,
     lastReceivedSequence: seq,
+    lastReceivedCctvSequence: cctvSeq,
+    lastReceivedIncidentSequence: incidentSeq,
+    lastReceivedEmergencySequence: emergencySeq,
+    lastReceivedSignalSequence: signalSeq,
+    lastReceivedDeviceSequence: deviceSeq,
     lastTelemetryAt: timestampMs,
     lastTelemetryTime: timestampMs,
     lastTelemetrySource: 'server'
   };
+
+  // Update diagnostics with authoritative baseline
+  diagnostics.recordAcceptedEvent('traffic', updates.lastReceivedSequence, timestampMs);
+  diagnostics.recordAcceptedEvent('cctv', updates.lastReceivedCctvSequence, timestampMs);
+  diagnostics.recordAcceptedEvent('incident', updates.lastReceivedIncidentSequence, timestampMs);
+  diagnostics.recordAcceptedEvent('emergency', updates.lastReceivedEmergencySequence, timestampMs);
+  diagnostics.recordAcceptedEvent('signal', updates.lastReceivedSignalSequence, timestampMs);
+  diagnostics.recordAcceptedEvent('device', updates.lastReceivedDeviceSequence, timestampMs);
 
   if (Array.isArray(rawState.intersections)) {
     updates.intersections = deepClone(rawState.intersections);
   }
   if (Array.isArray(rawState.activeEmergencies)) {
     updates.activeEmergencies = deepClone(rawState.activeEmergencies);
+  }
+  if (Array.isArray(rawState.incidents)) {
+    updates.incidents = deepClone(rawState.incidents);
+  }
+  if (Array.isArray(rawState.devices)) {
+    updates.devices = deepClone(rawState.devices);
   }
 
   const telemetryKeys = ['networkLoad', 'avgWaitTime', 'congestionIndex', 'co2SavedKg', 'fuelSavedLiters', 'vehiclesToday', 'sitsUptime', 'cctvOnline', 'iotOnline', 'sitsSignal', 'aiScore', 'aiConfidence', 'timestamp'];
@@ -639,6 +677,7 @@ export function validateAndTrackSequence(payload, source, topicKey) {
 
   if (!timestamp || !seq || !packetSource) {
     console.warn(`[StateStore] [${topicKey}] Malformed packet ignored. Missing critical headers.`, payload);
+    diagnostics.recordDroppedEvent(topicKey, seq || 0, 'malformed_missing_headers');
     return false;
   }
 
@@ -661,19 +700,22 @@ export function validateAndTrackSequence(payload, source, topicKey) {
   // 2. Ignore duplicate packets
   if (seq === currentSeq) {
     console.warn(`[StateStore] [${topicKey}] Duplicate packet ignored (seq: ${seq})`);
+    diagnostics.recordDuplicateEvent(topicKey, seq);
     return false;
   }
 
   // 3. Ignore out-of-order/older packets
   if (seq < currentSeq) {
     console.warn(`[StateStore] [${topicKey}] Out-of-order packet ignored (seq: ${seq} < currentSeq: ${currentSeq})`);
+    diagnostics.recordDroppedEvent(topicKey, seq, 'out_of_order');
     return false;
   }
 
   // 4. Ignore packets older than active state (timestamp-wise)
   const packetTime = typeof timestamp === 'number' ? timestamp : Date.parse(timestamp) || Date.now();
-  if (lastTelemetryAt > 0 && packetTime < lastTelemetryAt) {
+  if (lastTelemetryAt > 0 && packetTime < (lastTelemetryAt - 5000)) {
     console.warn(`[StateStore] [${topicKey}] Outdated packet by timestamp ignored (${packetTime} < ${lastTelemetryAt})`);
+    diagnostics.recordDroppedEvent(topicKey, seq, 'stale_timestamp');
     return false;
   }
 
@@ -688,6 +730,8 @@ export function validateAndTrackSequence(payload, source, topicKey) {
     });
   }
 
+  // Record valid accepted event in diagnostics
+  diagnostics.recordAcceptedEvent(topicKey, seq, packetTime);
   return true;
 }
 
@@ -814,12 +858,18 @@ export function updateIncidentState(incidentId, updateData, source = 'controller
   }
   const incomingSeq = updateData.seq || updateData.sequence || 0;
   const currentIncidents = deepClone(stateStore.getState().incidents || []);
+  let found = false;
   const updated = currentIncidents.map(inc => {
     if (String(inc.id) === String(incidentId)) {
+      found = true;
       return { ...inc, ...updateData };
     }
     return inc;
   });
+
+  if (!found) {
+    updated.unshift({ id: incidentId, ...updateData });
+  }
 
   stateStore.setState({ 
     incidents: updated,
@@ -838,7 +888,7 @@ export function updateDeviceState(deviceId, deviceData, source = 'controller') {
   const incomingSeq = deviceData.seq || deviceData.sequence || 0;
   const currentDevices = deepClone(stateStore.getState().devices || []);
   const updated = currentDevices.map(dev => {
-    if (dev.id === deviceId) {
+    if (dev.deviceId === deviceId) {
       return { ...dev, ...deviceData };
     }
     return dev;

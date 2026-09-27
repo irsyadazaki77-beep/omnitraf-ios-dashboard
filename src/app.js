@@ -162,31 +162,42 @@ export class App {
     const cleanOld = (oldView || '').replace('#', '').replace('view-', '');
     const cleanNew = (newView || '').replace('#', '').replace('view-', '');
 
-    // Deactivate CCTV controller if target view doesn't render CCTV canvas
-    if ((cleanOld === 'cctv' || cleanOld === 'dashboard') && (cleanNew !== 'cctv' && cleanNew !== 'dashboard')) {
-      if (cctvController && typeof cctvController.deactivate === 'function') {
-        cctvController.deactivate();
-      }
-    }
+    const VIEW_CONTROLLERS = {
+      'dashboard': ['mapManager', 'cctvController', 'signalsController', 'incidentController', 'emergencyController'],
+      'map': ['mapManager'],
+      'cctv': ['cctvController'],
+      'signals': ['signalsController'],
+      'incidents': ['incidentController'],
+      'emergency': ['emergencyController'],
+      'emergencies': ['emergencyController'],
+      'analytics': ['analyticsController'],
+      'prediction': ['analyticsController'],
+      'devices': ['deviceController'],
+      'reports': ['reportController']
+    };
 
-    // Deactivate Map Manager if target view doesn't render Leaflet maps
-    if ((cleanOld === 'map' || cleanOld === 'dashboard') && (cleanNew !== 'map' && cleanNew !== 'dashboard')) {
-      if (mapManager && typeof mapManager.deactivate === 'function') {
-        mapManager.deactivate();
-      }
-    }
+    const oldCtrls = VIEW_CONTROLLERS[cleanOld] || [];
+    const newCtrls = VIEW_CONTROLLERS[cleanNew] || [];
 
-    if (cleanOld === 'analytics' || cleanOld === 'prediction') {
-      if (analyticsController && typeof analyticsController.deactivate === 'function') {
-        analyticsController.deactivate();
-      }
-    }
+    const controllers = {
+      mapManager,
+      cctvController,
+      signalsController,
+      incidentController,
+      emergencyController,
+      analyticsController,
+      deviceController,
+      reportController
+    };
 
-    if (cleanOld === 'devices') {
-      if (deviceController && typeof deviceController.deactivate === 'function') {
-        deviceController.deactivate();
+    oldCtrls.forEach(ctrlName => {
+      if (!newCtrls.includes(ctrlName)) {
+        const ctrl = controllers[ctrlName];
+        if (ctrl && typeof ctrl.deactivate === 'function') {
+          ctrl.deactivate();
+        }
       }
-    }
+    });
   }
 
   _safeInitAndActivate(name, ctrl) {

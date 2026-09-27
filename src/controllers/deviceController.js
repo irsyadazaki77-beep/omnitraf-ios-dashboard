@@ -8,8 +8,10 @@
 import { soundManager } from '../core/soundManager.js';
 import { SYSTEM_CONFIG } from '../config/systemConfig.js';
 import { stateStore, updateDeviceState } from '../core/stateStore.js';
-import { socketClient } from '../core/socketClient.js';
+import { socketClient, fetchWithCacheAndDedupe } from '../core/socketClient.js';
 import { authManager } from '../core/authManager.js';
+import { Disposer } from '../core/disposer.js';
+import { commandLayer } from '../core/commandLayer.js';
 
 export class DeviceController {
   constructor() {
@@ -17,50 +19,48 @@ export class DeviceController {
     this.ctx = null;
     this._isInitialized = false;
     this.selectedDeviceId = "NODE-EDGE-01";
-    this._unsubscribeCallbacks = [];
+    this.disposer = new Disposer('DeviceController');
   }
 
   init() {
     if (this._isInitialized) return;
     this._isInitialized = true;
-
     console.info("🔌 [DeviceController] Menginisialisasi Edge Node Registry & Health Monitor...");
-
-    this.canvas = document.getElementById("deviceLatencyCanvas") || document.getElementById("latencySparkCanvas");
-    if (this.canvas) {
-      this.ctx = this.canvas.getContext("2d");
-    }
-
-    // 1. Subscribe ke StateStore untuk update data secara reaktif
-    const unDevices = stateStore.subscribe("state:devices", () => {
-      this.render();
-    });
-    this._unsubscribeCallbacks.push(unDevices);
-
-    // 2. Registrasi Socket.io listener untuk transisi konfigurasi
-    const socket = socketClient.getSocket();
-    if (socket) {
-      socket.on('device:config-transition', (transitionData) => {
-        this._handleConfigTransitionEvent(transitionData);
-      });
-    }
-
-    // 3. Centralized Event Delegation untuk tabel & dashboard
-    this._bindTableEvents();
-    this._bindDrawerEvents();
-
-    // Jalankan render awal
-    this.render();
   }
 
   activate() {
+    this.deactivate(); // Ensure clean slate before binding
+
     this.canvas = document.getElementById("deviceLatencyCanvas") || document.getElementById("latencySparkCanvas");
     if (this.canvas) {
       this.ctx = this.canvas.getContext("2d");
     }
+
+    this._setupStoreListeners();
+    this._setupSocketListeners();
     this._bindTableEvents();
     this._bindDrawerEvents();
+    
     this.render();
+  }
+
+  deactivate() {
+    this.disposer.clear();
+  }
+
+  _setupStoreListeners() {
+    this.disposer.addStoreSubscription(stateStore, "state:devices", () => {
+      this.render();
+    });
+  }
+
+  _setupSocketListeners() {
+    const socket = socketClient.getSocket();
+    if (socket) {
+      this.disposer.addSocketListener(socketClient, 'device:config-transition', (transitionData) => {
+        this._handleConfigTransitionEvent(transitionData);
+      });
+    }
   }
 
   /**
@@ -213,7 +213,7 @@ export class DeviceController {
     if (!tbody) return;
 
     // centralized click delegator
-    tbody.addEventListener("click", (e) => {
+    this.disposer.addEventListener(tbody, "click", (e) => {
       const pingBtn = e.target.closest(".btn-ping-device-row");
       const row = e.target.closest(".clickable-device-row");
 
@@ -234,7 +234,7 @@ export class DeviceController {
     // Bind Ping All button
     const btnPingAll = document.getElementById("btnPingAll");
     if (btnPingAll) {
-      btnPingAll.addEventListener("click", async () => {
+      this.disposer.addEventListener(btnPingAll, "click", async () => {
         btnPingAll.disabled = true;
         const origText = btnPingAll.textContent;
         btnPingAll.textContent = "Pinging All...";
@@ -267,15 +267,18 @@ export class DeviceController {
     }
 
     try {
-      const res = await fetch(`/api/devices/ping?deviceId=${deviceId}&actor=Zaki Putra (Operator)`);
-      const payload = await res.json();
+      const actorName = authManager.getUser()?.name || "Operator SITS";
+      const payload = await fetchWithCacheAndDedupe(
+        `/api/devices/ping?deviceId=${encodeURIComponent(deviceId)}&actor=${encodeURIComponent(actorName)}`,
+        { method: 'GET', forceRefresh: true }
+      );
 
       if (payload && payload.success) {
-        const latency = payload.data.latencyMs;
+        const latency = payload.data?.latencyMs || payload.latencyMs || 8;
         window.showToast(`✓ Ping ${deviceId} Sukses: ${latency} ms respon balik.`);
         soundManager.play('success');
       } else {
-        throw new Error(payload?.error?.message || "Unknown error");
+        throw new Error(payload?.error?.message || "Ping gagal diproses.");
       }
     } catch (err) {
       window.showToast(`❌ Gagal ping ${deviceId}: ${err.message}`, "danger");
@@ -396,13 +399,6 @@ export class DeviceController {
           </div>
         </div>
       `;
-
-      // Re-bind click handlers untuk tombol fault injection yang baru di-render
-      diagBox.querySelectorAll(".btn-inject-fault").forEach(btn => {
-        btn.addEventListener("click", () => {
-          this._handleFaultInjectionClick(this.selectedDeviceId, btn.dataset.fault);
-        });
-      });
     }
 
     // Render Latency Sparkline di Drawer Canvas
@@ -479,26 +475,28 @@ export class DeviceController {
 
   async _fetchDeviceAuditTrail(deviceId) {
     try {
-      const res = await fetch(`/api/devices/audit?deviceId=${deviceId}`);
-      const payload = await res.json();
+      const payload = await fetchWithCacheAndDedupe(
+        `/api/devices/audit?deviceId=${encodeURIComponent(deviceId)}`,
+        { method: 'GET', ttlMs: 1500 }
+      );
       const el = document.getElementById("diagLastCommand");
       if (!el) return;
 
-      if (payload && payload.success && payload.data && payload.data.length > 0) {
+      if (payload && payload.success && Array.isArray(payload.data) && payload.data.length > 0) {
         const cmd = payload.data[0];
         const time = new Date(cmd.requestedAt).toLocaleTimeString('id-ID');
         
         let desc = "";
-        if (cmd.actionId.includes("CFG")) {
-          desc = `Config update (FPS:${cmd.newState.fps}, Res:${cmd.newState.resolution}) oleh ${cmd.actor}`;
-        } else if (cmd.actionId.includes("PING")) {
-          desc = `Manual ping selesai, respon: ${cmd.newState.latencyMs}ms oleh ${cmd.actor}`;
-        } else if (cmd.actionId.includes("FAULT")) {
-          desc = `Fault: ${cmd.newState} disuntik oleh ${cmd.actor}`;
+        if (cmd.actionId && cmd.actionId.includes("CFG")) {
+          desc = `Config update (FPS:${cmd.newState?.fps}, Res:${cmd.newState?.resolution}) oleh ${cmd.actor}`;
+        } else if (cmd.actionId && cmd.actionId.includes("PING")) {
+          desc = `Manual ping selesai, respon: ${cmd.newState?.latencyMs}ms oleh ${cmd.actor}`;
+        } else if (cmd.actionId && cmd.actionId.includes("FAULT")) {
+          desc = `Fault: ${typeof cmd.newState === 'object' ? (cmd.newState?.status || 'Active') : cmd.newState} disuntik oleh ${cmd.actor}`;
         }
 
         el.innerHTML = `
-          <strong>[${time} WIB] ID: ${cmd.actionId.slice(-6)}</strong><br/>
+          <strong>[${time} WIB] ID: ${cmd.actionId ? cmd.actionId.slice(-6) : '-'}</strong><br/>
           <span style="color:#10b981;">• Status: ${cmd.status || 'APPLIED'}</span><br/>
           <span>• Detail: ${desc}</span>
         `;
@@ -526,7 +524,7 @@ export class DeviceController {
     };
 
     if (closeBtn) {
-      closeBtn.addEventListener("click", closeDrawer);
+      this.disposer.addEventListener(closeBtn, "click", closeDrawer);
     }
 
     const handleFormSubmit = async (e) => {
@@ -552,24 +550,16 @@ export class DeviceController {
       }
 
       try {
-        const token = authManager.getToken();
-        const res = await fetch("/api/devices/config", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { "Authorization": `Bearer ${token}` } : {})
-          },
-          body: JSON.stringify(payload)
-        });
+        await commandLayer.dispatchCommand({
+          action: 'device:config',
+          targetType: 'device',
+          targetId: this.selectedDeviceId,
+          payload
+        }, false); // low risk
 
-        const data = await res.json();
-        if (data && data.success) {
-          window.showToast(`✓ Konfigurasi parameter ${this.selectedDeviceId} berhasil disimpan & disinkronkan.`);
-          soundManager.play('success');
-          closeDrawer();
-        } else {
-          throw new Error(data?.error?.message || data?.message || "Validation failed");
-        }
+        window.showToast(`✓ Konfigurasi parameter ${this.selectedDeviceId} berhasil disimpan & disinkronkan.`);
+        soundManager.play('success');
+        closeDrawer();
       } catch (err) {
         window.showToast(`❌ Gagal menyimpan konfigurasi: ${err.message}`, "danger");
         soundManager.play('alert');
@@ -582,30 +572,34 @@ export class DeviceController {
     };
 
     if (form) {
-      form.addEventListener("submit", handleFormSubmit);
+      this.disposer.addEventListener(form, "submit", handleFormSubmit);
     }
     if (saveBtn) {
-      saveBtn.addEventListener("click", handleFormSubmit);
+      this.disposer.addEventListener(saveBtn, "click", handleFormSubmit);
+    }
+
+    // Event delegation on drawer for fault injection clicks - absolutely 100% leak-proof!
+    if (drawer) {
+      this.disposer.addEventListener(drawer, "click", (e) => {
+        const injectBtn = e.target.closest(".btn-inject-fault");
+        if (injectBtn) {
+          this._handleFaultInjectionClick(this.selectedDeviceId, injectBtn.dataset.fault);
+        }
+      });
     }
   }
 
   async _handleFaultInjectionClick(deviceId, faultType) {
     try {
-      const token = authManager.getToken();
-      const res = await fetch("/api/devices/fault", {
+      const payload = await fetchWithCacheAndDedupe("/api/devices/fault", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
+        body: {
           deviceId,
           type: faultType,
           actor: authManager.getUser()?.name || "Administrator SITS"
-        })
+        }
       });
 
-      const payload = await res.json();
       if (payload && payload.success) {
         if (faultType === "recover") {
           window.showToast(`✓ Perangkat ${deviceId} berhasil dipulihkan secara normal (HEALTHY).`);
@@ -621,7 +615,9 @@ export class DeviceController {
         throw new Error(payload?.error?.message || "Fault injection rejected");
       }
     } catch (err) {
-      window.showToast(`❌ Gagal menyuntikkan gangguan: ${err.message}`, "danger");
+      const isRoleErr = err.status === 403 || err.code === 'FORBIDDEN';
+      const msg = isRoleErr ? 'Akses ditolak: Memerlukan akun role Administrator SITS.' : err.message;
+      window.showToast(`❌ Gagal menyuntikkan gangguan: ${msg}`, "danger");
       soundManager.play('alert');
     }
   }
@@ -647,17 +643,7 @@ export class DeviceController {
   }
 
   destroy() {
-    this._unsubscribeCallbacks.forEach(un => {
-      if (typeof un === 'function') un();
-    });
-    this._unsubscribeCallbacks = [];
-    this._isInitialized = false;
-
-    // Hapus socket listener
-    const socket = socketClient.getSocket();
-    if (socket) {
-      socket.off('device:config-transition');
-    }
+    this.deactivate();
   }
 }
 

@@ -17,8 +17,8 @@ class CommandLayer {
     this.lastActivityAt = new Date().toISOString();
     
     // Idempotency keys & pending commands maps
-    this.executedCommandIds = new Set();
-    this.pendingCommands = new Map();
+    this.executedCommands = new Map(); // idempotencyKey -> result
+    this.pendingCommands = new Map(); // commandId -> cmd
     
     // In-memory Audit Trail Ring Buffer (Bounded)
     this.auditHistory = [];
@@ -104,40 +104,53 @@ class CommandLayer {
    */
   async dispatchCommand(intent, isHighRisk = false) {
     this.lastActivityAt = new Date().toISOString();
-    const commandId = `CMD-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
-    const correlationId = `CORR-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+    const commandId = intent.commandId || `CMD-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+    const correlationId = intent.correlationId || `CORR-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+    const idempotencyKey = intent.idempotencyKey || `IDEMP-${intent.action}-${intent.targetId || 'global'}-${JSON.stringify(intent.payload || {})}`;
 
     const cmd = {
       commandId,
+      correlationId,
+      requestedAt: new Date().toISOString(),
+      completedAt: null,
+      actor: this.actor,
       action: intent.action,
       targetType: intent.targetType,
       targetId: intent.targetId,
-      requestedAt: new Date().toISOString(),
-      source: this.actor,
       payload: intent.payload || {},
       previousState: this._captureStateSnapshot(intent.targetType, intent.targetId),
-      result: 'PENDING',
-      completedAt: null,
+      result: 'REQUESTED',
       errorCode: null,
-      correlationId
+      idempotencyKey
     };
 
     // 1. Validasi Idempotency
-    const idempotencyKey = `${intent.action}:${JSON.stringify(intent.payload)}`;
-    if (this._checkIdempotency(intent.action, intent.payload)) {
-      console.warn(`[CommandLayer] Perintah duplikat / idempotent ditolak: ${intent.action}`);
-      return { success: true, type: "idempotent_no_op", commandId };
+    const pending = Array.from(this.pendingCommands.values()).find(p => p.idempotencyKey === idempotencyKey);
+    if (pending) {
+      console.warn(`[CommandLayer] Perintah duplikat sedang berjalan: ${intent.action}`);
+      throw new Error(`Perintah [${intent.action}] sedang diproses. Silakan tunggu.`);
+    }
+
+    if (this.executedCommands.has(idempotencyKey)) {
+      const cached = this.executedCommands.get(idempotencyKey);
+      console.info(`[CommandLayer] Menggunakan hasil cache idempotensi untuk ${intent.action}`);
+      return { success: true, commandId: cached.commandId, data: cached.data, mode: "idempotent_no_op" };
     }
 
     // 2. State Machine Rule Check
+    cmd.result = 'VALIDATING';
     const validationError = this._validateStateMachine(intent);
     if (validationError) {
+      cmd.result = 'REJECTED';
+      cmd.errorCode = 'VALIDATION_FAILED';
+      cmd.completedAt = new Date().toISOString();
       this.addAuditEvent({
         type: "command:rejected",
         entity: intent.targetId,
         source: this.actor,
         reasonCode: "STATE_MACHINE_REJECT",
         result: "REJECTED",
+        correlationId,
         details: `Gagal validasi state: ${validationError}`
       });
       throw new Error(validationError);
@@ -147,12 +160,16 @@ class CommandLayer {
     if (isHighRisk) {
       const userApproved = await this._showConfirmationGuard(intent);
       if (!userApproved) {
+        cmd.result = 'REJECTED';
+        cmd.errorCode = 'OPERATOR_CANCELLED';
+        cmd.completedAt = new Date().toISOString();
         this.addAuditEvent({
           type: "command:rejected",
           entity: intent.targetId,
           source: this.actor,
           reasonCode: "OPERATOR_CANCELLED",
           result: "CANCELLED",
+          correlationId,
           details: `Perintah dibatalkan oleh operator.`
         });
         throw new Error("Perintah dibatalkan oleh operator.");
@@ -160,6 +177,7 @@ class CommandLayer {
     }
 
     // 4. Catat ke in-memory pending commands
+    cmd.result = 'DISPATCHED';
     this.pendingCommands.set(commandId, cmd);
     this.addAuditEvent({
       type: "command:requested",
@@ -175,32 +193,29 @@ class CommandLayer {
     return new Promise((resolve, reject) => {
       const socket = socketClient.getSocket();
       if (!socket || !socket.connected) {
-        // Fallback Standalone / Offline Mode
-        cmd.result = 'APPLIED';
+        // Honest Connection & Offline Handling
+        cmd.result = 'OFFLINE';
+        cmd.errorCode = 'OFFLINE';
         cmd.completedAt = new Date().toISOString();
         this.pendingCommands.delete(commandId);
-        this.executedCommandIds.add(idempotencyKey);
-        
-        // Mutasi StateStore lokal optimis
-        this._mutateStateStoreLocally(intent);
         
         this.addAuditEvent({
-          type: "command:acknowledged",
+          type: "command:failed",
           entity: intent.targetId,
-          source: "Local Fallback Simulator",
-          reasonCode: "STANDALONE_ACK",
+          source: this.actor,
+          reasonCode: "OFFLINE",
           correlationId,
-          result: "SUCCESS",
-          details: `Perintah ${intent.action} berhasil diterapkan secara lokal (Offline Fallback).`
+          result: "OFFLINE",
+          details: `Gagal mengirim perintah ${intent.action}: Jaringan Offline.`
         });
 
-        resolve({ success: true, commandId, state: "applied", mode: "offline" });
+        reject(new Error("Koneksi server terputus. Kondisi offline tidak boleh dianggap sebagai eksekusi backend."));
         return;
       }
 
       // Kirim via Socket.io dengan Timeout 4 detik
       const timeoutId = setTimeout(() => {
-        cmd.result = 'FAILED';
+        cmd.result = 'TIMEOUT';
         cmd.errorCode = 'TIMEOUT';
         cmd.completedAt = new Date().toISOString();
         this.pendingCommands.delete(commandId);
@@ -211,7 +226,7 @@ class CommandLayer {
           source: this.actor,
           reasonCode: "TIMEOUT_RECONCILIATION",
           correlationId,
-          result: "FAILED",
+          result: "TIMEOUT",
           details: `Koneksi perintah timeout. Memulai rekonsiliasi resync...`
         });
 
@@ -226,9 +241,14 @@ class CommandLayer {
         this.pendingCommands.delete(commandId);
 
         if (response && response.success) {
-          cmd.result = 'APPLIED';
+          cmd.result = 'SERVER_APPLIED';
           cmd.completedAt = new Date().toISOString();
-          this.executedCommandIds.add(idempotencyKey);
+          
+          this.executedCommands.set(idempotencyKey, {
+            commandId,
+            data: response.data,
+            result: 'SERVER_APPLIED'
+          });
 
           // Simpan Decision Traceability jika berasal dari AI Recommendation
           if (intent.payload && intent.payload.recommendationId) {
@@ -244,14 +264,22 @@ class CommandLayer {
             source: "SITS Core Server",
             reasonCode: "SERVER_ACK",
             correlationId,
-            result: "SUCCESS",
-            details: `Perintah ${intent.action} berhasil divalidasi dan diterapkan di server.`
+            result: "SERVER_APPLIED",
+            details: `Perintah ${intent.action} berhasil diterapkan di server.`
           });
 
-          resolve({ success: true, commandId, data: response.data });
+          // Apply state strictly based on server acknowledgement response
+          if (response.resultingState) {
+            stateStore.setState(response.resultingState, { source: 'server' });
+          }
+
+          resolve({ success: true, commandId, data: response.data, status: 'SERVER_APPLIED' });
         } else {
+          const errMessage = response?.error?.message || (typeof response?.error === 'string' ? response.error : response?.message) || "Perintah ditolak oleh Server ATCS SITS.";
+          const errCode = response?.error?.code || response?.code || (typeof response?.error === 'string' ? response.error : 'SERVER_REJECT');
+
           cmd.result = 'REJECTED';
-          cmd.errorCode = response?.error || 'SERVER_REJECT';
+          cmd.errorCode = errCode;
           cmd.completedAt = new Date().toISOString();
 
           this.addAuditEvent({
@@ -261,46 +289,90 @@ class CommandLayer {
             reasonCode: "SERVER_REJECTED",
             correlationId,
             result: "REJECTED",
-            details: `Perintah ditolak server: ${response?.error || 'Alasan keamanan / otentikasi'}`
+            details: `Perintah ditolak server: ${errMessage}`
           });
 
-          reject(new Error(response?.error || "Perintah ditolak oleh Server ATCS SITS."));
+          reject(new Error(errMessage));
         }
       });
     });
   }
 
-  _checkIdempotency(action, payload) {
-    const state = stateStore.getState();
-
-    if (action === 'green-wave:toggle') {
-      return state.greenWaveActive === !!payload.active;
-    }
-    if (action === 'emergency:activate') {
-      const activeEmg = state.activeEmergencies || [];
-      return activeEmg.some(e => e.vehicleId === payload.code && !["COMPLETED", "CANCELLED"].includes(e.status));
-    }
-    if (action === 'device:config') {
-      const dev = (state.devices || []).find(d => d.deviceId === payload.deviceId);
-      if (dev) {
-        return dev.fps === payload.fps && dev.resolution === payload.resolution;
+  handleDisconnect() {
+    console.warn(`⚠️ [CommandLayer] Socket disconnect. Marking ${this.pendingCommands.size} pending command(s) as PENDING_RECONCILIATION.`);
+    for (const [id, cmd] of this.pendingCommands.entries()) {
+      if (cmd.result === 'DISPATCHED') {
+        cmd.result = 'PENDING_RECONCILIATION';
       }
     }
-    return false;
+  }
+
+  async checkCommandStatusOnServer(commandId, idempotencyKey) {
+    const socket = socketClient.getSocket();
+    if (!socket || !socket.connected) return null;
+    return new Promise((resolve) => {
+      socket.emit('command:status', { commandId, idempotencyKey }, (response) => {
+        if (response && response.success) {
+          resolve(response.status); // 'SERVER_APPLIED' or 'NOT_FOUND'
+        } else {
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  async reconcilePendingCommands() {
+    console.info(`🔄 [CommandLayer] Memulai rekonsiliasi perintah tertunda setelah koneksi pulih (${this.pendingCommands.size} commands)...`);
+    for (const [commandId, cmd] of this.pendingCommands.entries()) {
+      if (cmd.result === 'DISPATCHED' || cmd.result === 'TIMEOUT' || cmd.result === 'PENDING_RECONCILIATION') {
+        try {
+          const serverStatus = await this.checkCommandStatusOnServer(cmd.commandId, cmd.idempotencyKey);
+          if (serverStatus === 'SERVER_APPLIED') {
+            cmd.result = 'SERVER_APPLIED';
+            cmd.completedAt = new Date().toISOString();
+            this.pendingCommands.delete(commandId);
+            this.executedCommands.set(cmd.idempotencyKey, {
+              commandId,
+              correlationId: cmd.correlationId,
+              result: 'SERVER_APPLIED'
+            });
+            this.addAuditEvent({
+              type: "command:reconciled",
+              entity: cmd.targetId,
+              source: "SITS Reconciler",
+              reasonCode: "RECONNECT_RECONCILIATION",
+              correlationId: cmd.correlationId,
+              result: "SERVER_APPLIED",
+              details: `Perintah ${cmd.action} berhasil direkonsiliasi dan terkonfirmasi telah diterapkan di server.`
+            });
+          } else {
+            cmd.result = 'UNKNOWN_SERVER_STATE';
+            cmd.errorCode = 'RECONCILIATION_UNCONFIRMED';
+            console.warn(`⚠️ [CommandLayer] Status perintah ${commandId} tidak ditemukan di server saat rekonsiliasi.`);
+          }
+        } catch (err) {
+          console.warn(`[CommandLayer] Gagal rekonsiliasi ${commandId}:`, err);
+        }
+      }
+    }
+  }
+
+  _checkIdempotency(action, payload) {
+    return false; // Handled explicitly using stable idempotencyKey/commandId history
   }
 
   _validateStateMachine(intent) {
     const state = stateStore.getState();
     const action = intent.action;
 
-    if (action === 'incident:acknowledge' || action === 'incident:resolve') {
+    if (action === 'incident:acknowledge' || action === 'incident:dispatch' || action === 'incident:resolve') {
       const id = intent.targetId;
       const inc = (state.incidents || []).find(i => String(i.id) === String(id));
       if (!inc) {
         return `Insiden #${id} tidak ditemukan di log aktif.`;
       }
-      if (inc.status === "RESOLVED" && action === 'incident:acknowledge') {
-        return `Insiden #${id} sudah terselesaikan (RESOLVED). Tidak dapat di-Acknowledge ulang.`;
+      if (inc.status === "RESOLVED" && (action === 'incident:acknowledge' || action === 'incident:dispatch')) {
+        return `Insiden #${id} sudah terselesaikan (RESOLVED). Tidak dapat diubah statusnya.`;
       }
     }
 
@@ -351,7 +423,7 @@ class CommandLayer {
         target.textContent = "Koridor Utama A. Yani - Darmo";
         reason.textContent = "Melakukan sinkronisasi gelombang hijau penuh untuk mengurai bottleneck. Membatasi kontrol dinamis adaptif AI.";
         duration.textContent = intent.payload.active ? "Aktif terus-menerus sampai dinonaktifkan" : "Kembali ke mode adaptif SITS";
-        impacted.textContent = "Wonokromo, Margorejo, Darmo, Tunjungan";
+        impacted.textContent = "Wonokromo, Jemursari, Darmo, Tunjungan";
       } else {
         title.textContent = "KONFIRMASI TINDAKAN OPERATOR CRITICAL";
         target.textContent = intent.targetId || "Sistem Core SITS";
@@ -367,6 +439,8 @@ class CommandLayer {
         modal.style.display = "none";
         btnCancel.removeEventListener("click", handleCancel);
         btnProceed.removeEventListener("click", handleProceed);
+        modal.removeEventListener("click", handleBackdropClick);
+        window.removeEventListener("keydown", handleEscape);
         resolve(false);
       };
 
@@ -374,11 +448,27 @@ class CommandLayer {
         modal.style.display = "none";
         btnCancel.removeEventListener("click", handleCancel);
         btnProceed.removeEventListener("click", handleProceed);
+        modal.removeEventListener("click", handleBackdropClick);
+        window.removeEventListener("keydown", handleEscape);
         resolve(true);
+      };
+
+      const handleBackdropClick = (e) => {
+        if (e.target === modal) {
+          handleCancel();
+        }
+      };
+
+      const handleEscape = (e) => {
+        if (e.key === "Escape") {
+          handleCancel();
+        }
       };
 
       btnCancel.addEventListener("click", handleCancel);
       btnProceed.addEventListener("click", handleProceed);
+      modal.addEventListener("click", handleBackdropClick);
+      window.addEventListener("keydown", handleEscape);
     });
   }
 
@@ -394,50 +484,55 @@ class CommandLayer {
   }
 
   _mutateStateStoreLocally(intent) {
-    const action = intent.action;
-    const payload = intent.payload;
-
-    if (action === 'green-wave:toggle') {
-      stateStore.setState({ greenWaveActive: !!payload.active });
-    } else if (action === 'signal:override') {
-      const ints = (stateStore.getState().intersections || []).map(n => {
-        if (n.id === intent.targetId) {
-          return { ...n, state: "green", timer: payload.duration || 45, status: "Manual Override" };
-        }
-        return n;
-      });
-      stateStore.setState({ intersections: ints });
-    } else if (action === 'green-split:update') {
-      const ints = (stateStore.getState().intersections || []).map(n => {
-        if (n.id === intent.targetId) {
-          return { ...n, greenSplit: payload.value };
-        }
-        return n;
-      });
-      stateStore.setState({ intersections: ints });
-    } else if (action === 'incident:acknowledge') {
-      const incs = (stateStore.getState().incidents || []).map(i => {
-        if (String(i.id) === String(intent.targetId)) {
-          return { ...i, status: "ACKNOWLEDGED", acknowledgedAt: new Date().toISOString() };
-        }
-        return i;
-      });
-      stateStore.setState({ incidents: incs });
-    } else if (action === 'incident:resolve') {
-      const incs = (stateStore.getState().incidents || []).map(i => {
-        if (String(i.id) === String(intent.targetId)) {
-          return { ...i, status: "RESOLVED", resolvedAt: new Date().toISOString() };
-        }
-        return i;
-      });
-      stateStore.setState({ incidents: incs });
-    }
+    // No-op. StateStore strictly only receives final state confirmed by server.
   }
 
   _handleCommandAck(ack) {
     if (!ack) return;
-    const { correlationId, commandId, result, details } = ack;
-    console.info(`[CommandLayer] Command ACK received: ${commandId} (${result})`);
+    const { correlationId, commandId, result, details, resultingState } = ack;
+    
+    // Check if this ack corresponds to a pending command
+    const pendingCmd = (commandId && this.pendingCommands.get(commandId)) ||
+                       Array.from(this.pendingCommands.values()).find(c => c.correlationId === correlationId);
+
+    if (!pendingCmd) {
+      // Late or duplicate ack for an already finalized command, or unknown correlationId
+      if (this.executedCommands.has(commandId) || (correlationId && Array.from(this.executedCommands.values()).some(e => e.correlationId === correlationId))) {
+        console.info(`[CommandLayer] Duplicate/Late ACK ignored for finalized command: ${commandId || correlationId}`);
+        return;
+      }
+      console.warn(`[CommandLayer] Unknown ACK correlationId/commandId ignored: ${correlationId || commandId}`);
+      return;
+    }
+
+    // Apply the acknowledgement
+    console.info(`[CommandLayer] Resolving pending command via ACK: ${pendingCmd.commandId} (${result})`);
+    pendingCmd.result = result === 'SUCCESS' ? 'SERVER_APPLIED' : 'REJECTED';
+    pendingCmd.completedAt = new Date().toISOString();
+
+    if (result === 'SUCCESS') {
+      this.executedCommands.set(pendingCmd.idempotencyKey, {
+        commandId: pendingCmd.commandId,
+        correlationId: pendingCmd.correlationId,
+        data: resultingState,
+        result: 'SERVER_APPLIED'
+      });
+      if (resultingState) {
+        stateStore.setState(resultingState, { source: 'server' });
+      }
+    }
+
+    this.pendingCommands.delete(pendingCmd.commandId);
+
+    this.addAuditEvent({
+      type: result === 'SUCCESS' ? "command:acknowledged" : "command:rejected",
+      entity: pendingCmd.targetId,
+      source: "SITS Core Server",
+      reasonCode: result === 'SUCCESS' ? "SERVER_ACK" : "SERVER_REJECT",
+      correlationId: pendingCmd.correlationId,
+      result: pendingCmd.result,
+      details: details || `Perintah ${pendingCmd.action} dikonfirmasi server.`
+    });
   }
 
   /**

@@ -207,23 +207,43 @@ export class TrafficEngine {
         this._smartUpdateDOM("wonokromoYellowTime", "0s");
         this._smartUpdateDOM("wonokromoRedTime", `${nodeW.timer}s`);
       }
+
+      // Sync active state of lights in modal
+      const wonoRedEl = document.getElementById("wonokromoRed");
+      const wonoYellowEl = document.getElementById("wonokromoYellow");
+      const wonoGreenEl = document.getElementById("wonokromoGreen");
+      if (wonoRedEl && wonoYellowEl && wonoGreenEl) {
+        wonoRedEl.classList.toggle("active", !isGreenWave && nodeW.state === "red");
+        wonoYellowEl.classList.toggle("active", !isGreenWave && nodeW.state === "yellow");
+        wonoGreenEl.classList.toggle("active", isGreenWave || nodeW.state === "green");
+      }
     }
 
-    // Simpang Margorejo
-    const nodeM = intersections.find(n => n.id === "node-margorejo") || intersections[1];
+    // Simpang Jemursari
+    const nodeM = intersections.find(n => n.id === "node-jemursari") || intersections[1];
     if (nodeM) {
       if (isGreenWave) {
-        this._smartUpdateDOM("margorejoBadge", "GREEN WAVE (HIJAU)", "status-badge green");
-        this._smartUpdateDOM("margorejoGreenTime", "∞");
-        this._smartUpdateDOM("margorejoRedTime", "0s");
+        this._smartUpdateDOM("jemursariBadge", "GREEN WAVE (HIJAU)", "status-badge green");
+        this._smartUpdateDOM("jemursariGreenTime", "∞");
+        this._smartUpdateDOM("jemursariRedTime", "0s");
       } else if (nodeM.state === "green") {
-        this._smartUpdateDOM("margorejoBadge", `HIJAU (${nodeM.timer}s)`, "status-badge green");
-        this._smartUpdateDOM("margorejoGreenTime", `${nodeM.timer}s`);
-        this._smartUpdateDOM("margorejoRedTime", "0s");
+        this._smartUpdateDOM("jemursariBadge", `HIJAU (${nodeM.timer}s)`, "status-badge green");
+        this._smartUpdateDOM("jemursariGreenTime", `${nodeM.timer}s`);
+        this._smartUpdateDOM("jemursariRedTime", "0s");
       } else {
-        this._smartUpdateDOM("margorejoBadge", `MERAH (${nodeM.timer}s)`, "status-badge red");
-        this._smartUpdateDOM("margorejoGreenTime", "0s");
-        this._smartUpdateDOM("margorejoRedTime", `${nodeM.timer}s`);
+        this._smartUpdateDOM("jemursariBadge", `MERAH (${nodeM.timer}s)`, "status-badge red");
+        this._smartUpdateDOM("jemursariGreenTime", "0s");
+        this._smartUpdateDOM("jemursariRedTime", `${nodeM.timer}s`);
+      }
+
+      // Sync active state of lights in modal
+      const margoRedEl = document.getElementById("jemursariRed");
+      const margoYellowEl = document.getElementById("jemursariYellow");
+      const margoGreenEl = document.getElementById("jemursariGreen");
+      if (margoRedEl && margoYellowEl && margoGreenEl) {
+        margoRedEl.classList.toggle("active", !isGreenWave && nodeM.state === "red");
+        margoYellowEl.classList.toggle("active", !isGreenWave && nodeM.state === "yellow");
+        margoGreenEl.classList.toggle("active", isGreenWave || nodeM.state === "green");
       }
     }
 
@@ -431,7 +451,7 @@ export class TrafficEngine {
       const updatedIntersections = (curState.intersections || []).map(node => {
         const nextNode = { ...node };
 
-        if (curState.greenWaveActive && (nextNode.id === "node-wonokromo" || nextNode.id === "node-margorejo" || nextNode.id === "node-darmo")) {
+        if (curState.greenWaveActive && (nextNode.id === "node-wonokromo" || nextNode.id === "node-jemursari" || nextNode.id === "node-darmo")) {
           nextNode.state = "green";
           nextNode.timer = "∞";
           nextNode.status = "Green Wave";

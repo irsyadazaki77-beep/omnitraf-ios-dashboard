@@ -11,30 +11,24 @@ import { TRAFFIC_LIMITS } from '../config/trafficConfig.js';
 import { mapManager } from '../modules/mapManager.js';
 import { SITS_INTERSECTIONS } from '../config/surabayaCoords.js';
 import { commandLayer } from '../core/commandLayer.js';
+import { Disposer } from '../core/disposer.js';
 
 export class SignalsController {
   constructor() {
     this.isGridView = false;
     this._isInitialized = false;
     this._currentTargetNode = 'node-wonokromo';
+    this.disposer = new Disposer('SignalsController');
   }
 
   init() {
     if (this._isInitialized) return;
     this._isInitialized = true;
-
-    this._bindDashboardSignalSlider();
-    this._bindSignalsViewSliders();
-    this._bindWebsterCalculator();
-    this._bindIntersectionLayoutToggle();
-    this._bindForceOverrideButtons();
-    this._bindAiRecommendationButtons();
-    this._bindManualOverrideModal();
-    this._bindTableSearchAndClick();
-    this._setupStoreSubscriptions();
   }
 
   activate() {
+    this.deactivate(); // deterministic cleanup first
+
     this._bindDashboardSignalSlider();
     this._bindSignalsViewSliders();
     this._bindWebsterCalculator();
@@ -43,10 +37,33 @@ export class SignalsController {
     this._bindAiRecommendationButtons();
     this._bindManualOverrideModal();
     this._bindTableSearchAndClick();
+    this._bindIntersectionSearchAutocomplete();
+    this._bindDashboardDensityFilterChips();
+    this._setupStoreSubscriptions();
+
+    // Initial sync
+    const state = stateStore.getState();
+    const greenSplit = state.greenSplitWonokromo;
+
+    const greenValEl = document.getElementById("greenValue");
+    if (greenValEl) greenValEl.textContent = `${greenSplit} dtk`;
+
+    const dashboardSlider = document.getElementById("greenRange") || document.getElementById("greenSplitSlider");
+    if (dashboardSlider) dashboardSlider.value = greenSplit;
+
+    const tooltip = document.getElementById("sliderTooltip");
+    if (tooltip) tooltip.textContent = `${greenSplit}s`;
+
+    this._updateDashboardTimeline(greenSplit);
+    this._updateActiveOverrideBadges();
+  }
+
+  deactivate() {
+    this.disposer.clear();
   }
 
   _setupStoreSubscriptions() {
-    stateStore.subscribe('state:greenSplitWonokromo', ({ value }) => {
+    this.disposer.addStoreSubscription(stateStore, 'state:greenSplitWonokromo', ({ value }) => {
       const greenValEl = document.getElementById("greenValue");
       if (greenValEl) greenValEl.textContent = `${value} dtk`;
 
@@ -61,7 +78,7 @@ export class SignalsController {
       this._updateDashboardTimeline(value);
     });
 
-    stateStore.subscribe('traffic:update', () => {
+    this.disposer.addStoreSubscription(stateStore, 'traffic:update', () => {
       this._updateActiveOverrideBadges();
     });
   }
@@ -113,16 +130,15 @@ export class SignalsController {
 
     if (!slider) return;
 
-    slider.addEventListener("input", (e) => {
+    this.disposer.addEventListener(slider, "input", (e) => {
       const val = parseInt(e.target.value, 10);
       if (tooltip) tooltip.textContent = `${val}s`;
       if (valDisplay) valDisplay.textContent = `${val} dtk`;
 
-      stateStore.setState({ greenSplitWonokromo: val });
       this._updateDashboardTimeline(val);
     });
 
-    slider.addEventListener("change", async (e) => {
+    this.disposer.addEventListener(slider, "change", async (e) => {
       const val = parseInt(e.target.value, 10);
       soundManager.play('click');
       try {
@@ -149,7 +165,7 @@ export class SignalsController {
   _bindSignalsViewSliders() {
     const sliders = document.querySelectorAll("#view-signals .sig-slide");
     sliders.forEach((slider, idx) => {
-      slider.addEventListener("input", (e) => {
+      this.disposer.addEventListener(slider, "input", (e) => {
         const val = parseInt(e.target.value, 10);
         const parent = slider.closest(".signal-sliders");
         const prevRow = slider.previousElementSibling;
@@ -175,10 +191,10 @@ export class SignalsController {
         }
       });
 
-      slider.addEventListener("change", async (e) => {
+      this.disposer.addEventListener(slider, "change", async (e) => {
         const val = parseInt(e.target.value, 10);
         soundManager.play('click');
-        const nodeIds = ["node-wonokromo", "node-tunjungan", "node-darmo", "node-margorejo"];
+        const nodeIds = ["node-wonokromo", "node-darmo", "node-tunjungan", "node-jemursari"];
         const targetId = nodeIds[idx] || "node-wonokromo";
 
         try {
@@ -205,13 +221,13 @@ export class SignalsController {
    */
   _bindForceOverrideButtons() {
     document.querySelectorAll(".force-override-btn").forEach((btn, idx) => {
-      btn.addEventListener("click", () => {
-        const nodeIds = ["node-wonokromo", "node-tunjungan", "node-darmo", "node-margorejo"];
+      this.disposer.addEventListener(btn, "click", () => {
+        const nodeIds = ["node-wonokromo", "node-tunjungan", "node-darmo", "node-jemursari"];
         const nodeNames = [
           "Simpang Wonokromo (Jl. Ahmad Yani)",
           "Simpang Tunjungan (Gedung Siola)",
           "Simpang Raya Darmo (Polisi Istimewa)",
-          "Simpang Margorejo (Jl. Jemursari)"
+          "Simpang Jemursari (Jl. Ahmad Yani)"
         ];
         
         this._currentTargetNode = nodeIds[idx] || "node-wonokromo";
@@ -240,23 +256,23 @@ export class SignalsController {
       modal.classList.remove("show");
     };
 
-    if (closeBtn) closeBtn.onclick = closeModal;
-    if (cancelBtn) cancelBtn.onclick = closeModal;
+    if (closeBtn) this.disposer.addEventListener(closeBtn, "click", closeModal);
+    if (cancelBtn) this.disposer.addEventListener(cancelBtn, "click", closeModal);
 
-    modal.onclick = (e) => {
+    this.disposer.addEventListener(modal, "click", (e) => {
       if (e.target === modal) closeModal();
-    };
+    });
 
     if (slider) {
-      slider.oninput = (e) => {
+      this.disposer.addEventListener(slider, "input", (e) => {
         const val = parseInt(e.target.value, 10);
         if (valDisplay) valDisplay.textContent = val;
         this._updateOverrideSafetyWarning(val);
-      };
+      });
     }
 
     if (confirmBtn) {
-      confirmBtn.onclick = async () => {
+      this.disposer.addEventListener(confirmBtn, "click", async () => {
         const dur = slider ? parseInt(slider.value, 10) : 45;
         confirmBtn.disabled = true;
         confirmBtn.textContent = "EXECUTING...";
@@ -283,7 +299,7 @@ export class SignalsController {
           confirmBtn.disabled = false;
           confirmBtn.textContent = "Eksekusi Lock HIJAU";
         }
-      };
+      });
     }
   }
 
@@ -358,7 +374,7 @@ export class SignalsController {
   _bindAiRecommendationButtons() {
     const buttons = document.querySelectorAll('button[data-action="simulate"], button[data-action="apply-ai"], .btn-apply-ai, #btnApplyAiRec');
     buttons.forEach(btn => {
-      btn.addEventListener("click", () => {
+      this.disposer.addEventListener(btn, "click", () => {
         this.openAiRecommendationModal('node-wonokromo', 'Simpang Wonokromo (A. Yani)');
       });
     });
@@ -375,15 +391,15 @@ export class SignalsController {
       modal.classList.remove("show");
     };
 
-    if (closeBtn) closeBtn.onclick = closeModal;
-    if (cancelBtn) cancelBtn.onclick = closeModal;
+    if (closeBtn) this.disposer.addEventListener(closeBtn, "click", closeModal);
+    if (cancelBtn) this.disposer.addEventListener(cancelBtn, "click", closeModal);
 
-    modal.onclick = (e) => {
+    this.disposer.addEventListener(modal, "click", (e) => {
       if (e.target === modal) closeModal();
-    };
+    });
 
     if (confirmBtn) {
-      confirmBtn.onclick = async () => {
+      this.disposer.addEventListener(confirmBtn, "click", async () => {
         confirmBtn.disabled = true;
         confirmBtn.textContent = "APPLYING...";
 
@@ -409,7 +425,7 @@ export class SignalsController {
           confirmBtn.disabled = false;
           confirmBtn.textContent = "✓ Terapkan Pada Siklus Berikutnya";
         }
-      };
+      });
     }
   }
 
@@ -463,8 +479,8 @@ export class SignalsController {
 
     const inputL = document.getElementById("websterLostTime");
     const inputY = document.getElementById("websterFlowRatio");
-    if (inputL) inputL.addEventListener("input", calcWebster);
-    if (inputY) inputY.addEventListener("input", calcWebster);
+    if (inputL) this.disposer.addEventListener(inputL, "input", calcWebster);
+    if (inputY) this.disposer.addEventListener(inputY, "input", calcWebster);
     calcWebster();
   }
 
@@ -520,7 +536,7 @@ export class SignalsController {
       }).join("");
 
       gridContainer.querySelectorAll(".intersection-card-item").forEach(card => {
-        card.addEventListener("click", () => {
+        this.disposer.addEventListener(card, "click", () => {
           const name = card.dataset.name;
           soundManager.play('click');
           if (typeof window.showToast === "function") {
@@ -531,7 +547,7 @@ export class SignalsController {
       });
     };
 
-    btnToggle.addEventListener("click", () => {
+    this.disposer.addEventListener(btnToggle, "click", () => {
       this.isGridView = !this.isGridView;
       soundManager.play('click');
 
@@ -555,7 +571,7 @@ export class SignalsController {
     const tableRows = document.querySelectorAll("#intersectionTable tr");
     tableRows.forEach(row => {
       row.style.cursor = "pointer";
-      row.addEventListener("click", () => {
+      this.disposer.addEventListener(row, "click", () => {
         const nameCell = row.cells[0];
         const name = nameCell ? nameCell.textContent.trim() : row.textContent.trim();
         soundManager.play('click');
@@ -563,6 +579,200 @@ export class SignalsController {
           window.showToast(`🛰️ Navigasi kamera ke: ${name}`);
         }
         mapManager.flyToIntersection(name);
+      });
+    });
+  }
+
+  /**
+   * 7. Dashboard Intersection Search Autocomplete & Flight
+   */
+  _bindIntersectionSearchAutocomplete() {
+    const searchInput = document.getElementById("intersectionSearch");
+    const suggestionsDiv = document.getElementById("searchSuggestions");
+    if (!searchInput || !suggestionsDiv) return;
+
+    let activeIndex = -1;
+
+    const renderSuggestions = (filtered) => {
+      if (filtered.length === 0) {
+        suggestionsDiv.innerHTML = `<div class="suggestion-item empty" style="padding: 10px; color: var(--text-muted); font-size: 12px; text-align: center;">Tidak ada simpang ditemukan</div>`;
+        suggestionsDiv.classList.remove("is-hidden");
+        return;
+      }
+
+      suggestionsDiv.innerHTML = filtered.map((item, idx) => `
+        <div class="suggestion-item" data-id="${item.id}" data-name="${item.name}" data-index="${idx}" style="padding: 8px 12px; cursor: pointer; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; transition: background 0.15s ease;">
+          <div>
+            <strong style="color: var(--text);">${item.name}</strong>
+            <div style="font-size: 10px; color: var(--text-muted);">${item.corridor || ''} • ${item.district || ''}</div>
+          </div>
+          <span class="tag tag-${item.status || 'success'}" style="font-size: 9px; padding: 1px 6px;">${item.status === 'danger' ? 'Macet' : item.status === 'warning' ? 'Padat' : 'Lancar'}</span>
+        </div>
+      `).join("");
+
+      suggestionsDiv.classList.remove("is-hidden");
+      activeIndex = -1;
+    };
+
+    const selectItem = (id, name) => {
+      soundManager.play('click');
+      searchInput.value = name;
+      suggestionsDiv.classList.add("is-hidden");
+      if (typeof window.showToast === "function") {
+        window.showToast(`🛰️ Navigasi kamera ke: ${name}`);
+      }
+      mapManager.flyToIntersection(id);
+      searchInput.blur();
+    };
+
+    this.disposer.addEventListener(searchInput, "input", () => {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) {
+        suggestionsDiv.classList.add("is-hidden");
+        return;
+      }
+
+      const filtered = SITS_INTERSECTIONS.filter(item => 
+        item.name.toLowerCase().includes(q) || 
+        (item.corridor && item.corridor.toLowerCase().includes(q)) || 
+        (item.district && item.district.toLowerCase().includes(q))
+      );
+
+      renderSuggestions(filtered);
+    });
+
+    this.disposer.addEventListener(searchInput, "focus", () => {
+      const q = searchInput.value.trim().toLowerCase();
+      if (q) {
+        const filtered = SITS_INTERSECTIONS.filter(item => 
+          item.name.toLowerCase().includes(q) || 
+          (item.corridor && item.corridor.toLowerCase().includes(q))
+        );
+        renderSuggestions(filtered);
+      }
+    });
+
+    this.disposer.addEventListener(searchInput, "keydown", (e) => {
+      const items = suggestionsDiv.querySelectorAll(".suggestion-item:not(.empty)");
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (items.length > 0) {
+          if (activeIndex >= 0) {
+            items[activeIndex].style.background = "";
+            items[activeIndex].style.boxShadow = "";
+          }
+          activeIndex = (activeIndex + 1) % items.length;
+          items[activeIndex].style.background = "rgba(0, 229, 255, 0.15)";
+          items[activeIndex].style.boxShadow = "inset 3px 0 0 var(--primary-2)";
+          items[activeIndex].scrollIntoView({ block: "nearest" });
+        }
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (items.length > 0) {
+          if (activeIndex >= 0) {
+            items[activeIndex].style.background = "";
+            items[activeIndex].style.boxShadow = "";
+          }
+          activeIndex = (activeIndex - 1 + items.length) % items.length;
+          items[activeIndex].style.background = "rgba(0, 229, 255, 0.15)";
+          items[activeIndex].style.boxShadow = "inset 3px 0 0 var(--primary-2)";
+          items[activeIndex].scrollIntoView({ block: "nearest" });
+        }
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (activeIndex >= 0 && items[activeIndex]) {
+          items[activeIndex].click();
+        } else {
+          if (items.length > 0) {
+            items[0].click();
+          }
+        }
+      } else if (e.key === "Escape") {
+        suggestionsDiv.classList.add("is-hidden");
+        searchInput.blur();
+      }
+    });
+
+    this.disposer.addEventListener(suggestionsDiv, "click", (e) => {
+      const item = e.target.closest(".suggestion-item:not(.empty)");
+      if (item) {
+        const id = item.dataset.id;
+        const name = item.dataset.name;
+        selectItem(id, name);
+      }
+    });
+
+    // Close when clicking outside
+    this.disposer.addEventListener(document, "click", (e) => {
+      if (!searchInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+        suggestionsDiv.classList.add("is-hidden");
+      }
+    });
+  }
+
+  /**
+   * 8. Dashboard Density Filter Chips (All / High / Moderate / Low)
+   */
+  _bindDashboardDensityFilterChips() {
+    const chips = document.querySelectorAll("#view-dashboard .filter-chip");
+    if (chips.length === 0) return;
+
+    chips.forEach(chip => {
+      this.disposer.addEventListener(chip, "click", () => {
+        soundManager.play('click');
+        chips.forEach(c => c.classList.remove("active"));
+        chip.classList.add("active");
+
+        const densityFilter = chip.dataset.filter; // "all", "high", "moderate", "low"
+        
+        const mapBox = document.getElementById("dashboardMapBox");
+        if (mapBox) {
+          mapBox.dataset.density = densityFilter;
+        }
+
+        if (typeof window.showToast === "function") {
+          const label = densityFilter === "all" ? "semua tingkat kepadatan" : `tingkat kepadatan ${densityFilter.toUpperCase()}`;
+          window.showToast(`Menyaring persimpangan: ${label}`);
+        }
+
+        if (mapManager && typeof mapManager.maps === "object") {
+          mapManager.maps.forEach((map, containerId) => {
+            const groups = mapManager.layerGroupsMap.get(containerId);
+            const signalGroup = groups ? groups['signal-points'] : null;
+            if (signalGroup) {
+              signalGroup.eachLayer(layer => {
+                const p = layer.options?.properties || (layer.feature && layer.feature.properties);
+                if (!p) return;
+                
+                const status = p.status; // 'danger' (high), 'warning' (moderate), 'success' (low)
+                let matches = false;
+                if (densityFilter === "all") {
+                  matches = true;
+                } else if (densityFilter === "high" && status === "danger") {
+                  matches = true;
+                } else if (densityFilter === "moderate" && status === "warning") {
+                  matches = true;
+                } else if (densityFilter === "low" && status === "success") {
+                  matches = true;
+                }
+
+                if (matches) {
+                  if (!map.hasLayer(layer)) {
+                    signalGroup.addLayer(layer);
+                    const masterCluster = groups['master-cluster'];
+                    if (masterCluster) masterCluster.addLayer(layer);
+                  }
+                } else {
+                  if (map.hasLayer(layer)) {
+                    signalGroup.removeLayer(layer);
+                    const masterCluster = groups['master-cluster'];
+                    if (masterCluster) masterCluster.removeLayer(layer);
+                  }
+                }
+              });
+            }
+          });
+        }
       });
     });
   }

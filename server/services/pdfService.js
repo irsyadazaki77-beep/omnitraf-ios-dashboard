@@ -237,7 +237,7 @@ export async function generateSitsPdfBuffer(state = {}) {
   // Table Headers
   const intersections = state.intersections || [
     { name: "Simpang Wonokromo (DTC)", state: "green", timer: 35, greenSplit: 35, waitTime: 42, status: "Normal" },
-    { name: "Simpang Margorejo (A. Yani)", state: "red", timer: 35, greenSplit: 28, waitTime: 36, status: "Lancar" },
+    { name: "Simpang Jemursari", state: "red", timer: 35, greenSplit: 28, waitTime: 36, status: "Lancar" },
     { name: "Simpang Raya Darmo (Bungkul)", state: "green", timer: 28, greenSplit: 42, waitTime: 28, status: "Lancar" },
     { name: "Simpang Tunjungan (Gedung Siola)", state: "yellow", timer: 3, greenSplit: 30, waitTime: 48, status: "Padat" },
     { name: "Simpang MERR Kertajaya Indah", state: "green", timer: 45, greenSplit: 45, waitTime: 22, status: "Lancar" }

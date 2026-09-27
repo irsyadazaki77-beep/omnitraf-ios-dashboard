@@ -1,10 +1,23 @@
 import 'dotenv/config';
+
+const isTest = typeof global.it === 'function' || 
+               typeof global.test === 'function' || 
+               process.env.NODE_ENV === 'test' || 
+               (process.env.DB_PATH && process.env.DB_PATH.includes('test')) ||
+               process.env.PORT === '0';
+
+if (isTest) {
+  console.log = () => {};
+  console.warn = () => {};
+}
+
 import express from 'express';
 import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { PORT } from './server/config/env.js';
 import { dbManager } from './server/db/database.js';
+import { backendState } from './server/services/stateManager.js';
 import { corsMiddleware, securityHeadersMiddleware } from './server/middlewares/security.js';
 import { rateLimiter } from './server/middlewares/rateLimiter.js';
 import { initializeSocketServer } from './server/sockets/socketServer.js';
@@ -12,6 +25,14 @@ import apiRoutes from './server/routes/apiRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Ensure persistence layer & state hydration are completed on startup
+try {
+  await dbManager.init();
+  await backendState.init();
+} catch (startupErr) {
+  console.error('❌ [Server Startup] Gagal inisialisasi persistensi database:', startupErr.message);
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -23,8 +44,11 @@ app.use(securityHeadersMiddleware);
 // 1b. Liveness & Readiness Endpoints
 app.get('/healthz', (req, res) => {
   res.status(200).json({
+    success: true,
+    type: 'health_liveness',
     status: 'OK',
     uptime: process.uptime(),
+    pid: process.pid,
     timestamp: new Date().toISOString()
   });
 });
@@ -41,13 +65,31 @@ app.get('/ready', (req, res) => {
     }
   }
 
-  const isReady = dbStatus === 'CONNECTED';
-  res.status(isReady ? 200 : 503).json({
-    status: isReady ? 'READY' : 'OUT_OF_SERVICE',
+  const isReady = dbStatus === 'CONNECTED' && backendState.isHydrated;
+  const status = isReady ? 'READY' : 'OUT_OF_SERVICE';
+  const statusCode = isReady ? 200 : 503;
+
+  res.status(statusCode).json({
+    success: isReady,
+    type: 'health_readiness',
+    status,
     timestamp: new Date().toISOString(),
     components: {
       database: dbStatus,
+      stateHydration: backendState.isHydrated ? 'COMPLETED' : 'PENDING',
       process: 'RUNNING'
+    },
+    data: {
+      status,
+      components: {
+        database: dbStatus,
+        stateHydration: backendState.isHydrated ? 'COMPLETED' : 'PENDING',
+        process: 'RUNNING'
+      }
+    },
+    error: isReady ? null : {
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Sistem SITS belum siap menerima trafik: dependensi database atau hidrasi state belum tuntas.'
     }
   });
 });
@@ -71,10 +113,11 @@ app.use('/api', apiRoutes);
 initializeSocketServer(server);
 
 // 5. Start HTTP & WebSocket Server Listen
-server.listen(PORT, '0.0.0.0', () => {
+const activePort = process.env.PORT !== undefined ? parseInt(process.env.PORT, 10) : PORT;
+server.listen(activePort, '0.0.0.0', () => {
   console.log(`\n🚦 ===================================================`);
   console.log(`   OmniTRAF Surabaya Traffic Control Center Online   `);
-  console.log(`   Local Server : http://localhost:${PORT}             `);
+  console.log(`   Local Server : http://localhost:${activePort}             `);
   console.log(`   Architecture : Clean Layered Architecture (Modular)`);
   console.log(`   Security     : JWT Auth + RBAC + CSP + RateLimit `);
   console.log(`===================================================\n`);

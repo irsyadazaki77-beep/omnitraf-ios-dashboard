@@ -34,9 +34,13 @@ export function registerSignalHandlers(io, socket) {
     if (typeof callback === 'function') {
       callback({
         success: true,
+        status: 'SERVER_APPLIED',
+        result: 'SUCCESS',
+        timestamp: Date.now(),
         nodeName: res.nodeName,
         duration: res.duration,
-        seq: backendState.sequence
+        seq: backendState.sequence,
+        error: null
       });
     }
   });
@@ -72,10 +76,14 @@ export function registerSignalHandlers(io, socket) {
     if (typeof callback === 'function') {
       callback({
         success: true,
+        status: 'SERVER_APPLIED',
+        result: 'SUCCESS',
+        timestamp: Date.now(),
         optimizedSplit: res.optimizedSplit,
         nodeName: res.nodeName,
         smoothTransitionScheduled: true,
-        seq: backendState.sequence
+        seq: backendState.sequence,
+        error: null
       });
     }
   });
@@ -85,7 +93,17 @@ export function registerSignalHandlers(io, socket) {
     if (!checkSocketRole(socket, [ROLES.OPERATOR, ROLES.ADMIN], 'green-split:update', callback)) return;
 
     if (!data) {
-      if (typeof callback === 'function') callback({ success: false, error: 'No data' });
+      if (typeof callback === 'function') {
+        callback({
+          success: false,
+          status: 'REJECTED',
+          result: 'FAILED',
+          timestamp: Date.now(),
+          code: 'VALIDATION_ERROR',
+          message: 'No data provided',
+          error: { code: 'VALIDATION_ERROR', message: 'No data provided' }
+        });
+      }
       return;
     }
     const newState = backendState.setGreenSplit(data.value, data.intersectionId);
@@ -106,8 +124,12 @@ export function registerSignalHandlers(io, socket) {
     if (typeof callback === 'function') {
       callback({
         success: true,
+        status: 'SERVER_APPLIED',
+        result: 'SUCCESS',
+        timestamp: Date.now(),
         greenSplit: data.value,
-        seq: backendState.sequence
+        seq: backendState.sequence,
+        error: null
       });
     }
   });
@@ -139,8 +161,12 @@ export function registerSignalHandlers(io, socket) {
     if (typeof callback === 'function') {
       callback({
         success: true,
+        status: 'SERVER_APPLIED',
+        result: 'SUCCESS',
+        timestamp: Date.now(),
         greenWaveActive: active,
-        seq: backendState.sequence
+        seq: backendState.sequence,
+        error: null
       });
     }
   });

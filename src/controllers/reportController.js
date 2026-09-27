@@ -7,6 +7,7 @@
 import { soundManager } from '../core/soundManager.js';
 import { stateStore } from '../core/stateStore.js';
 import { commandLayer } from '../core/commandLayer.js';
+import { Disposer } from '../core/disposer.js';
 
 export class ReportController {
   constructor() {
@@ -14,11 +15,16 @@ export class ReportController {
     this.abortController = null;
     this.lastType = "Daily Mobility";
     this._isBound = false;
+    this.disposer = new Disposer('ReportController');
   }
 
   init() {
     if (this._isBound) return;
     this._isBound = true;
+  }
+
+  activate() {
+    this.deactivate(); // Ensure clean slate before binding
 
     this._bindExportButtons();
     this._bindModalControls();
@@ -27,8 +33,12 @@ export class ReportController {
     this._exposeGlobalBridges();
   }
 
-  activate() {
-    this._bindModalControls();
+  deactivate() {
+    if (this.abortController) {
+      this.abortController.abort();
+    }
+    this.isGenerating = false;
+    this.disposer.clear();
   }
 
   _exposeGlobalBridges() {
@@ -37,7 +47,7 @@ export class ReportController {
   }
 
   _bindExportButtons() {
-    document.addEventListener("click", (e) => {
+    this.disposer.addEventListener(document, "click", (e) => {
       const btn = e.target.closest(".btn-export-report, [data-action='download-report'], [data-action='export'], .btn-download-report, #btnGenerateReport");
       if (btn) {
         e.preventDefault();
@@ -56,7 +66,7 @@ export class ReportController {
     ].filter(Boolean);
 
     closeBtns.forEach(btn => {
-      btn.addEventListener("click", (e) => {
+      this.disposer.addEventListener(btn, "click", (e) => {
         e.preventDefault();
         this.closeReportModal();
       });
@@ -64,7 +74,7 @@ export class ReportController {
 
     const modal = document.getElementById("reportModal");
     if (modal) {
-      modal.addEventListener("click", (e) => {
+      this.disposer.addEventListener(modal, "click", (e) => {
         if (e.target === modal) {
           this.closeReportModal();
         }
@@ -73,7 +83,7 @@ export class ReportController {
 
     const retryBtn = document.getElementById("btnRetryReportGen");
     if (retryBtn) {
-      retryBtn.addEventListener("click", (e) => {
+      this.disposer.addEventListener(retryBtn, "click", (e) => {
         e.preventDefault();
         this.generateMobilitySnapshot(this.lastType);
       });
@@ -81,19 +91,55 @@ export class ReportController {
 
     const printDocBtn = document.getElementById("btnPrintReportDoc");
     if (printDocBtn) {
-      printDocBtn.addEventListener("click", (e) => {
+      this.disposer.addEventListener(printDocBtn, "click", async (e) => {
         e.preventDefault();
         soundManager.play('click');
-        const downloadUrl = `/api/reports/download?type=${encodeURIComponent(this.lastType || "Daily Mobility")}`;
-        const a = document.createElement("a");
-        a.href = downloadUrl;
-        a.target = "_blank";
-        a.download = `OmniTRAF-Mobility-Snapshot-${new Date().toISOString().slice(0, 10)}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        if (typeof window.showToast === "function") {
-          window.showToast("🖨️ Mengunduh dokumen resmi PDF SITS Surabaya...");
+        const origText = printDocBtn.textContent;
+        printDocBtn.disabled = true;
+        printDocBtn.textContent = "Mengunduh PDF...";
+
+        try {
+          const downloadUrl = `/api/reports/download?type=${encodeURIComponent(this.lastType || "Daily Mobility")}`;
+          const res = await fetch(downloadUrl);
+          const contentType = res.headers.get("content-type") || "";
+
+          if (!res.ok || !contentType.includes("application/pdf")) {
+            let errorMsg = `Server mengembalikan status HTTP ${res.status}`;
+            try {
+              const errJson = await res.json();
+              if (errJson?.error?.message) errorMsg = errJson.error.message;
+              else if (errJson?.message) errorMsg = errJson.message;
+            } catch (_) {}
+            throw new Error(errorMsg);
+          }
+
+          const blob = await res.blob();
+          if (blob.size < 100) {
+            throw new Error("Dokumen PDF yang diterima kosong atau korup.");
+          }
+
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `OmniTRAF-Mobility-Snapshot-${new Date().toISOString().slice(0, 10)}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+          if (typeof window.showToast === "function") {
+            window.showToast("✓ Dokumen resmi PDF SITS Surabaya berhasil diunduh.");
+          }
+          soundManager.play('success');
+        } catch (err) {
+          console.error("Gagal mengunduh PDF laporan:", err);
+          if (typeof window.showToast === "function") {
+            window.showToast(`❌ Gagal unduh PDF: ${err.message}`, "danger");
+          }
+          soundManager.play('alert');
+        } finally {
+          printDocBtn.disabled = false;
+          printDocBtn.textContent = origText;
         }
       });
     }
@@ -103,6 +149,11 @@ export class ReportController {
    * Main Pipeline for Generating Mobility Snapshot
    */
   async generateMobilitySnapshot(type = "Daily Mobility") {
+    if (this.isGenerating) {
+      console.warn("[ReportController] Laporan sedang diproses. Mengabaikan request ganda.");
+      return;
+    }
+
     this.lastType = type;
 
     if (this.abortController) {
@@ -181,11 +232,12 @@ export class ReportController {
 
   _getReportTelemetry(type) {
     const state = stateStore.getState() || {};
+    const telemetry = state.telemetry || {};
     return {
-      volume: state.vehiclesToday || 128540,
-      waitTime: state.avgWaitTime || 48,
-      co2Saved: state.co2Saved || state.co2SavedKg || 1420,
-      incidents: state.resolvedIncidents || 12,
+      volume: telemetry.vehiclesToday || 128540,
+      waitTime: telemetry.avgWaitTime || 42,
+      co2Saved: telemetry.co2SavedKg || 1420,
+      incidents: (state.incidents || []).filter(i => i.status === 'RESOLVED').length || 12,
       docId: `SITS-EKS-${new Date().getFullYear()}/${(new Date().getMonth() + 1).toString().padStart(2, '0')}/REC-${Math.floor(1000 + Math.random() * 9000)}`
     };
   }
@@ -409,7 +461,7 @@ export class ReportController {
     ].filter(Boolean);
 
     printBtns.forEach(btn => {
-      btn.addEventListener("click", () => {
+      this.disposer.addEventListener(btn, "click", () => {
         soundManager.play('click');
         window.print();
       });
@@ -423,7 +475,7 @@ export class ReportController {
     ].filter(Boolean);
 
     copyBtns.forEach(btn => {
-      btn.addEventListener("click", () => {
+      this.disposer.addEventListener(btn, "click", () => {
         const state = stateStore.getState();
         const payload = JSON.stringify(state.telemetry || state, null, 2);
         navigator.clipboard.writeText(payload).then(() => {

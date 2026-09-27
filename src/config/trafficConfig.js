@@ -48,7 +48,7 @@ export const EMERGENCY_CORRIDORS = {
   SOETOMO: {
     id: "route-soetomo",
     name: "Jalur Cepat RSU Dr. Soetomo",
-    nodes: ["node-margorejo", "node-wonokromo", "node-darmo", "node-diponegoro"],
+    nodes: ["node-jemursari", "node-wonokromo", "node-darmo", "node-diponegoro"],
     lockPhase: APILL_PHASES.GREEN
   }
 };

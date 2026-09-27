@@ -8,7 +8,7 @@ export const MODEL_VERSION = "v5.2.0-deterministic-diurnal";
 
 export const CORRIDORS_CONFIG = [
   { id: "corridor-ayani", name: "A. Yani / Wonokromo", capacity: 3200, lengthKm: 4.8, baselineSpeedKmh: 45 },
-  { id: "corridor-margorejo", name: "Margorejo - Jemursari", capacity: 2100, lengthKm: 2.6, baselineSpeedKmh: 40 },
+  { id: "corridor-jemursari", name: "A. Yani - Jemursari", capacity: 2100, lengthKm: 2.6, baselineSpeedKmh: 40 },
   { id: "corridor-darmo", name: "Raya Darmo", capacity: 2800, lengthKm: 3.2, baselineSpeedKmh: 42 },
   { id: "corridor-tunjungan", name: "Tunjungan - Siola", capacity: 1900, lengthKm: 1.8, baselineSpeedKmh: 35 },
   { id: "corridor-merr", name: "MERR Kertajaya", capacity: 3400, lengthKm: 6.2, baselineSpeedKmh: 50 },

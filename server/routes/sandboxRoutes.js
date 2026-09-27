@@ -10,7 +10,7 @@ router.get('/traffic/realtime', (req, res) => res.json({
   activeNodes: 184,
   networkLoadPercent: backendState.state.networkLoad,
   averageWaitTimeSec: backendState.state.avgWaitTime,
-  activeCorridor: "Jl. Ahmad Yani (Frontage Margorejo)"
+  activeCorridor: "Jl. Ahmad Yani (Frontage Jemursari)"
 }));
 
 router.get('/signals/cycle', (req, res) => res.json({
@@ -39,7 +39,7 @@ router.all('/*', (req, res) => {
       activeNodes: 184,
       networkLoadPercent: backendState.state.networkLoad,
       averageWaitTimeSec: backendState.state.avgWaitTime,
-      activeCorridor: "Jl. Ahmad Yani (Frontage Margorejo)"
+      activeCorridor: "Jl. Ahmad Yani (Frontage Jemursari)"
     });
   }
   if (pathStr === '/signals/cycle' || pathStr === '/v1/signals/cycle') {

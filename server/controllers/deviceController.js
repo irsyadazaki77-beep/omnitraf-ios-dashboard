@@ -1,70 +1,64 @@
 import { backendState } from '../services/stateManager.js';
+import { dbManager } from '../db/database.js';
+import { createApiResponse, createApiErrorResponse } from '../middlewares/errorHandler.js';
+
+export const VALID_RESOLUTIONS = ['720p', '1080p', '4k'];
+export const VALID_FAULTS = ["recover", "clear", "latency_spike", "packet_loss", "low_fps", "thermal_warning", "heartbeat_timeout"];
 
 export async function updateDeviceConfig(req, res) {
-  const { deviceId, fps, resolution, mode, greenWaveSync, refreshRate, actor } = req.body || {};
+  const { deviceId, fps, resolution, mode, greenWaveSync, actor } = req.body || {};
   const currentTimestamp = Date.now();
   const act = actor || req.user?.name || "Administrator SITS";
 
   if (!deviceId) {
-    return res.status(400).json({
-      success: false,
-      type: "validation_error",
-      timestamp: currentTimestamp,
-      version: backendState.sequence,
-      data: null,
-      error: { code: "validation_error", message: "Parameter deviceId wajib disertakan." }
-    });
+    return res.status(400).json(createApiErrorResponse(
+      400,
+      "VALIDATION_ERROR",
+      "Parameter deviceId wajib disertakan.",
+      { field: "deviceId" }
+    ));
   }
 
   const dev = backendState.devicesRegistry.find(d => d.deviceId === deviceId);
   if (!dev) {
-    return res.status(404).json({
-      success: false,
-      type: "not_found",
-      timestamp: currentTimestamp,
-      version: backendState.sequence,
-      data: null,
-      error: { code: "not_found", message: `Perangkat dengan ID ${deviceId} tidak ditemukan di registry.` }
-    });
+    return res.status(404).json(createApiErrorResponse(
+      404,
+      "NOT_FOUND",
+      `Perangkat dengan ID ${deviceId} tidak ditemukan di registry.`,
+      { deviceId }
+    ));
   }
 
   if (fps !== undefined) {
     const fpsVal = parseInt(fps, 10);
     if (isNaN(fpsVal) || fpsVal < 5 || fpsVal > 60) {
-      return res.status(400).json({
-        success: false,
-        type: "validation_error",
-        timestamp: currentTimestamp,
-        version: backendState.sequence,
-        data: null,
-        error: { code: "validation_error", message: "Frame Rate Limit (FPS) harus berupa angka antara 5 dan 60." }
-      });
+      return res.status(422).json(createApiErrorResponse(
+        422,
+        "UNPROCESSABLE_ENTITY",
+        "Frame Rate Limit (FPS) harus berupa angka bulat antara 5 dan 60.",
+        { min: 5, max: 60, received: fps }
+      ));
     }
   }
 
   if (resolution !== undefined) {
-    const validRes = ['720p', '1080p', '4k'];
-    if (!validRes.includes(resolution)) {
-      return res.status(400).json({
-        success: false,
-        type: "validation_error",
-        timestamp: currentTimestamp,
-        version: backendState.sequence,
-        data: null,
-        error: { code: "validation_error", message: "Resolusi kamera tidak valid. Harus salah satu dari: 720p, 1080p, 4k." }
-      });
+    if (!VALID_RESOLUTIONS.includes(resolution)) {
+      return res.status(422).json(createApiErrorResponse(
+        422,
+        "UNPROCESSABLE_ENTITY",
+        `Resolusi kamera tidak valid. Harus salah satu dari: ${VALID_RESOLUTIONS.join(', ')}.`,
+        { allowedResolutions: VALID_RESOLUTIONS, received: resolution }
+      ));
     }
   }
 
   if (greenWaveSync !== undefined && typeof greenWaveSync !== 'boolean') {
-    return res.status(400).json({
-      success: false,
-      type: "validation_error",
-      timestamp: currentTimestamp,
-      version: backendState.sequence,
-      data: null,
-      error: { code: "validation_error", message: "greenWaveSync harus berupa boolean." }
-    });
+    return res.status(422).json(createApiErrorResponse(
+      422,
+      "UNPROCESSABLE_ENTITY",
+      "greenWaveSync harus berupa boolean (true/false).",
+      { field: "greenWaveSync", receivedType: typeof greenWaveSync }
+    ));
   }
 
   const actionId = `ACT-CFG-${Date.now()}`;
@@ -111,6 +105,22 @@ export async function updateDeviceConfig(req, res) {
   if (greenWaveSync !== undefined) dev.greenWaveSync = !!greenWaveSync;
   dev.updatedAt = new Date().toISOString();
 
+  // Persist to SQLite
+  try {
+    dbManager.upsertDeviceTelemetry(dev, true);
+  } catch (persistErr) {
+    // Rollback in-memory mutation
+    dev.fps = previousState.fps;
+    dev.resolution = previousState.resolution;
+    dev.mode = previousState.mode;
+    dev.greenWaveSync = previousState.greenWaveSync;
+    return res.status(500).json(createApiErrorResponse(
+      500,
+      "PERSISTENCE_FAILED",
+      `Gagal menyimpan konfigurasi perangkat ke database SQLite: ${persistErr.message}`
+    ));
+  }
+
   const auditRecord = {
     actionId,
     deviceId,
@@ -149,11 +159,9 @@ export async function updateDeviceConfig(req, res) {
     });
   }
 
-  res.status(200).json({
-    success: true,
+  res.status(200).json(createApiResponse({
     type: "device_config_updated",
-    timestamp: Date.now(),
-    version: backendState.sequence,
+    sequence: backendState.deviceSequence,
     data: {
       actionId,
       deviceId,
@@ -161,9 +169,8 @@ export async function updateDeviceConfig(req, res) {
       previousState,
       newState,
       completedAt: auditRecord.completedAt
-    },
-    error: null
-  });
+    }
+  }));
 }
 
 export function pingDevice(req, res) {
@@ -172,26 +179,22 @@ export function pingDevice(req, res) {
   const actor = req.query.actor || req.body?.actor || req.user?.name || "Operator SITS";
 
   if (!deviceId) {
-    return res.status(400).json({
-      success: false,
-      type: "validation_error",
-      timestamp: currentTimestamp,
-      version: backendState.sequence,
-      data: null,
-      error: { code: "validation_error", message: "Parameter deviceId wajib disertakan." }
-    });
+    return res.status(400).json(createApiErrorResponse(
+      400,
+      "VALIDATION_ERROR",
+      "Parameter deviceId wajib disertakan.",
+      { field: "deviceId" }
+    ));
   }
 
   const dev = backendState.devicesRegistry.find(d => d.deviceId === deviceId);
   if (!dev) {
-    return res.status(404).json({
-      success: false,
-      type: "not_found",
-      timestamp: currentTimestamp,
-      version: backendState.sequence,
-      data: null,
-      error: { code: "not_found", message: `Perangkat dengan ID ${deviceId} tidak ditemukan di registry.` }
-    });
+    return res.status(404).json(createApiErrorResponse(
+      404,
+      "NOT_FOUND",
+      `Perangkat dengan ID ${deviceId} tidak ditemukan di registry.`,
+      { deviceId }
+    ));
   }
 
   const latency = Math.floor(Math.random() * 5) + 6;
@@ -233,11 +236,9 @@ export function pingDevice(req, res) {
     });
   }
 
-  res.status(200).json({
-    success: true,
+  res.status(200).json(createApiResponse({
     type: "device_ping_success",
-    timestamp: Date.now(),
-    version: backendState.sequence,
+    sequence: backendState.deviceSequence,
     data: {
       deviceId,
       latencyMs: latency,
@@ -245,9 +246,8 @@ export function pingDevice(req, res) {
       status: dev.status,
       healthScore: dev.healthScore,
       actionId
-    },
-    error: null
-  });
+    }
+  }));
 }
 
 export function injectDeviceFault(req, res) {
@@ -256,26 +256,22 @@ export function injectDeviceFault(req, res) {
   const act = actor || req.user?.name || "Administrator SITS";
 
   if (!deviceId) {
-    return res.status(400).json({
-      success: false,
-      type: "validation_error",
-      timestamp: currentTimestamp,
-      version: backendState.sequence,
-      data: null,
-      error: { code: "validation_error", message: "Parameter deviceId wajib disertakan." }
-    });
+    return res.status(400).json(createApiErrorResponse(
+      400,
+      "VALIDATION_ERROR",
+      "Parameter deviceId wajib disertakan.",
+      { field: "deviceId" }
+    ));
   }
 
   const dev = backendState.devicesRegistry.find(d => d.deviceId === deviceId);
   if (!dev) {
-    return res.status(404).json({
-      success: false,
-      type: "not_found",
-      timestamp: currentTimestamp,
-      version: backendState.sequence,
-      data: null,
-      error: { code: "not_found", message: `Perangkat dengan ID ${deviceId} tidak ditemukan.` }
-    });
+    return res.status(404).json(createApiErrorResponse(
+      404,
+      "NOT_FOUND",
+      `Perangkat dengan ID ${deviceId} tidak ditemukan di registry.`,
+      { deviceId }
+    ));
   }
 
   const previousState = {
@@ -292,16 +288,13 @@ export function injectDeviceFault(req, res) {
     dev.consecutiveFailures = 0;
     dev.errorCount = 0;
   } else {
-    const validFaults = ["latency_spike", "packet_loss", "low_fps", "thermal_warning", "heartbeat_timeout"];
-    if (!validFaults.includes(type)) {
-      return res.status(400).json({
-        success: false,
-        type: "validation_error",
-        timestamp: currentTimestamp,
-        version: backendState.sequence,
-        data: null,
-        error: { code: "validation_error", message: `Tipe gangguan tidak valid. Harus salah satu dari: ${validFaults.join(", ")}` }
-      });
+    if (!VALID_FAULTS.includes(type)) {
+      return res.status(422).json(createApiErrorResponse(
+        422,
+        "UNPROCESSABLE_ENTITY",
+        `Tipe gangguan '${type}' tidak valid. Harus salah satu dari: ${VALID_FAULTS.join(", ")}`,
+        { allowedFaults: VALID_FAULTS, received: type }
+      ));
     }
 
     backendState.activeFaults[deviceId] = {
@@ -349,19 +342,16 @@ export function injectDeviceFault(req, res) {
     });
   }
 
-  res.status(200).json({
-    success: true,
+  res.status(200).json(createApiResponse({
     type: "device_fault_injected",
-    timestamp: Date.now(),
-    version: backendState.sequence,
+    sequence: backendState.deviceSequence,
     data: {
       actionId,
       deviceId,
       faultType: type,
       deviceData: dev
-    },
-    error: null
-  });
+    }
+  }));
 }
 
 export function getDeviceAuditTrail(req, res) {
@@ -370,12 +360,9 @@ export function getDeviceAuditTrail(req, res) {
   if (deviceId) {
     trail = trail.filter(t => t.deviceId === deviceId);
   }
-  res.json({
-    success: true,
+  res.status(200).json(createApiResponse({
     type: "device_audit_trail",
-    timestamp: Date.now(),
-    version: backendState.sequence,
-    data: trail,
-    error: null
-  });
+    sequence: backendState.deviceSequence,
+    data: trail
+  }));
 }

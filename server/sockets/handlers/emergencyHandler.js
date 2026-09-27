@@ -35,8 +35,12 @@ export function registerEmergencyHandlers(io, socket) {
       if (typeof callback === 'function') {
         callback({
           success: true,
+          status: 'SERVER_APPLIED',
+          result: 'SUCCESS',
+          timestamp: Date.now(),
           emergencyItem: res.emergencyItem,
-          seq: backendState.sequence
+          seq: backendState.sequence,
+          error: null
         });
       }
     } catch (err) {
@@ -44,7 +48,16 @@ export function registerEmergencyHandlers(io, socket) {
       if (typeof callback === 'function') {
         callback({
           success: false,
-          error: err.message
+          status: 'REJECTED',
+          result: 'FAILED',
+          timestamp: Date.now(),
+          code: 'EMERGENCY_ACTIVATE_FAILED',
+          message: err.message,
+          error: {
+            code: 'EMERGENCY_ACTIVATE_FAILED',
+            message: err.message,
+            details: { code, route }
+          }
         });
       }
     }
@@ -56,7 +69,17 @@ export function registerEmergencyHandlers(io, socket) {
 
     const id = data ? data.id : null;
     if (!id) {
-      if (typeof callback === 'function') callback({ success: false, error: 'Missing emergency ID' });
+      if (typeof callback === 'function') {
+        callback({
+          success: false,
+          status: 'REJECTED',
+          result: 'FAILED',
+          timestamp: Date.now(),
+          code: 'VALIDATION_ERROR',
+          message: 'Missing emergency ID',
+          error: { code: 'VALIDATION_ERROR', message: 'Missing emergency ID' }
+        });
+      }
       return;
     }
 
@@ -78,7 +101,11 @@ export function registerEmergencyHandlers(io, socket) {
       if (typeof callback === 'function') {
         callback({
           success: true,
-          seq: backendState.sequence
+          status: 'SERVER_APPLIED',
+          result: 'SUCCESS',
+          timestamp: Date.now(),
+          seq: backendState.sequence,
+          error: null
         });
       }
     } catch (err) {
@@ -86,7 +113,16 @@ export function registerEmergencyHandlers(io, socket) {
       if (typeof callback === 'function') {
         callback({
           success: false,
-          error: err.message
+          status: 'REJECTED',
+          result: 'FAILED',
+          timestamp: Date.now(),
+          code: 'EMERGENCY_CANCEL_FAILED',
+          message: err.message,
+          error: {
+            code: 'EMERGENCY_CANCEL_FAILED',
+            message: err.message,
+            details: { id }
+          }
         });
       }
     }

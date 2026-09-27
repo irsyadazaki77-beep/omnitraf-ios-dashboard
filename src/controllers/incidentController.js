@@ -9,16 +9,22 @@ import { soundManager } from '../core/soundManager.js';
 import { socketClient } from '../core/socketClient.js';
 import { mapManager } from '../modules/mapManager.js';
 import { commandLayer } from '../core/commandLayer.js';
+import { Disposer } from '../core/disposer.js';
 
 export class IncidentController {
   constructor() {
     this.selectedIntersection = null;
     this._isInitialized = false;
+    this.disposer = new Disposer('IncidentController');
   }
 
   init() {
     if (this._isInitialized) return;
     this._isInitialized = true;
+  }
+
+  activate() {
+    this.deactivate(); // Ensure clean slate before binding
 
     this._bindContextMenu();
     this._bindIncidentModal();
@@ -26,14 +32,15 @@ export class IncidentController {
     this._bindExportCsv();
     this._setupStoreListeners();
     this._registerGlobalHandlers();
+
+    // Initial sync / render immediately on activation
+    const state = stateStore.getState();
+    this._renderIncidentListUI(state.incidents);
+    this._renderNotificationDrawer(state.incidents);
   }
 
-  activate() {
-    this._bindContextMenu();
-    this._bindIncidentModal();
-    this._bindIncidentFilterChips();
-    this._bindExportCsv();
-    this._registerGlobalHandlers();
+  deactivate() {
+    this.disposer.clear();
   }
 
   _registerGlobalHandlers() {
@@ -51,7 +58,7 @@ export class IncidentController {
   async dispatchIncident(id) {
     try {
       await commandLayer.dispatchCommand({
-        action: 'incident:acknowledge',
+        action: 'incident:dispatch',
         targetType: 'incident',
         targetId: id,
         payload: {
@@ -96,10 +103,10 @@ export class IncidentController {
       soundManager.play('click');
     };
 
-    document.addEventListener("contextmenu", handleContextMenu);
+    this.disposer.addEventListener(document, "contextmenu", handleContextMenu);
 
     // Hide context menu when clicking elsewhere
-    document.addEventListener("click", (e) => {
+    this.disposer.addEventListener(document, "click", (e) => {
       if (menu && menu.style.display !== "none" && !menu.contains(e.target)) {
         menu.style.display = "none";
         menu.classList.remove("show");
@@ -108,7 +115,7 @@ export class IncidentController {
 
     // Handle context menu action buttons
     menu.querySelectorAll(".context-item").forEach(btn => {
-      btn.addEventListener("click", (e) => {
+      this.disposer.addEventListener(btn, "click", (e) => {
         e.stopPropagation();
         menu.style.display = "none";
         menu.classList.remove("show");
@@ -116,11 +123,18 @@ export class IncidentController {
         const target = this.selectedIntersection || "Simpang Wonokromo";
 
         if (action === "override-sinyal") {
-          if (socketClient.isConnected()) {
-            socketClient.emitWithAck('signal:override', { intersectionId: 'node-wonokromo', duration: 45 }, 4000).catch(() => {});
-          }
-          window.showToast(`🚦 Sinyal ${target} di-override: HIJAU 45s.`);
-          soundManager.play('alert');
+          commandLayer.dispatchCommand({
+            action: 'signal:override',
+            targetType: 'intersection',
+            targetId: 'node-wonokromo',
+            payload: { duration: 45 }
+          }, true).then(() => {
+            window.showToast(`✓ Sinyal ${target} berhasil di-override: HIJAU 45s.`);
+            soundManager.play('success');
+          }).catch((err) => {
+            window.showToast(`❌ Gagal override sinyal: ${err.message}`, "danger");
+            soundManager.play('alert');
+          });
         } else if (action === "lapor-insiden") {
           this.openIncidentDetail("NEW-112", target, "Baru saja", `Laporan insiden kepadatan/hambatan lajur dilaporkan pada ${target}.`);
         } else if (action === "zoom-simpang") {
@@ -148,11 +162,17 @@ export class IncidentController {
       }
     };
 
-    if (closeInc) closeInc.addEventListener("click", closeModal);
-    if (btnIncClose) btnIncClose.addEventListener("click", closeModal);
+    if (closeInc) this.disposer.addEventListener(closeInc, "click", closeModal);
+    if (btnIncClose) this.disposer.addEventListener(btnIncClose, "click", closeModal);
+
+    if (incModal) {
+      this.disposer.addEventListener(incModal, "click", (e) => {
+        if (e.target === incModal) closeModal();
+      });
+    }
 
     if (btnIncDispatch) {
-      btnIncDispatch.addEventListener("click", () => {
+      this.disposer.addEventListener(btnIncDispatch, "click", () => {
         closeModal();
         if (this.activeIncidentId) {
           this.updateIncidentStatus(this.activeIncidentId, "DISPATCHED/RESPONDING", "Patroli Dishub & Tim 112");
@@ -169,7 +189,7 @@ export class IncidentController {
    */
   _bindIncidentFilterChips() {
     document.querySelectorAll(".incident-filter-bar .filter-chip").forEach(chip => {
-      chip.addEventListener("click", () => {
+      this.disposer.addEventListener(chip, "click", () => {
         document.querySelectorAll(".incident-filter-bar .filter-chip").forEach(c => c.classList.remove("active"));
         chip.classList.add("active");
         const filter = chip.dataset.incFilter || "all";
@@ -197,11 +217,11 @@ export class IncidentController {
     const btnExport = document.getElementById("btnExportCsv");
     if (!btnExport) return;
 
-    btnExport.addEventListener("click", () => {
+    this.disposer.addEventListener(btnExport, "click", () => {
       const incidents = [
         { time: new Date().toLocaleTimeString('id-ID'), loc: "Simpang Wonokromo (Bemo)", type: "Antrean Padat Koridor", status: "Ditangani SITS 112", officer: "Regu Patroli Dishub Timur" },
         { time: "18:24:10", loc: "Jl. Darmo (Taman Bungkul)", type: "Volume Tinggi Jam Pulang", status: "Fase Hijau +12s", officer: "Operator ATCS Ruang Kontrol" },
-        { time: "17:45:00", loc: "Margorejo Indah", type: "Pohon Tumbang Sebagian", status: "Selesai Ditangani", officer: "DLH & Satlantas Polrestabes" },
+        { time: "17:45:00", loc: "Jemursari Indah", type: "Pohon Tumbang Sebagian", status: "Selesai Ditangani", officer: "DLH & Satlantas Polrestabes" },
         { time: "16:30:15", loc: "Bundaran Waru (Masuk Kota)", type: "Penyempitan Lajur Tol", status: "Normal Kembali", officer: "PJR Polda Jatim" },
         { time: "15:10:02", loc: "Jl. Pemuda - Simpang Yos Sudarso", type: "Prioritas Rombongan Dinas", status: "Selesai", officer: "Satlantas Polrestabes Surabaya" }
       ];
@@ -278,7 +298,8 @@ export class IncidentController {
 
   async updateIncidentStatus(id, newStatus, assignedUnit = null, notes = null) {
     try {
-      const action = newStatus === 'ACKNOWLEDGED' ? 'incident:acknowledge' : 'incident:resolve';
+      const action = newStatus === 'ACKNOWLEDGED' ? 'incident:acknowledge' :
+                     (newStatus === 'RESOLVED' ? 'incident:resolve' : 'incident:dispatch');
       await commandLayer.dispatchCommand({
         action,
         targetType: 'incident',
@@ -296,7 +317,7 @@ export class IncidentController {
   }
 
   _setupStoreListeners() {
-    stateStore.subscribe('state:incidents', ({ value }) => {
+    this.disposer.addStoreSubscription(stateStore, 'state:incidents', ({ value }) => {
       this._renderIncidentListUI(value);
       this._renderNotificationDrawer(value);
     });

@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { USERS_DB } from '../config/constants.js';
 import { generateToken } from '../middlewares/auth.js';
-import { createApiErrorResponse } from '../middlewares/errorHandler.js';
+import { createApiErrorResponse, createApiResponse } from '../middlewares/errorHandler.js';
 import { backendState } from '../services/stateManager.js';
 
 export async function login(req, res) {
@@ -11,7 +11,8 @@ export async function login(req, res) {
     return res.status(400).json(createApiErrorResponse(
       400,
       'VALIDATION_ERROR',
-      'Username dan password wajib diisi.'
+      'Username dan password wajib diisi.',
+      { fields: { username: !username ? 'REQUIRED' : 'OK', password: !password ? 'REQUIRED' : 'OK' } }
     ));
   }
 
@@ -34,6 +35,13 @@ export async function login(req, res) {
   }
 
   const token = generateToken(user);
+  const userProfile = {
+    id: user.id,
+    username: user.username,
+    role: user.role,
+    name: user.name,
+    email: user.email
+  };
 
   // Catat login ke audit logs
   backendState.auditLogs.unshift({
@@ -44,22 +52,27 @@ export async function login(req, res) {
     timestamp: new Date().toISOString()
   });
 
-  res.status(200).json({
-    success: true,
-    token,
-    user: {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-      name: user.name,
-      email: user.email
+  res.status(200).json(createApiResponse({
+    type: 'auth_login_success',
+    data: {
+      token,
+      user: userProfile
+    },
+    extra: {
+      token,
+      user: userProfile
     }
-  });
+  }));
 }
 
 export function getCurrentUser(req, res) {
-  res.json({
-    success: true,
-    user: req.user
-  });
+  res.status(200).json(createApiResponse({
+    type: 'auth_user_profile',
+    data: {
+      user: req.user
+    },
+    extra: {
+      user: req.user
+    }
+  }));
 }

@@ -50,7 +50,7 @@ export class UiMarquee {
         if (data.congestionIndex > 75) {
           this.setAnnouncements([
             `⚠️ PERINGATAN KEMACETAN: Indeks kepadatan Kota Surabaya mencapai ${Math.round(data.congestionIndex)}%.`,
-            "⚡ ATCS ADAPTIF: Durasi lampu hijau Simpang Wonokromo & Margorejo dioptimalkan otomatis.",
+            "⚡ ATCS ADAPTIF: Durasi lampu hijau Simpang Wonokromo & Jemursari dioptimalkan otomatis.",
             "📹 184 CCTV SITS Surabaya beroperasi normal."
           ], "warning");
         }

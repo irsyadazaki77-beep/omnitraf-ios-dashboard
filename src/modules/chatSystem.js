@@ -30,7 +30,7 @@ export class ChatSystem {
       {
         sender: "Rian (Dishub Wonokromo)",
         role: "field",
-        text: "Copy pusat. Titik temu Frontage Margorejo - Wonokromo mulai merayap 200m arah utara.",
+        text: "Copy pusat. Titik temu Frontage Jemursari - Wonokromo mulai merayap 200m arah utara.",
         time: "07:52"
       },
       {
@@ -236,7 +236,7 @@ export class ChatSystem {
       } else if (lower.includes("ambulans") || lower.includes("darurat") || lower.includes("112")) {
         replySender = "Dewi (Dispatcher 112)";
         replyRole = "dispatcher";
-        replyText = "🚨 Siaga darurat: Koridor prioritas Ambulans Bundaran Waru - RSUD Dr. Soetomo aktif! Sinyal Margorejo, Wonokromo, dan Darmo dikunci hijau.";
+        replyText = "🚨 Siaga darurat: Koridor prioritas Ambulans Bundaran Waru - RSUD Dr. Soetomo aktif! Sinyal Jemursari, Wonokromo, dan Darmo dikunci hijau.";
         soundManager.play('siren');
       } else if (lower.includes("patroli") || lower.includes("dishub")) {
         replySender = "Patroli Dishub Unit 04";
