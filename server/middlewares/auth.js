@@ -1,6 +1,8 @@
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET } from '../config/env.js';
+import { JWT_SECRET, IS_TEST } from '../config/env.js';
 import { createApiErrorResponse } from './errorHandler.js';
+
+export const ALLOWED_JWT_ALGORITHMS = ['HS256'];
 
 export function generateToken(user) {
   return jwt.sign(
@@ -12,30 +14,46 @@ export function generateToken(user) {
       email: user.email
     },
     JWT_SECRET,
-    { expiresIn: '24h' }
+    {
+      algorithm: 'HS256',
+      expiresIn: '24h',
+      issuer: 'omnitraf-sits-surabaya'
+    }
   );
 }
 
 export function verifyToken(token) {
-  if (!token) return null;
+  if (!token || typeof token !== 'string') return null;
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, JWT_SECRET, {
+      algorithms: ALLOWED_JWT_ALGORITHMS,
+      issuer: 'omnitraf-sits-surabaya'
+    });
   } catch (err) {
-    return null;
+    // Fallback without issuer check for legacy or existing tokens in flight
+    try {
+      return jwt.verify(token, JWT_SECRET, {
+        algorithms: ALLOWED_JWT_ALGORITHMS
+      });
+    } catch (fallbackErr) {
+      return null;
+    }
   }
 }
 
-export function requireAuth(requiredRoles = []) {
+export function requireAuth(requiredRoles = [], options = {}) {
   const roles = Array.isArray(requiredRoles) ? requiredRoles : (requiredRoles ? [requiredRoles] : []);
+  const allowQueryToken = options.allowQueryToken === true || IS_TEST;
 
   return (req, res, next) => {
     const authHeader = req.headers.authorization;
     let token = null;
 
     if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.substring(7);
-    } else if (req.query && req.query.token) {
-      token = req.query.token;
+      token = authHeader.substring(7).trim();
+    } else if (allowQueryToken && req.query && typeof req.query.token === 'string') {
+      // Discouraged mechanism: limited to explicit flag or test environment to prevent URL leakage
+      token = req.query.token.trim();
     }
 
     if (!token) {
@@ -66,7 +84,15 @@ export function requireAuth(requiredRoles = []) {
       ));
     }
 
-    req.user = decoded;
+    // Authoritative Server Context: verified principal
+    req.user = {
+      id: decoded.id,
+      username: decoded.username,
+      role: decoded.role,
+      name: decoded.name,
+      email: decoded.email
+    };
     next();
   };
 }
+

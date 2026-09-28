@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { IS_PRODUCTION } from './env.js';
 
 // Definisi 3 Role Utama: VIEWER, OPERATOR, ADMIN
 export const ROLES = {
@@ -7,8 +8,9 @@ export const ROLES = {
   ADMIN: 'ADMIN'        // Bisa aktifkan Green Wave, ubah config sensor, toggle chaos mode, terminal
 };
 
-// Database pengguna default development (disimpan dengan password hash bcrypt yang aman)
-export const USERS_DB = [
+// Database pengguna: default development credentials hanya aktif di development/testing.
+// Di environment production, pengguna harus dikonfigurasi melalui server configuration / environment variables.
+const DEV_USERS = [
   {
     id: 'usr-admin-01',
     username: 'admin',
@@ -34,6 +36,20 @@ export const USERS_DB = [
     email: 'viewer@sits.surabaya.go.id'
   }
 ];
+
+export const USERS_DB = IS_PRODUCTION
+  ? (process.env.ADMIN_PASSWORD_HASH ? [
+      {
+        id: 'usr-admin-prod',
+        username: process.env.ADMIN_USERNAME || 'admin',
+        passwordHash: process.env.ADMIN_PASSWORD_HASH,
+        role: ROLES.ADMIN,
+        name: 'Production Administrator',
+        email: 'admin@sits.surabaya.go.id'
+      }
+    ] : [])
+  : DEV_USERS;
+
 
 // Rute Jalur Prioritas Darurat (Ambulans / PMK Surabaya)
 export const ROUTES_DB = {

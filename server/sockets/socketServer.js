@@ -13,6 +13,9 @@ import { registerChaosHandlers } from './handlers/chaosHandler.js';
 
 export function initializeSocketServer(httpServer) {
   const io = new Server(httpServer, {
+    maxHttpBufferSize: 1e6, // 1 MB payload protection
+    pingTimeout: 20000,
+    pingInterval: 10000,
     cors: {
       origin: (origin, callback) => {
         if (isOriginAllowed(origin)) {

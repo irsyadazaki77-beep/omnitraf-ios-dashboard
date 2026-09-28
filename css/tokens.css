@@ -71,6 +71,14 @@
   --info-soft: rgba(59, 130, 246, 0.12);
   --info-border: rgba(59, 130, 246, 0.25);
 
+  --stale: #94a3b8;
+  --stale-soft: rgba(148, 163, 184, 0.12);
+  --stale-border: rgba(148, 163, 184, 0.25);
+
+  --control-height-sm: 28px;
+  --control-height-md: 34px;
+  --control-height-lg: 40px;
+
   /* Geometry, Radius & Elevation Scale */
   --radius-xs: 4px;
   --radius-sm: 6px;

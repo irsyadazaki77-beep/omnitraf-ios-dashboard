@@ -1,5 +1,5 @@
 /* --------------------------------------------------------------------------
-   13. View 3: Live CCTV & Edge Computer Vision Intelligence
+   13. View 3: Live CCTV & Edge Computer Vision Intelligence (Modern 2026 Traffic Camera Suite)
    -------------------------------------------------------------------------- */
 .cctv-dashboard {
   display: flex;
@@ -15,7 +15,7 @@
   align-items: center;
   gap: 6px;
   overflow-x: auto;
-  padding: 4px;
+  padding: 6px 8px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -58,7 +58,7 @@
   background: var(--primary) !important;
   border-color: var(--primary-hover) !important;
   color: #ffffff !important;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.25);
 }
 
 /* Unified CCTV Control Toolbar */
@@ -114,7 +114,7 @@
   background: var(--primary);
   color: #ffffff;
   border-color: var(--primary-hover);
-  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.25);
 }
 
 .cctv-toolbar-btn.btn-primary:hover {
@@ -178,9 +178,9 @@
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
-  padding: 14px;
+  padding: 12px;
   box-shadow: var(--shadow-sm);
-  transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease);
+  transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
 }
 
 .camera-card:hover {
@@ -244,11 +244,11 @@
   position: relative;
   aspect-ratio: 16 / 9;
   width: 100%;
-  background: #040810;
+  background: #090d16;
   border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--border-subtle);
-  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.5);
 }
 
 .cctv-canvas {
@@ -287,13 +287,13 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  color: #f87171 !important; /* Elegant refined red */
+  color: #f87171 !important;
   font-weight: 700;
 }
 
 .rec-dot {
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: #ef4444;
   box-shadow: 0 0 4px #ef4444;
@@ -303,12 +303,12 @@
 /* Bottom Telemetry Strip Overlay */
 .camera-hud-bottom {
   position: absolute;
-  bottom: 8px;
-  left: 12px;
-  right: 12px;
+  bottom: 6px;
+  left: 10px;
+  right: 10px;
   display: flex;
   align-items: center;
-  gap: 0px; /* Separator spacing handled by margin */
+  gap: 0px;
   z-index: 10;
   flex-wrap: wrap;
 }
@@ -329,7 +329,7 @@
 
 .hud-metric-pill::after {
   content: "·";
-  margin: 0 8px;
+  margin: 0 6px;
   color: rgba(255, 255, 255, 0.3);
   font-weight: bold;
 }
@@ -368,18 +368,18 @@
   display: inline-block;
 }
 
-/* Offline / Glitch Overlay */
+/* Stream Disrupted / Reconnecting Overlay */
 .cctv-glitch-overlay {
   display: none;
   position: absolute;
   inset: 0;
-  background: rgba(8, 12, 20, 0.92);
-  backdrop-filter: blur(12px);
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(8px);
   color: var(--danger);
   align-items: center;
   justify-content: center;
-  font-family: var(--font-mono);
-  font-weight: 700;
+  font-family: var(--font-sans);
+  font-weight: 600;
   font-size: 12px;
   z-index: 20;
 }
@@ -389,12 +389,14 @@
 }
 
 /* CCTV Responsive */
-/* View 3: CCTV Matrix */
+@media (max-width: 900px) {
   .cctv-feed-grid {
     grid-template-columns: 1fr;
     gap: 12px;
   }
 
-  .cctv-feed-card {
+  .camera-card {
     border-radius: var(--radius-lg);
   }
+}
+

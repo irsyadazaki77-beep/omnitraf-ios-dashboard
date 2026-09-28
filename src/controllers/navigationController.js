@@ -190,6 +190,11 @@ export class NavigationController {
     const clockEl = document.getElementById("clock") || document.getElementById("currentTime");
     const dateEl = document.getElementById("currentDate");
 
+    if (this.clockInterval) {
+      clearInterval(this.clockInterval);
+      this.clockInterval = null;
+    }
+
     const updateTime = () => {
       const now = new Date();
       

@@ -2,14 +2,20 @@
         <section class="integration-board">
           <div class="integration-status-grid">
             <article class="widget glass-panel">
-              <h3>ATCS SITS Surabaya Connector</h3>
-              <p>Status: <strong class="green-text">SYNCED (RTSP Active)</strong></p>
-              <small>Sinkronisasi data real-time dengan pusat kendali Dinas Perhubungan Kota Surabaya.</small>
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                <h3>ATCS SITS Surabaya Connector</h3>
+                <span class="provenance-badge simulated">SIMULATED / MOCK</span>
+              </div>
+              <p>Status: <strong class="text-warning">LOCAL EMULATION</strong></p>
+              <small>Emulasi protokol RTSP SITS Dishub Surabaya untuk pipeline visual & sensor edge.</small>
             </article>
             <article class="widget glass-panel">
-              <h3>Surabaya Smart City Hub</h3>
-              <p>Status: <strong class="green-text">WEBHOOK ACTIVE</strong></p>
-              <small>API Webhook telemetri kepadatan aktif.</small>
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                <h3>Surabaya Smart City Hub</h3>
+                <span class="provenance-badge derived">CONFIGURED / REST</span>
+              </div>
+              <p>Status: <strong class="text-primary-2">SANDBOX GATEWAY</strong></p>
+              <small>Lingkungan uji webhook telemetri kepadatan Kota Surabaya.</small>
             </article>
           </div>
 

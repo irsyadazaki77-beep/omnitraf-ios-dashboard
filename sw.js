@@ -71,11 +71,21 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Jangan cache real-time streaming, socket handshake, atau REST mutation
+  // Jangan cache real-time streaming, socket handshake, REST mutation, auth, atau privileged endpoints
+  const isAuthOrPrivileged = 
+    url.pathname.startsWith('/api/auth/') ||
+    url.pathname.startsWith('/api/diagnostics') ||
+    url.pathname.startsWith('/api/devices') ||
+    url.pathname.startsWith('/api/emergencies') ||
+    url.pathname.startsWith('/api/audit') ||
+    request.headers.has('Authorization');
+
   if (
     url.pathname.startsWith('/socket.io/') ||
     url.pathname.startsWith('/api/stream') ||
-    request.method !== 'GET'
+    url.pathname.startsWith('/api/stream-traffic') ||
+    request.method !== 'GET' ||
+    isAuthOrPrivileged
   ) {
     return;
   }

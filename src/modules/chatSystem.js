@@ -109,7 +109,9 @@ export class ChatSystem {
 
     bubble.appendChild(meta);
     bubble.appendChild(textBubble);
-    this.chatBody.appendChild(bubble);
+    if (this.chatBody) {
+      this.chatBody.appendChild(bubble);
+    }
   }
 
   _scrollToBottom() {
@@ -181,6 +183,28 @@ export class ChatSystem {
     }
   }
 
+  addMessage(msg) {
+    if (!msg || !msg.text) return;
+    const time = msg.time || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    const formatted = {
+      sender: msg.sender || "Petugas SITS",
+      role: msg.role || "user",
+      text: msg.text,
+      time
+    };
+    this.messages.push(formatted);
+    if (this.messages.length > 100) {
+      this.messages.shift();
+    }
+    this._appendMessageDom(formatted);
+    if (this.chatBody && this.chatBody.children && this.chatBody.children.length > 100) {
+      if (typeof this.chatBody.children[0]?.remove === 'function') {
+        this.chatBody.children[0].remove();
+      }
+    }
+    this._scrollToBottom();
+  }
+
   sendMessage() {
     if (!this.chatInput) return;
     const text = this.chatInput.value.trim();
@@ -197,7 +221,13 @@ export class ChatSystem {
     };
 
     this.messages.push(userMsg);
+    if (this.messages.length > 100) {
+      this.messages.shift();
+    }
     this._appendMessageDom(userMsg);
+    if (this.chatBody && this.chatBody.children.length > 100) {
+      this.chatBody.children[0].remove();
+    }
     this.chatInput.value = "";
     this._scrollToBottom();
 
@@ -265,7 +295,13 @@ export class ChatSystem {
       };
 
       this.messages.push(replyMsg);
+      if (this.messages.length > 100) {
+        this.messages.shift();
+      }
       this._appendMessageDom(replyMsg);
+      if (this.chatBody && this.chatBody.children.length > 100) {
+        this.chatBody.children[0].remove();
+      }
       this._scrollToBottom();
 
       soundManager.play('dispatch');

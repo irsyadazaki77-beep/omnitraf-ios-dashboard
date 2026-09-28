@@ -7,11 +7,32 @@ export function registerEmergencyHandlers(io, socket) {
   socket.on('emergency:activate', (data, callback) => {
     if (!checkSocketRole(socket, [ROLES.OPERATOR, ROLES.ADMIN], 'emergency:activate', callback)) return;
 
-    const code = data ? data.code : "AMB-02";
-    const route = data ? data.route : "route-soetomo";
+    const code = data?.code && typeof data.code === 'string' ? data.code.trim() : "AMB-02";
+    const route = data?.route && typeof data.route === 'string' ? data.route.trim() : "route-soetomo";
+
+    if (code.length > 50 || route.length > 50) {
+      if (typeof callback === 'function') {
+        callback({
+          success: false,
+          status: 'REJECTED',
+          result: 'FAILED',
+          timestamp: Date.now(),
+          code: 'VALIDATION_ERROR',
+          message: 'Parameter code atau route melebihi batas panjang yang diizinkan (maks 50 karakter).'
+        });
+      }
+      return;
+    }
     
     try {
-      const res = backendState.activateEmergencyPriority(code, route);
+      const actorName = socket.user?.name || 'Operator SITS 112 Surabaya';
+      const correlationId = `CORR-SOCK-EMG-${Date.now()}`;
+      const commandId = `CMD-SOCK-EMG-${Date.now()}`;
+      const res = backendState.activateEmergencyPriority(code, route, {
+        actor: actorName,
+        correlationId,
+        commandId
+      });
       
       io.emit('traffic:update', res.state);
       
@@ -84,7 +105,14 @@ export function registerEmergencyHandlers(io, socket) {
     }
 
     try {
-      const newState = backendState.cancelEmergency(id);
+      const actorName = socket.user?.name || 'Operator SITS 112 Surabaya';
+      const correlationId = `CORR-SOCK-CAN-${Date.now()}`;
+      const commandId = `CMD-SOCK-CAN-${Date.now()}`;
+      const newState = backendState.cancelEmergency(id, {
+        actor: actorName,
+        correlationId,
+        commandId
+      });
       
       io.emit('traffic:update', newState);
       

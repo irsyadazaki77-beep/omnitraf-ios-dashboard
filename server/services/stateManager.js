@@ -12,6 +12,17 @@ if (isTest) {
 }
 
 import { dbManager } from '../db/database.js';
+import {
+  INCIDENT_STATES,
+  EMERGENCY_STATES,
+  VALID_INCIDENT_STATUSES,
+  VALID_EMERGENCY_STATUSES,
+  normalizeIncidentStatus,
+  normalizeEmergencyStatus,
+  validateIncidentTransition,
+  validateEmergencyTransition,
+  createDomainEventEnvelope
+} from '../config/stateMachine.js';
 
 export class BackendStateManager {
   constructor() {
@@ -902,6 +913,29 @@ export class BackendStateManager {
             emg.status = "COMPLETED";
             emg.updatedAt = new Date().toISOString();
             emg.holdTicks = 0;
+
+            // Explicit cleanup of preemption across the route
+            const route = ROUTES_DB[emg.routeId] || ROUTES_DB["route-soetomo"];
+            route.forEach(pt => {
+              if (pt.isIntersection) {
+                const node = this.state.intersections.find(n => n.id === pt.id);
+                if (node && node.preemptionVehicleId === emg.id) {
+                  node.state = "green";
+                  node.timer = node.greenSplit || 35;
+                  node.status = "Normal";
+                  delete node.isPreempted;
+                  delete node.preemptionVehicleId;
+                }
+              }
+            });
+
+            // Check if any other emergency is still active; if not, disable greenWaveActive
+            const remainingActive = this.state.activeEmergencies.filter(
+              e => e.id !== emg.id && !["COMPLETED", "CANCELLED", "TERMINAL_ARCHIVED"].includes(e.status)
+            );
+            if (remainingActive.length === 0) {
+              this.state.greenWaveActive = false;
+            }
           }
         } else if (emg.status === "COMPLETED" || emg.status === "CANCELLED") {
           emg.holdTicks = (emg.holdTicks || 0) + 1;
@@ -914,6 +948,11 @@ export class BackendStateManager {
         }
         return true;
       });
+
+      // If activeEmergencies became empty, ensure greenWaveActive is false
+      if (this.state.activeEmergencies.length === 0 && this.state.greenWaveActive) {
+        this.state.greenWaveActive = false;
+      }
     }
 
     // Advance APILL Light Timers using Epoch Timestamp Synchronization
@@ -1130,20 +1169,34 @@ export class BackendStateManager {
     return { state: this.state, nodeName: node.name, duration: durSec };
   }
 
-  updateIncidentStatus(id, newStatus, assignedUnit = null, notes = null) {
-    const validStatuses = ["ACTIVE", "ACKNOWLEDGED", "DISPATCHED", "RESPONDING", "DISPATCHED/RESPONDING", "MITIGATED", "RESOLVED", "ARCHIVED"];
-    if (!validStatuses.includes(newStatus)) {
-      throw new Error(`Status ${newStatus} tidak valid.`);
-    }
+  updateIncidentStatus(id, newStatus, assignedUnit = null, notes = null, options = {}) {
+    const rawTarget = newStatus;
+    const cleanStatus = normalizeIncidentStatus(newStatus);
 
     const inc = this.state.incidents.find(i => String(i.id) === String(id));
     if (!inc) {
       throw new Error(`Insiden dengan ID ${id} tidak ditemukan.`);
     }
 
-    const oldStatus = inc.status;
-    if (oldStatus === newStatus) {
+    const oldStatus = normalizeIncidentStatus(inc.status);
+    if (oldStatus === cleanStatus) {
       return inc;
+    }
+
+    // Formal State Machine Validation
+    const transitionCheck = validateIncidentTransition(oldStatus, cleanStatus);
+    if (!transitionCheck.valid) {
+      throw new Error(`STATE_CONFLICT: ${transitionCheck.reason}`);
+    }
+
+    // Cross-module check: Cannot resolve incident while associated emergency is still actively responding
+    if (cleanStatus === INCIDENT_STATES.RESOLVED && inc.associatedEmergencyId) {
+      const activeEmg = (this.state.activeEmergencies || []).find(
+        e => String(e.id) === String(inc.associatedEmergencyId) || String(e.vehicleId) === String(inc.associatedEmergencyId)
+      );
+      if (activeEmg && !["ARRIVED", "COMPLETED", "CANCELLED", "TERMINAL_ARCHIVED"].includes(activeEmg.status)) {
+        throw new Error(`STATE_CONFLICT: Insiden #${id} tidak dapat diselesaikan karena armada tanggap darurat (${activeEmg.vehicleId}) masih berstatus aktif (${activeEmg.status}). Batalkan atau selesaikan dispatch terlebih dahulu.`);
+      }
     }
 
     const previousSnapshot = {
@@ -1152,20 +1205,23 @@ export class BackendStateManager {
       acknowledgedAt: inc.acknowledgedAt,
       resolvedAt: inc.resolvedAt,
       assignedUnit: inc.assignedUnit,
-      notes: inc.notes
+      notes: inc.notes,
+      associatedEmergencyId: inc.associatedEmergencyId
     };
 
-    inc.status = newStatus;
+    inc.status = cleanStatus;
     inc.updatedAt = new Date().toISOString();
-    if (newStatus === "ACKNOWLEDGED") {
+    if (cleanStatus === INCIDENT_STATES.ACKNOWLEDGED && !inc.acknowledgedAt) {
       inc.acknowledgedAt = new Date().toISOString();
-    } else if (newStatus === "RESOLVED") {
+    } else if (cleanStatus === INCIDENT_STATES.RESOLVED && !inc.resolvedAt) {
       inc.resolvedAt = new Date().toISOString();
     }
     if (assignedUnit) inc.assignedUnit = assignedUnit;
     if (notes) inc.notes = notes;
+    if (options.associatedEmergencyId) inc.associatedEmergencyId = options.associatedEmergencyId;
 
     this.sequence++;
+    this.incidentSequence++;
     this.state.seq = this.sequence;
     this.state.timestampMs = Date.now();
 
@@ -1176,32 +1232,51 @@ export class BackendStateManager {
       // Rollback in-memory mutation
       Object.assign(inc, previousSnapshot);
       this.sequence--;
+      this.incidentSequence--;
       this.state.seq = this.sequence;
       console.error(`❌ [State Manager] Rollback insiden #${id} karena persistence failure:`, err.message);
       throw new Error(`PERSISTENCE_FAILED: Gagal menyimpan status insiden #${id} ke SQLite (${err.message})`);
     }
 
+    const stableCorrId = options.correlationId || `STATUS-${id}-${cleanStatus}-${Date.now()}`;
     const logEntry = {
-      operator: "Operator SITS 112 Surabaya",
-      action: `TRANSITION_${newStatus}`,
+      operator: options.actor || "Operator SITS 112 Surabaya",
+      action: `TRANSITION_${cleanStatus}`,
       entity: `Incident ${id}`,
-      result: `SUCCESS (dari ${oldStatus} ke ${newStatus})`,
-      correlationId: `STATUS-${id}-${newStatus}-${Date.now()}`,
+      result: `SUCCESS (dari ${oldStatus} ke ${cleanStatus})`,
+      correlationId: stableCorrId,
       timestamp: new Date().toISOString()
     };
     this.recordAuditLog(logEntry);
 
+    const domainEvent = createDomainEventEnvelope({
+      entityId: id,
+      entityType: 'incident',
+      previousState: oldStatus,
+      nextState: cleanStatus,
+      commandId: options.commandId,
+      correlationId: stableCorrId,
+      actor: options.actor || "Operator SITS 112 Surabaya",
+      reason: options.reason || `Status insiden diubah dari ${oldStatus} ke ${cleanStatus}`,
+      sequence: this.incidentSequence,
+      details: {
+        assignedUnit: inc.assignedUnit,
+        associatedEmergencyId: inc.associatedEmergencyId
+      }
+    });
+
     if (this.io) {
       this.io.emit('incident:update', {
         id: id,
-        seq: this.sequence,
+        seq: this.incidentSequence,
         timestamp: Date.now(),
         source: 'server',
-        payload: inc
+        payload: inc,
+        event: domainEvent
       });
 
       this.io.emit('system:toast', {
-        message: `🔔 Status Insiden #${id} diubah ke ${newStatus}.`,
+        message: `🔔 Status Insiden #${id} diubah ke ${cleanStatus}.`,
         type: 'info'
       });
     }
@@ -1209,22 +1284,39 @@ export class BackendStateManager {
     return inc;
   }
 
-  activateEmergencyPriority(code, routeId = "route-soetomo") {
+  activateEmergencyPriority(code, routeId = "route-soetomo", options = {}) {
     const existing = this.state.activeEmergencies.find(
-      emg => emg.vehicleId === code && !["COMPLETED", "CANCELLED"].includes(emg.status)
+      emg => emg.vehicleId === code && !["COMPLETED", "CANCELLED", "TERMINAL_ARCHIVED"].includes(emg.status)
     );
     if (existing) {
       throw new Error(`KENDARAAN SUDAH DISPATCHED: ${code} saat ini sedang aktif di rute.`);
     }
 
+    const route = ROUTES_DB[routeId] || ROUTES_DB["route-soetomo"];
+    const id = options.emergencyId || `EMG-${Date.now().toString().slice(-4)}`;
+    
+    // Explicit cross-module linkage: check if an associated incident exists or can be resolved
+    const associatedIncidentId = options.incidentId || options.associatedIncidentId || null;
+    let linkedIncident = null;
+    if (associatedIncidentId) {
+      linkedIncident = this.state.incidents.find(i => String(i.id) === String(associatedIncidentId));
+      if (linkedIncident) {
+        linkedIncident.associatedEmergencyId = id;
+        if (linkedIncident.status === INCIDENT_STATES.ACTIVE || linkedIncident.status === INCIDENT_STATES.ACKNOWLEDGED) {
+          linkedIncident.status = INCIDENT_STATES.DISPATCHED;
+          linkedIncident.assignedUnit = `${code} (${(code && (code.toLowerCase().includes("damkar") || code.toLowerCase().includes("pmk"))) ? "PMK" : "Ambulance"})`;
+          linkedIncident.updatedAt = new Date().toISOString();
+          try { dbManager.upsertIncident(linkedIncident, true); } catch (_) {}
+        }
+      }
+    }
+
     this.sequence++;
+    this.emergencySequence++;
     this.lastUpdated = Date.now();
     this.state.seq = this.sequence;
     this.state.timestampMs = this.lastUpdated;
 
-    const route = ROUTES_DB[routeId] || ROUTES_DB["route-soetomo"];
-    const id = `EMG-${Date.now().toString().slice(-4)}`;
-    
     const emergencyItem = {
       id: id,
       vehicleId: code || "AMB-02",
@@ -1232,7 +1324,7 @@ export class BackendStateManager {
       origin: route[0].name,
       destination: route[route.length - 1].name,
       routeId: routeId,
-      status: "REQUESTED",
+      status: EMERGENCY_STATES.REQUESTED,
       priority: "high",
       ETA: "165s",
       speed: 60,
@@ -1241,36 +1333,76 @@ export class BackendStateManager {
       activatedAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 300000).toISOString(),
       assignedRoute: routeId,
-      progress: 0
+      progress: 0,
+      associatedIncidentId: associatedIncidentId || (linkedIncident ? linkedIncident.id : null),
+      originalSignalStates: new Map() // Snapshot for deterministic rollback on completion/cancellation
     };
+
+    // Snapshot current signals along the route before applying preemption
+    route.forEach(pt => {
+      if (pt.isIntersection) {
+        const node = this.state.intersections.find(n => n.id === pt.id);
+        if (node) {
+          emergencyItem.originalSignalStates.set(node.id, {
+            state: node.state,
+            timer: node.timer,
+            status: node.status,
+            greenSplit: node.greenSplit
+          });
+        }
+      }
+    });
 
     this.state.activeEmergencies.unshift(emergencyItem);
 
+    // Apply immediate green-wave corridor activation
+    this.state.greenWaveActive = true;
+
+    const domainEvent = createDomainEventEnvelope({
+      entityId: id,
+      entityType: 'emergency',
+      previousState: null,
+      nextState: EMERGENCY_STATES.REQUESTED,
+      commandId: options.commandId,
+      correlationId: options.correlationId,
+      actor: options.actor || "Operator SITS 112 Surabaya",
+      reason: `Dispatch darurat diaktifkan untuk kendaraan ${code} pada rute ${routeId}`,
+      sequence: this.emergencySequence,
+      details: {
+        vehicleId: code,
+        routeId,
+        associatedIncidentId: emergencyItem.associatedIncidentId
+      }
+    });
+
     this.recordAuditLog({
-      operator: "Operator SITS 112 Surabaya",
+      operator: options.actor || "Operator SITS 112 Surabaya",
       action: "DISPATCH_REQUEST",
       entity: `Emergency ${id}`,
       result: `SUCCESS (Vehicle ${code} requested for ${routeId})`,
+      correlationId: options.correlationId,
       timestamp: new Date().toISOString()
     });
 
-    return { state: this.state, emergencyItem };
+    return { state: this.state, emergencyItem, domainEvent };
   }
 
-  cancelEmergency(id) {
+  cancelEmergency(id, options = {}) {
     const emg = this.state.activeEmergencies.find(e => e.id === id || e.vehicleId === id);
     if (!emg) {
       throw new Error(`Emergency dispatch dengan ID ${id} tidak ditemukan.`);
     }
 
-    if (["COMPLETED", "CANCELLED"].includes(emg.status)) {
+    if (["COMPLETED", "CANCELLED", "TERMINAL_ARCHIVED"].includes(emg.status)) {
       return this.state;
     }
 
-    emg.status = "CANCELLED";
+    const oldStatus = emg.status;
+    emg.status = EMERGENCY_STATES.CANCELLED;
     emg.updatedAt = new Date().toISOString();
     emg.holdTicks = 0;
 
+    // Restore all pre-empted signals deterministically
     const route = ROUTES_DB[emg.routeId] || ROUTES_DB["route-soetomo"];
     route.forEach(pt => {
       if (pt.isIntersection) {
@@ -1285,19 +1417,58 @@ export class BackendStateManager {
       }
     });
 
+    // Check if there are other active emergencies; if none, deactivate green wave
+    const remainingActive = this.state.activeEmergencies.filter(
+      e => e.id !== emg.id && !["COMPLETED", "CANCELLED", "TERMINAL_ARCHIVED"].includes(e.status)
+    );
+    if (remainingActive.length === 0) {
+      this.state.greenWaveActive = false;
+    }
+
     this.sequence++;
+    this.emergencySequence++;
     this.state.seq = this.sequence;
     this.state.timestampMs = Date.now();
 
+    const domainEvent = createDomainEventEnvelope({
+      entityId: emg.id,
+      entityType: 'emergency',
+      previousState: oldStatus,
+      nextState: EMERGENCY_STATES.CANCELLED,
+      commandId: options.commandId,
+      correlationId: options.correlationId,
+      actor: options.actor || "Operator SITS 112 Surabaya",
+      reason: `Prioritas darurat #${emg.id} (${emg.vehicleId}) dibatalkan oleh operator.`,
+      sequence: this.emergencySequence,
+      details: {
+        vehicleId: emg.vehicleId,
+        associatedIncidentId: emg.associatedIncidentId
+      }
+    });
+
     this.recordAuditLog({
-      operator: "Operator SITS 112 Surabaya",
+      operator: options.actor || "Operator SITS 112 Surabaya",
       action: "DISPATCH_CANCEL",
       entity: `Emergency ${emg.id}`,
       result: `SUCCESS (Vehicle ${emg.vehicleId} cancelled by operator)`,
+      correlationId: options.correlationId,
       timestamp: new Date().toISOString()
     });
 
     if (this.io) {
+      this.io.emit('emergency:update', {
+        seq: this.emergencySequence,
+        timestamp: Date.now(),
+        source: 'server',
+        payload: {
+          activeEmergencies: this.state.activeEmergencies,
+          greenWaveActive: this.state.greenWaveActive
+        },
+        event: domainEvent
+      });
+
+      this.io.emit('traffic:update', this.state);
+
       this.io.emit('system:toast', {
         message: `🛑 DISPATCH DIBATALKAN: Prioritas darurat untuk ${emg.vehicleId} dihentikan.`,
         type: 'warning'

@@ -60,10 +60,36 @@
   border-color: var(--border-focus);
 }
 
-.provenance-badge.stale {
-  background: rgba(148, 163, 184, 0.12);
-  color: var(--text-muted);
-  border-color: rgba(148, 163, 184, 0.25);
+.provenance-badge.stale,
+.badge-stale,
+.pill-stale {
+  background: var(--stale-soft);
+  color: var(--stale);
+  border-color: var(--stale-border);
+}
+
+.provenance-badge.fault,
+.badge-fault,
+.pill-fault {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: var(--danger-border);
+}
+
+.provenance-badge.recovering,
+.badge-recovering,
+.pill-recovering {
+  background: var(--info-soft);
+  color: var(--info);
+  border-color: var(--info-border);
+}
+
+.provenance-badge.simulated,
+.badge-simulated,
+.pill-simulated {
+  background: var(--warning-soft);
+  color: var(--warning);
+  border-color: var(--warning-border);
 }
 
 .provenance-badge.user-triggered {

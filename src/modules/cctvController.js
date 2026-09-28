@@ -11,6 +11,7 @@ import { socketClient } from '../core/socketClient.js';
 import { commandLayer } from '../core/commandLayer.js';
 import { Disposer } from '../core/disposer.js';
 import { authManager } from '../core/authManager.js';
+import { diagnostics } from '../core/diagnostics.js';
 
 // Color map for YOLOv8 object classes
 const CLASS_COLORS = {
@@ -39,6 +40,13 @@ export class CctvCanvasRenderer {
     this.renderFps = 60;
     this.fpsTimer = Date.now();
     this.fpsCounter = 0;
+
+    // Gradient & geometry cache to eliminate per-frame allocations
+    this._cachedWidth = 0;
+    this._cachedHeight = 0;
+    this._skyGrad = null;
+    this._roadGrad = null;
+    this._topGrad = null;
   }
 
   /**
@@ -167,32 +175,37 @@ export class CctvCanvasRenderer {
       this.fpsTimer = now;
     }
 
-    // 2. Procedural Roadway Scene (Beautiful, Natural Sunset/Senja Glow with Perspective)
-    // 2a. Sky Linear Gradient (Sunset atmosphere)
-    const vy = h * 0.28;
-    const vx = w * 0.5;
+    // 2. Procedural Urban Roadway Scene (Natural Lighting, Realistic Asphalt, Perspective & Lane Markings)
+    const vy = h * 0.28; // Horizon Y
+    const vx = w * 0.5;  // Vanishing point X
 
-    const skyGrad = ctx.createLinearGradient(0, 0, 0, vy);
-    skyGrad.addColorStop(0, '#111827');   // Dark slate-indigo top
-    skyGrad.addColorStop(0.5, '#1e293b'); // Refined dark-blue mid
-    skyGrad.addColorStop(1, '#fdba74');   // Beautiful warm peach golden sunset glow at horizon
-    ctx.fillStyle = skyGrad;
+    if (this._cachedWidth !== w || this._cachedHeight !== h || !this._skyGrad || !this._roadGrad || !this._topGrad) {
+      this._cachedWidth = w;
+      this._cachedHeight = h;
+
+      this._skyGrad = ctx.createLinearGradient(0, 0, 0, vy);
+      this._skyGrad.addColorStop(0, '#0f172a');
+      this._skyGrad.addColorStop(0.65, '#1e293b');
+      this._skyGrad.addColorStop(1, '#334155');
+
+      this._roadGrad = ctx.createLinearGradient(0, vy, 0, h);
+      this._roadGrad.addColorStop(0, '#1e293b');
+      this._roadGrad.addColorStop(1, '#334155');
+
+      this._topGrad = ctx.createLinearGradient(0, 0, 0, 26);
+      this._topGrad.addColorStop(0, 'rgba(15, 23, 42, 0.78)');
+      this._topGrad.addColorStop(1, 'rgba(15, 23, 42, 0)');
+    }
+
+    // 2a. Sky & Sky Silhouette
+    ctx.fillStyle = this._skyGrad;
     ctx.fillRect(0, 0, w, vy);
 
-    // 2b. Warm Ambient Sun Glow near center horizon
-    const sunGrad = ctx.createRadialGradient(vx, vy, 0, vx, vy, w * 0.22);
-    sunGrad.addColorStop(0, 'rgba(254, 215, 170, 0.4)');
-    sunGrad.addColorStop(1, 'rgba(254, 215, 170, 0)');
-    ctx.fillStyle = sunGrad;
-    ctx.beginPath();
-    ctx.arc(vx, vy, w * 0.22, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 2c. Distant Skyline Silhouettes (Subtle buildings for depth)
-    ctx.fillStyle = 'rgba(30, 41, 59, 0.4)';
-    const bHeights = [14, 25, 11, 19, 29, 13, 23, 12, 17];
-    const bWidths = [w * 0.05, w * 0.045, w * 0.06, w * 0.05, w * 0.04, w * 0.065, w * 0.04, w * 0.05, w * 0.05];
-    let bX = w * 0.04;
+    // Subtle Distant Skyline Silhouette (Depth layer)
+    ctx.fillStyle = 'rgba(30, 41, 59, 0.55)';
+    const bHeights = [12, 22, 10, 18, 25, 14, 20, 11, 16];
+    const bWidths = [w * 0.05, w * 0.04, w * 0.06, w * 0.045, w * 0.04, w * 0.06, w * 0.04, w * 0.05, w * 0.05];
+    let bX = w * 0.03;
     for (let i = 0; i < bHeights.length; i++) {
       if (bX + bWidths[i] < w) {
         ctx.fillRect(bX, vy - bHeights[i], bWidths[i], bHeights[i]);
@@ -200,65 +213,75 @@ export class CctvCanvasRenderer {
       }
     }
 
-    // 2d. Roadway Base & Ground Shoulders
-    ctx.fillStyle = '#0f172a'; // Deep slate base
+    // Overhead CCTV Frame Gantry Structure Line
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(w * 0.04, vy - 3);
+    ctx.lineTo(w * 0.96, vy - 3);
+    ctx.stroke();
+
+    // 2b. Road Shoulders & Greenery
+    ctx.fillStyle = '#0f172a';
     ctx.fillRect(0, vy, w, h - vy);
 
-    // Subdued side green/olive shoulder lands for perspective depth
+    // Left & Right Greenery/Shoulder Wedges for spatial depth
     ctx.fillStyle = '#1e293b';
     ctx.beginPath();
     ctx.moveTo(0, vy);
-    ctx.lineTo(vx - w * 0.05, vy);
+    ctx.lineTo(vx - w * 0.06, vy);
     ctx.lineTo(0, h);
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = '#1e293b';
     ctx.beginPath();
     ctx.moveTo(w, vy);
-    ctx.lineTo(vx + w * 0.05, vy);
+    ctx.lineTo(vx + w * 0.06, vy);
     ctx.lineTo(w, h);
     ctx.closePath();
     ctx.fill();
 
-    // 2e. Asphalt Road Trapezoid
-    const roadGrad = ctx.createLinearGradient(0, vy, 0, h);
-    roadGrad.addColorStop(0, '#1e293b'); // Darker asphalt far away
-    roadGrad.addColorStop(1, '#2d3748'); // Detailed lighter road up close
-    ctx.fillStyle = roadGrad;
+    // 2c. Asphalt Road Surface
+    ctx.fillStyle = this._roadGrad;
     ctx.beginPath();
-    ctx.moveTo(vx - w * 0.04, vy);
-    ctx.lineTo(vx + w * 0.04, vy);
-    ctx.lineTo(w * 0.95, h);
-    ctx.lineTo(w * 0.05, h);
+    ctx.moveTo(vx - w * 0.05, vy);
+    ctx.lineTo(vx + w * 0.05, vy);
+    ctx.lineTo(w * 0.94, h);
+    ctx.lineTo(w * 0.06, h);
     ctx.closePath();
     ctx.fill();
 
-    // 2f. Left & Right Concrete Curb Borders
-    ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
-    ctx.lineWidth = 1.2;
-    // Left border
+    // Curb / Shoulder Edge Lines (Solid White)
+    ctx.strokeStyle = 'rgba(248, 250, 252, 0.45)';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(vx - w * 0.04, vy);
-    ctx.lineTo(w * 0.05, h);
-    ctx.stroke();
-    // Right border
-    ctx.beginPath();
-    ctx.moveTo(vx + w * 0.04, vy);
-    ctx.lineTo(w * 0.95, h);
+    ctx.moveTo(vx - w * 0.05, vy);
+    ctx.lineTo(w * 0.06, h);
+    ctx.moveTo(vx + w * 0.05, vy);
+    ctx.lineTo(w * 0.94, h);
     ctx.stroke();
 
-    // 2g. Perspective-Correct Dashed Lane Lines
+    // 2d. Center Double Yellow Divide Line
+    ctx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(vx - 0.5, vy);
+    ctx.lineTo(w * 0.5 - 1, h);
+    ctx.moveTo(vx + 0.5, vy);
+    ctx.lineTo(w * 0.5 + 1, h);
+    ctx.stroke();
+
+    // 2e. Perspective Dashed Lane Lines
     const drawPerspectiveDashedLine = (xStart, yStart, xEnd, yEnd) => {
-      const segments = 10;
+      const segments = 9;
       ctx.save();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.32)';
       for (let i = 0; i < segments; i++) {
         const t1 = i / segments;
-        const t2 = (i + 0.42) / segments;
+        const t2 = (i + 0.45) / segments;
 
-        const p1 = Math.pow(t1, 2.5);
-        const p2 = Math.pow(t2, 2.5);
+        const p1 = Math.pow(t1, 2.2);
+        const p2 = Math.pow(t2, 2.2);
 
         const lx1 = xStart + (xEnd - xStart) * p1;
         const ly1 = yStart + (yEnd - yStart) * p1;
@@ -274,30 +297,35 @@ export class CctvCanvasRenderer {
       ctx.restore();
     };
 
-    // 3 lane dividing lines on the 4-lane roadway
-    const sepBottoms = [w * 0.275, w * 0.5, w * 0.725];
+    const sepBottoms = [w * 0.28, w * 0.72];
     for (let i = 0; i < sepBottoms.length; i++) {
       drawPerspectiveDashedLine(vx, vy, sepBottoms[i], h);
     }
 
-    // 2h. Highly aesthetic minimalist side streetlight
-    ctx.strokeStyle = 'rgba(148, 163, 184, 0.15)';
-    ctx.lineWidth = 1;
+    // 2f. Road Markings (Stop Line & Crosswalk Zebra Stripes near foreground)
+    const stopY = h * 0.72;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.moveTo(w * 0.02, h);
-    ctx.quadraticCurveTo(w * 0.02, vy + 40, w * 0.06, vy + 30);
+    ctx.moveTo(w * 0.12, stopY);
+    ctx.lineTo(w * 0.88, stopY);
     ctx.stroke();
-    ctx.fillStyle = 'rgba(254, 240, 138, 0.35)';
-    ctx.beginPath();
-    ctx.arc(w * 0.06, vy + 30, 1.8, 0, Math.PI * 2);
-    ctx.fill();
 
-    // 3. Render Real-Time Bounding Boxes & Stylized Vector Vehicles
+    // Zebra crosswalk stripes
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+    const zebraCount = 12;
+    const zebraY1 = stopY + 4;
+    const zebraY2 = stopY + 14;
+    for (let i = 0; i < zebraCount; i++) {
+      const zx1 = w * 0.14 + (i / zebraCount) * (w * 0.72);
+      ctx.fillRect(zx1, zebraY1, 10, zebraY2 - zebraY1);
+    }
+
+    // 3. Render Real-Time Bounding Boxes & Modern Vector Vehicles
     const drawnLabels = [];
     if (showBoxes && !isPaused && this.trackedBoxes.size > 0) {
       const lerpFactor = 1 - Math.exp(-12 * dt);
 
-      // Determine intersection signalState for speed and movement sync
       const CAMERA_TO_NODE_MAP = {
         'dashCameraCanvas': 'node-wonokromo',
         'cctvCanvas1': 'node-wonokromo',
@@ -319,7 +347,6 @@ export class CctvCanvasRenderer {
           box.localSpeedKmh = targetSpeed;
         }
 
-        // Adjust speed based on APILL signalState
         if (signalState === 'red') {
           box.localSpeedKmh = Math.max(0, box.localSpeedKmh - dt * 25);
         } else {
@@ -329,13 +356,11 @@ export class CctvCanvasRenderer {
         const speedRatio = targetSpeed > 0 ? (box.localSpeedKmh / targetSpeed) : 1;
         const clampedRatio = Math.max(0, Math.min(1, speedRatio));
 
-        // Update positions using stable LERP factor
         box.x += (box.targetX - box.x) * lerpFactor * clampedRatio;
         box.y += (box.targetY - box.y) * lerpFactor * clampedRatio;
         box.w += (box.targetW - box.w) * lerpFactor * clampedRatio;
         box.h += (box.targetH - box.h) * lerpFactor * clampedRatio;
 
-        // Map normalized coordinates (0..1) to actual canvas dimensions
         const px = box.x * w;
         const py = box.y * h;
         const pw = box.w * w;
@@ -345,7 +370,7 @@ export class CctvCanvasRenderer {
         const color = CLASS_COLORS[classKey] || '#38bdf8';
         const isEmergency = classKey === 'ambulance' || classKey === 'emergency';
 
-        // 3a. Subtle Tracking Trajectory (Minimal, soft path)
+        // 3a. Subtle Tracking Trajectory (Minimal, restrained dots)
         const cx = px + pw / 2;
         const cy = py + ph;
 
@@ -355,36 +380,36 @@ export class CctvCanvasRenderer {
 
         if (box.localSpeedKmh > 1) {
           box.trail.push({ x: cx, y: cy });
-          if (box.trail.length > 5) { // very short history for restraint
+          if (box.trail.length > 4) {
             box.trail.shift();
           }
         } else if (box.trail.length > 0) {
-          if (Math.random() < 0.25) {
+          if (Math.random() < 0.2) {
             box.trail.shift();
           }
         }
 
         if (box.trail.length > 1) {
           ctx.save();
-          ctx.beginPath();
-          ctx.moveTo(box.trail[0].x, box.trail[0].y);
-          for (let j = 1; j < box.trail.length; j++) {
-            ctx.lineTo(box.trail[j].x, box.trail[j].y);
+          for (let j = 0; j < box.trail.length; j++) {
+            const pt = box.trail[j];
+            const trailAlpha = ((j + 1) / box.trail.length) * 0.35;
+            ctx.fillStyle = color;
+            ctx.globalAlpha = trailAlpha;
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 1.2 + (j / box.trail.length) * 1.2, 0, Math.PI * 2);
+            ctx.fill();
           }
-          ctx.strokeStyle = color;
-          ctx.lineWidth = 1;
-          ctx.globalAlpha = 0.12; // Extremely soft transparent path
-          ctx.stroke();
           ctx.restore();
         }
 
-        // 3b. Draw High-Fidelity Simplified Vector Vehicle
+        // 3b. Draw Recognizable Vector Vehicle Graphic
         ctx.save();
         
-        // Soft bottom ambient shadow
+        // Soft bottom drop shadow
         ctx.fillStyle = 'rgba(15, 23, 42, 0.45)';
         ctx.beginPath();
-        ctx.ellipse(cx, py + ph - 2, pw * 0.44, ph * 0.08, 0, 0, Math.PI * 2);
+        ctx.ellipse(cx, py + ph - 1, pw * 0.42, ph * 0.08, 0, 0, Math.PI * 2);
         ctx.fill();
 
         if (classKey === 'car') {
@@ -392,20 +417,20 @@ export class CctvCanvasRenderer {
           const idNum = parseInt(box.id.replace(/\D/g, ''), 10) || 0;
           const mainColor = carColors[idNum % carColors.length];
 
-          // Car body base
+          // Chassis body
           ctx.fillStyle = mainColor;
           ctx.beginPath();
-          ctx.roundRect(px + pw * 0.08, py + ph * 0.4, pw * 0.84, ph * 0.52, Math.max(1, pw * 0.08));
+          ctx.roundRect(px + pw * 0.08, py + ph * 0.38, pw * 0.84, ph * 0.54, Math.max(1, pw * 0.08));
           ctx.fill();
 
-          // Car cabin (on top of chassis)
-          ctx.fillStyle = '#1e293b';
+          // Cabin glass
+          ctx.fillStyle = '#0f172a';
           ctx.beginPath();
           ctx.roundRect(px + pw * 0.16, py + ph * 0.12, pw * 0.68, ph * 0.32, Math.max(1, pw * 0.06));
           ctx.fill();
 
           // Windshield reflection line
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.14)';
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
           ctx.beginPath();
           ctx.moveTo(px + pw * 0.22, py + ph * 0.16);
           ctx.lineTo(px + pw * 0.45, py + ph * 0.16);
@@ -414,25 +439,22 @@ export class CctvCanvasRenderer {
           ctx.closePath();
           ctx.fill();
 
-          // Headlights
+          // Headlamps
           ctx.fillStyle = '#fef08a';
           ctx.beginPath();
-          ctx.arc(px + pw * 0.22, py + ph * 0.76, Math.max(1, pw * 0.06), 0, Math.PI * 2);
-          ctx.arc(px + pw * 0.78, py + ph * 0.76, Math.max(1, pw * 0.06), 0, Math.PI * 2);
+          ctx.arc(px + pw * 0.22, py + ph * 0.78, Math.max(1, pw * 0.06), 0, Math.PI * 2);
+          ctx.arc(px + pw * 0.78, py + ph * 0.78, Math.max(1, pw * 0.06), 0, Math.PI * 2);
           ctx.fill();
         } 
         else if (classKey === 'motorcycle') {
-          // Rider back chassis
           ctx.fillStyle = '#1e293b';
           ctx.fillRect(px + pw * 0.36, py + ph * 0.32, pw * 0.28, ph * 0.6);
           
-          // Helmet
           ctx.fillStyle = '#475569';
           ctx.beginPath();
           ctx.arc(cx, py + ph * 0.24, Math.max(1.5, pw * 0.18), 0, Math.PI * 2);
           ctx.fill();
 
-          // Front light
           ctx.fillStyle = '#ffffff';
           ctx.beginPath();
           ctx.arc(cx, py + ph * 0.72, Math.max(1, pw * 0.08), 0, Math.PI * 2);
@@ -441,45 +463,37 @@ export class CctvCanvasRenderer {
         else if (classKey === 'bus' || classKey === 'truck') {
           const bodyColor = classKey === 'bus' ? '#1e3a8a' : '#475569';
           
-          // Large solid chassis
           ctx.fillStyle = bodyColor;
           ctx.beginPath();
           ctx.roundRect(px + pw * 0.05, py + ph * 0.05, pw * 0.9, ph * 0.88, Math.max(1, pw * 0.04));
           ctx.fill();
 
-          // Windshield
           ctx.fillStyle = '#0f172a';
           ctx.fillRect(px + pw * 0.12, py + ph * 0.15, pw * 0.76, ph * 0.28);
 
-          // Dual Headlights
           ctx.fillStyle = '#fef08a';
           ctx.fillRect(px + pw * 0.14, py + ph * 0.78, pw * 0.12, ph * 0.08);
           ctx.fillRect(px + pw * 0.74, py + ph * 0.78, pw * 0.12, ph * 0.08);
         } 
         else if (isEmergency) {
-          // Ambulance
-          ctx.fillStyle = '#f8fafc'; // Clean white body
+          ctx.fillStyle = '#f8fafc';
           ctx.beginPath();
           ctx.roundRect(px + pw * 0.05, py + ph * 0.08, pw * 0.9, ph * 0.84, Math.max(1, pw * 0.05));
           ctx.fill();
 
-          // Emergency red side stripe
           ctx.fillStyle = '#ef4444';
           ctx.fillRect(px + pw * 0.05, py + ph * 0.5, pw * 0.9, ph * 0.1);
 
-          // Front window
           ctx.fillStyle = '#0f172a';
           ctx.fillRect(px + pw * 0.12, py + ph * 0.16, pw * 0.76, ph * 0.24);
 
-          // Headlights
           ctx.fillStyle = '#fef08a';
           ctx.beginPath();
           ctx.arc(px + pw * 0.22, py + ph * 0.74, Math.max(1, pw * 0.06), 0, Math.PI * 2);
           ctx.arc(px + pw * 0.78, py + ph * 0.74, Math.max(1, pw * 0.06), 0, Math.PI * 2);
           ctx.fill();
 
-          // Pulsing lightbar siren
-          const flash = Math.sin(Date.now() / 80) > 0;
+          const flash = Math.sin(Date.now() / 90) > 0;
           ctx.fillStyle = flash ? '#3b82f6' : '#ef4444';
           ctx.fillRect(px + pw * 0.35, py + ph * 0.01, pw * 0.3, ph * 0.08);
         }
@@ -489,18 +503,17 @@ export class CctvCanvasRenderer {
         }
         ctx.restore();
 
-        // 3c. Thin Precise Bounding Box Stroke
+        // 3c. Thin Precise Bounding Box
         ctx.save();
         ctx.strokeStyle = color;
-        ctx.lineWidth = 1.0; // Restrained thin stroke
+        ctx.lineWidth = 1.0;
         ctx.strokeRect(px, py, pw, ph);
 
-        // Very faint box fill for identification contrast
         ctx.fillStyle = isEmergency ? 'rgba(239, 68, 68, 0.04)' : 'rgba(255, 255, 255, 0.02)';
         ctx.fillRect(px, py, pw, ph);
         ctx.restore();
 
-        // 3d. Clean, Modern, Compact Label Tag (No overlap, unboxed, consistent spacing)
+        // 3d. Clean Compact Object Tag (Non-overlapping, clipped inside viewport)
         ctx.save();
         const displayClass = classKey === 'ambulance' ? 'EMERGENCY' : classKey.toUpperCase();
         const displaySpeed = Math.round(box.localSpeedKmh);
@@ -512,14 +525,13 @@ export class CctvCanvasRenderer {
         const padX = 5;
         const padY = 3;
         const labelW = textWidth + padX * 2;
-        const labelH = 12 + padY;
+        const labelH = 13;
 
-        // Smart coordinates layout to prevent overlapping labels
         let labelX = Math.max(4, Math.min(w - labelW - 4, px));
-        let labelY = py - labelH - 2;
+        let labelY = py - labelH - 3;
 
-        if (labelY < 20) {
-          labelY = py + ph + 2; // draw below if hitting top edge
+        if (labelY < 24) {
+          labelY = py + ph + 3;
         }
 
         const isLabelOverlapping = (x, y, wl, hl) => {
@@ -532,44 +544,36 @@ export class CctvCanvasRenderer {
         };
 
         let shiftAttempts = 0;
-        while (isLabelOverlapping(labelX, labelY, labelW, labelH) && shiftAttempts < 3) {
-          labelY -= labelH + 2; // offset vertically
+        while (isLabelOverlapping(labelX, labelY, labelW, labelH) && shiftAttempts < 4) {
+          labelY += labelH + 2;
           shiftAttempts++;
         }
 
         drawnLabels.push({ x: labelX, y: labelY, w: labelW, h: labelH });
 
-        // Draw pill tag container (soft glass slate)
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        // Label Tag Pill
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
         ctx.beginPath();
         ctx.roundRect(labelX, labelY, labelW, labelH, 3);
         ctx.fill();
 
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.strokeStyle = color;
         ctx.lineWidth = 0.5;
         ctx.strokeRect(labelX, labelY, labelW, labelH);
 
-        // Print compact text
         ctx.fillStyle = '#f8fafc';
-        ctx.fillText(labelText, labelX + padX, labelY + 10.5);
+        ctx.fillText(labelText, labelX + padX, labelY + 9.5);
         ctx.restore();
       });
     }
 
-    // 4. Subtle Chaos Mode / Ambient Hue Overlay (Restrained warning indicator)
+    // 4. Subtle Chaos Warning Accent
     if (isChaosMode) {
       ctx.fillStyle = 'rgba(239, 68, 68, 0.03)';
       ctx.fillRect(0, 0, w, h);
-      
-      ctx.strokeStyle = 'rgba(239, 68, 68, 0.2)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(0, vy);
-      ctx.lineTo(w, vy);
-      ctx.stroke();
     }
 
-    // 5. Refined SITS Camera Telemetry Strip (Minimalist broadcast style)
+    // 5. Refined OSD Broadcast Strip (Honest Provenance Badge & Telemetry)
     ctx.save();
     const CAM_CODES = {
       'dashCameraCanvas': 'CAM-01',
@@ -581,8 +585,8 @@ export class CctvCanvasRenderer {
     };
 
     const CAM_NAMES_OSD = {
-      'dashCameraCanvas': 'SIMPANG WONOKROMO UTARA',
-      'cctvCanvas1': 'SIMPANG WONOKROMO UTARA',
+      'dashCameraCanvas': 'SIMPANG WONOKROMO',
+      'cctvCanvas1': 'SIMPANG WONOKROMO',
       'cctvCanvas2': 'KORIDOR RAYA DARMO',
       'cctvCanvas3': 'BUNDARAN WARU',
       'cctvCanvas4': 'SIMPANG JEMURSARI',
@@ -592,115 +596,127 @@ export class CctvCanvasRenderer {
     const camCode = CAM_CODES[this.canvasId] || 'CAM-01';
     const camName = CAM_NAMES_OSD[this.canvasId] || this.cameraName.toUpperCase();
 
-    // Subtle dark gradient strip background at top
-    const headerH = 22;
-    const headerGrad = ctx.createLinearGradient(0, 0, 0, headerH);
-    headerGrad.addColorStop(0, 'rgba(15, 23, 42, 0.65)');
-    headerGrad.addColorStop(1, 'rgba(15, 23, 42, 0)');
-    ctx.fillStyle = headerGrad;
-    ctx.fillRect(0, 0, w, headerH);
+    // Top overlay gradient strip
+    ctx.fillStyle = this._topGrad;
+    ctx.fillRect(0, 0, w, 26);
 
-    // Render Camera Code & Location Info
-    const osdTextLeft = `${camCode}  ·  ${camName}`;
-    ctx.font = '500 8px "Plus Jakarta Sans", sans-serif';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.fillText(osdTextLeft, 12, 14);
+    // Provenance Badge
+    const provText = 'SIMULATED VISION';
+    ctx.font = '700 7.5px "Plus Jakarta Sans", sans-serif';
+    
+    ctx.fillStyle = 'rgba(30, 41, 59, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(8, 5, 86, 14, 3);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
 
-    // Render OSD live clock
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(provText, 12, 15);
+
+    // Camera Identifier & Location Name
+    ctx.font = '600 8.5px "Plus Jakarta Sans", sans-serif';
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillText(`${camCode} · ${camName}`, 102, 15);
+
+    // Live clock
     const formatTime = () => {
       const d = new Date();
       const pad = (n) => String(n).padStart(2, '0');
-      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}  ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     };
-    const osdTextRight = formatTime();
-    ctx.font = '600 8px "Share Tech Mono", monospace'; // tabular figures
-    const rightWidth = ctx.measureText(osdTextRight).width;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
-    ctx.fillText(osdTextRight, w - rightWidth - 12, 14);
+    const osdTime = formatTime();
+    ctx.font = '600 8.5px "Share Tech Mono", monospace';
+    const timeWidth = ctx.measureText(osdTime).width;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.fillText(osdTime, w - timeWidth - 10, 15);
     ctx.restore();
 
-    // 6. Compact Camera Insight Overlay Card (Elegant analytics widget)
+    // 6. Compact Camera Insight Overlay (Bottom-left corner)
     if (metrics && typeof metrics.vehicleCount !== 'undefined') {
       ctx.save();
       
-      const panelW = 120;
-      const panelH = 74;
-      const panelX = 12;
-      const panelY = 28;
+      const panelW = 126;
+      const panelH = 64;
+      const panelX = 10;
+      const panelY = h - panelH - 22;
 
-      // Dark slate translucent background with subtle glow
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.82)';
       ctx.beginPath();
-      ctx.roundRect(panelX, panelY, panelW, panelH, 6);
+      ctx.roundRect(panelX, panelY, panelW, panelH, 4);
       ctx.fill();
 
-      // Delicate hairline border
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 0.75;
       ctx.stroke();
 
-      // Card Header Title
       ctx.fillStyle = '#94a3b8';
       ctx.font = '700 7px "Plus Jakarta Sans", sans-serif';
-      ctx.fillText('ANALYTICS INSIGHTS', panelX + 8, panelY + 12);
+      ctx.fillText('CAMERA INSIGHTS', panelX + 7, panelY + 10);
 
-      // Fine divider
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-      ctx.beginPath();
-      ctx.moveTo(panelX + 6, panelY + 16);
-      ctx.lineTo(panelX + panelW - 6, panelY + 16);
-      ctx.stroke();
-
-      // Key-Value rows
       ctx.font = '500 7.5px "Plus Jakarta Sans", sans-serif';
       
-      // Row 1: Volume & Speed
+      // Density
       ctx.fillStyle = 'rgba(248, 250, 252, 0.6)';
-      ctx.fillText('VOL', panelX + 8, panelY + 28);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(metrics.vehicleCount, panelX + 32, panelY + 28);
-
-      ctx.fillStyle = 'rgba(248, 250, 252, 0.6)';
-      ctx.fillText('SPD', panelX + 62, panelY + 28);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(`${metrics.estimatedAverageSpeed} km/h`, panelX + 84, panelY + 28);
-
-      // Row 2: Queue & Density
-      ctx.fillStyle = 'rgba(248, 250, 252, 0.6)';
-      ctx.fillText('Q_LEN', panelX + 8, panelY + 41);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(`${metrics.queueLengthMeters}m`, panelX + 32, panelY + 41);
-
-      ctx.fillStyle = 'rgba(248, 250, 252, 0.6)';
-      ctx.fillText('DENS', panelX + 62, panelY + 41);
-      
-      let densityColor = '#34d399'; // Emerald-400
-      if (metrics.trafficDensity > 75) densityColor = '#f87171'; // Red-400
-      else if (metrics.trafficDensity > 45) densityColor = '#fbbf24'; // Amber-400
+      ctx.fillText('Density', panelX + 7, panelY + 22);
+      let densityColor = '#10b981';
+      if (metrics.trafficDensity > 75) densityColor = '#f87171';
+      else if (metrics.trafficDensity > 45) densityColor = '#f59e0b';
       ctx.fillStyle = densityColor;
-      ctx.fillText(`${metrics.trafficDensity}%`, panelX + 84, panelY + 41);
+      ctx.fillText(`${metrics.trafficDensity}%`, panelX + 48, panelY + 22);
 
-      // Row 3: Risk rating & AI confidence rate
+      // Queue
       ctx.fillStyle = 'rgba(248, 250, 252, 0.6)';
-      ctx.fillText('RISK', panelX + 8, panelY + 54);
-      
-      let riskColor = '#34d399';
+      ctx.fillText('Queue', panelX + 72, panelY + 22);
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillText(`${metrics.queueLengthMeters}m`, panelX + 100, panelY + 22);
+
+      // Avg Speed
+      ctx.fillStyle = 'rgba(248, 250, 252, 0.6)';
+      ctx.fillText('Avg Speed', panelX + 7, panelY + 34);
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillText(`${metrics.estimatedAverageSpeed} km/h`, panelX + 48, panelY + 34);
+
+      // Risk
+      ctx.fillStyle = 'rgba(248, 250, 252, 0.6)';
+      ctx.fillText('Risk', panelX + 7, panelY + 46);
+      let riskColor = '#10b981';
       if (metrics.incidentRisk > 70) riskColor = '#f87171';
-      else if (metrics.incidentRisk > 40) riskColor = '#fbbf24';
+      else if (metrics.incidentRisk > 40) riskColor = '#f59e0b';
       ctx.fillStyle = riskColor;
-      ctx.fillText(`${metrics.incidentRisk}%`, panelX + 32, panelY + 54);
+      ctx.fillText(metrics.incidentRisk > 60 ? 'High' : metrics.incidentRisk > 35 ? 'Moderate' : 'Low', panelX + 48, panelY + 46);
 
+      // Detection Confidence
       ctx.fillStyle = 'rgba(248, 250, 252, 0.6)';
-      ctx.fillText('CONF', panelX + 62, panelY + 54);
-      ctx.fillStyle = '#38bdf8'; // Sky-400
-      ctx.fillText(`${metrics.aiConfidence}%`, panelX + 84, panelY + 54);
+      ctx.fillText('Confidence', panelX + 7, panelY + 57);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText(`${metrics.aiConfidence}%`, panelX + 54, panelY + 57);
 
-      // Row 4: AI pipeline status
-      ctx.fillStyle = 'rgba(248, 250, 252, 0.5)';
-      ctx.fillText('AI MODULE', panelX + 8, panelY + 66);
-      ctx.fillStyle = '#94a3b8';
-      ctx.fillText('ACTIVE (YOLO)', panelX + 54, panelY + 66);
+      ctx.restore();
+    }
 
+    // 7. Visual Stream State Overlay (Paused, Stale, Offline)
+    if (isPaused || status === 'OFFLINE' || status === 'STALE') {
+      ctx.save();
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.font = '600 12px "Plus Jakarta Sans", sans-serif';
+      let stateMsg = 'FEED PAUSED';
+      let stateColor = '#f59e0b';
+      
+      if (status === 'OFFLINE') {
+        stateMsg = 'CAMERA FEED OFFLINE';
+        stateColor = '#f87171';
+      } else if (status === 'STALE') {
+        stateMsg = 'STREAM RECONNECTING...';
+        stateColor = '#f59e0b';
+      }
+
+      ctx.fillStyle = stateColor;
+      const msgWidth = ctx.measureText(stateMsg).width;
+      ctx.fillText(stateMsg, (w - msgWidth) / 2, h / 2);
       ctx.restore();
     }
   }
@@ -1567,16 +1583,24 @@ export class CctvController {
       const isPaused = state.cctvPaused;
       const showBoxes = state.cctvBoxesVisible;
 
+      const renderStart = performance.now();
+      let totalTrackedCount = 0;
+
       this.renderers.forEach((renderer, id) => {
         if (renderer.canvas && renderer.canvas.offsetParent !== null) {
           const camState = this.camerasState.get(id);
           const metrics = camState ? camState.metrics : {};
-          const diagnostics = camState ? camState.diagnostics : {};
+          const diag = camState ? camState.diagnostics : {};
           const status = camState ? camState.status : 'ONLINE';
           
-          renderer.render(isChaos, isPaused, showBoxes, dt, metrics, diagnostics, status);
+          renderer.render(isChaos, isPaused, showBoxes, dt, metrics, diag, status);
+          totalTrackedCount += renderer.trackedBoxes ? renderer.trackedBoxes.size : 0;
         }
       });
+
+      const renderDuration = performance.now() - renderStart;
+      diagnostics.recordRenderDuration(renderDuration);
+      diagnostics.recordTrackedObjectsCount(totalTrackedCount);
     };
 
     this.animFrameId = requestAnimationFrame(render);

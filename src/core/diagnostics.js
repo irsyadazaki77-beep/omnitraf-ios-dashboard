@@ -7,6 +7,56 @@
  * - initCount, activeTimers, activeSocketListeners, activeAnimationFrames
  */
 
+export const DIAGNOSTIC_LEVELS = Object.freeze({
+  DEBUG: 'DEBUG',
+  INFO: 'INFO',
+  WARN: 'WARN',
+  ERROR: 'ERROR',
+  CRITICAL: 'CRITICAL'
+});
+
+export const EVENT_CATEGORIES = Object.freeze({
+  OPERATIONAL: 'operational',
+  STATE_TRANSITION: 'state_transition',
+  PERFORMANCE: 'performance',
+  SECURITY: 'security',
+  FAULT: 'fault'
+});
+
+export function sanitizeDiagnosticData(data) {
+  if (data === null || data === undefined) return data;
+  if (typeof data !== 'object') {
+    if (typeof data === 'string') {
+      return data
+        .replace(/Bearer\s+[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*/gi, 'Bearer [REDACTED]')
+        .replace(/([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi, '[REDACTED_EMAIL]')
+        .replace(/([A-Z]:\\[^"'\n\r\t]+)/gi, '[REDACTED_PATH]');
+    }
+    return data;
+  }
+  if (Array.isArray(data)) {
+    return data.slice(0, 50).map(sanitizeDiagnosticData);
+  }
+  const sanitized = {};
+  const sensitiveKeys = new Set([
+    'password', 'passwordhash', 'token', 'jwt', 'secret', 'auth',
+    'authorization', 'apikey', 'credentials', 'cookie', 'sessionid'
+  ]);
+  for (const [key, value] of Object.entries(data)) {
+    const lowerKey = key.toLowerCase();
+    if (sensitiveKeys.has(lowerKey)) {
+      sanitized[key] = '[REDACTED]';
+    } else if (lowerKey === 'frame' || lowerKey === 'image' || lowerKey === 'buffer' || lowerKey === 'imagedata') {
+      sanitized[key] = '[BINARY_IMAGE_BUFFER_OMITTED]';
+    } else if (typeof value === 'object' && value !== null) {
+      sanitized[key] = sanitizeDiagnosticData(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
+}
+
 class DiagnosticsManager {
   constructor() {
     this.initCount = 0;
@@ -19,6 +69,10 @@ class DiagnosticsManager {
     this.apiErrorCount = 0;
     this.lastRenderDuration = 0;
     this.startTime = Date.now();
+
+    // Structured Event Ring Buffer (Bounded 100 items)
+    this.maxEvents = 100;
+    this.events = [];
 
     // Phase 18 Realtime Reliability & Ordering Diagnostics
     this.lastEventTimestamp = 0;
@@ -39,10 +93,75 @@ class DiagnosticsManager {
     this.pendingCommandCount = 0;
     this.duplicateEventCount = 0;
 
+    // Phase 16 Performance & Jank Tracking Instrumentation
+    this.stateUpdateCount = 0;
+    this.lastFps = 60;
+    this.fpsCounter = 0;
+    this.fpsLastCheck = Date.now();
+    this.jankCount = 0; // Frames exceeding 50ms (Long Task budget)
+    this.maxFrameTimeMs = 0;
+    this.renderTimes = []; // rolling 30 items
+    this.activeMapLayersCount = 0;
+    this.trackedCctvObjectsCount = 0;
+
     // Attach to window for debug / terminal access
     if (typeof window !== 'undefined') {
       window.__omnitrafDiagnostics = this;
     }
+  }
+
+  /**
+   * Log a structured diagnostic event into the frontend ring-buffer
+   */
+  logEvent({
+    level = DIAGNOSTIC_LEVELS.INFO,
+    category = EVENT_CATEGORIES.OPERATIONAL,
+    component = 'client',
+    event = 'EVENT',
+    operation = null,
+    commandId = null,
+    correlationId = null,
+    entityType = null,
+    entityId = null,
+    source = 'client',
+    stateVersion = null,
+    sequence = null,
+    durationMs = null,
+    errorCode = null,
+    message = '',
+    details = null
+  }) {
+    const diagnosticEvt = Object.freeze({
+      timestamp: new Date().toISOString(),
+      timestampMs: Date.now(),
+      level: DIAGNOSTIC_LEVELS[level] || DIAGNOSTIC_LEVELS.INFO,
+      category: EVENT_CATEGORIES[category.toUpperCase()] || category || EVENT_CATEGORIES.OPERATIONAL,
+      component,
+      event,
+      operation,
+      commandId,
+      correlationId,
+      entityType,
+      entityId,
+      source,
+      stateVersion: stateVersion ?? sequence ?? null,
+      sequence: sequence ?? stateVersion ?? null,
+      durationMs: typeof durationMs === 'number' ? Number(durationMs.toFixed(2)) : null,
+      errorCode: errorCode || null,
+      message: typeof message === 'string' ? message : '',
+      details: sanitizeDiagnosticData(details)
+    });
+
+    this.events.unshift(diagnosticEvt);
+    if (this.events.length > this.maxEvents) {
+      this.events.pop();
+    }
+
+    return diagnosticEvt;
+  }
+
+  getRecentEvents(limit = 20) {
+    return this.events.slice(0, Math.min(limit, this.events.length));
   }
 
   recordInit(label) {
@@ -181,8 +300,47 @@ class DiagnosticsManager {
     this.apiErrorCount++;
   }
 
+  recordStateUpdate() {
+    this.stateUpdateCount++;
+  }
+
+  recordFrame(frameDurationMs = 16.6) {
+    this.fpsCounter++;
+    const now = Date.now();
+    if (now - this.fpsLastCheck >= 1000) {
+      this.lastFps = this.fpsCounter;
+      this.fpsCounter = 0;
+      this.fpsLastCheck = now;
+    }
+    if (frameDurationMs > 50) {
+      this.jankCount++;
+    }
+    if (frameDurationMs > this.maxFrameTimeMs) {
+      this.maxFrameTimeMs = Number(frameDurationMs.toFixed(1));
+    }
+  }
+
   recordRenderDuration(durationMs) {
     this.lastRenderDuration = Number(durationMs.toFixed(2));
+    this.renderTimes.push(this.lastRenderDuration);
+    if (this.renderTimes.length > 30) {
+      this.renderTimes.shift();
+    }
+    this.recordFrame(durationMs);
+  }
+
+  recordMapLayersCount(count) {
+    this.activeMapLayersCount = Math.max(0, count);
+  }
+
+  recordTrackedObjectsCount(count) {
+    this.trackedCctvObjectsCount = Math.max(0, count);
+  }
+
+  getAverageRenderDuration() {
+    if (this.renderTimes.length === 0) return 0;
+    const sum = this.renderTimes.reduce((acc, v) => acc + v, 0);
+    return Number((sum / this.renderTimes.length).toFixed(2));
   }
 
   getMemoryUsageMB() {
@@ -200,10 +358,17 @@ class DiagnosticsManager {
       activeAnimationFrames: this.activeAnimationFrames.size,
       activeSocketListeners: this.activeSocketListenersCount,
       domUpdateCount: this.domUpdateCount,
+      stateUpdateCount: this.stateUpdateCount,
       cctvDroppedFrames: this.cctvDroppedFrames,
       apiRequestCount: this.apiRequestCount,
       apiErrorCount: this.apiErrorCount,
+      fps: this.lastFps,
+      jankCount: this.jankCount,
+      maxFrameTimeMs: `${this.maxFrameTimeMs}ms`,
+      avgRenderDurationMs: `${this.getAverageRenderDuration()}ms`,
       lastRenderDurationMs: `${this.lastRenderDuration}ms`,
+      activeMapLayers: this.activeMapLayersCount,
+      trackedCctvObjects: this.trackedCctvObjectsCount,
       memoryMB: `${this.getMemoryUsageMB()} MB`,
       uptimeSec: `${uptimeSec}s`,
 
@@ -218,6 +383,16 @@ class DiagnosticsManager {
       staleDurationMs: this.staleDurationMs,
       pendingCommandCount: this.pendingCommandCount,
       duplicateEventCount: this.duplicateEventCount
+    };
+  }
+
+  captureSnapshot(context = {}) {
+    return {
+      timestamp: new Date().toISOString(),
+      timestampMs: Date.now(),
+      metrics: this.getMetricsReport(),
+      recentEvents: this.getRecentEvents(15),
+      context: sanitizeDiagnosticData(context)
     };
   }
 
@@ -236,6 +411,23 @@ class DiagnosticsManager {
       cancelAnimationFrame(id);
     });
     this.activeAnimationFrames.clear();
+  }
+
+  reset() {
+    this.resetAllTimers();
+    this.initCount = 0;
+    this.activeSocketListenersCount = 0;
+    this.domUpdateCount = 0;
+    this.stateUpdateCount = 0;
+    this.cctvDroppedFrames = 0;
+    this.apiRequestCount = 0;
+    this.apiErrorCount = 0;
+    this.lastRenderDuration = 0;
+    this.jankCount = 0;
+    this.maxFrameTimeMs = 0;
+    this.renderTimes = [];
+    this.activeMapLayersCount = 0;
+    this.trackedCctvObjectsCount = 0;
   }
 }
 

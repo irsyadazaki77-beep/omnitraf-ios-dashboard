@@ -5,6 +5,7 @@ import incidentRoutes from './incidentRoutes.js';
 import reportRoutes from './reportRoutes.js';
 import terminalRoutes from './terminalRoutes.js';
 import sandboxRoutes from './sandboxRoutes.js';
+import diagnosticRoutes from './diagnosticRoutes.js';
 import { getStateSnapshot, streamTrafficSse } from '../controllers/signalController.js';
 
 const router = Router();
@@ -16,9 +17,11 @@ router.get('/stream-traffic', streamTrafficSse);
 // Sub-routers mounting
 router.use('/auth', authRoutes);
 router.use('/devices', deviceRoutes);
+router.use('/diagnostics', diagnosticRoutes);
 router.use('/', incidentRoutes);
 router.use('/', reportRoutes);
 router.use('/', terminalRoutes);
 router.use('/v1', sandboxRoutes);
 
 export default router;
+

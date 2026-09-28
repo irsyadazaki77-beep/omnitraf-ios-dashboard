@@ -130,7 +130,11 @@ export class DeviceController {
       } else if (dev.healthLevel === "DEGRADED") {
         badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#f59e0b;"></span><span class="pulse-ring-inner" style="background:#f59e0b;"></span></span><span style="color:#f59e0b; font-weight:700;">DEGRADED</span>`;
       } else if (dev.healthLevel === "STALE") {
-        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#ef4444;"></span><span class="pulse-ring-inner" style="background:#ef4444;"></span></span><span style="color:#ef4444; font-weight:700;">STALE</span>`;
+        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#94a3b8;"></span><span class="pulse-ring-inner" style="background:#94a3b8;"></span></span><span style="color:#94a3b8; font-weight:700;">STALE</span>`;
+      } else if (dev.healthLevel === "FAULT") {
+        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#ef4444;"></span><span class="pulse-ring-inner" style="background:#ef4444;"></span></span><span style="color:#ef4444; font-weight:700;">FAULT</span>`;
+      } else if (dev.healthLevel === "RECOVERING") {
+        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#38bdf8;"></span><span class="pulse-ring-inner" style="background:#38bdf8;"></span></span><span style="color:#38bdf8; font-weight:700;">RECOVERING</span>`;
       } else { // OFFLINE
         badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#64748b;"></span><span class="pulse-ring-inner" style="background:#64748b;"></span></span><span style="color:#64748b; font-weight:700;">OFFLINE</span>`;
       }
@@ -178,7 +182,7 @@ export class DeviceController {
         </svg>
       `;
 
-      const inferenceRateText = dev.fps > 0 ? `${dev.fps} FPS` : dev.type.includes("PLC") ? "Active Telemetry" : "N/A";
+      const inferenceRateText = dev.fps > 0 ? `${dev.fps} FPS` : (dev.type && dev.type.includes("PLC")) ? "Active Telemetry" : "N/A";
 
       // Row layout HTML murni
       html += `
@@ -331,20 +335,24 @@ export class DeviceController {
     const fpsInput = document.getElementById("cfgDeviceFps");
     if (fpsInput && (isInitialSelect || document.activeElement !== fpsInput)) {
       fpsInput.value = dev.fps || 30;
-      if (dev.type.includes("PLC")) {
-        fpsInput.parentElement.style.display = "none";
-      } else {
-        fpsInput.parentElement.style.display = "block";
+      if (fpsInput.parentElement && fpsInput.parentElement.style) {
+        if (dev.type.includes("PLC")) {
+          fpsInput.parentElement.style.display = "none";
+        } else {
+          fpsInput.parentElement.style.display = "block";
+        }
       }
     }
 
     const resSelect = document.getElementById("cfgDeviceResolution");
     if (resSelect && (isInitialSelect || document.activeElement !== resSelect)) {
       resSelect.value = dev.resolution || "1080p";
-      if (dev.type.includes("PLC")) {
-        resSelect.parentElement.style.display = "none";
-      } else {
-        resSelect.parentElement.style.display = "block";
+      if (resSelect.parentElement && resSelect.parentElement.style) {
+        if (dev.type.includes("PLC")) {
+          resSelect.parentElement.style.display = "none";
+        } else {
+          resSelect.parentElement.style.display = "block";
+        }
       }
     }
 

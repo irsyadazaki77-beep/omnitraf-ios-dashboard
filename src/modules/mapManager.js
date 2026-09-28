@@ -19,6 +19,7 @@ import {
 import { stateStore } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
 import { Disposer } from '../core/disposer.js';
+import { diagnostics } from '../core/diagnostics.js';
 
 /**
  * Helper menghitung jarak Euclidean antar dua titik koordinat [lng, lat]
@@ -801,8 +802,8 @@ export class MapManager {
   }
 
   activate() {
+    this.deactivate(); // Ensure deterministic cleanup first
     this.isActive = true;
-    this.activationDisposer.clear(); // Ensure deterministic cleanup first
 
     this.initAllMaps();
     this._bindZoomControls();
@@ -853,8 +854,11 @@ export class MapManager {
 
     zoomResetBtns.forEach(btn => {
       this.activationDisposer.addEventListener(btn, "click", () => {
-        this.maps.forEach(map => map.setView([SURABAYA_CENTER.lat, SURABAYA_CENTER.lng], SURABAYA_CENTER.zoom));
+        this.resetViewport();
         soundManager.play('click');
+        if (typeof window.showToast === 'function') {
+          window.showToast("✓ Viewport peta dipusatkan kembali ke Surabaya.");
+        }
       });
     });
   }
@@ -1074,6 +1078,10 @@ export class MapManager {
     this.setupEmergencyVehicleMarkers(map);
     this.createMapLayerSwitcher(map, containerId);
     this.createWeatherWidget(map, containerId);
+
+    // Record total active map layers in diagnostics
+    let totalLayers = Object.keys(layerGroups).length;
+    diagnostics.recordMapLayersCount(totalLayers);
 
     // Mulai loop animasi requestAnimationFrame jika belum berjalan
     if (!this.animFrameId) {
@@ -1544,7 +1552,7 @@ export class MapManager {
     const fireCoords = EMERGENCY_PATHS_GEOJSON.fire.geometry.coordinates;
 
     const animateStep = (timestamp) => {
-      if (!this.isActive || document.hidden) {
+      if (!this.isActive || document.hidden || !this.emergencyMarkers || this.emergencyMarkers.length === 0) {
         this.animFrameId = null;
         return;
       }
@@ -2744,10 +2752,13 @@ export class MapManager {
           </div>
         `;
 
-        hud.querySelector('.efh-close-btn').addEventListener('click', () => {
-          this.stopEmergency112Simulation(false);
-          soundManager.play('click');
-        });
+        const closeBtn = hud.querySelector('.efh-close-btn');
+        if (closeBtn) {
+          closeBtn.addEventListener('click', () => {
+            this.stopEmergency112Simulation(false);
+            soundManager.play('click');
+          });
+        }
 
         parent.appendChild(hud);
       }
@@ -2774,6 +2785,7 @@ export class MapManager {
   stopEmergency112Simulation(isFinished = false) {
     if (this.emergency112Sim && this.emergency112Sim.animId) {
       cancelAnimationFrame(this.emergency112Sim.animId);
+      this.emergency112Sim.animId = null;
     }
 
     this.emergency112Sim.active = false;
@@ -2828,6 +2840,46 @@ export class MapManager {
 
     this.maps.forEach(map => {
       map.flyTo(target, targetZoom, { duration: 1.5, easeLinearity: 0.25 });
+    });
+  }
+
+  /**
+   * Reset peta ke viewport pusat Surabaya dan bersihkan semua popup/seleksi
+   */
+  resetViewport(containerId = null) {
+    const target = [SURABAYA_CENTER.lat, SURABAYA_CENTER.lng];
+    const targetZoom = SURABAYA_CENTER.zoom || 13;
+
+    if (containerId && this.maps.has(containerId)) {
+      const map = this.maps.get(containerId);
+      map.closePopup();
+      map.flyTo(target, targetZoom, { duration: 1.2, easeLinearity: 0.25 });
+    } else {
+      this.maps.forEach(map => {
+        map.closePopup();
+        map.flyTo(target, targetZoom, { duration: 1.2, easeLinearity: 0.25 });
+      });
+    }
+
+    this.clearSelection();
+  }
+
+  /**
+   * Tutup semua popup, deselect marker yang aktif, dan reset state seleksi
+   */
+  clearSelection() {
+    this.maps.forEach(map => {
+      map.closePopup();
+    });
+
+    const landmarkCard = document.getElementById("landmarkDetailCard");
+    if (landmarkCard) {
+      landmarkCard.classList.add("is-hidden");
+      landmarkCard.style.display = "none";
+    }
+
+    document.querySelectorAll('.leaflet-marker-selected').forEach(el => {
+      el.classList.remove('leaflet-marker-selected');
     });
   }
 

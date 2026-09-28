@@ -341,6 +341,31 @@ export class TrafficEngine {
     if (countEl) {
       this._smartUpdateDOM(countEl, `${emergencies.length} Active priority`);
     }
+
+    // Dynamic sync for dashboard Emergency Priority card
+    const titleEl = document.getElementById("dashEmergencyTitle");
+    const etaEl = document.getElementById("dashEmergencyEta");
+    const routeEl = document.getElementById("dashEmergencyRoute");
+    const badgeEl = document.getElementById("dashEmergencyBadge");
+    const iconEl = document.getElementById("dashEmergencyIcon");
+
+    if (titleEl) {
+      if (emergencies.length > 0) {
+        const emg = emergencies[0];
+        const isFinished = ["ARRIVED", "COMPLETED", "CANCELLED"].includes(emg.status);
+        this._smartUpdateDOM(titleEl, `${emg.vehicleId || 'Ambulans'} (${emg.vehicleType || '112'})`);
+        if (etaEl) this._smartUpdateDOM(etaEl, isFinished ? `Status: ${emg.status}` : `ETA ${emg.ETA || '1m 45s'} • Kecepatan: ${emg.speed || 60} km/j`);
+        if (routeEl) this._smartUpdateDOM(routeEl, `Rute: ${emg.routeId ? emg.routeId.replace('route-', '').toUpperCase() : 'Jl. Raya Darmo → RSU Dr. Soetomo'}`);
+        if (badgeEl) this._smartUpdateDOM(badgeEl, isFinished ? 'Selesai' : 'Aktif', isFinished ? 'pill pill-live' : 'pill pill-danger');
+        if (iconEl) iconEl.className = isFinished ? 'emergency-icon' : 'emergency-icon pulse-red';
+      } else {
+        this._smartUpdateDOM(titleEl, 'Tidak Ada Armada Darurat Aktif');
+        if (etaEl) this._smartUpdateDOM(etaEl, 'Sistem Siaga Dispatch 112 Surabaya');
+        if (routeEl) this._smartUpdateDOM(routeEl, 'Koridor dalam mode operasi normal');
+        if (badgeEl) this._smartUpdateDOM(badgeEl, 'Standby', 'pill');
+        if (iconEl) iconEl.className = 'emergency-icon';
+      }
+    }
   }
 
   _toggleDeviceTableChaos(isChaos) {

@@ -7,7 +7,7 @@
  * - Internal runtime diagnostics integration
  */
 
-import { stateStore } from './core/stateStore.js';
+import { stateStore, flushPendingDomWrites } from './core/stateStore.js';
 import { soundManager } from './core/soundManager.js';
 import { socketClient } from './core/socketClient.js';
 import { authManager } from './core/authManager.js';
@@ -89,6 +89,8 @@ export class App {
     // Deactivate previous controllers if needed
     if (oldView && oldView !== newView) {
       this._deactivateViewModules(oldView, newView);
+      // Flush pending DOM writes to prevent detached DOM memory retainers
+      flushPendingDomWrites();
     }
 
     // Lazy load & mount HTML partial into DOM
@@ -307,6 +309,17 @@ export class App {
     window.addEventListener('error', (event) => {
       console.warn("🛡️ [OmniTRAF Boundary] Global Error Handled:", event.error || event.message);
       diagnostics.recordApiError();
+      if (typeof diagnostics.logEvent === 'function') {
+        diagnostics.logEvent({
+          level: 'ERROR',
+          category: 'fault',
+          component: 'ui_shell',
+          event: 'UNCAUGHT_WINDOW_ERROR',
+          errorCode: 'WINDOW_ERROR',
+          message: event.message || 'Uncaught client error',
+          details: { filename: event.filename, lineno: event.lineno, colno: event.colno }
+        });
+      }
       this._showToastNotification("Terjadi kendala pada sistem UI. Operasi dilanjutkan secara aman.", "warning");
       event.preventDefault();
     });
@@ -314,6 +327,17 @@ export class App {
     window.addEventListener('unhandledrejection', (event) => {
       console.warn("🛡️ [OmniTRAF Boundary] Unhandled Promise Rejection:", event.reason);
       diagnostics.recordApiError();
+      if (typeof diagnostics.logEvent === 'function') {
+        diagnostics.logEvent({
+          level: 'WARN',
+          category: 'fault',
+          component: 'async_boundary',
+          event: 'UNHANDLED_PROMISE_REJECTION',
+          errorCode: 'UNHANDLED_REJECTION',
+          message: event.reason?.message || String(event.reason || 'Unhandled rejection'),
+          details: { reason: String(event.reason) }
+        });
+      }
       this._showToastNotification("Penundaan koneksi data terdeteksi. Mencoba ulang...", "warning");
       event.preventDefault();
     });
@@ -322,10 +346,12 @@ export class App {
   _initAccessibleModalHandlers() {
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        const activeModals = document.querySelectorAll('.modal.active, .modal.show, .modal-backdrop.active, #emergencyModal.show, .dialog.open');
+        const activeModals = document.querySelectorAll('.modal.active, .modal.show, .modal-backdrop.active, #emergencyModal.show, .dialog.open, .modal-overlay.active');
         activeModals.forEach(modal => {
           modal.classList.remove('active', 'show', 'open');
-          if (modal.style) modal.style.display = 'none';
+          if (modal.style && modal.style.display !== 'none' && !modal.classList.contains('modal-backdrop')) {
+            modal.style.display = 'none';
+          }
         });
         const drawer = document.getElementById('sidebar');
         const backdrop = document.getElementById('drawerBackdrop');
@@ -335,13 +361,23 @@ export class App {
         }
       }
     });
+
+    // Dismiss modal when clicking outside content area on overlay/backdrop
+    document.addEventListener('click', (e) => {
+      if (e.target && (e.target.classList.contains('modal') || e.target.classList.contains('modal-overlay') || e.target.classList.contains('modal-backdrop'))) {
+        e.target.classList.remove('active', 'show', 'open');
+        if (e.target.style) e.target.style.display = 'none';
+      }
+    });
   }
 }
 
 export const app = new App();
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => app.init());
-} else {
-  app.init();
+if (typeof document !== "undefined") {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => app.init());
+  } else {
+    app.init();
+  }
 }

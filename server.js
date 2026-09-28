@@ -22,6 +22,7 @@ import { corsMiddleware, securityHeadersMiddleware } from './server/middlewares/
 import { rateLimiter } from './server/middlewares/rateLimiter.js';
 import { initializeSocketServer } from './server/sockets/socketServer.js';
 import apiRoutes from './server/routes/apiRoutes.js';
+import { diagnosticEngine } from './server/services/diagnosticEngine.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,9 +55,12 @@ app.get('/healthz', (req, res) => {
 });
 
 app.get('/ready', (req, res) => {
-  const dbReady = dbManager.isInitialized && dbManager.db !== null;
+  const hasActiveDbFault = diagnosticEngine.isFaultActive('database');
+  const dbReady = dbManager.isInitialized && dbManager.db !== null && !hasActiveDbFault;
   let dbStatus = 'DISCONNECTED';
-  if (dbReady) {
+  if (hasActiveDbFault) {
+    dbStatus = 'FAULT_INJECTED_UNAVAILABLE';
+  } else if (dbReady) {
     try {
       dbManager.db.exec('SELECT 1;');
       dbStatus = 'CONNECTED';
@@ -65,18 +69,25 @@ app.get('/ready', (req, res) => {
     }
   }
 
-  const isReady = dbStatus === 'CONNECTED' && backendState.isHydrated;
-  const status = isReady ? 'READY' : 'OUT_OF_SERVICE';
+  const clientsCount = backendState.io?.engine?.clientsCount || 0;
+  const socketStatus = backendState.io ? 'CONNECTED' : 'DISCONNECTED';
+
+  const isReady = dbStatus === 'CONNECTED' && backendState.isHydrated && !hasActiveDbFault;
+  const status = isReady ? 'READY' : (hasActiveDbFault ? 'DEGRADED' : 'OUT_OF_SERVICE');
   const statusCode = isReady ? 200 : 503;
 
   res.status(statusCode).json({
+    ready: isReady,
     success: isReady,
     type: 'health_readiness',
     status,
+    health: isReady ? 'HEALTHY' : (hasActiveDbFault ? 'DEGRADED' : 'UNAVAILABLE'),
     timestamp: new Date().toISOString(),
     components: {
       database: dbStatus,
       stateHydration: backendState.isHydrated ? 'COMPLETED' : 'PENDING',
+      socketServer: socketStatus,
+      activeClients: clientsCount,
       process: 'RUNNING'
     },
     data: {
@@ -84,6 +95,8 @@ app.get('/ready', (req, res) => {
       components: {
         database: dbStatus,
         stateHydration: backendState.isHydrated ? 'COMPLETED' : 'PENDING',
+        socketServer: socketStatus,
+        activeClients: clientsCount,
         process: 'RUNNING'
       }
     },
@@ -97,14 +110,41 @@ app.get('/ready', (req, res) => {
 app.use(rateLimiter({ windowMs: 15000, max: 200, keyPrefix: 'api-global' }));
 app.use(express.json({ limit: '1mb' }));
 
+// 1c. Sensitive File & Static Asset Access Protection
+app.use((req, res, next) => {
+  const reqPath = req.path.toLowerCase().replace(/\\/g, '/');
+  // Strictly prohibit direct exposure of .env, sqlite databases, private data directories, test files, package internals, and server source code
+  if (
+    reqPath.includes('.env') ||
+    reqPath.includes('.sqlite') ||
+    reqPath.includes('.git') ||
+    reqPath.startsWith('/data/') ||
+    reqPath.startsWith('/server/') ||
+    reqPath.startsWith('/test/') ||
+    reqPath === '/server.js' ||
+    reqPath === '/package.json' ||
+    reqPath === '/package-lock.json'
+  ) {
+    return res.status(403).json({
+      success: false,
+      code: 'ACCESS_DENIED',
+      message: 'Akses ke berkas internal sistem tidak diizinkan.'
+    });
+  }
+  next();
+});
+
 // 2. Static Assets Serving
 app.use(express.static(__dirname, {
+  dotfiles: 'deny',
+  index: ['index.html'],
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.webmanifest')) {
       res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
     }
   }
 }));
+
 
 // 3. Mount Modular REST API Routes
 app.use('/api', apiRoutes);

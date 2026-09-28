@@ -7,11 +7,20 @@
 import { stateStore } from './stateStore.js';
 import { socketClient } from './socketClient.js';
 import { soundManager } from './soundManager.js';
+import { authManager } from './authManager.js';
+import { diagnostics, DIAGNOSTIC_LEVELS, EVENT_CATEGORIES } from './diagnostics.js';
+
+function generateSecureId(prefix = 'CMD') {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  const rand = Math.random().toString(36).substring(2, 10);
+  return `${prefix}-${Date.now()}-${rand}`;
+}
 
 class CommandLayer {
   constructor() {
-    this.sessionId = `SESS-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
-    this.actor = "Zaki Putra (Operator SITS)";
+    this.sessionId = generateSecureId('SESS');
     this.clientVersion = "v1.7.0-enterprise";
     this.connectedAt = new Date().toISOString();
     this.lastActivityAt = new Date().toISOString();
@@ -94,6 +103,30 @@ class CommandLayer {
         });
       }
     });
+
+    // Teardown pending state & reset session on auth changes (logout or switch user)
+    authManager.onAuthChange((user, token) => {
+      this.pendingCommands.clear();
+      this.executedCommands.clear();
+      this.sessionId = generateSecureId('SESS');
+      this.addAuditEvent({
+        type: "auth:changed",
+        timestamp: new Date().toISOString(),
+        source: "client",
+        entity: "SessionContext",
+        result: user ? `AUTHENTICATED (${user.role})` : "LOGGED_OUT",
+        reasonCode: "AUTH_CONTEXT_SWITCH",
+        details: user ? `Principal active: ${user.username} (${user.role})` : "Sesi dibersihkan total."
+      });
+    });
+  }
+
+  get actor() {
+    const user = authManager.getUser();
+    if (user && user.name) {
+      return `${user.name} (${user.role ? user.role.toUpperCase() : 'OPERATOR'})`;
+    }
+    return "Zaki Putra (Operator SITS)";
   }
 
   /**
@@ -104,8 +137,8 @@ class CommandLayer {
    */
   async dispatchCommand(intent, isHighRisk = false) {
     this.lastActivityAt = new Date().toISOString();
-    const commandId = intent.commandId || `CMD-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
-    const correlationId = intent.correlationId || `CORR-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+    const commandId = intent.commandId || generateSecureId('CMD');
+    const correlationId = intent.correlationId || generateSecureId('CORR');
     const idempotencyKey = intent.idempotencyKey || `IDEMP-${intent.action}-${intent.targetId || 'global'}-${JSON.stringify(intent.payload || {})}`;
 
     const cmd = {
@@ -144,6 +177,21 @@ class CommandLayer {
       cmd.result = 'REJECTED';
       cmd.errorCode = 'VALIDATION_FAILED';
       cmd.completedAt = new Date().toISOString();
+
+      diagnostics.logEvent({
+        level: DIAGNOSTIC_LEVELS.WARN,
+        category: EVENT_CATEGORIES.STATE_TRANSITION,
+        component: 'command_pipeline',
+        event: 'COMMAND_VALIDATION_REJECTED',
+        operation: intent.action,
+        commandId,
+        correlationId,
+        entityType: intent.targetType,
+        entityId: intent.targetId,
+        errorCode: 'VALIDATION_FAILED',
+        message: `Validation failed: ${validationError}`
+      });
+
       this.addAuditEvent({
         type: "command:rejected",
         entity: intent.targetId,
@@ -163,6 +211,21 @@ class CommandLayer {
         cmd.result = 'REJECTED';
         cmd.errorCode = 'OPERATOR_CANCELLED';
         cmd.completedAt = new Date().toISOString();
+
+        diagnostics.logEvent({
+          level: DIAGNOSTIC_LEVELS.INFO,
+          category: EVENT_CATEGORIES.OPERATIONAL,
+          component: 'command_pipeline',
+          event: 'COMMAND_OPERATOR_CANCELLED',
+          operation: intent.action,
+          commandId,
+          correlationId,
+          entityType: intent.targetType,
+          entityId: intent.targetId,
+          errorCode: 'OPERATOR_CANCELLED',
+          message: 'Operator cancelled confirmation prompt'
+        });
+
         this.addAuditEvent({
           type: "command:rejected",
           entity: intent.targetId,
@@ -179,6 +242,21 @@ class CommandLayer {
     // 4. Catat ke in-memory pending commands
     cmd.result = 'DISPATCHED';
     this.pendingCommands.set(commandId, cmd);
+    diagnostics.recordPendingCommandCount(this.pendingCommands.size);
+
+    diagnostics.logEvent({
+      level: DIAGNOSTIC_LEVELS.INFO,
+      category: EVENT_CATEGORIES.OPERATIONAL,
+      component: 'command_pipeline',
+      event: 'COMMAND_DISPATCHED',
+      operation: intent.action,
+      commandId,
+      correlationId,
+      entityType: intent.targetType,
+      entityId: intent.targetId,
+      message: `Dispatched command ${intent.action}`
+    });
+
     this.addAuditEvent({
       type: "command:requested",
       entity: intent.targetId,
@@ -190,6 +268,7 @@ class CommandLayer {
     });
 
     // 5. Kirim Perintah secara Fisik ke Server / Socket
+    const dispatchStartTime = Date.now();
     return new Promise((resolve, reject) => {
       const socket = socketClient.getSocket();
       if (!socket || !socket.connected) {
@@ -198,6 +277,21 @@ class CommandLayer {
         cmd.errorCode = 'OFFLINE';
         cmd.completedAt = new Date().toISOString();
         this.pendingCommands.delete(commandId);
+        diagnostics.recordPendingCommandCount(this.pendingCommands.size);
+
+        diagnostics.logEvent({
+          level: DIAGNOSTIC_LEVELS.ERROR,
+          category: EVENT_CATEGORIES.FAULT,
+          component: 'command_pipeline',
+          event: 'COMMAND_DISPATCH_OFFLINE',
+          operation: intent.action,
+          commandId,
+          correlationId,
+          entityType: intent.targetType,
+          entityId: intent.targetId,
+          errorCode: 'OFFLINE',
+          message: 'Socket not connected. Command rejected offline.'
+        });
         
         this.addAuditEvent({
           type: "command:failed",
@@ -219,6 +313,22 @@ class CommandLayer {
         cmd.errorCode = 'TIMEOUT';
         cmd.completedAt = new Date().toISOString();
         this.pendingCommands.delete(commandId);
+        diagnostics.recordPendingCommandCount(this.pendingCommands.size);
+
+        diagnostics.logEvent({
+          level: DIAGNOSTIC_LEVELS.WARN,
+          category: EVENT_CATEGORIES.FAULT,
+          component: 'command_pipeline',
+          event: 'COMMAND_TIMEOUT',
+          operation: intent.action,
+          commandId,
+          correlationId,
+          entityType: intent.targetType,
+          entityId: intent.targetId,
+          durationMs: Date.now() - dispatchStartTime,
+          errorCode: 'TIMEOUT',
+          message: 'Command timed out after 4000ms. Triggering state reconciliation.'
+        });
         
         this.addAuditEvent({
           type: "command:failed",
@@ -239,6 +349,9 @@ class CommandLayer {
       socket.emit('operator:command', { cmd, correlationId }, (response) => {
         clearTimeout(timeoutId);
         this.pendingCommands.delete(commandId);
+        diagnostics.recordPendingCommandCount(this.pendingCommands.size);
+
+        const durationMs = Date.now() - dispatchStartTime;
 
         if (response && response.success) {
           cmd.result = 'SERVER_APPLIED';
@@ -257,6 +370,20 @@ class CommandLayer {
               resultingState: response.resultingState || intent.payload
             });
           }
+
+          diagnostics.logEvent({
+            level: DIAGNOSTIC_LEVELS.INFO,
+            category: EVENT_CATEGORIES.OPERATIONAL,
+            component: 'command_pipeline',
+            event: 'COMMAND_SERVER_ACK',
+            operation: intent.action,
+            commandId,
+            correlationId,
+            entityType: intent.targetType,
+            entityId: intent.targetId,
+            durationMs,
+            message: `Command applied successfully by server in ${durationMs}ms`
+          });
 
           this.addAuditEvent({
             type: "command:acknowledged",
@@ -281,6 +408,21 @@ class CommandLayer {
           cmd.result = 'REJECTED';
           cmd.errorCode = errCode;
           cmd.completedAt = new Date().toISOString();
+
+          diagnostics.logEvent({
+            level: DIAGNOSTIC_LEVELS.WARN,
+            category: EVENT_CATEGORIES.OPERATIONAL,
+            component: 'command_pipeline',
+            event: 'COMMAND_SERVER_REJECTED',
+            operation: intent.action,
+            commandId,
+            correlationId,
+            entityType: intent.targetType,
+            entityId: intent.targetId,
+            durationMs,
+            errorCode: errCode,
+            message: `Server rejected command: ${errMessage}`
+          });
 
           this.addAuditEvent({
             type: "command:rejected",
@@ -345,6 +487,9 @@ class CommandLayer {
               result: "SERVER_APPLIED",
               details: `Perintah ${cmd.action} berhasil direkonsiliasi dan terkonfirmasi telah diterapkan di server.`
             });
+          } else if (serverStatus === 'EXECUTING') {
+            cmd.result = 'EXECUTING';
+            console.info(`⏳ [CommandLayer] Perintah ${commandId} masih dalam proses eksekusi di server.`);
           } else {
             cmd.result = 'UNKNOWN_SERVER_STATE';
             cmd.errorCode = 'RECONCILIATION_UNCONFIRMED';
@@ -371,15 +516,29 @@ class CommandLayer {
       if (!inc) {
         return `Insiden #${id} tidak ditemukan di log aktif.`;
       }
-      if (inc.status === "RESOLVED" && (action === 'incident:acknowledge' || action === 'incident:dispatch')) {
-        return `Insiden #${id} sudah terselesaikan (RESOLVED). Tidak dapat diubah statusnya.`;
+
+      const currentStatus = (inc.status || '').trim().toUpperCase();
+      if (currentStatus === "ARCHIVED") {
+        return `Insiden #${id} sudah diarsipkan (ARCHIVED) dan tidak dapat diubah lagi.`;
+      }
+      if (currentStatus === "RESOLVED" && action !== 'incident:resolve') {
+        return `Insiden #${id} sudah berstatus RESOLVED. Tidak dapat diubah statusnya ke aktif.`;
+      }
+
+      if (action === 'incident:resolve' && inc.associatedEmergencyId) {
+        const activeEmg = (state.activeEmergencies || []).find(
+          e => String(e.id) === String(inc.associatedEmergencyId) || String(e.vehicleId) === String(inc.associatedEmergencyId)
+        );
+        if (activeEmg && !["ARRIVED", "COMPLETED", "CANCELLED", "TERMINAL_ARCHIVED"].includes(activeEmg.status)) {
+          return `Insiden #${id} terhubung ke armada darurat aktif (${activeEmg.vehicleId} - ${activeEmg.status}). Batalkan atau selesaikan dispatch darurat terlebih dahulu.`;
+        }
       }
     }
 
     if (action === 'emergency:activate') {
       const code = intent.payload?.code;
       const existing = (state.activeEmergencies || []).find(
-        e => e.vehicleId === code && !["COMPLETED", "CANCELLED"].includes(e.status)
+        e => e.vehicleId === code && !["COMPLETED", "CANCELLED", "TERMINAL_ARCHIVED"].includes(e.status)
       );
       if (existing) {
         return `Kendaraan prioritas ${code} sedang aktif dalam rute. Gunakan rute alternatif atau batalkan dispensasi lama.`;
@@ -596,10 +755,10 @@ class CommandLayer {
     `;
 
     // Append to container, keeping limit
-    terminal.insertAdjacentHTML('beforeend', lineHtml);
-    
-    // Auto scroll to bottom
-    terminal.scrollTop = terminal.scrollHeight;
+    if (terminal && typeof terminal.insertAdjacentHTML === 'function') {
+      terminal.insertAdjacentHTML('beforeend', lineHtml);
+      terminal.scrollTop = terminal.scrollHeight;
+    }
 
     // Bounded terminal lines in DOM
     const lines = terminal.querySelectorAll(".terminal-line");
@@ -624,4 +783,6 @@ class CommandLayer {
 }
 
 export const commandLayer = new CommandLayer();
-window.commandLayer = commandLayer;
+if (typeof window !== 'undefined') {
+  window.commandLayer = commandLayer;
+}

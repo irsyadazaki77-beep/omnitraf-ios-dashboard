@@ -1,13 +1,15 @@
 import { backendState } from '../services/stateManager.js';
 import { createApiResponse, createApiErrorResponse } from '../middlewares/errorHandler.js';
+import { diagnosticEngine } from '../services/diagnosticEngine.js';
 
 export function executeTerminalCommand(req, res) {
-  const { command, actor } = req.body || {};
+  const { command } = req.body || {};
   const cmd = (command || '').trim();
   const lower = cmd.toLowerCase().split(' ')[0];
   const time = backendState._getWibTimeString();
   const executionId = `EXEC-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
-  const act = actor || req.user?.name || "Administrator SITS";
+  // Security: authenticated user strictly from verified principal (req.user), never client body
+  const act = req.user?.name || (req.user ? `${req.user.username} (${req.user.role})` : "Administrator SITS");
 
   let responseLines = [];
   let color = "var(--text)";
@@ -21,7 +23,7 @@ export function executeTerminalCommand(req, res) {
     ));
   }
 
-  const allowedCommands = ['/help', 'help', '/status', 'status', '/ping', 'ping', '/telemetry', 'telemetry', '/nodes', 'nodes', '/chaos', 'chaos', '/clear', 'clear', '/perf', 'perf', '/sys-metrics'];
+  const allowedCommands = ['/help', 'help', '/status', 'status', '/ping', 'ping', '/telemetry', 'telemetry', '/nodes', 'nodes', '/chaos', 'chaos', '/clear', 'clear', '/perf', 'perf', '/sys-metrics', '/diagnostics', 'diagnostics'];
 
   if (!allowedCommands.includes(lower)) {
     responseLines = [
@@ -84,9 +86,24 @@ export function executeTerminalCommand(req, res) {
       `  • Heap Total : ${(mem.heapTotal / 1024 / 1024).toFixed(2)} MB`,
       `  • RSS        : ${(mem.rss / 1024 / 1024).toFixed(2)} MB`,
       `  • Connected Clients: ${clientsCount}`,
-      `  • Active Sequence : ${backendState.sequence}`
+      `  • Active Sequence : ${backendState.sequence}`,
+      `  • Injected Faults: ${diagnosticEngine.activeFaults.size}`
     ];
     color = "var(--cyan)";
+  } else if (lower === '/diagnostics' || lower === 'diagnostics') {
+    const snap = diagnosticEngine.captureSnapshot();
+    const subs = snap.subsystems || {};
+    responseLines = [
+      `🔍 OBSERVABILITY & DIAGNOSTICS SNAPSHOT:`,
+      `  • Database      : ${subs.database?.status || 'UNKNOWN'} (Latency: ${subs.database?.latencyMs ?? 0}ms)`,
+      `  • State Hydration: ${subs.state_manager?.status || 'UNKNOWN'} (Seq: ${backendState.sequence})`,
+      `  • Socket Stream : ${subs.socket?.status || 'UNKNOWN'} (Clients: ${backendState.io?.engine?.clientsCount || 0})`,
+      `  • Fault Matrix  : ${snap.activeFaultsCount} Active Fault(s)`,
+      `  • Transitions   : ${snap.metrics.stateTransitionCount} applied, ${snap.metrics.rejectedTransitionCount} rejected`,
+      `  • Command Stats : ${snap.metrics.commandSuccessCount} OK, ${snap.metrics.commandFailureCount} Fail`
+    ];
+    color = "var(--primary-2)";
+
   } else if (lower === '/status' || lower === 'status') {
     responseLines = [
       `[HTTP 200 OK] SITS Enterprise Server: ONLINE`,

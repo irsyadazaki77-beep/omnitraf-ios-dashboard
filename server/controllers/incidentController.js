@@ -2,16 +2,20 @@ import { backendState } from '../services/stateManager.js';
 import { createApiResponse, createApiErrorResponse } from '../middlewares/errorHandler.js';
 import { ROUTES_DB } from '../config/constants.js';
 import { dbManager } from '../db/database.js';
+import {
+  INCIDENT_STATES,
+  EMERGENCY_STATES,
+  VALID_INCIDENT_STATUSES as CANONICAL_INCIDENT_STATUSES,
+  VALID_EMERGENCY_STATUSES,
+  normalizeIncidentStatus,
+  validateIncidentTransition,
+  validateEmergencyTransition,
+  createDomainEventEnvelope
+} from '../config/stateMachine.js';
 
 export const VALID_INCIDENT_STATUSES = [
-  "ACTIVE",
-  "ACKNOWLEDGED",
-  "DISPATCHED",
-  "RESPONDING",
-  "DISPATCHED/RESPONDING",
-  "MITIGATED",
-  "RESOLVED",
-  "ARCHIVED"
+  ...CANONICAL_INCIDENT_STATUSES,
+  "DISPATCHED/RESPONDING"
 ];
 
 export const VALID_INCIDENT_SEVERITIES = ["low", "medium", "high", "critical"];
@@ -41,20 +45,20 @@ export function getIncidents(req, res) {
 export function createIncident(req, res) {
   const { title, category = "congestion", severity = "medium", location, assignedUnit, notes, source = "API" } = req.body || {};
 
-  if (!title || typeof title !== 'string' || !title.trim()) {
+  if (!title || typeof title !== 'string' || !title.trim() || title.trim().length > 200) {
     return res.status(400).json(createApiErrorResponse(
       400,
       "VALIDATION_ERROR",
-      "Parameter 'title' wajib diisi berupa teks non-kosong.",
+      "Parameter 'title' wajib diisi berupa teks valid (maksimal 200 karakter).",
       { field: "title" }
     ));
   }
 
-  if (!location || typeof location !== 'string' || !location.trim()) {
+  if (!location || typeof location !== 'string' || !location.trim() || location.trim().length > 250) {
     return res.status(400).json(createApiErrorResponse(
       400,
       "VALIDATION_ERROR",
-      "Parameter 'location' wajib diisi berupa teks lokasi yang valid.",
+      "Parameter 'location' wajib diisi berupa teks lokasi yang valid (maksimal 250 karakter).",
       { field: "location" }
     ));
   }
@@ -101,7 +105,7 @@ export function createIncident(req, res) {
     location: location.trim(),
     status: "ACTIVE",
     priority: cleanSev === 'critical' || cleanSev === 'high' ? 'high' : 'normal',
-    source: source || (req.user?.name ? `Operator (${req.user.name})` : "AI_VISION"),
+    source: req.user?.name ? `Operator (${req.user.name})` : "AI_VISION",
     assignedUnit: assignedUnit || "Menunggu Disposisi Petugas",
     notes: notes || "Laporan insiden baru masuk antrean verifikasi SITS.",
     reportedAt: nowStr,
@@ -183,11 +187,11 @@ export function getEmergencies(req, res) {
 export function activateEmergencyRest(req, res) {
   const { code, route, type } = req.body || {};
 
-  if (!code || typeof code !== 'string' || !code.trim()) {
+  if (!code || typeof code !== 'string' || !code.trim() || code.trim().length > 50) {
     return res.status(400).json(createApiErrorResponse(
       400,
       "VALIDATION_ERROR",
-      "Parameter 'code' (ID Armada Darurat) wajib diisi.",
+      "Parameter 'code' (ID Armada Darurat) wajib diisi berupa teks valid (maksimal 50 karakter).",
       { field: "code" }
     ));
   }
@@ -202,11 +206,53 @@ export function activateEmergencyRest(req, res) {
     ));
   }
 
+  const commandId = req.headers['x-command-id'] || req.body?.commandId || `CMD-REST-EMG-${Date.now()}`;
+  const correlationId = req.headers['x-correlation-id'] || req.body?.correlationId || `CORR-REST-EMG-${Date.now()}`;
+  const idempotencyKey = req.headers['x-idempotency-key'] || req.body?.idempotencyKey || `IDEMP-REST-EMG-${code.trim()}-${routeId}`;
+
+  // Check idempotency cache
+  if (backendState.processedCommands && backendState.processedCommands.has(idempotencyKey)) {
+    const cached = backendState.processedCommands.get(idempotencyKey);
+    // Collision check: verify target code and route
+    if (cached.targetId && cached.targetId !== code.trim()) {
+      return res.status(409).json(createApiErrorResponse(
+        409,
+        "IDEMPOTENCY_CONFLICT",
+        `Idempotency key '${idempotencyKey}' sudah digunakan untuk kendaraan '${cached.targetId}', tidak dapat digunakan kembali untuk '${code.trim()}'.`
+      ));
+    }
+    return res.status(200).json(createApiResponse({
+      type: "emergency_activated",
+      sequence: backendState.emergencySequence,
+      data: cached.resultingState || cached.newState,
+      extra: {
+        status: "success",
+        isIdempotentReplay: true,
+        emergencyItem: cached.resultingState || cached.newState
+      }
+    }));
+  }
+
   try {
-    const result = backendState.activateEmergencyPriority(code.trim(), routeId);
+    const result = backendState.activateEmergencyPriority(code.trim(), routeId, {
+      commandId,
+      correlationId,
+      actor: req.user?.name || "Operator SITS 112 Surabaya",
+      incidentId: req.body?.incidentId || req.body?.associatedIncidentId
+    });
+
+    if (backendState.processedCommands) {
+      backendState.processedCommands.set(idempotencyKey, {
+        status: 'SERVER_APPLIED',
+        commandId,
+        correlationId,
+        targetId: code.trim(),
+        resultingState: result.emergencyItem,
+        timestamp: Date.now()
+      });
+    }
 
     if (backendState.io) {
-      backendState.emergencySequence++;
       backendState.io.emit('emergency:update', {
         seq: backendState.emergencySequence,
         timestamp: Date.now(),
@@ -215,7 +261,8 @@ export function activateEmergencyRest(req, res) {
           greenWaveActive: true,
           emergencyItem: result.emergencyItem,
           activeEmergencies: result.state.activeEmergencies
-        }
+        },
+        event: result.domainEvent
       });
 
       backendState.io.emit('traffic:update', result.state);
@@ -254,29 +301,23 @@ export function activateEmergencyRest(req, res) {
 
 export function cancelEmergencyRest(req, res) {
   const id = req.params.id || req.body?.id;
-  if (!id) {
+  if (!id || typeof id !== 'string' || !id.trim() || id.trim().length > 64) {
     return res.status(400).json(createApiErrorResponse(
       400,
       "VALIDATION_ERROR",
-      "Parameter ID armada darurat wajib disertakan."
+      "Parameter ID armada darurat wajib disertakan (maksimal 64 karakter)."
     ));
   }
 
-  try {
-    const newState = backendState.cancelEmergency(id);
+  const commandId = req.headers['x-command-id'] || req.body?.commandId || `CMD-REST-CANCEL-${Date.now()}`;
+  const correlationId = req.headers['x-correlation-id'] || req.body?.correlationId || `CORR-REST-CANCEL-${Date.now()}`;
 
-    if (backendState.io) {
-      backendState.emergencySequence++;
-      backendState.io.emit('emergency:update', {
-        seq: backendState.emergencySequence,
-        timestamp: Date.now(),
-        source: 'server',
-        payload: {
-          activeEmergencies: newState.activeEmergencies
-        }
-      });
-      backendState.io.emit('traffic:update', newState);
-    }
+  try {
+    const newState = backendState.cancelEmergency(id, {
+      commandId,
+      correlationId,
+      actor: req.user?.name || "Operator SITS 112 Surabaya"
+    });
 
     res.status(200).json(createApiResponse({
       type: "emergency_cancelled",
@@ -337,17 +378,25 @@ export function updateIncidentStatus(req, res) {
     ));
   }
 
-  if (existingInc.status === "RESOLVED" && cleanStatus !== "RESOLVED" && cleanStatus !== "ARCHIVED") {
+  const validation = validateIncidentTransition(existingInc.status, cleanStatus);
+  if (!validation.valid) {
     return res.status(409).json(createApiErrorResponse(
       409,
       "STATE_CONFLICT",
-      `Insiden #${incidentId} sudah berstatus RESOLVED dan tidak dapat diubah kembali ke status aktif.`,
+      validation.reason || `Transisi status tidak sah dari ${existingInc.status} ke ${cleanStatus}.`,
       { currentStatus: existingInc.status, requestedStatus: cleanStatus }
     ));
   }
 
   try {
-    const updated = backendState.updateIncidentStatus(incidentId, cleanStatus, assignedUnit, notes);
+    const actorName = req.user?.name || "Operator SITS 112 Surabaya";
+    const correlationId = req.headers['x-correlation-id'] || `CORR-INC-STAT-${Date.now()}`;
+    const commandId = req.headers['x-command-id'] || `CMD-INC-STAT-${Date.now()}`;
+    const updated = backendState.updateIncidentStatus(incidentId, cleanStatus, assignedUnit, notes, {
+      actor: actorName,
+      correlationId,
+      commandId
+    });
     res.status(200).json(createApiResponse({
       type: "incident_status_updated",
       sequence: backendState.incidentSequence,
@@ -359,9 +408,12 @@ export function updateIncidentStatus(req, res) {
     }));
   } catch (err) {
     console.error('❌ [API Incident Status] Error:', err);
-    res.status(err.message.includes("tidak ditemukan") ? 404 : 400).json(createApiErrorResponse(
-      err.message.includes("tidak ditemukan") ? 404 : 400,
-      err.message.includes("tidak ditemukan") ? "NOT_FOUND" : "BAD_REQUEST",
+    const isConflict = err.message.includes("STATE_CONFLICT") || err.message.includes("tidak diizinkan") || err.message.includes("Transisi");
+    const statusCode = err.message.includes("tidak ditemukan") ? 404 : (isConflict ? 409 : 400);
+    const errorCode = err.message.includes("tidak ditemukan") ? "NOT_FOUND" : (isConflict ? "STATE_CONFLICT" : "BAD_REQUEST");
+    res.status(statusCode).json(createApiErrorResponse(
+      statusCode,
+      errorCode,
       err.message
     ));
   }
@@ -380,9 +432,16 @@ export function resolveIncident(req, res) {
     ));
   }
 
+  const commandId = req.headers['x-command-id'] || req.body?.commandId || `CMD-REST-RESOLVE-${Date.now()}`;
+  const correlationId = req.headers['x-correlation-id'] || req.body?.correlationId || `CORR-REST-RESOLVE-${Date.now()}`;
+  const resolverName = req.user?.name || "Operator SITS 112 Surabaya";
+
   try {
-    const updated = backendState.updateIncidentStatus(incidentId, "RESOLVED");
-    const resolverName = req.user?.name || "Operator SITS 112 Surabaya";
+    const updated = backendState.updateIncidentStatus(incidentId, "RESOLVED", null, null, {
+      commandId,
+      correlationId,
+      actor: resolverName
+    });
 
     // Emit incident:resolved event specifically for clients listening on that event
     if (backendState.io) {
@@ -390,7 +449,8 @@ export function resolveIncident(req, res) {
         id: incidentId,
         seq: backendState.incidentSequence,
         timestamp: Date.now(),
-        resolvedBy: resolverName
+        resolvedBy: resolverName,
+        correlationId
       });
     }
 
@@ -409,9 +469,12 @@ export function resolveIncident(req, res) {
     }));
   } catch (err) {
     console.error('❌ [API Incident Resolve] Error:', err);
-    res.status(err.message.includes("tidak ditemukan") ? 404 : 400).json(createApiErrorResponse(
-      err.message.includes("tidak ditemukan") ? 404 : 400,
-      err.message.includes("tidak ditemukan") ? "NOT_FOUND" : "BAD_REQUEST",
+    const isConflict = err.message.includes("STATE_CONFLICT") || err.message.includes("tidak diizinkan") || err.message.includes("masih berstatus aktif");
+    const statusCode = err.message.includes("tidak ditemukan") ? 404 : (isConflict ? 409 : 400);
+    const errorCode = err.message.includes("tidak ditemukan") ? "NOT_FOUND" : (isConflict ? "STATE_CONFLICT" : "BAD_REQUEST");
+    res.status(statusCode).json(createApiErrorResponse(
+      statusCode,
+      errorCode,
       err.message
     ));
   }

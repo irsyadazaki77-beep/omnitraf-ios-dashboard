@@ -362,20 +362,8 @@
               <!-- 16:9 Aspect Ratio Camera Viewport with Crisp Overlays -->
               <div class="camera-box tactical-camera-box" id="cameraBox">
                 <canvas class="cctv-canvas" id="dashCameraCanvas" width="640" height="360"></canvas>
-                <div class="scan-line"></div>
-                <div class="camera-noise" id="cameraNoise"></div>
-                <div class="camera-badge hud-pill"><span class="rec-dot"></span>REC</div>
-                <div class="camera-grid-overlay"></div>
+                <div class="camera-badge hud-pill"><span class="rec-dot"></span>LIVE</div>
                 <div class="camera-timestamp cctv-time hud-pill" id="cameraTime">--</div>
-
-                <!-- Official SITS Edge AI Inference Watermark -->
-                <div class="cctv-telemetry-watermark" id="cctvTelemetryWatermark">
-                  <span class="watermark-node">[SITS SURABAYA - NODE 01 | CORRIDOR AHMAD YANI | AI INFERENCE: 58.4 FPS]</span>
-                </div>
-
-                <!-- Bounding Box Overlays -->
-                <div class="cv-rect rect-car" id="rect-dash-1"><span class="cv-tag">Mobil 97%</span></div>
-                <div class="cv-rect rect-motorcycle" id="rect-dash-2"><span class="cv-tag">Motor 94%</span></div>
 
                 <!-- Glitch Overlay -->
                 <div class="cctv-glitch-overlay" id="dashCameraGlitch">
@@ -494,22 +482,22 @@
           </article>
 
           <!-- Emergency Priority Widget -->
-          <article class="ops-card glass-panel reveal-card priority-alert-widget">
+          <article class="ops-card glass-panel reveal-card priority-alert-widget" id="dashEmergencyWidget">
             <div class="section-head compact">
               <div>
                 <h2>Emergency Priority</h2>
                 <p>Prioritas kendaraan darurat terdeteksi.</p>
               </div>
-              <span class="pill pill-danger">Aktif</span>
+              <span class="pill pill-danger" id="dashEmergencyBadge">Aktif</span>
             </div>
-            <div class="emergency-row">
+            <div class="emergency-row" id="dashEmergencyRow">
               <div class="emergency-icon-container">
-                <div class="emergency-icon pulse-red">✚</div>
+                <div class="emergency-icon pulse-red" id="dashEmergencyIcon">✚</div>
               </div>
               <div>
-                <strong>Ambulans menuju RSU Dr. Soetomo</strong>
-                <p>ETA 1 menit 45 detik</p>
-                <small>Rute: Jl. Raya Darmo → RSU Dr. Soetomo</small>
+                <strong id="dashEmergencyTitle">Ambulans menuju RSU Dr. Soetomo</strong>
+                <p id="dashEmergencyEta">ETA 1 menit 45 detik</p>
+                <small id="dashEmergencyRoute">Rute: Jl. Raya Darmo → RSU Dr. Soetomo</small>
               </div>
             </div>
           </article>

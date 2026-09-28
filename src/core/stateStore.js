@@ -56,16 +56,47 @@ function deepFreeze(obj) {
 }
 
 /**
- * Smart DOM Update Helper with Diffing & RAF Batching (Phase 8)
+ * Smart DOM Update Helper with Diffing & RAF Batching (Phase 8 & 16 Hardened)
  * Writes to DOM only when value has actually changed to prevent layout thrashing and unnecessary repaints.
+ * Includes bounded write queue, cleanup helpers, and disconnected node eviction.
  */
 const pendingDomWrites = new Map();
 let domWriteFrameId = null;
+
+export function clearPendingDomWrites() {
+  if (domWriteFrameId) {
+    cancelAnimationFrame(domWriteFrameId);
+    domWriteFrameId = null;
+  }
+  pendingDomWrites.clear();
+}
+
+export function flushPendingDomWrites() {
+  if (domWriteFrameId) {
+    cancelAnimationFrame(domWriteFrameId);
+    domWriteFrameId = null;
+  }
+  if (pendingDomWrites.size === 0) return;
+
+  pendingDomWrites.forEach(({ attr, isHtml, content }, el) => {
+    if (!el || (typeof el.isConnected === 'boolean' && !el.isConnected)) return;
+    if (attr) {
+      el.setAttribute(attr, content);
+    } else if (isHtml) {
+      el.innerHTML = content;
+    } else {
+      el.textContent = content;
+    }
+    diagnostics.recordDomUpdate();
+  });
+  pendingDomWrites.clear();
+}
 
 export function smartUpdateDOM(element, newContent, options = {}) {
   if (!element) return false;
   const attr = options.attr || null;
   const isHtml = options.isHtml || false;
+  const immediate = options.immediate || false;
 
   const currentVal = attr 
     ? element.getAttribute(attr) 
@@ -75,28 +106,35 @@ export function smartUpdateDOM(element, newContent, options = {}) {
     return false; // No change needed
   }
 
+  if (immediate) {
+    if (attr) {
+      element.setAttribute(attr, newContent);
+    } else if (isHtml) {
+      element.innerHTML = newContent;
+    } else {
+      element.textContent = newContent;
+    }
+    diagnostics.recordDomUpdate();
+    return true;
+  }
+
   // Queue write in RAF to batch layout operations
+  // Bound check: if pending queue exceeds 100 entries, flush immediately to prevent unbounded growth
+  if (pendingDomWrites.size > 100) {
+    flushPendingDomWrites();
+  }
+
   pendingDomWrites.set(element, { attr, isHtml, content: newContent });
 
   if (!domWriteFrameId) {
     domWriteFrameId = requestAnimationFrame(() => {
       domWriteFrameId = null;
-      pendingDomWrites.forEach(({ attr, isHtml, content }, el) => {
-        if (!el || !el.isConnected) return;
-        if (attr) {
-          el.setAttribute(attr, content);
-        } else if (isHtml) {
-          el.innerHTML = content;
-        } else {
-          el.textContent = content;
-        }
-        diagnostics.recordDomUpdate();
-      });
-      pendingDomWrites.clear();
+      flushPendingDomWrites();
     });
   }
   return true;
 }
+
 
 /**
  * Struktur State Baku (Initial Schema)
@@ -364,6 +402,7 @@ export class StateStore {
 
     this._state.stateVersion = this._version;
     this._state.lastUpdated = nowIso;
+    diagnostics.recordStateUpdate();
 
     const changedKeys = Object.keys(partialState);
     const snapshot = this.getState();
@@ -831,16 +870,26 @@ export function updateEmergencyState(emergencyPayload, source = 'controller') {
     return;
   }
   const incomingSeq = emergencyPayload.seq || emergencyPayload.sequence || 0;
-  const isGreenWave = !!emergencyPayload.greenWaveActive;
+  const isGreenWave = !!emergencyPayload.greenWaveActive || !!emergencyPayload.payload?.greenWaveActive;
   const updates = {
     emergency112Active: isGreenWave,
     greenWaveActive: isGreenWave,
     lastReceivedEmergencySequence: source === 'server' && incomingSeq > 0 ? incomingSeq : stateStore.getState().lastReceivedEmergencySequence
   };
 
-  if (emergencyPayload.item || emergencyPayload.emergencyItem) {
+  const payloadData = emergencyPayload.payload || emergencyPayload;
+
+  if (Array.isArray(payloadData.activeEmergencies)) {
+    updates.activeEmergencies = deepClone(payloadData.activeEmergencies);
+  } else if (payloadData.item || payloadData.emergencyItem) {
+    const item = payloadData.item || payloadData.emergencyItem;
     const list = deepClone(stateStore.getState().activeEmergencies || []);
-    list.unshift(emergencyPayload.item || emergencyPayload.emergencyItem);
+    const existingIdx = list.findIndex(e => e.id === item.id || e.vehicleId === item.vehicleId);
+    if (existingIdx >= 0) {
+      list[existingIdx] = { ...list[existingIdx], ...item };
+    } else {
+      list.unshift(item);
+    }
     if (list.length > 5) list.pop();
     updates.activeEmergencies = list;
   }

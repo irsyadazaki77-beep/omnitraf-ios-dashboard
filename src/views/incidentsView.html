@@ -56,31 +56,10 @@
             <button class="filter-chip" type="button" data-inc-filter="resolved">Arsip Selesai</button>
           </div>
           
-          <div class="incident-logs-list">
-            <div class="incident-log-item unresolved">
-              <div class="inc-meta">
-                <span class="inc-type alert-red">⚠️ KECELAKAAN (ACCIDENT-02)</span>
-                <span class="inc-time">5 menit lalu</span>
-              </div>
-              <strong class="inc-title">Tabrakan Ringan di Simpang Darmo - Basra</strong>
-              <p class="inc-desc">Insiden benturan minor dua kendaraan pada lajur kiri. Menghambat arus Jl. Raya Darmo ke arah utara. Rekomendasi AI: perpanjang fase hijau ke arah Basuki Rahmat untuk mengurai antrean.</p>
-              <div class="inc-actions">
-                <button class="btn btn-primary compact resolve-btn" onclick="resolveDynamicIncident(1)">Mark as Resolved</button>
-                <button class="btn btn-ghost compact dispatch-btn" onclick="openIncidentDetail(1)">Disposisi Petugas</button>
-              </div>
-            </div>
-
-            <div class="incident-log-item unresolved">
-              <div class="inc-meta">
-                <span class="inc-type alert-orange">🚧 PENUTUPAN JALUR (ROADBLOCK-01)</span>
-                <span class="inc-time">15 menit lalu</span>
-              </div>
-              <strong class="inc-title">Galian Utilitas Kabel di Jl. Raya Darmo (Depan Al-Falah)</strong>
-              <p class="inc-desc">Pekerjaan utilitas memakan satu lajur frontage road. Mengakibatkan penyempitan arus (bottleneck) menuju Wonokromo.</p>
-              <div class="inc-actions">
-                <button class="btn btn-primary compact resolve-btn" onclick="resolveDynamicIncident(2)">Mark as Resolved</button>
-                <button class="btn btn-ghost compact dispatch-btn" onclick="openIncidentDetail(2)">Disposisi Petugas</button>
-              </div>
+          <div class="incident-logs-list" id="incidentLogsList">
+            <div class="glass-panel text-center" style="padding: 24px; color: var(--text-dim);">
+              <span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>
+              <span>Memuat data insiden aktif SITS...</span>
             </div>
           </div>
         </article>

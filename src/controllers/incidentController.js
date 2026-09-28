@@ -62,7 +62,7 @@ export class IncidentController {
         targetType: 'incident',
         targetId: id,
         payload: {
-          status: 'DISPATCHED/RESPONDING',
+          status: 'DISPATCHED',
           assignedUnit: 'Patroli Dishub & Tim 112 Surabaya',
           notes: 'Tim lapangan & armada derek telah didisposisikan ke lokasi.'
         }
@@ -175,7 +175,7 @@ export class IncidentController {
       this.disposer.addEventListener(btnIncDispatch, "click", () => {
         closeModal();
         if (this.activeIncidentId) {
-          this.updateIncidentStatus(this.activeIncidentId, "DISPATCHED/RESPONDING", "Patroli Dishub & Tim 112");
+          this.updateIncidentStatus(this.activeIncidentId, "DISPATCHED", "Patroli Dishub & Tim 112");
         } else {
           window.showToast("🚨 Petugas Patroli Dishub & SITS 112 didisposisikan ke lokasi insiden.");
           soundManager.play('alert');
@@ -479,6 +479,48 @@ export class IncidentController {
         </div>
       `;
       listContainer.appendChild(item);
+    });
+
+    this._renderDashboardTimeline(list);
+  }
+
+  _renderDashboardTimeline(incidents) {
+    const timelineEl = document.querySelector("#card-incidents .timeline");
+    const countBadge = document.querySelector("#card-incidents .pill-danger");
+    if (!timelineEl) return;
+
+    const list = Array.isArray(incidents) ? incidents : [];
+    const activeList = list.filter(inc => !["RESOLVED", "ARCHIVED"].includes(inc.status));
+
+    if (countBadge) {
+      countBadge.textContent = `${activeList.length} Alert`;
+      countBadge.className = activeList.length > 0 ? "pill pill-danger" : "pill pill-live";
+    }
+
+    if (list.length === 0) {
+      timelineEl.innerHTML = `<li style="color: var(--text-dim); padding: 8px 0;">Tidak ada kronologi insiden aktif.</li>`;
+      return;
+    }
+
+    timelineEl.innerHTML = "";
+    // Display up to 3 most recent incidents
+    list.slice(0, 3).forEach(inc => {
+      const isResolved = ["RESOLVED", "ARCHIVED"].includes(inc.status);
+      const isDispatched = ["DISPATCHED", "RESPONDING", "DISPATCHED/RESPONDING", "ACKNOWLEDGED"].includes(inc.status);
+
+      let dotClass = "danger pulse-red-dot";
+      if (isDispatched) dotClass = "warning";
+      else if (isResolved) dotClass = "success";
+
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <span class="timeline-dot ${dotClass}"></span>
+        <div>
+          <strong>${inc.title || 'Insiden Lalu Lintas'}</strong>
+          <small>${inc.location || 'Koridor SITS'} • ${isResolved ? 'selesai' : (inc.reportedAt ? new Date(inc.reportedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : 'baru saja')}</small>
+        </div>
+      `;
+      timelineEl.appendChild(li);
     });
   }
 }

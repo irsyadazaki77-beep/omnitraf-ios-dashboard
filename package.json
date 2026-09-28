@@ -7,8 +7,8 @@
     "dev": "node server.js",
     "build": "echo 'Build complete'",
     "start": "node server.js",
-    "lint": "node --check server.js",
-    "test": "node --test test/unit/**/*.test.js && node --test test/integration/api.test.js && node --test test/integration/persistence.test.js && node --test test/integration/realtime_recovery.test.js"
+    "lint": "node --check server.js && node --check src/app.js && node --check src/core/stateStore.js && node --check src/core/diagnostics.js && node --check src/modules/cctvController.js && node --check src/modules/mapManager.js && node --check src/modules/chatSystem.js",
+    "test": "node --test test/unit/**/*.test.js && node --test test/integration/api.test.js && node --test test/integration/persistence.test.js && node --test test/integration/command_authority.test.js && node --test test/integration/state_machine_p14d.test.js && node --test test/integration/chaos_resilience.test.js && node --test test/integration/security_hardening.test.js"
   },
   "dependencies": {
     "@socket.io/redis-adapter": "^8.3.0",

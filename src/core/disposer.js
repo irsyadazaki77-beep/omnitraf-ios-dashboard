@@ -13,55 +13,64 @@ export class Disposer {
 
   setInterval(fn, ms) {
     const id = diagnostics.setInterval(fn, ms);
-    this.add(() => diagnostics.clearInterval(id));
+    const cleanup = () => diagnostics.clearInterval(id);
+    this.add(cleanup);
     return id;
   }
 
   setTimeout(fn, ms) {
     const id = diagnostics.setTimeout(fn, ms);
-    this.add(() => diagnostics.clearTimeout(id));
+    const cleanup = () => diagnostics.clearTimeout(id);
+    this.add(cleanup);
     return id;
   }
 
   requestAnimationFrame(fn) {
     const id = diagnostics.requestAnimationFrame(fn);
-    this.add(() => diagnostics.cancelAnimationFrame(id));
+    const cleanup = () => diagnostics.cancelAnimationFrame(id);
+    this.add(cleanup);
     return id;
   }
 
   addEventListener(target, event, handler, options) {
-    if (!target || typeof target.addEventListener !== 'function') return;
+    if (!target || typeof target.addEventListener !== 'function') return () => {};
     target.addEventListener(event, handler, options);
-    this.add(() => {
+    const cleanup = () => {
       try {
         target.removeEventListener(event, handler, options);
       } catch (err) {
         // Ignore removal error
       }
-    });
+    };
+    this.add(cleanup);
+    return cleanup;
   }
 
   addSocketListener(socketClient, event, handler) {
-    if (!socketClient || typeof socketClient.on !== 'function') return;
+    if (!socketClient || typeof socketClient.on !== 'function') return () => {};
     const unsub = socketClient.on(event, handler);
     this.add(unsub);
+    return unsub;
   }
 
   addStoreSubscription(stateStore, event, handler) {
-    if (!stateStore || typeof stateStore.subscribe !== 'function') return;
+    if (!stateStore || typeof stateStore.subscribe !== 'function') return () => {};
     const unsub = stateStore.subscribe(event, handler);
     this.add(unsub);
+    return unsub;
   }
 
   addObserver(observer) {
-    if (!observer || typeof observer.disconnect !== 'function') return;
-    this.add(() => {
+    if (!observer || typeof observer.disconnect !== 'function') return () => {};
+    const cleanup = () => {
       try {
         observer.disconnect();
       } catch (err) {
         // Ignore
       }
-    });
+    };
+    this.add(cleanup);
+    return cleanup;
   }
 
   add(cleanupFn) {

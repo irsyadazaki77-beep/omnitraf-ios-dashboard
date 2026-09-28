@@ -13,11 +13,34 @@ class AuthManager {
     this.user = null;
     this._listeners = new Set();
     this._loadSession();
+    this._bindStorageEvents();
+  }
+
+  _bindStorageEvents() {
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('storage', (event) => {
+        if (event.key === AUTH_STORAGE_KEY || event.key === USER_STORAGE_KEY) {
+          if (!event.newValue) {
+            // Logged out in another tab
+            this.token = null;
+            this.user = null;
+            this._notifyListeners();
+          } else if (event.key === AUTH_STORAGE_KEY) {
+            this.token = event.newValue;
+            const userStr = localStorage.getItem(USER_STORAGE_KEY);
+            if (userStr) {
+              try { this.user = JSON.parse(userStr); } catch (_) {}
+            }
+            this._notifyListeners();
+          }
+        }
+      });
+    }
   }
 
   _loadSession() {
     try {
-      if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
         const storedToken = localStorage.getItem(AUTH_STORAGE_KEY);
         const storedUser = localStorage.getItem(USER_STORAGE_KEY);
 
@@ -76,7 +99,7 @@ class AuthManager {
       }
       return this.token;
     }
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       const storedToken = localStorage.getItem(AUTH_STORAGE_KEY);
       if (storedToken) {
         if (this.isTokenExpired(storedToken)) {
@@ -131,7 +154,7 @@ class AuthManager {
       this.token = data.data?.token || data.token;
       this.user = data.data?.user || data.user;
 
-      if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
         localStorage.setItem(AUTH_STORAGE_KEY, this.token);
         localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(this.user));
       }
@@ -151,7 +174,7 @@ class AuthManager {
     this.token = null;
     this.user = null;
 
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       localStorage.removeItem(AUTH_STORAGE_KEY);
       localStorage.removeItem(USER_STORAGE_KEY);
     }

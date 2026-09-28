@@ -7,8 +7,23 @@ export function registerSignalHandlers(io, socket) {
   socket.on('signal:override', (data, callback) => {
     if (!checkSocketRole(socket, [ROLES.OPERATOR, ROLES.ADMIN], 'signal:override', callback)) return;
 
-    const intersectionId = data ? data.intersectionId : "node-wonokromo";
-    const duration = data ? data.duration : 45;
+    const intersectionId = data?.intersectionId && typeof data.intersectionId === 'string' ? data.intersectionId.trim() : "node-wonokromo";
+    const duration = data && typeof data.duration === 'number' ? Math.round(data.duration) : 45;
+
+    if (isNaN(duration) || duration < 10 || duration > 180) {
+      if (typeof callback === 'function') {
+        callback({
+          success: false,
+          status: 'REJECTED',
+          result: 'FAILED',
+          timestamp: Date.now(),
+          code: 'VALIDATION_ERROR',
+          message: 'Durasi manual override harus berupa bilangan bulat antara 10 hingga 180 detik.'
+        });
+      }
+      return;
+    }
+
     const res = backendState.signalOverride(intersectionId, duration);
     
     io.emit('traffic:update', res.state);
@@ -92,7 +107,7 @@ export function registerSignalHandlers(io, socket) {
   socket.on('green-split:update', (data, callback) => {
     if (!checkSocketRole(socket, [ROLES.OPERATOR, ROLES.ADMIN], 'green-split:update', callback)) return;
 
-    if (!data) {
+    if (!data || typeof data.value !== 'number' || isNaN(data.value) || data.value < 10 || data.value > 120) {
       if (typeof callback === 'function') {
         callback({
           success: false,
@@ -100,13 +115,14 @@ export function registerSignalHandlers(io, socket) {
           result: 'FAILED',
           timestamp: Date.now(),
           code: 'VALIDATION_ERROR',
-          message: 'No data provided',
-          error: { code: 'VALIDATION_ERROR', message: 'No data provided' }
+          message: 'Nilai green split harus berupa angka antara 10 hingga 120 detik.',
+          error: { code: 'VALIDATION_ERROR', message: 'Nilai green split harus antara 10 dan 120 detik.' }
         });
       }
       return;
     }
-    const newState = backendState.setGreenSplit(data.value, data.intersectionId);
+    const intersectionId = data.intersectionId || 'node-wonokromo';
+    const newState = backendState.setGreenSplit(data.value, intersectionId);
     
     io.emit('traffic:update', newState);
     

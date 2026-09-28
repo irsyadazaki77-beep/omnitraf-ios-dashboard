@@ -186,7 +186,7 @@ export async function fetchWithCacheAndDedupe(url, options = {}) {
   return fetchPromise;
 }
 
-class SocketClient {
+export class SocketClient {
   constructor() {
     this.socket = null;
     this.hasRegisteredListeners = false;
@@ -254,16 +254,17 @@ class SocketClient {
     };
 
     try {
-      if (typeof window.io !== "undefined") {
+      if (typeof window !== "undefined" && typeof window.io !== "undefined") {
         this.socket = window.io(socketOptions);
         this._bindStandardEvents();
+        this._flushPendingListeners();
         this._startHealthWatchdog();
-      } else {
+      } else if (typeof document !== "undefined") {
         // Dynamic load fallback
         const script = document.createElement("script");
         script.src = "/socket.io/socket.io.js";
         script.onload = () => {
-          if (typeof window.io !== "undefined" && !this.socket) {
+          if (typeof window !== "undefined" && typeof window.io !== "undefined" && !this.socket) {
             const currentToken = authManager.getToken();
             this.socket = window.io({
               ...socketOptions,
@@ -279,6 +280,8 @@ class SocketClient {
           setConnectionLifecycle('fallback', { isStaleData: true });
         };
         document.head.appendChild(script);
+      } else {
+        setConnectionLifecycle('fallback', { isStaleData: true });
       }
     } catch (err) {
       console.warn("[SocketClient] Connection deferred:", err);
@@ -747,7 +750,11 @@ class SocketClient {
    */
   off(event, callback) {
     if (this._listeners.has(event)) {
-      this._listeners.get(event).delete(callback);
+      const set = this._listeners.get(event);
+      set.delete(callback);
+      if (set.size === 0) {
+        this._listeners.delete(event);
+      }
     }
     if (this.socket) {
       this.socket.off(event, callback);
@@ -758,6 +765,7 @@ class SocketClient {
     if (!this.socket) return;
     this._listeners.forEach((callbacks, event) => {
       callbacks.forEach(cb => {
+        this.socket.off(event, cb);
         this.socket.on(event, cb);
       });
     });
@@ -771,6 +779,7 @@ class SocketClient {
    * Memperbarui UI Topbar Status Capsule & Banner Offline sesuai Lifecycle Koneksi
    */
   _updateDomStatusCapsule() {
+    if (typeof document === 'undefined') return;
     const state = stateStore.getState();
     const status = state.connectionStatus;
     const isStale = !!state.isStaleData;
@@ -843,6 +852,7 @@ class SocketClient {
   }
 
   _updatePerformanceChip() {
+    if (typeof document === 'undefined') return;
     const perfChip = document.getElementById("perfChip");
     if (!perfChip) return;
 
@@ -867,10 +877,15 @@ class SocketClient {
   destroy() {
     if (this.watchdogInterval) clearInterval(this.watchdogInterval);
     if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+    this.watchdogInterval = null;
+    this.heartbeatInterval = null;
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
     }
+    this.hasRegisteredListeners = false;
+    this.isResyncing = false;
+    this._resyncPromise = null;
     this._listeners.clear();
   }
 }
