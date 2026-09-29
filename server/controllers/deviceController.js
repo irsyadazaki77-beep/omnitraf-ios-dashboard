@@ -1,10 +1,11 @@
 import { backendState } from '../services/stateManager.js';
 import { dbManager } from '../db/database.js';
 import { commandExecutor } from '../services/commandExecutor.js';
-import { createApiResponse, createApiErrorResponse } from '../middlewares/errorHandler.js';
+import { createApiResponse, createApiErrorResponse, createCommandErrorResponse, getCommandErrorStatus } from '../middlewares/errorHandler.js';
+import { DEVICE_FAULTS, DEVICE_RESOLUTIONS } from '../config/contracts.js';
 
-export const VALID_RESOLUTIONS = ['720p', '1080p', '4k'];
-export const VALID_FAULTS = ["recover", "clear", "latency_spike", "packet_loss", "low_fps", "thermal_warning", "heartbeat_timeout"];
+export const VALID_RESOLUTIONS = DEVICE_RESOLUTIONS;
+export const VALID_FAULTS = DEVICE_FAULTS;
 
 export async function updateDeviceConfig(req, res) {
   const { deviceId, fps, resolution, mode, greenWaveSync } = req.body || {};
@@ -12,66 +13,9 @@ export async function updateDeviceConfig(req, res) {
   const correlationId = req.headers['x-correlation-id'] || req.body?.correlationId || `CORR-REST-${Date.now()}`;
   const idempotencyKey = req.headers['x-idempotency-key'] || req.body?.idempotencyKey || `IDEMP-REST-CFG-${deviceId}-${JSON.stringify(req.body)}`;
 
-  if (!deviceId) {
-    return res.status(400).json(createApiErrorResponse(
-      400,
-      "VALIDATION_ERROR",
-      "Parameter deviceId wajib disertakan.",
-      { field: "deviceId" }
-    ));
-  }
-
-  const dev = backendState.devicesRegistry.find(d => d.deviceId === deviceId);
-  if (!dev) {
-    return res.status(404).json(createApiErrorResponse(
-      404,
-      "NOT_FOUND",
-      `Perangkat dengan ID ${deviceId} tidak ditemukan di registry.`,
-      { deviceId }
-    ));
-  }
-
-  if (fps !== undefined) {
-    const fpsVal = parseInt(fps, 10);
-    if (isNaN(fpsVal) || fpsVal < 5 || fpsVal > 60) {
-      return res.status(422).json(createApiErrorResponse(
-        422,
-        "UNPROCESSABLE_ENTITY",
-        "Frame Rate Limit (FPS) harus berupa angka bulat antara 5 dan 60.",
-        { min: 5, max: 60, received: fps }
-      ));
-    }
-  }
-
-  if (resolution !== undefined) {
-    if (!VALID_RESOLUTIONS.includes(resolution)) {
-      return res.status(422).json(createApiErrorResponse(
-        422,
-        "UNPROCESSABLE_ENTITY",
-        `Resolusi kamera tidak valid. Harus salah satu dari: ${VALID_RESOLUTIONS.join(', ')}.`,
-        { allowedResolutions: VALID_RESOLUTIONS, received: resolution }
-      ));
-    }
-  }
-
-  if (greenWaveSync !== undefined && typeof greenWaveSync !== 'boolean') {
-    return res.status(422).json(createApiErrorResponse(
-      422,
-      "UNPROCESSABLE_ENTITY",
-      "greenWaveSync harus berupa boolean (true/false).",
-      { field: "greenWaveSync", receivedType: typeof greenWaveSync }
-    ));
-  }
-
   try {
-    const authenticatedUser = req.user ? {
-      id: req.user.id,
-      role: req.user.role,
-      name: req.user.name
-    } : {
-      id: 'usr-admin-rest',
-      role: 'ADMIN',
-      name: 'Administrator SITS'
+    const authenticatedUser = {
+      id: req.user.id, role: req.user.role, name: req.user.name
     };
 
     const outcome = await commandExecutor.executeCommand({
@@ -101,15 +45,13 @@ export async function updateDeviceConfig(req, res) {
       },
       extra: {
         commandId: outcome.commandId,
-        status: outcome.status
+        status: outcome.status,
+        command: outcome
       }
     }));
   } catch (err) {
-    return res.status(500).json(createApiErrorResponse(
-      500,
-      "PERSISTENCE_FAILED",
-      `Gagal menyimpan konfigurasi perangkat ke database SQLite: ${err.message}`
-    ));
+    const response = createCommandErrorResponse(err);
+    return res.status(getCommandErrorStatus(err)).json(response);
   }
 }
 
@@ -118,35 +60,8 @@ export async function pingDevice(req, res) {
   const commandId = req.body?.commandId || `CMD-PING-${Date.now()}`;
   const correlationId = req.headers['x-correlation-id'] || req.body?.correlationId || `CORR-PING-${Date.now()}`;
 
-  if (!deviceId) {
-    return res.status(400).json(createApiErrorResponse(
-      400,
-      "VALIDATION_ERROR",
-      "Parameter deviceId wajib disertakan.",
-      { field: "deviceId" }
-    ));
-  }
-
-  const dev = backendState.devicesRegistry.find(d => d.deviceId === deviceId);
-  if (!dev) {
-    return res.status(404).json(createApiErrorResponse(
-      404,
-      "NOT_FOUND",
-      `Perangkat dengan ID ${deviceId} tidak ditemukan di registry.`,
-      { deviceId }
-    ));
-  }
-
   try {
-    const authenticatedUser = req.user ? {
-      id: req.user.id,
-      role: req.user.role,
-      name: req.user.name
-    } : {
-      id: 'usr-operator-rest',
-      role: 'OPERATOR',
-      name: 'Operator SITS'
-    };
+    const authenticatedUser = req.user;
 
     const outcome = await commandExecutor.executeCommand({
       action: 'device:ping',
@@ -157,6 +72,7 @@ export async function pingDevice(req, res) {
       authenticatedUser,
       sourceChannel: 'rest'
     });
+    const dev = backendState.devicesRegistry.find(d => d.deviceId === deviceId);
 
     res.status(200).json(createApiResponse({
       type: "device_ping_success",
@@ -167,11 +83,13 @@ export async function pingDevice(req, res) {
         packetLossPercent: 0,
         status: dev.status,
         healthScore: dev.healthScore,
-        actionId: outcome.commandId
+        actionId: outcome.commandId,
+        command: outcome
       }
     }));
   } catch (err) {
-    return res.status(500).json(createApiErrorResponse(500, "EXECUTION_FAIL", err.message));
+    const response = createCommandErrorResponse(err);
+    return res.status(getCommandErrorStatus(err)).json(response);
   }
 }
 
@@ -179,45 +97,13 @@ export async function injectDeviceFault(req, res) {
   const { deviceId, type, duration } = req.body || {};
   const commandId = req.body?.commandId || `CMD-FAULT-${Date.now()}`;
   const correlationId = req.headers['x-correlation-id'] || req.body?.correlationId || `CORR-FAULT-${Date.now()}`;
-  const idempotencyKey = req.headers['x-idempotency-key'] || req.body?.idempotencyKey || `IDEMP-FAULT-${deviceId}-${type}-${Date.now()}`;
-
-  if (!deviceId) {
-    return res.status(400).json(createApiErrorResponse(
-      400,
-      "VALIDATION_ERROR",
-      "Parameter deviceId wajib disertakan.",
-      { field: "deviceId" }
-    ));
-  }
-
-  const dev = backendState.devicesRegistry.find(d => d.deviceId === deviceId);
-  if (!dev) {
-    return res.status(404).json(createApiErrorResponse(
-      404,
-      "NOT_FOUND",
-      `Perangkat dengan ID ${deviceId} tidak ditemukan di registry.`,
-      { deviceId }
-    ));
-  }
-
-  if (type !== "recover" && type !== "clear" && !VALID_FAULTS.includes(type)) {
-    return res.status(422).json(createApiErrorResponse(
-      422,
-      "UNPROCESSABLE_ENTITY",
-      `Tipe gangguan '${type}' tidak valid. Harus salah satu dari: ${VALID_FAULTS.join(", ")}`,
-      { allowedFaults: VALID_FAULTS, received: type }
-    ));
-  }
+  const idempotencyKey = req.headers['x-idempotency-key'] || req.body?.idempotencyKey || `IDEMP-FAULT-${deviceId}-${type}`;
 
   try {
-    const authenticatedUser = req.user ? {
+    const authenticatedUser = {
       id: req.user.id,
       role: req.user.role,
       name: req.user.name
-    } : {
-      id: 'usr-admin-rest',
-      role: 'ADMIN',
-      name: 'Administrator SITS'
     };
 
     const outcome = await commandExecutor.executeCommand({
@@ -230,6 +116,7 @@ export async function injectDeviceFault(req, res) {
       authenticatedUser,
       sourceChannel: 'rest'
     });
+    const dev = backendState.devicesRegistry.find(d => d.deviceId === deviceId);
 
     res.status(200).json(createApiResponse({
       type: "device_fault_injected",
@@ -238,11 +125,13 @@ export async function injectDeviceFault(req, res) {
         actionId: outcome.commandId,
         deviceId,
         faultType: type,
-        deviceData: dev
+        deviceData: dev,
+        command: outcome
       }
     }));
   } catch (err) {
-    return res.status(500).json(createApiErrorResponse(500, "EXECUTION_FAIL", err.message));
+    const response = createCommandErrorResponse(err);
+    return res.status(getCommandErrorStatus(err)).json(response);
   }
 }
 

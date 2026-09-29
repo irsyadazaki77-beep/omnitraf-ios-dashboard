@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { backendState } from '../services/stateManager.js';
+import { requireCapability } from '../middlewares/auth.js';
 
 const router = Router();
+router.use(requireCapability('traffic:read'));
 
 router.get('/traffic/realtime', (req, res) => res.json({
   status: "success",

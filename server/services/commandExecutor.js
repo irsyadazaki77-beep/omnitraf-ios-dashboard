@@ -2,18 +2,26 @@ import { backendState } from '../services/stateManager.js';
 import { dbManager } from '../db/database.js';
 import { isActionAuthorized, getRequiredRoles } from '../config/capabilities.js';
 import { ROLES } from '../config/constants.js';
+import { diagnosticEngine } from './diagnosticEngine.js';
+import { parseCommandInput, normalizeCommand, validateCommand, ContractValidationError } from '../config/contracts.js';
 import {
   INCIDENT_STATES,
   EMERGENCY_STATES,
   validateIncidentTransition,
   validateEmergencyTransition,
-  normalizeIncidentStatus,
   normalizeEmergencyStatus,
   createDomainEventEnvelope
 } from '../config/stateMachine.js';
 
 export const VALID_RESOLUTIONS = ['720p', '1080p', '4k'];
 export const VALID_FAULTS = ["recover", "clear", "latency_spike", "packet_loss", "low_fps", "thermal_warning", "heartbeat_timeout"];
+
+function commandError(code, message, statusCode) {
+  const error = new Error(message);
+  error.code = code;
+  error.statusCode = statusCode;
+  return error;
+}
 
 /**
  * Authoritative Command Execution Engine (Phase 14C)
@@ -48,19 +56,34 @@ export class CommandExecutor {
     authenticatedUser = null,
     sourceChannel = 'socket'
   }) {
-    const actorRole = authenticatedUser?.role || ROLES.VIEWER;
-    const actorName = authenticatedUser?.name || 'Anonymous Principal';
-    const actorId = authenticatedUser?.id || 'usr-anon';
+    // Canonical parse/normalize/validate happens before authorization, idempotency,
+    // domain lookup, persistence, or any event/audit side effect.
+    const parsed = parseCommandInput({ action, targetId, payload, commandId, idempotencyKey, correlationId });
+    const normalized = normalizeCommand(parsed);
+    const canonical = validateCommand(normalized);
+    action = canonical.action;
+    targetId = canonical.targetId;
+    payload = canonical.payload;
+
+    const actorRole = authenticatedUser?.role;
+    const actorName = authenticatedUser?.name;
+    const actorId = authenticatedUser?.id;
 
     // 1. Establish stable identifiers
     const finalCommandId = commandId || `CMD-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
     const finalCorrelationId = correlationId || `CORR-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     const finalIdempotencyKey = idempotencyKey || finalCommandId || `IDEMP-${action}-${targetId || 'global'}-${JSON.stringify(payload || {})}`;
 
+    // Resolve explicit entity targets before authorization so malformed and unknown
+    // targets share one canonical rejection and cannot fall through to another entity.
+    this._assertKnownTarget(action, targetId, payload);
+
     // 2. Strict Server-Side RBAC Enforcement
-    if (!isActionAuthorized(actorRole, action)) {
+    if (!actorId || !actorName || !Object.values(ROLES).includes(actorRole) || !isActionAuthorized(actorRole, action)) {
       const requiredRoles = getRequiredRoles(action);
-      const errMsg = `Akses ditolak untuk '${action}'. Memerlukan hak akses [${requiredRoles.join('/')}], peran akun Anda: '${actorRole}'.`;
+      const errMsg = !actorId || !actorName || !Object.values(ROLES).includes(actorRole)
+        ? `Akses ditolak untuk '${action}': principal terverifikasi wajib disertakan.`
+        : `Akses ditolak untuk '${action}'. Memerlukan hak akses [${requiredRoles.join('/')}], peran akun Anda: '${actorRole}'.`;
       
       const rejectionResult = {
         success: false,
@@ -79,19 +102,6 @@ export class CommandExecutor {
         }
       };
 
-      if (backendState.io) {
-        backendState.io.emit('audit:log', {
-          type: 'command:rejected',
-          timestamp: new Date().toISOString(),
-          entity: targetId || 'System Core',
-          source: actorName,
-          reasonCode: 'FORBIDDEN',
-          result: 'REJECTED',
-          correlationId: finalCorrelationId,
-          details: errMsg
-        });
-      }
-
       return rejectionResult;
     }
 
@@ -101,10 +111,13 @@ export class CommandExecutor {
 
       // Verify that key is not colliding with a materially different action or target
       if (cached.action && cached.action !== action) {
-        throw new Error(`IDEMPOTENCY_CONFLICT: Key '${finalIdempotencyKey}' telah digunakan untuk aksi '${cached.action}', tidak dapat digunakan kembali untuk '${action}'.`);
+        throw commandError('IDEMPOTENCY_CONFLICT', `Key '${finalIdempotencyKey}' has already been used for action '${cached.action}', not '${action}'.`, 409);
       }
       if (cached.targetId !== undefined && cached.targetId !== targetId) {
-        throw new Error(`IDEMPOTENCY_CONFLICT: Key '${finalIdempotencyKey}' telah digunakan untuk target '${cached.targetId}', bukan '${targetId}'.`);
+        throw commandError('IDEMPOTENCY_CONFLICT', `Key '${finalIdempotencyKey}' has already been used for target '${cached.targetId}', not '${targetId}'.`, 409);
+      }
+      if (cached.payloadFingerprint !== undefined && cached.payloadFingerprint !== JSON.stringify(payload || {})) {
+        throw commandError('IDEMPOTENCY_CONFLICT', `Key '${finalIdempotencyKey}' has already been used with a different payload.`, 409);
       }
 
       console.info(`🔄 [Idempotency Backend] Returning cached authoritative result for key: ${finalIdempotencyKey}`);
@@ -119,13 +132,16 @@ export class CommandExecutor {
         timestamp: cached.timestamp || Date.now(),
         resultingState: cached.resultingState,
         data: cached.resultingState,
+        previousState: cached.previousState,
+        newState: cached.newState,
+        normalizedCommand: cached.normalizedCommand,
         isIdempotentReplay: true,
         error: null
       };
     }
 
     if (this.inFlightKeys.has(finalIdempotencyKey)) {
-      throw new Error(`Perintah [${action}] dengan idempotency key '${finalIdempotencyKey}' sedang dalam eksekusi server.`);
+      throw commandError('COMMAND_IN_PROGRESS', `Command [${action}] with idempotency key '${finalIdempotencyKey}' is already executing.`, 409);
     }
 
     this.inFlightKeys.add(finalIdempotencyKey);
@@ -137,6 +153,7 @@ export class CommandExecutor {
         action,
         targetId,
         payload,
+        actorId,
         actorName,
         actorRole,
         finalCommandId,
@@ -158,10 +175,13 @@ export class CommandExecutor {
         commandId: finalCommandId,
         correlationId: finalCorrelationId,
         idempotencyKey: finalIdempotencyKey,
+        payloadFingerprint: JSON.stringify(payload || {}),
         resultingState,
         previousState,
         newState,
+        normalizedCommand: { action, targetId, payload },
         actor: actorName,
+        actorId,
         timestamp: Date.now()
       };
 
@@ -177,6 +197,7 @@ export class CommandExecutor {
 
       // 6. Authoritative Audit Trail Persistence & Broadcast
       const auditLog = {
+        actorId,
         operator: actorName,
         action: action.toUpperCase().replace(/[-:]/g, '_'),
         entity: entityId || targetId || 'SITS Core',
@@ -192,6 +213,7 @@ export class CommandExecutor {
           timestamp: new Date().toISOString(),
           entity: entityId || targetId || 'System Core',
           source: actorName,
+          actorId,
           reasonCode: 'SERVER_APPLIED',
           result: 'SUCCESS',
           commandId: finalCommandId,
@@ -227,12 +249,20 @@ export class CommandExecutor {
         data: resultingState,
         previousState,
         newState,
+        normalizedCommand: record.normalizedCommand,
         sequence: domainSequence || backendState.sequence,
         error: null
       };
 
     } catch (err) {
       console.error(`❌ [CommandExecutor Error] [${action}]:`, err.message);
+      if (!err.code) {
+        if (err.message.startsWith('PERSISTENCE_FAILED')) err.code = 'PERSISTENCE_FAILED';
+        else if (err.message.startsWith('STATE_CONFLICT')) err.code = 'STATE_CONFLICT';
+        else if (err.message.startsWith('FAULT_INJECTION_PROHIBITED')) err.code = 'FAULT_INJECTION_PROHIBITED';
+        else if (err.message.includes('tidak ditemukan')) err.code = 'NOT_FOUND';
+        else err.code = 'EXECUTION_FAIL';
+      }
 
       if (backendState.io) {
         backendState.io.emit('audit:log', {
@@ -240,7 +270,7 @@ export class CommandExecutor {
           timestamp: new Date().toISOString(),
           entity: targetId || 'System Core',
           source: actorName,
-          reasonCode: 'EXECUTION_FAIL',
+          reasonCode: err.code,
           result: 'FAILED',
           commandId: finalCommandId,
           correlationId: finalCorrelationId,
@@ -255,11 +285,14 @@ export class CommandExecutor {
           status: 'REJECTED',
           result: 'FAILED',
           timestamp: Date.now(),
-          code: 'EXECUTION_FAIL',
+          code: err.code,
           message: err.message,
           error: {
-            code: 'EXECUTION_FAIL',
-            message: err.message
+            code: err.code,
+            message: err.message,
+            field: err.field || null,
+            expected: err.expected ?? null,
+            actual: err.actual ?? null
           }
         });
       }
@@ -270,33 +303,26 @@ export class CommandExecutor {
     }
   }
 
+  _assertKnownTarget(action, targetId, payload) {
+    const notFound = (type) => { throw new ContractValidationError('NOT_FOUND', `${type} '${targetId}' was not found.`, { field: 'targetId', expected: `known ${type}`, actual: targetId, statusCode: 404 }); };
+    if (['device:config', 'device:fault', 'device:ping'].includes(action) && !backendState.devicesRegistry.some(device => device.deviceId === targetId)) notFound('device');
+    if (['signal:override', 'green-split:update', 'ai:apply-recommendation'].includes(action) && !backendState.state.intersections.some(node => node.id === targetId)) notFound('intersection');
+    if (['incident:acknowledge', 'incident:update-status', 'incident:dispatch', 'incident:resolve'].includes(action) && !(backendState.state.incidents || []).some(incident => String(incident.id) === targetId)) notFound('incident');
+    if (action === 'emergency:cancel' && !(backendState.state.activeEmergencies || []).some(emergency => String(emergency.id) === targetId || String(emergency.vehicleId) === targetId)) notFound('emergency');
+    if (action === 'chaos:fault-clear' && targetId !== 'all' && !diagnosticEngine.activeFaults.has(targetId)) notFound('fault');
+    if (action === 'emergency:activate' && payload.incidentId && !(backendState.state.incidents || []).some(incident => String(incident.id) === payload.incidentId)) notFound('incident');
+  }
+
   /**
    * Dispatches business logic with strict atomic persistence and rollback
    */
-  async _dispatchBusinessLogic({ action, targetId, payload, actorName, actorRole, finalCommandId, finalCorrelationId }) {
+  async _dispatchBusinessLogic({ action, targetId, payload, actorId, actorName, actorRole, finalCommandId, finalCorrelationId }) {
     switch (action) {
       case 'device:config': {
         const { deviceId, fps, resolution, mode, greenWaveSync } = payload || {};
-        const devId = deviceId || targetId;
-        if (!devId) throw new Error('Parameter deviceId wajib disertakan.');
+        const devId = deviceId;
 
         const dev = backendState.devicesRegistry.find(d => d.deviceId === devId);
-        if (!dev) throw new Error(`Perangkat dengan ID ${devId} tidak ditemukan di registry.`);
-
-        if (fps !== undefined) {
-          const fpsVal = parseInt(fps, 10);
-          if (isNaN(fpsVal) || fpsVal < 5 || fpsVal > 60) {
-            throw new Error('Frame Rate Limit (FPS) harus berupa angka antara 5 dan 60.');
-          }
-        }
-        if (resolution !== undefined) {
-          if (!VALID_RESOLUTIONS.includes(resolution)) {
-            throw new Error(`Resolusi kamera tidak valid. Harus salah satu dari: ${VALID_RESOLUTIONS.join(', ')}.`);
-          }
-        }
-        if (greenWaveSync !== undefined && typeof greenWaveSync !== 'boolean') {
-          throw new Error('greenWaveSync harus berupa boolean (true/false).');
-        }
 
         // Snapshot previous state BEFORE mutation
         const previousState = {
@@ -307,14 +333,14 @@ export class CommandExecutor {
         };
 
         const newState = {
-          fps: fps !== undefined ? parseInt(fps, 10) : dev.fps,
+          fps: fps !== undefined ? fps : dev.fps,
           resolution: resolution !== undefined ? resolution : dev.resolution,
           mode: mode !== undefined ? mode : (dev.mode || 'Adaptive AI (YOLOv8)'),
           greenWaveSync: greenWaveSync !== undefined ? !!greenWaveSync : (dev.greenWaveSync ?? true)
         };
 
         // Mutate in-memory
-        if (fps !== undefined) dev.fps = parseInt(fps, 10);
+        if (fps !== undefined) dev.fps = fps;
         if (resolution !== undefined) dev.resolution = resolution;
         if (mode !== undefined) dev.mode = mode;
         if (greenWaveSync !== undefined) dev.greenWaveSync = !!greenWaveSync;
@@ -342,6 +368,7 @@ export class CommandExecutor {
           requestedAt: new Date().toISOString(),
           completedAt: new Date().toISOString(),
           actor: actorName,
+          actorId,
           previousState,
           newState,
           result: 'SUCCESS',
@@ -384,15 +411,9 @@ export class CommandExecutor {
 
       case 'device:fault': {
         const { deviceId, type, duration } = payload || {};
-        const devId = deviceId || targetId;
-        if (!devId) throw new Error('Parameter deviceId wajib disertakan.');
+        const devId = deviceId;
 
         const dev = backendState.devicesRegistry.find(d => d.deviceId === devId);
-        if (!dev) throw new Error(`Perangkat dengan ID ${devId} tidak ditemukan di registry.`);
-
-        if (!VALID_FAULTS.includes(type)) {
-          throw new Error(`Tipe gangguan '${type}' tidak valid. Harus salah satu dari: ${VALID_FAULTS.join(', ')}.`);
-        }
 
         // Snapshot previous state BEFORE mutation
         const previousState = {
@@ -411,7 +432,7 @@ export class CommandExecutor {
         } else {
           backendState.activeFaults[devId] = {
             type,
-            duration: duration || 30000,
+            duration,
             timestamp: Date.now()
           };
         }
@@ -466,11 +487,9 @@ export class CommandExecutor {
       }
 
       case 'device:ping': {
-        const devId = targetId || payload?.deviceId;
-        if (!devId) throw new Error('Parameter deviceId wajib disertakan.');
+        const devId = payload.deviceId;
 
         const dev = backendState.devicesRegistry.find(d => d.deviceId === devId);
-        if (!dev) throw new Error(`Perangkat dengan ID ${devId} tidak ditemukan di registry.`);
 
         // Snapshot previousState BEFORE mutation
         const previousState = {
@@ -535,13 +554,11 @@ export class CommandExecutor {
       }
 
       case 'signal:override': {
-        const intersectionId = targetId || payload?.intersectionId || 'node-wonokromo';
-        const duration = payload?.duration ? parseInt(payload.duration, 10) : 45;
-        if (isNaN(duration) || duration < 15 || duration > 90) {
-          throw new Error('Durasi override sinyal harus berupa angka antara 15 dan 90 detik.');
-        }
+        const intersectionId = targetId;
+        const duration = payload.duration;
 
-        const node = backendState.state.intersections.find(n => n.id === intersectionId) || backendState.state.intersections[0];
+        const node = backendState.state.intersections.find(n => n.id === intersectionId);
+        if (!node) throw new Error(`Simpang dengan ID ${intersectionId} tidak ditemukan.`);
         const previousState = {
           state: node.state,
           timer: node.timer,
@@ -570,7 +587,7 @@ export class CommandExecutor {
         return {
           resultingState: res.state,
           previousState,
-          newState: { state: 'green', timer: duration, status: 'Manual Override' },
+          newState: { state: 'green', timer: res.duration, status: 'Manual Override', nodeName: res.nodeName },
           entityId: intersectionId,
           domainSequence: backendState.signalSequence,
           customAudit: { details: `Manual Override sinyal ${res.nodeName} aktif selama ${duration}s.` }
@@ -578,16 +595,14 @@ export class CommandExecutor {
       }
 
       case 'green-split:update': {
-        const intersectionId = targetId || payload?.intersectionId || 'node-wonokromo';
-        const value = parseInt(payload?.value, 10) || 35;
-        if (isNaN(value) || value < 15 || value > 90) {
-          throw new Error('Nilai green split harus berupa angka antara 15 dan 90 detik.');
-        }
+        const intersectionId = targetId;
+        const value = payload.value;
 
         const node = backendState.state.intersections.find(n => n.id === intersectionId);
+        if (!node) throw new Error(`Simpang dengan ID ${intersectionId} tidak ditemukan.`);
         const previousState = {
-          greenSplit: node ? node.greenSplit : 35,
-          pendingGreenSplit: node ? node.pendingGreenSplit : null
+          greenSplit: node.greenSplit,
+          pendingGreenSplit: node.pendingGreenSplit
         };
 
         const resultingState = backendState.setGreenSplit(value, intersectionId);
@@ -615,7 +630,7 @@ export class CommandExecutor {
       }
 
       case 'green-wave:toggle': {
-        const active = payload ? !!payload.active : false;
+        const active = payload.active;
         const previousState = { greenWaveActive: !!backendState.state.greenWaveActive };
         const resultingState = backendState.toggleGreenWave(active);
 
@@ -646,8 +661,8 @@ export class CommandExecutor {
       }
 
       case 'ai:apply-recommendation': {
-        const intersectionId = targetId || payload?.intersectionId || 'node-wonokromo';
-        const targetSplit = payload?.targetSplit || null;
+        const intersectionId = targetId;
+        const targetSplit = payload.targetSplit ?? null;
 
         const res = backendState.applyAiRecommendation(intersectionId, targetSplit);
         backendState.signalSequence++;
@@ -670,7 +685,7 @@ export class CommandExecutor {
         return {
           resultingState: res.state,
           previousState: null,
-          newState: { greenSplit: res.optimizedSplit },
+          newState: { greenSplit: res.optimizedSplit, nodeName: res.nodeName },
           entityId: intersectionId,
           domainSequence: backendState.signalSequence,
           customAudit: { details: `Rekomendasi AI diterapkan untuk ${res.nodeName} (${res.optimizedSplit}s).` }
@@ -678,7 +693,7 @@ export class CommandExecutor {
       }
 
       case 'chaos:toggle': {
-        const targetActive = payload ? !!payload.active : !backendState.state.isChaosMode;
+        const targetActive = payload.active === undefined ? !backendState.state.isChaosMode : payload.active;
         const previousState = { isChaosMode: !!backendState.state.isChaosMode, chaosLevel: backendState.state.chaosLevel };
         const resultingState = backendState.toggleChaos(targetActive);
 
@@ -700,14 +715,61 @@ export class CommandExecutor {
         };
       }
 
+      case 'chaos:fault-inject': {
+        const fault = diagnosticEngine.injectFault(payload);
+        if (payload.targetSubsystem === 'system' || payload.intendedEffect === 'chaos_spike') {
+          const resultingState = backendState.toggleChaos(true);
+          if (backendState.io) backendState.io.emit('traffic:update', resultingState);
+        }
+        if (backendState.io) backendState.io.emit('chaos:fault-injected', { fault, correlationId: finalCorrelationId });
+        return { resultingState: backendState.state, previousState: null, newState: fault,
+          entityId: fault.faultId, domainSequence: backendState.sequence,
+          customAudit: { details: `Fault ${fault.faultId} diinjeksikan ke ${payload.targetSubsystem}.` } };
+      }
+
+      case 'chaos:fault-clear': {
+        const faultId = targetId;
+        const clearedCount = faultId === 'all' ? diagnosticEngine.clearAllFaults() : (diagnosticEngine.clearFault(faultId) ? 1 : 0);
+        if (!clearedCount && faultId !== 'all') throw new Error(`Fault dengan ID '${faultId}' tidak ditemukan di active fault matrix.`);
+        if ((faultId === 'all' || diagnosticEngine.activeFaults.size === 0) && backendState.state.isChaosMode) {
+          const resultingState = backendState.toggleChaos(false);
+          if (backendState.io) backendState.io.emit('traffic:update', resultingState);
+        }
+        return { resultingState: backendState.state, previousState: null,
+          newState: { faultId, clearedCount, status: 'CLEARED' }, entityId: faultId || 'all-faults',
+          domainSequence: backendState.sequence,
+          customAudit: { details: `Fault ${faultId || 'all'} dibersihkan.` } };
+      }
+
+      case 'simulation:control': {
+        const { operation, speedMultiplier, seed, deltaMs, mode } = payload || {};
+        const clock = backendState.clock;
+        if (operation === 'pause') { clock.pause(); backendState.simConfig.paused = true; }
+        else if (operation === 'resume') { clock.resume(); backendState.simConfig.paused = false; }
+        else if (operation === 'step') backendState.tick(deltaMs || 1000);
+        else if (operation === 'set_speed' && typeof speedMultiplier === 'number') {
+          clock.setSpeedMultiplier(speedMultiplier); backendState.simConfig.speedMultiplier = speedMultiplier;
+        } else if (operation === 'set_mode' && mode) {
+          clock.setMode(mode); backendState.simConfig.mode = mode;
+        } else if (operation === 'reset_seed' && seed !== undefined) {
+          backendState.randomRegistry.resetAll(seed); backendState.simConfig.seed = seed;
+        } else throw new Error(`Operasi kontrol simulasi '${operation}' tidak valid.`);
+        const resultingState = { mode: clock.mode, speedMultiplier: clock.speedMultiplier,
+          paused: clock.paused, seed: backendState.simConfig.seed, simTimeMs: clock.now() };
+        return { resultingState, previousState: null, newState: resultingState,
+          entityId: 'simulation-runtime', domainSequence: backendState.sequence,
+          customAudit: { details: `Kontrol simulasi '${operation}' diterapkan.` } };
+      }
+
       case 'emergency:activate': {
-        const code = payload?.code || targetId || 'AMB-02';
-        const route = payload?.route || 'route-soetomo';
+        const code = payload.code;
+        const route = payload.route;
 
         const res = backendState.activateEmergencyPriority(code, route, {
           commandId: finalCommandId,
           correlationId: finalCorrelationId,
           actor: actorName,
+          commandManaged: true,
           incidentId: payload?.incidentId || payload?.associatedIncidentId
         });
 
@@ -746,8 +808,7 @@ export class CommandExecutor {
       }
 
       case 'emergency:cancel': {
-        const id = targetId || payload?.id;
-        if (!id) throw new Error('Parameter ID armada darurat wajib disertakan.');
+        const id = targetId;
 
         const existingEmg = (backendState.state.activeEmergencies || []).find(e => String(e.id) === String(id) || String(e.vehicleId) === String(id));
         const previousState = existingEmg ? { ...existingEmg } : null;
@@ -755,7 +816,8 @@ export class CommandExecutor {
         const resultingState = backendState.cancelEmergency(id, {
           commandId: finalCommandId,
           correlationId: finalCorrelationId,
-          actor: actorName
+          actor: actorName,
+          commandManaged: true
         });
 
         return {
@@ -769,8 +831,7 @@ export class CommandExecutor {
       }
 
       case 'incident:acknowledge': {
-        const id = targetId || payload?.id;
-        if (!id) throw new Error('Parameter ID insiden wajib disertakan.');
+        const id = targetId;
 
         const existingInc = (backendState.state.incidents || []).find(i => String(i.id) === String(id));
         const previousState = existingInc ? { ...existingInc } : null;
@@ -778,7 +839,7 @@ export class CommandExecutor {
         const inc = backendState.updateIncidentStatus(id, INCIDENT_STATES.ACKNOWLEDGED, payload?.assignedUnit, payload?.notes, {
           commandId: finalCommandId,
           correlationId: finalCorrelationId,
-          actor: actorName
+          actor: actorName, commandManaged: true
         });
         return {
           resultingState: backendState.state,
@@ -790,20 +851,75 @@ export class CommandExecutor {
         };
       }
 
+      case 'incident:create': {
+        const { title, category = 'congestion', severity = 'medium', location, assignedUnit, notes } = payload || {};
+        const id = targetId;
+        if ((backendState.state.incidents || []).some(item => String(item.id) === String(id))) throw new Error(`Insiden dengan ID #${id} sudah ada di sistem.`);
+        const now = new Date().toISOString();
+        const incident = {
+          id, title: String(title).trim(), category, severity, location: String(location).trim(),
+          status: INCIDENT_STATES.ACTIVE,
+          priority: severity === 'critical' || severity === 'high' ? 'high' : 'normal',
+          source: `Operator (${actorName})`, assignedUnit: assignedUnit || 'Menunggu Disposisi Petugas',
+          notes: notes || 'Laporan insiden baru masuk antrean verifikasi SITS.',
+          reportedAt: now, updatedAt: now, acknowledgedAt: null, resolvedAt: null
+        };
+        backendState.state.incidents.unshift(incident);
+        backendState.incidentSequence++;
+        backendState.sequence++;
+        backendState.state.seq = backendState.sequence;
+        backendState.state.timestampMs = Date.now();
+        try {
+          dbManager.upsertIncident(incident, true);
+        } catch (err) {
+          backendState.state.incidents.splice(backendState.state.incidents.indexOf(incident), 1);
+          backendState.incidentSequence--;
+          backendState.sequence--;
+          backendState.state.seq = backendState.sequence;
+          throw new Error(`PERSISTENCE_FAILED: Gagal menyimpan insiden ke SQLite (${err.message})`);
+        }
+        if (backendState.io) backendState.io.emit('incident:update', {
+          id, seq: backendState.incidentSequence, timestamp: Date.now(), source: 'server', payload: incident
+        });
+        if (backendState.io) backendState.io.emit('system:toast', {
+          message: `🚨 Insiden Baru Terdeteksi: #${id} (${incident.title}) pada ${incident.location}.`,
+          type: severity === 'critical' ? 'alert' : 'warning'
+        });
+        return {
+          resultingState: backendState.state, previousState: null, newState: incident,
+          entityId: id, domainSequence: backendState.incidentSequence,
+          customAudit: { details: `Insiden #${id} dibuat: ${incident.title}.` }
+        };
+      }
+
+      case 'incident:update-status': {
+        const id = targetId;
+        const existing = (backendState.state.incidents || []).find(item => String(item.id) === String(id));
+        const previousState = existing ? { ...existing } : null;
+        const status = payload.status;
+        const inc = backendState.updateIncidentStatus(id, status, payload.assignedUnit, payload.notes, {
+          commandId: finalCommandId, correlationId: finalCorrelationId, actor: actorName, commandManaged: true
+        });
+        return {
+          resultingState: backendState.state, previousState, newState: inc,
+          entityId: id, domainSequence: backendState.incidentSequence,
+          customAudit: { details: `Status insiden #${id} diubah menjadi ${status}.` }
+        };
+      }
+
       case 'incident:dispatch': {
-        const id = targetId || payload?.id;
-        if (!id) throw new Error('Parameter ID insiden wajib disertakan.');
+        const id = targetId;
 
         const existingInc = (backendState.state.incidents || []).find(i => String(i.id) === String(id));
         const previousState = existingInc ? { ...existingInc } : null;
 
-        const targetStatus = payload?.status ? normalizeIncidentStatus(payload.status) : INCIDENT_STATES.DISPATCHED;
+        const targetStatus = payload.status;
         const assignedUnit = payload?.assignedUnit || 'Patroli Dishub & Tim 112 Surabaya';
         const notes = payload?.notes || 'Tim lapangan telah didisposisikan ke lokasi.';
         const inc = backendState.updateIncidentStatus(id, targetStatus, assignedUnit, notes, {
           commandId: finalCommandId,
           correlationId: finalCorrelationId,
-          actor: actorName
+          actor: actorName, commandManaged: true
         });
 
         return {
@@ -817,8 +933,7 @@ export class CommandExecutor {
       }
 
       case 'incident:resolve': {
-        const id = targetId || payload?.id;
-        if (!id) throw new Error('Parameter ID insiden wajib disertakan.');
+        const id = targetId;
 
         const existingInc = (backendState.state.incidents || []).find(i => String(i.id) === String(id));
         const previousState = existingInc ? { ...existingInc } : null;
@@ -826,7 +941,7 @@ export class CommandExecutor {
         const inc = backendState.updateIncidentStatus(id, INCIDENT_STATES.RESOLVED, payload?.assignedUnit, payload?.notes || `Diselesaikan oleh ${actorName}`, {
           commandId: finalCommandId,
           correlationId: finalCorrelationId,
-          actor: actorName
+          actor: actorName, commandManaged: true
         });
         
         if (backendState.io) {
@@ -850,7 +965,7 @@ export class CommandExecutor {
       }
 
       case 'siren:mute': {
-        const muted = payload ? !!payload.muted : false;
+        const muted = payload.muted;
         backendState.state.isSirenMuted = muted;
         const resultingState = backendState.state;
 
@@ -869,7 +984,7 @@ export class CommandExecutor {
       }
 
       case 'cctv:snapshot': {
-        const camId = targetId || payload?.cameraId || 'CCTV-AYANI-01';
+        const camId = targetId;
         return {
           resultingState: backendState.state,
           previousState: null,

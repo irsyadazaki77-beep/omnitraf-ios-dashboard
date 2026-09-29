@@ -23,6 +23,7 @@ import { rateLimiter } from './server/middlewares/rateLimiter.js';
 import { initializeSocketServer } from './server/sockets/socketServer.js';
 import apiRoutes from './server/routes/apiRoutes.js';
 import { diagnosticEngine } from './server/services/diagnosticEngine.js';
+import { requireCapability } from './server/middlewares/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,18 +44,16 @@ app.use(corsMiddleware);
 app.use(securityHeadersMiddleware);
 
 // 1b. Liveness & Readiness Endpoints
-app.get('/healthz', (req, res) => {
+app.get('/healthz', requireCapability('health:liveness'), (req, res) => {
   res.status(200).json({
     success: true,
     type: 'health_liveness',
     status: 'OK',
-    uptime: process.uptime(),
-    pid: process.pid,
     timestamp: new Date().toISOString()
   });
 });
 
-app.get('/ready', (req, res) => {
+app.get('/ready', requireCapability('diagnostics:read'), (req, res) => {
   const hasActiveDbFault = diagnosticEngine.isFaultActive('database');
   const dbReady = dbManager.isInitialized && dbManager.db !== null && !hasActiveDbFault;
   let dbStatus = 'DISCONNECTED';

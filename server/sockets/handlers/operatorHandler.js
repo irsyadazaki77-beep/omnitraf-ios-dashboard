@@ -4,15 +4,10 @@ import { commandExecutor } from '../../services/commandExecutor.js';
 import { isActionAuthorized, getRequiredRoles } from '../../config/capabilities.js';
 
 export function checkSocketRole(socket, allowedRoles, eventName, callback) {
-  const userRole = socket.user?.role || ROLES.VIEWER;
+  const userRole = socket.user?.role || null;
   if (!allowedRoles.includes(userRole)) {
     const errorMsg = `Akses ditolak untuk '${eventName}'. Memerlukan hak akses [${allowedRoles.join('/')}], peran saat ini: '${userRole}'.`;
     console.warn(`🔒 [Socket RBAC Ditolak] ${socket.user?.name || 'Anonymous'} (${userRole}) mencoba memanggil '${eventName}'`);
-
-    socket.emit('system:toast', {
-      message: `⛔ AKSES DITOLAK: Role '${userRole}' tidak memiliki izin untuk '${eventName}'.`,
-      type: 'danger'
-    });
 
     if (typeof callback === 'function') {
       callback({
@@ -31,6 +26,10 @@ export function checkSocketRole(socket, allowedRoles, eventName, callback) {
 export function registerOperatorHandlers(io, socket) {
   // Check the authoritative status of a command (reconnection / resync helper)
   socket.on('command:status', (data, callback) => {
+    if (!isActionAuthorized(socket.user?.role, 'command:status')) {
+      if (typeof callback === 'function') callback({ success: false, status: 'REJECTED', result: 'FORBIDDEN', code: 'FORBIDDEN' });
+      return;
+    }
     const { commandId, idempotencyKey, correlationId } = data || {};
     const cmds = backendState.processedCommands;
     const cached = cmds && (
@@ -40,6 +39,10 @@ export function registerOperatorHandlers(io, socket) {
     );
 
     if (cached) {
+      if (cached.actorId !== socket.user.id && socket.user.role !== ROLES.ADMIN) {
+        if (typeof callback === 'function') callback({ success: false, status: 'REJECTED', result: 'FORBIDDEN', code: 'FORBIDDEN' });
+        return;
+      }
       if (typeof callback === 'function') {
         callback({
           success: true,
@@ -74,14 +77,9 @@ export function registerOperatorHandlers(io, socket) {
     const { action, targetId, payload, commandId, idempotencyKey } = cmd;
 
     // Security: Authenticated principal always from socket.user, never trust client-forged actor field
-    const authenticatedUser = socket.user || {
-      id: 'usr-anonymous',
-      username: 'anonymous',
-      role: ROLES.VIEWER,
-      name: 'Publik / Dishub Viewer'
-    };
+    const authenticatedUser = socket.user || null;
 
-    console.info(`🛡️ [Operator Command] Gateway received: ${action} for ${targetId || 'global'} from ${authenticatedUser.name} (${authenticatedUser.role})`);
+    console.info(`🛡️ [Operator Command] Gateway received: ${action} for ${targetId || 'global'} from ${authenticatedUser?.name || 'UNAUTHENTICATED'} (${authenticatedUser?.role || 'NONE'})`);
 
     try {
       const outcome = await commandExecutor.executeCommand({
@@ -108,11 +106,15 @@ export function registerOperatorHandlers(io, socket) {
         status: 'REJECTED',
         result: 'FAILED',
         timestamp: Date.now(),
-        code: 'EXECUTION_FAIL',
+        statusCode: err.statusCode || 500,
+        code: err.code || 'EXECUTION_FAIL',
         message: err.message,
         error: {
-          code: 'EXECUTION_FAIL',
-          message: err.message
+          code: err.code || 'EXECUTION_FAIL',
+          message: err.message,
+          field: err.field || null,
+          expected: err.expected ?? null,
+          actual: err.actual ?? null
         }
       };
 
@@ -122,4 +124,3 @@ export function registerOperatorHandlers(io, socket) {
     }
   });
 }
-

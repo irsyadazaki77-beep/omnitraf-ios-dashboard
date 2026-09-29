@@ -170,7 +170,6 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
   if (dataQuality.provenance === "DEGRADED") factors.push("Data Telemetri Basi / Koneksi Terdegradasi");
 
   // Rule-Based Decision Support Recommendation
-  const recommendationId = `REC-${h.toString().padStart(2, '0')}-${Date.now().toString().slice(-4)}`;
   let recText = "Kondisi arus lalu lintas optimal. Pertahankan siklus hijau standar ATCS SITS.";
   let reasonCodes = ["NORMAL_FLOW"];
   let expectedImpact = "Waktu tunggu stabil 28-35 detik";
@@ -198,6 +197,11 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
     recRisk = "Low";
   }
 
+  // Stable deterministic recommendation ID based on hour and primary reason
+  const primaryReason = reasonCodes[0] || "REC";
+  const recommendationId = `REC-${h.toString().padStart(2, '0')}-${primaryReason.slice(0, 8)}`;
+  const snapshotTimestamp = state.simulatedTimeIso || state.timestamp || (state.simTimeMs ? new Date(state.simTimeMs).toISOString() : new Date().toISOString());
+
   const recommendation = {
     recommendationId,
     text: recText,
@@ -206,7 +210,7 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
     expectedImpact,
     risk: recRisk,
     requiresOperatorApproval: true,
-    timestamp: new Date().toISOString()
+    timestamp: snapshotTimestamp
   };
 
   // Scenario Comparison: Baseline vs AI Optimized
@@ -286,7 +290,7 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
 
   return {
     status: "success",
-    timestamp: new Date().toISOString(),
+    timestamp: snapshotTimestamp,
     modelVersion: MODEL_VERSION,
     inputWindow: "realtime-1h-window",
     forecastHorizon: "1h",

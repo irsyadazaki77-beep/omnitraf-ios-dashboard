@@ -14,6 +14,11 @@ if (IS_PRODUCTION && (!process.env.JWT_SECRET || process.env.JWT_SECRET === defa
 }
 
 export const JWT_SECRET = process.env.JWT_SECRET || defaultDevSecret;
+export const JWT_ISSUER = process.env.JWT_ISSUER || 'omnitraf-sits-surabaya';
+export const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'omnitraf-api';
+export const JWT_ALGORITHM = 'HS256';
+// Query-string JWTs are disabled by default, including normal test runs.
+export const ALLOW_TEST_QUERY_TOKEN_AUTH = NODE_ENV === 'test' && process.env.ALLOW_TEST_QUERY_TOKEN_AUTH === 'true';
 export const REDIS_URL = process.env.REDIS_URL || null;
 export const TRUST_PROXY = process.env.TRUST_PROXY === 'true' || process.env.TRUST_PROXY === '1' || process.env.NODE_ENV === 'test' || IS_TEST;
 
@@ -40,4 +45,3 @@ export const isOriginAllowed = (origin) => {
   }
   return false;
 };
-

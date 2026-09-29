@@ -1,30 +1,24 @@
-import { ROLES } from '../../config/constants.js';
-import { backendState } from '../../services/stateManager.js';
-import { checkSocketRole } from './operatorHandler.js';
+import { commandExecutor } from '../../services/commandExecutor.js';
 
-export function registerChaosHandlers(io, socket) {
-  // Toggle Chaos Mode (ADMIN ONLY)
-  socket.on('chaos:toggle', (data, callback) => {
-    if (!checkSocketRole(socket, [ROLES.ADMIN], 'chaos:toggle', callback)) return;
-
-    const targetActive = data ? data.active : !backendState.state.isChaosMode;
-    const newState = backendState.toggleChaos(targetActive);
-    io.emit('traffic:update', newState);
-    io.emit('system:toast', {
-      message: targetActive ? '🔥 MODE KEOS DIAKTIFKAN SERVER: Lonjakan beban jaringan SITS & gridlock!' : 'Sistem ATCS Surabaya pulih dari kondisi darurat.',
-      type: targetActive ? 'danger' : 'success'
-    });
-
-    if (typeof callback === 'function') {
-      callback({
-        success: true,
-        status: 'SERVER_APPLIED',
-        result: 'SUCCESS',
-        timestamp: Date.now(),
-        isChaosMode: newState.isChaosMode,
-        chaosLevel: newState.chaosLevel,
-        seq: backendState.sequence,
-        error: null
+export function registerChaosHandlers(_io, socket) {
+  socket.on('chaos:toggle', async (data = {}, callback) => {
+    const payload = data || {};
+    const commandId = payload.commandId || `CMD-SOCK-CHAOS-${Date.now()}`;
+    try {
+      const outcome = await commandExecutor.executeCommand({
+        action: 'chaos:toggle', targetId: 'global-network', payload,
+        commandId, idempotencyKey: payload.idempotencyKey || commandId,
+        correlationId: payload.correlationId || `CORR-SOCK-${commandId}`,
+        authenticatedUser: socket.user || null, sourceChannel: 'socket'
+      });
+      if (typeof callback === 'function') callback({
+        ...outcome, isChaosMode: outcome.newState?.isChaosMode, chaosLevel: outcome.newState?.chaosLevel
+      });
+    } catch (error) {
+      if (typeof callback === 'function') callback({
+        success: false, commandId, action: 'chaos:toggle', status: 'REJECTED', result: 'FAILED', timestamp: Date.now(),
+        statusCode: error.statusCode || 500, code: error.code || 'EXECUTION_FAIL', message: error.message,
+        error: { code: error.code || 'EXECUTION_FAIL', message: error.message, field: error.field || null, expected: error.expected ?? null, actual: error.actual ?? null }
       });
     }
   });

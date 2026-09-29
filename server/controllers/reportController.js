@@ -1,7 +1,8 @@
 import { backendState } from '../services/stateManager.js';
 import { generateSitsPdfBuffer } from '../services/pdfService.js';
 import { getForecastSnapshot, getForecastTestSuite } from '../services/forecastService.js';
-import { createApiResponse, createApiErrorResponse } from '../middlewares/errorHandler.js';
+import { createApiResponse, createApiErrorResponse, createCommandErrorResponse } from '../middlewares/errorHandler.js';
+import { validateForecastQuery } from '../config/contracts.js';
 
 export async function downloadPdfReport(req, res) {
   try {
@@ -27,27 +28,15 @@ export async function downloadPdfReport(req, res) {
 
 export function getForecast(req, res) {
   try {
-    let hour = req.query.hour !== undefined ? parseFloat(req.query.hour) : new Date().getHours();
-
-    if (isNaN(hour)) {
-      return res.status(400).json(createApiErrorResponse(
-        400,
-        'VALIDATION_ERROR',
-        'Parameter query hour harus berupa angka valid (0 - 23.99).',
-        { hour: req.query.hour }
-      ));
-    }
-
-    const wasClamped = hour < 0 || hour >= 24;
-    const clampedHour = Math.max(0, Math.min(23.99, hour));
+    const hour = validateForecastQuery(req.query.hour, new Date().getHours());
 
     const currentState = backendState.getSnapshot().state || {};
-    const forecastSnapshot = getForecastSnapshot(clampedHour, currentState);
+    const forecastSnapshot = getForecastSnapshot(hour, currentState);
 
     const metadata = {
       requestedHour: hour,
-      evaluatedHour: clampedHour,
-      wasClamped,
+      evaluatedHour: hour,
+      wasClamped: false,
       engineVersion: "v5.2.0-deterministic-diurnal",
       evaluatedAt: new Date().toISOString()
     };
@@ -67,6 +56,7 @@ export function getForecast(req, res) {
     }));
   } catch (err) {
     console.error('❌ [API Forecast] Error:', err);
+    if (err.code === 'INVALID_COMMAND') return res.status(err.statusCode || 422).json(createCommandErrorResponse(err));
     res.status(500).json(createApiErrorResponse(
       500,
       'FORECAST_ENGINE_ERROR',

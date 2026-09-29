@@ -9,7 +9,7 @@ export function executeTerminalCommand(req, res) {
   const time = backendState._getWibTimeString();
   const executionId = `EXEC-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
   // Security: authenticated user strictly from verified principal (req.user), never client body
-  const act = req.user?.name || (req.user ? `${req.user.username} (${req.user.role})` : "Administrator SITS");
+  const act = req.user.name;
 
   let responseLines = [];
   let color = "var(--text)";
@@ -23,7 +23,7 @@ export function executeTerminalCommand(req, res) {
     ));
   }
 
-  const allowedCommands = ['/help', 'help', '/status', 'status', '/ping', 'ping', '/telemetry', 'telemetry', '/nodes', 'nodes', '/chaos', 'chaos', '/clear', 'clear', '/perf', 'perf', '/sys-metrics', '/diagnostics', 'diagnostics'];
+  const allowedCommands = ['/help', 'help', '/status', 'status', '/ping', 'ping', '/telemetry', 'telemetry', '/nodes', 'nodes', '/chaos', 'chaos', '/clear', 'clear', '/perf', 'perf', '/sys-metrics', '/diagnostics', 'diagnostics', '/sim', 'sim'];
 
   if (!allowedCommands.includes(lower)) {
     responseLines = [
@@ -145,6 +145,19 @@ export function executeTerminalCommand(req, res) {
       `Status Mode Keos: ${backendState.state.isChaosMode ? 'AKTIF (Level ' + backendState.state.chaosLevel + ')' : 'NON-AKTIF (Sistem Normal)'}`
     ];
     color = backendState.state.isChaosMode ? "var(--danger)" : "var(--success)";
+  } else if (lower === '/sim' || lower === 'sim') {
+    const clk = backendState.clock;
+    const sim = backendState.simEngine;
+    responseLines = [
+      `⏱️ SITS UNIFIED DETERMINISTIC SIMULATION:`,
+      `  • Mode            : ${clk.mode} (Paused: ${clk.paused})`,
+      `  • Speed Multiplier: ${clk.speedMultiplier}x`,
+      `  • Simulation Time : ${clk.nowWibString()} (${clk.now()} ms)`,
+      `  • Active Seed     : ${backendState.simConfig.seed}`,
+      `  • Tick Sequence   : ${sim.tickSequence} (Last duration: ${sim.lastTickDurationMs}ms)`,
+      `  • Event Sequence  : ${sim.eventSequence} (Journal: ${sim.eventJournal.length} events)`
+    ];
+    color = "var(--cyan)";
   } else if (lower === '/clear' || lower === 'clear') {
     responseLines = ["CLEAR_TERMINAL"];
   }

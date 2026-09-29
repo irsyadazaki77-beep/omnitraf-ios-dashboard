@@ -391,7 +391,7 @@ export class TrafficEngine {
       await commandLayer.dispatchCommand({
         action: 'green-wave:toggle',
         targetType: 'system',
-        targetId: 'green-wave-corridor',
+        targetId: 'corridor-ayani-darmo',
         payload: { active: isBool }
       }, isBool); // High risk confirmation guard when activating (isBool === true)
 
@@ -623,7 +623,7 @@ export class TrafficEngine {
           await commandLayer.dispatchCommand({
             action: 'chaos:toggle',
             targetType: 'system',
-            targetId: 'atcs-chaos-sim',
+            targetId: 'global-network',
             payload: { active: target }
           }, false); // low-risk simulation toggle
         } catch (err) {
@@ -648,7 +648,7 @@ export class TrafficEngine {
           await commandLayer.dispatchCommand({
             action: 'siren:mute',
             targetType: 'system',
-            targetId: 'siren-sound-node',
+            targetId: 'global-audio',
             payload: { muted: targetMuted }
           }, false); // low-risk
           this._smartUpdateDOM(btnMuteSiren, targetMuted ? "Unmute Sirine" : "Mute Sirine");

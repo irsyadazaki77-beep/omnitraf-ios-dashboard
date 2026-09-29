@@ -246,18 +246,26 @@ export class DeviceController {
 
         const state = stateStore.getState();
         const devices = state.devices || [];
+        let pingFailures = 0;
 
         // Ping sequential / concurrent limit
         for (const dev of devices) {
           try {
-            await fetch(`/api/devices/ping?deviceId=${dev.deviceId}&actor=System-Scheduler`);
+            const result = await fetchWithCacheAndDedupe(
+              `/api/devices/ping?deviceId=${encodeURIComponent(dev.deviceId)}`,
+              { method: 'GET', forceRefresh: true }
+            );
+            if (!result?.success) pingFailures++;
           } catch (err) {
+            pingFailures++;
             console.warn("Ping failed for", dev.deviceId);
           }
         }
 
-        window.showToast("✓ Pemindaian Latensi Seluruh Node Berhasil Diselesaikan.");
-        soundManager.play('success');
+        window.showToast(pingFailures
+          ? `⚠ Pemindaian selesai, ${pingFailures} node tidak dapat diping.`
+          : "✓ Pemindaian Latensi Seluruh Node Berhasil Diselesaikan.", pingFailures ? 'warning' : 'success');
+        soundManager.play(pingFailures ? 'alert' : 'success');
         btnPingAll.disabled = false;
         btnPingAll.textContent = origText;
       });
@@ -271,9 +279,8 @@ export class DeviceController {
     }
 
     try {
-      const actorName = authManager.getUser()?.name || "Operator SITS";
       const payload = await fetchWithCacheAndDedupe(
-        `/api/devices/ping?deviceId=${encodeURIComponent(deviceId)}&actor=${encodeURIComponent(actorName)}`,
+        `/api/devices/ping?deviceId=${encodeURIComponent(deviceId)}`,
         { method: 'GET', forceRefresh: true }
       );
 

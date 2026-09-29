@@ -23,16 +23,34 @@ import {
   validateEmergencyTransition,
   createDomainEventEnvelope
 } from '../config/stateMachine.js';
+import { UnifiedClock, SIMULATION_MODES, systemClock } from './unifiedClock.js';
+import { DeterministicRandomRegistry, defaultRandomRegistry } from './seededRandom.js';
+import { DeterministicSimulationEngine, defaultSimEngine } from './simulationEngine.js';
+import { validateDomainCommand, ContractValidationError } from '../config/contracts.js';
 
 export class BackendStateManager {
-  constructor() {
+  constructor(options = {}) {
+    this.clock = options.clock || systemClock;
+    this.randomRegistry = options.randomRegistry || defaultRandomRegistry;
+    this.simEngine = options.simEngine || defaultSimEngine;
+
+    this.simConfig = {
+      mode: options.mode || this.clock.mode || SIMULATION_MODES.LIVE,
+      seed: options.seed || this.randomRegistry.masterSeed || 42,
+      startTime: options.startTime || this.clock.now(),
+      tickResolution: options.tickResolution || 1000,
+      speedMultiplier: options.speedMultiplier || this.clock.speedMultiplier || 1.0,
+      paused: options.paused !== undefined ? !!options.paused : this.clock.paused,
+      timezone: 'Asia/Jakarta'
+    };
+
     this.sequence = 1;
     this.cctvSequence = 1;
     this.incidentSequence = 1;
     this.emergencySequence = 1;
     this.signalSequence = 1;
     this.deviceSequence = 1;
-    this.lastUpdated = Date.now();
+    this.lastUpdated = this.clock.now();
     this.vehiclesCountToday = 128540;
     this.co2SavedKg = 1420;
     this.fuelSavedLiters = 580;
@@ -48,6 +66,7 @@ export class BackendStateManager {
         timestamp: new Date().toISOString()
       }
     ];
+
 
     this.devicesRegistry = [
       {
@@ -191,13 +210,22 @@ export class BackendStateManager {
       greenWaveActive: false,
       greenSplitWonokromo: 35,
       
+      // Simulation metadata exposed in state
+      simulation: {
+        mode: this.simConfig.mode,
+        seed: this.simConfig.seed,
+        speedMultiplier: this.simConfig.speedMultiplier,
+        paused: this.simConfig.paused,
+        tickResolution: this.simConfig.tickResolution
+      },
+
       // APILL Timers per Intersection
       intersections: [
-        { id: "node-wonokromo", name: "Simpang Wonokromo", state: "green", timer: 35, greenSplit: 35, redDuration: 25, yellowDuration: 3, totalCycleTime: 63, cycleStartTime: Date.now(), waitTime: 42, status: "Normal", pendingGreenSplit: null, overrideStartTime: null, overrideDuration: 0 },
-        { id: "node-jemursari", name: "Simpang Jemursari", state: "red", timer: 25, greenSplit: 28, redDuration: 25, yellowDuration: 3, totalCycleTime: 56, cycleStartTime: Date.now(), waitTime: 36, status: "Lancar", pendingGreenSplit: null, overrideStartTime: null, overrideDuration: 0 },
-        { id: "node-darmo", name: "Simpang Raya Darmo", state: "green", timer: 42, greenSplit: 42, redDuration: 25, yellowDuration: 3, totalCycleTime: 70, cycleStartTime: Date.now(), waitTime: 28, status: "Lancar", pendingGreenSplit: null, overrideStartTime: null, overrideDuration: 0 },
-        { id: "node-tunjungan", name: "Simpang Tunjungan", state: "yellow", timer: 3, greenSplit: 30, redDuration: 25, yellowDuration: 3, totalCycleTime: 58, cycleStartTime: Date.now(), waitTime: 48, status: "Padat", pendingGreenSplit: null, overrideStartTime: null, overrideDuration: 0 },
-        { id: "node-merr", name: "Simpang MERR Kertajaya", state: "green", timer: 45, greenSplit: 45, redDuration: 25, yellowDuration: 3, totalCycleTime: 73, cycleStartTime: Date.now(), waitTime: 22, status: "Lancar", pendingGreenSplit: null, overrideStartTime: null, overrideDuration: 0 }
+        { id: "node-wonokromo", name: "Simpang Wonokromo", state: "green", timer: 35, greenSplit: 35, redDuration: 25, yellowDuration: 3, totalCycleTime: 63, cycleStartTime: this.clock.now(), waitTime: 42, status: "Normal", pendingGreenSplit: null, overrideStartTime: null, overrideDuration: 0 },
+        { id: "node-jemursari", name: "Simpang Jemursari", state: "red", timer: 25, greenSplit: 28, redDuration: 25, yellowDuration: 3, totalCycleTime: 56, cycleStartTime: this.clock.now(), waitTime: 36, status: "Lancar", pendingGreenSplit: null, overrideStartTime: null, overrideDuration: 0 },
+        { id: "node-darmo", name: "Simpang Raya Darmo", state: "green", timer: 42, greenSplit: 42, redDuration: 25, yellowDuration: 3, totalCycleTime: 70, cycleStartTime: this.clock.now(), waitTime: 28, status: "Lancar", pendingGreenSplit: null, overrideStartTime: null, overrideDuration: 0 },
+        { id: "node-tunjungan", name: "Simpang Tunjungan", state: "yellow", timer: 3, greenSplit: 30, redDuration: 25, yellowDuration: 3, totalCycleTime: 58, cycleStartTime: this.clock.now(), waitTime: 48, status: "Padat", pendingGreenSplit: null, overrideStartTime: null, overrideDuration: 0 },
+        { id: "node-merr", name: "Simpang MERR Kertajaya", state: "green", timer: 45, greenSplit: 45, redDuration: 25, yellowDuration: 3, totalCycleTime: 73, cycleStartTime: this.clock.now(), waitTime: 22, status: "Lancar", pendingGreenSplit: null, overrideStartTime: null, overrideDuration: 0 }
       ],
 
       // Stateful Incident Records
@@ -264,6 +292,10 @@ export class BackendStateManager {
     this.init().catch(err => {
       console.error('❌ [State Manager] Inisialisasi awal database gagal:', err.message);
     });
+  }
+
+  setIo(io) {
+    this.io = io;
   }
 
   async init() {
@@ -445,13 +477,14 @@ export class BackendStateManager {
     }
   }
 
-  setIo(ioInstance) {
-    this.io = ioInstance;
+  _getWibTimeString() {
+    return this.clock.nowWibString();
   }
 
   tickDevices() {
     const isChaos = this.state.isChaosMode;
-    const now = Date.now();
+    const now = this.clock.now();
+    const devPrng = this.randomRegistry.getStream('devices');
 
     this.devicesRegistry.forEach(dev => {
       const fault = this.activeFaults ? this.activeFaults[dev.deviceId] : null;
@@ -558,7 +591,7 @@ export class BackendStateManager {
       }
 
       dev.source = source;
-      dev.updatedAt = new Date().toISOString();
+      dev.updatedAt = new Date(now).toISOString();
 
       if (dev.healthLevel !== previousHealthLevel) {
         this.handleDeviceTransition(dev, previousHealthLevel, dev.healthLevel);
@@ -571,7 +604,8 @@ export class BackendStateManager {
   handleDeviceTransition(dev, oldLevel, newLevel) {
     const id = dev.deviceId;
     let existingInc = this.state.incidents.find(i => String(i.id) === `INC-${id}` || (i.notes && i.notes.includes(id) && i.status !== "RESOLVED"));
-    const nowStr = new Date().toISOString();
+    const nowStr = this.clock.nowIso();
+    const simTimestamp = this.clock.now();
 
     if (newLevel === "OFFLINE" || newLevel === "STALE") {
       const severity = newLevel === "OFFLINE" ? "danger" : "warning";
@@ -708,13 +742,6 @@ export class BackendStateManager {
     }
   }
 
-  _getWibTimeString() {
-    return new Date().toLocaleTimeString('id-ID', {
-      timeZone: 'Asia/Jakarta',
-      hour12: false
-    }) + ' WIB';
-  }
-
   getSnapshot() {
     return {
       seq: this.sequence,
@@ -724,87 +751,98 @@ export class BackendStateManager {
       signalSeq: this.signalSequence,
       deviceSeq: this.deviceSequence,
       timestamp: this.lastUpdated,
-      isoTime: new Date().toISOString(),
+      isoTime: this.clock.nowIso(),
       source: 'server',
+      simConfig: { ...this.simConfig, mode: this.clock.mode, paused: this.clock.paused, speedMultiplier: this.clock.speedMultiplier },
       state: JSON.parse(JSON.stringify(this.state))
     };
   }
 
-  tick() {
+  tick(deltaMs = 1000) {
+    // 1. Advance sequence and simulation clock
     this.sequence++;
-    this.lastUpdated = Date.now();
+    this.lastUpdated = this.clock.advance(deltaMs, false);
     this.state.seq = this.sequence;
     this.state.timestampMs = this.lastUpdated;
     this.state.timestamp = this._getWibTimeString();
 
-    // Simulasikan kesehatan & telemetri device
+    const trafficPrng = this.randomRegistry.getStream('traffic');
+    const chaosPrng = this.randomRegistry.getStream('chaos');
+
+    // 2. Simulasikan kesehatan & telemetri device
     this.tickDevices();
 
     // Hitung reduksi AI confidence berdasarkan kesehatan node (Phase 4/5 integration)
     const offlineCount = this.devicesRegistry.filter(d => d.healthLevel === "OFFLINE" || d.healthLevel === "STALE").length;
     const degradedCount = this.devicesRegistry.filter(d => d.healthLevel === "DEGRADED").length;
 
-    // Increment metrics naturally
-    this.vehiclesCountToday += Math.floor(Math.random() * 5) + 1;
-    this.co2SavedKg += Number((Math.random() * 0.2).toFixed(2));
-    this.fuelSavedLiters += Number((Math.random() * 0.1).toFixed(2));
+    // Increment metrics naturally using deterministic domain PRNG
+    const effectiveDeltaSec = Math.max(0.1, deltaMs / 1000);
+    this.vehiclesCountToday += (Math.floor(trafficPrng.nextFloat() * 5) + 1) * effectiveDeltaSec;
+    this.co2SavedKg += Number((trafficPrng.nextFloat() * 0.2).toFixed(2)) * effectiveDeltaSec;
+    this.fuelSavedLiters += Number((trafficPrng.nextFloat() * 0.1).toFixed(2)) * effectiveDeltaSec;
 
     this.state.vehiclesToday = Math.round(this.vehiclesCountToday);
     this.state.co2SavedKg = Math.round(this.co2SavedKg);
     this.state.fuelSavedLiters = Math.round(this.fuelSavedLiters);
 
-    // Chaos mode impact calculations
+    // Chaos mode impact calculations using seeded PRNG
     if (this.state.isChaosMode) {
-      this.state.networkLoad = Math.min(99, Math.max(88, Math.floor(94 + (Math.random() * 6 - 3))));
-      this.state.avgWaitTime = Math.min(130, Math.max(95, Math.floor(118 + (Math.random() * 10 - 5))));
-      this.state.congestionIndex = Math.min(98, Math.max(85, Math.floor(92 + (Math.random() * 6 - 3))));
+      this.state.networkLoad = Math.min(99, Math.max(88, Math.floor(94 + (chaosPrng.nextFloat() * 6 - 3))));
+      this.state.avgWaitTime = Math.min(130, Math.max(95, Math.floor(118 + (chaosPrng.nextFloat() * 10 - 5))));
+      this.state.congestionIndex = Math.min(98, Math.max(85, Math.floor(92 + (chaosPrng.nextFloat() * 6 - 3))));
       this.state.sitsUptime = 42.5;
       this.state.cctvOnline = 72;
       this.state.iotOnline = 142;
       this.state.sitsSignal = 28;
       this.state.aiScore = 34;
-      this.state.aiConfidence = Math.min(60, Math.max(35, Math.floor(45 + (Math.random() * 8 - 4))));
+      this.state.aiConfidence = Math.min(60, Math.max(35, Math.floor(45 + (chaosPrng.nextFloat() * 8 - 4))));
     } else {
-      this.state.networkLoad = Math.min(92, Math.max(55, Math.floor(68 + (Math.random() * 8 - 4))));
-      this.state.avgWaitTime = Math.min(65, Math.max(28, Math.floor(41 + (Math.random() * 6 - 3))));
-      this.state.congestionIndex = Math.min(88, Math.max(45, Math.floor(60 + (Math.random() * 6 - 3))));
+      this.state.networkLoad = Math.min(92, Math.max(55, Math.floor(68 + (trafficPrng.nextFloat() * 8 - 4))));
+      this.state.avgWaitTime = Math.min(65, Math.max(28, Math.floor(41 + (trafficPrng.nextFloat() * 6 - 3))));
+      this.state.congestionIndex = Math.min(88, Math.max(45, Math.floor(60 + (trafficPrng.nextFloat() * 6 - 3))));
       this.state.sitsUptime = 99.4;
       this.state.cctvOnline = Math.max(120, 184 - (offlineCount * 12));
       this.state.iotOnline = Math.max(200, 312 - (offlineCount * 25));
       this.state.sitsSignal = Math.max(30, 94 - (offlineCount * 15) - (degradedCount * 5));
       this.state.aiScore = Math.max(20, 92 - (offlineCount * 10) - (degradedCount * 4));
       
-      const normalConfidence = Math.min(99, Math.max(91, Math.floor(96 + (Math.random() * 3 - 1))));
+      const normalConfidence = Math.min(99, Math.max(91, Math.floor(96 + (trafficPrng.nextFloat() * 3 - 1))));
       const confReduction = (offlineCount * 15) + (degradedCount * 5);
       this.state.aiConfidence = Math.max(10, normalConfidence - confReduction);
     }
 
-    // Advance Active Emergencies
+    // Advance Active Emergencies (Simulation Time Based)
+    const emgNowIso = this.clock.nowIso();
+    const emgNowMs = this.clock.now();
+
     if (this.state.activeEmergencies && this.state.activeEmergencies.length > 0) {
       this.state.activeEmergencies.forEach((emg) => {
+        const route = ROUTES_DB[emg.routeId];
+        if (["REQUESTED", "VERIFIED", "DISPATCHED", "EN_ROUTE", "ARRIVED"].includes(emg.status) && !route) return;
         if (emg.status === "REQUESTED") {
           emg.status = "VERIFIED";
-          emg.updatedAt = new Date().toISOString();
+          emg.updatedAt = emgNowIso;
         } else if (emg.status === "VERIFIED") {
           emg.status = "DISPATCHED";
-          emg.updatedAt = new Date().toISOString();
+          emg.updatedAt = emgNowIso;
         } else if (emg.status === "DISPATCHED") {
           emg.status = "EN_ROUTE";
-          emg.updatedAt = new Date().toISOString();
+          emg.updatedAt = emgNowIso;
           if (this.io) this.io.emit('emergency:dispatch-alert', emg);
         } else if (emg.status === "EN_ROUTE") {
-          const route = ROUTES_DB[emg.routeId] || ROUTES_DB["route-soetomo"];
           const speedFactor = this.state.isChaosMode ? 0.6 : 1.0;
-          emg.speed = Math.round((this.state.isChaosMode ? 42 : 65) + Math.sin(Date.now() / 1000) * 5);
+          emg.speed = Math.round((this.state.isChaosMode ? 42 : 65) + Math.sin(emgNowMs / 1000) * 5);
 
-          emg.progress += 0.025 * speedFactor;
+          // Progress scales with deltaSec so lag or variable tick step does not affect progression
+          emg.progress += (0.025 * speedFactor) * effectiveDeltaSec;
 
           if (emg.progress >= 1.0) {
             emg.progress = 1.0;
             emg.status = "ARRIVED";
             emg.ETA = "0s";
             emg.currentPosition = [route[route.length - 1].lat, route[route.length - 1].lng];
-            emg.updatedAt = new Date().toISOString();
+            emg.updatedAt = emgNowIso;
             emg.holdTicks = 0;
 
             this.recordAuditLog({
@@ -812,7 +850,7 @@ export class BackendStateManager {
               action: "TRANSITION_ARRIVED",
               entity: `Emergency ${emg.id}`,
               result: `SUCCESS (Vehicle ${emg.vehicleId} arrived at destination)`,
-              timestamp: new Date().toISOString()
+              timestamp: emgNowIso
             });
 
             if (this.io) {
@@ -847,7 +885,7 @@ export class BackendStateManager {
             const lng = p1.lng + (p2.lng - p1.lng) * segFraction;
 
             emg.currentPosition = [lat, lng];
-            emg.updatedAt = new Date().toISOString();
+            emg.updatedAt = emgNowIso;
 
             const remainingRatio = 1 - emg.progress;
             const etaSec = Math.round(remainingRatio * 165);
@@ -881,7 +919,7 @@ export class BackendStateManager {
                       action: "CONFLICT_RESOLVED",
                       entity: node.id,
                       result: `EMERGENCY PREEMPTION OVERRODE MANUAL OVERRIDE`,
-                      timestamp: new Date().toISOString()
+                      timestamp: emgNowIso
                     });
                   }
 
@@ -911,11 +949,10 @@ export class BackendStateManager {
           emg.holdTicks = (emg.holdTicks || 0) + 1;
           if (emg.holdTicks >= 3) {
             emg.status = "COMPLETED";
-            emg.updatedAt = new Date().toISOString();
+            emg.updatedAt = emgNowIso;
             emg.holdTicks = 0;
 
             // Explicit cleanup of preemption across the route
-            const route = ROUTES_DB[emg.routeId] || ROUTES_DB["route-soetomo"];
             route.forEach(pt => {
               if (pt.isIntersection) {
                 const node = this.state.intersections.find(n => n.id === pt.id);
@@ -955,8 +992,8 @@ export class BackendStateManager {
       }
     }
 
-    // Advance APILL Light Timers using Epoch Timestamp Synchronization
-    const nowMs = Date.now();
+    // Advance APILL Light Timers using Epoch Timestamp Synchronization (from this.clock.now())
+    const nowMs = this.clock.now();
     this.state.intersections.forEach(node => {
       if (node.isPreempted) {
         node.state = "green";
@@ -1050,10 +1087,20 @@ export class BackendStateManager {
       }
     });
 
+    // Mirror simulation metadata in state
+    this.state.simulation = {
+      mode: this.clock.mode,
+      seed: this.simConfig.seed,
+      speedMultiplier: this.clock.speedMultiplier,
+      paused: this.clock.paused,
+      tickResolution: this.simConfig.tickResolution
+    };
+
     return this.state;
   }
 
   toggleChaos(active) {
+    validateDomainCommand('chaos:toggle', 'global-network', { active });
     this.sequence++;
     this.lastUpdated = Date.now();
     this.state.seq = this.sequence;
@@ -1088,23 +1135,24 @@ export class BackendStateManager {
     return this.state;
   }
 
-  setGreenSplit(value, intersectionId = "node-wonokromo") {
+  setGreenSplit(value, intersectionId) {
+    const input = validateDomainCommand('green-split:update', intersectionId, { value });
+    const node = this.state.intersections.find(n => n.id === intersectionId);
+    if (!node) throw new ContractValidationError('NOT_FOUND', `Intersection '${intersectionId}' was not found.`, { field: 'targetId', expected: 'known intersection', actual: intersectionId, statusCode: 404 });
     this.sequence++;
     this.lastUpdated = Date.now();
     this.state.seq = this.sequence;
     this.state.timestampMs = this.lastUpdated;
-    const val = Math.min(90, Math.max(15, parseInt(value, 10) || 35));
-    const node = this.state.intersections.find(n => n.id === intersectionId);
-    if (node) {
-      node.pendingGreenSplit = val;
-      if (intersectionId === "node-wonokromo") {
-        this.state.greenSplitWonokromo = val;
-      }
+    const val = input.value;
+    node.pendingGreenSplit = val;
+    if (intersectionId === "node-wonokromo") {
+      this.state.greenSplitWonokromo = val;
     }
     return this.state;
   }
 
   toggleGreenWave(active) {
+    validateDomainCommand('green-wave:toggle', 'corridor-ayani-darmo', { active });
     this.sequence++;
     this.lastUpdated = Date.now();
     this.state.seq = this.sequence;
@@ -1128,13 +1176,16 @@ export class BackendStateManager {
     return this.state;
   }
 
-  applyAiRecommendation(intersectionId = "node-wonokromo", targetSplit = null) {
+  applyAiRecommendation(intersectionId, targetSplit) {
+    const input = validateDomainCommand('ai:apply-recommendation', intersectionId, { targetSplit });
+    const node = this.state.intersections.find(n => n.id === intersectionId);
+    if (!node) throw new ContractValidationError('NOT_FOUND', `Intersection '${intersectionId}' was not found.`, { field: 'targetId', expected: 'known intersection', actual: intersectionId, statusCode: 404 });
     this.sequence++;
-    this.lastUpdated = Date.now();
+    this.lastUpdated = this.clock.now();
     this.state.seq = this.sequence;
     this.state.timestampMs = this.lastUpdated;
-    const node = this.state.intersections.find(n => n.id === intersectionId) || this.state.intersections[0];
-    const optimizedSplit = targetSplit || Math.floor(42 + Math.random() * 8);
+    const aiPrng = this.randomRegistry.getStream('prediction');
+    const optimizedSplit = input.targetSplit ?? Math.floor(42 + aiPrng.nextFloat() * 8);
     
     // Smooth Cycle Transition: set pendingGreenSplit to apply cleanly on next cycle!
     node.pendingGreenSplit = optimizedSplit;
@@ -1145,37 +1196,55 @@ export class BackendStateManager {
     return { state: this.state, optimizedSplit, nodeName: node.name, smoothTransitionScheduled: true };
   }
 
-  signalOverride(intersectionId, duration = 45) {
+  signalOverride(intersectionId, duration) {
+    const input = validateDomainCommand('signal:override', intersectionId, { duration });
+    const node = this.state.intersections.find(n => n.id === intersectionId);
+    if (!node) throw new ContractValidationError('NOT_FOUND', `Intersection '${intersectionId}' was not found.`, { field: 'targetId', expected: 'known intersection', actual: intersectionId, statusCode: 404 });
+    const previousNodeState = {
+      state: node.state, timer: node.timer, status: node.status,
+      overrideStartTime: node.overrideStartTime, overrideDuration: node.overrideDuration,
+      isOverrideActive: node.isOverrideActive
+    };
+    const previousSequence = this.sequence;
+    const previousLastUpdated = this.lastUpdated;
     this.sequence++;
-    this.lastUpdated = Date.now();
+    this.lastUpdated = this.clock.now();
     this.state.seq = this.sequence;
     this.state.timestampMs = this.lastUpdated;
-    const node = this.state.intersections.find(n => n.id === intersectionId) || this.state.intersections[0];
     
-    const durSec = Math.min(90, Math.max(15, parseInt(duration, 10) || 45));
-    node.overrideStartTime = Date.now();
+    const durSec = input.duration;
+    node.overrideStartTime = this.clock.now();
     node.overrideDuration = durSec;
     node.isOverrideActive = true;
     node.state = "green";
     node.timer = durSec;
     node.status = `Manual Override (${durSec}s)`;
 
-    dbManager.upsertSignalConfig(node.id, {
-      greenSplit: durSec,
-      cycleTime: durSec,
-      mode: 'MANUAL_OVERRIDE'
-    });
+    try {
+      dbManager.upsertSignalConfig(node.id, {
+        greenSplit: durSec,
+        cycleTime: durSec,
+        mode: 'MANUAL_OVERRIDE'
+      });
+    } catch (err) {
+      Object.assign(node, previousNodeState);
+      this.sequence = previousSequence;
+      this.lastUpdated = previousLastUpdated;
+      this.state.seq = previousSequence;
+      this.state.timestampMs = previousLastUpdated;
+      throw new Error(`PERSISTENCE_FAILED: Gagal menyimpan override sinyal ke SQLite (${err.message})`);
+    }
 
     return { state: this.state, nodeName: node.name, duration: durSec };
   }
 
   updateIncidentStatus(id, newStatus, assignedUnit = null, notes = null, options = {}) {
-    const rawTarget = newStatus;
-    const cleanStatus = normalizeIncidentStatus(newStatus);
+    const canonical = validateDomainCommand('incident:update-status', id, { status: newStatus, assignedUnit, notes });
+    const cleanStatus = canonical.status;
 
     const inc = this.state.incidents.find(i => String(i.id) === String(id));
     if (!inc) {
-      throw new Error(`Insiden dengan ID ${id} tidak ditemukan.`);
+      throw new ContractValidationError('NOT_FOUND', `Incident '${id}' was not found.`, { field: 'targetId', expected: 'known incident', actual: id, statusCode: 404 });
     }
 
     const oldStatus = normalizeIncidentStatus(inc.status);
@@ -1209,12 +1278,15 @@ export class BackendStateManager {
       associatedEmergencyId: inc.associatedEmergencyId
     };
 
+    const incNowIso = this.clock.nowIso();
+    const incNowMs = this.clock.now();
+
     inc.status = cleanStatus;
-    inc.updatedAt = new Date().toISOString();
+    inc.updatedAt = incNowIso;
     if (cleanStatus === INCIDENT_STATES.ACKNOWLEDGED && !inc.acknowledgedAt) {
-      inc.acknowledgedAt = new Date().toISOString();
+      inc.acknowledgedAt = incNowIso;
     } else if (cleanStatus === INCIDENT_STATES.RESOLVED && !inc.resolvedAt) {
-      inc.resolvedAt = new Date().toISOString();
+      inc.resolvedAt = incNowIso;
     }
     if (assignedUnit) inc.assignedUnit = assignedUnit;
     if (notes) inc.notes = notes;
@@ -1222,8 +1294,9 @@ export class BackendStateManager {
 
     this.sequence++;
     this.incidentSequence++;
+    this.lastUpdated = incNowMs;
     this.state.seq = this.sequence;
-    this.state.timestampMs = Date.now();
+    this.state.timestampMs = this.lastUpdated;
 
     // Persist ke Database SQLite with immediate atomic save and rollback guard
     try {
@@ -1238,16 +1311,16 @@ export class BackendStateManager {
       throw new Error(`PERSISTENCE_FAILED: Gagal menyimpan status insiden #${id} ke SQLite (${err.message})`);
     }
 
-    const stableCorrId = options.correlationId || `STATUS-${id}-${cleanStatus}-${Date.now()}`;
+    const stableCorrId = options.correlationId || `STATUS-${id}-${cleanStatus}-${incNowMs}`;
     const logEntry = {
       operator: options.actor || "Operator SITS 112 Surabaya",
       action: `TRANSITION_${cleanStatus}`,
       entity: `Incident ${id}`,
       result: `SUCCESS (dari ${oldStatus} ke ${cleanStatus})`,
       correlationId: stableCorrId,
-      timestamp: new Date().toISOString()
+      timestamp: incNowIso
     };
-    this.recordAuditLog(logEntry);
+    if (!options.commandManaged) this.recordAuditLog(logEntry);
 
     const domainEvent = createDomainEventEnvelope({
       entityId: id,
@@ -1269,7 +1342,7 @@ export class BackendStateManager {
       this.io.emit('incident:update', {
         id: id,
         seq: this.incidentSequence,
-        timestamp: Date.now(),
+        timestamp: incNowMs,
         source: 'server',
         payload: inc,
         event: domainEvent
@@ -1284,7 +1357,10 @@ export class BackendStateManager {
     return inc;
   }
 
-  activateEmergencyPriority(code, routeId = "route-soetomo", options = {}) {
+  activateEmergencyPriority(code, routeId, options = {}) {
+    const canonical = validateDomainCommand('emergency:activate', code, { code, route: routeId, incidentId: options.incidentId || options.associatedIncidentId });
+    code = canonical.code;
+    routeId = canonical.route;
     const existing = this.state.activeEmergencies.find(
       emg => emg.vehicleId === code && !["COMPLETED", "CANCELLED", "TERMINAL_ARCHIVED"].includes(emg.status)
     );
@@ -1292,7 +1368,7 @@ export class BackendStateManager {
       throw new Error(`KENDARAAN SUDAH DISPATCHED: ${code} saat ini sedang aktif di rute.`);
     }
 
-    const route = ROUTES_DB[routeId] || ROUTES_DB["route-soetomo"];
+    const route = ROUTES_DB[routeId];
     const id = options.emergencyId || `EMG-${Date.now().toString().slice(-4)}`;
     
     // Explicit cross-module linkage: check if an associated incident exists or can be resolved
@@ -1300,6 +1376,7 @@ export class BackendStateManager {
     let linkedIncident = null;
     if (associatedIncidentId) {
       linkedIncident = this.state.incidents.find(i => String(i.id) === String(associatedIncidentId));
+      if (!linkedIncident) throw new ContractValidationError('NOT_FOUND', `Incident '${associatedIncidentId}' was not found.`, { field: 'incidentId', expected: 'known incident', actual: associatedIncidentId, statusCode: 404 });
       if (linkedIncident) {
         linkedIncident.associatedEmergencyId = id;
         if (linkedIncident.status === INCIDENT_STATES.ACTIVE || linkedIncident.status === INCIDENT_STATES.ACKNOWLEDGED) {
@@ -1311,15 +1388,18 @@ export class BackendStateManager {
       }
     }
 
+    const emgNowIso = this.clock.nowIso();
+    const emgNowMs = this.clock.now();
+
     this.sequence++;
     this.emergencySequence++;
-    this.lastUpdated = Date.now();
+    this.lastUpdated = emgNowMs;
     this.state.seq = this.sequence;
     this.state.timestampMs = this.lastUpdated;
 
     const emergencyItem = {
       id: id,
-      vehicleId: code || "AMB-02",
+      vehicleId: code,
       vehicleType: (code && (code.toLowerCase().includes("damkar") || code.toLowerCase().includes("pmk") || code.toLowerCase().includes("pemadam"))) ? "PMK" : "Ambulance",
       origin: route[0].name,
       destination: route[route.length - 1].name,
@@ -1330,8 +1410,8 @@ export class BackendStateManager {
       speed: 60,
       currentPosition: [route[0].lat, route[0].lng],
       nextIntersection: `Simpang ${route.find(p => p.isIntersection)?.name || 'Wonokromo'}`,
-      activatedAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 300000).toISOString(),
+      activatedAt: emgNowIso,
+      expiresAt: new Date(emgNowMs + 300000).toISOString(),
       assignedRoute: routeId,
       progress: 0,
       associatedIncidentId: associatedIncidentId || (linkedIncident ? linkedIncident.id : null),
@@ -1375,7 +1455,7 @@ export class BackendStateManager {
       }
     });
 
-    this.recordAuditLog({
+    if (!options.commandManaged) this.recordAuditLog({
       operator: options.actor || "Operator SITS 112 Surabaya",
       action: "DISPATCH_REQUEST",
       entity: `Emergency ${id}`,
@@ -1388,22 +1468,25 @@ export class BackendStateManager {
   }
 
   cancelEmergency(id, options = {}) {
+    validateDomainCommand('emergency:cancel', id, { id });
     const emg = this.state.activeEmergencies.find(e => e.id === id || e.vehicleId === id);
     if (!emg) {
-      throw new Error(`Emergency dispatch dengan ID ${id} tidak ditemukan.`);
+      throw new ContractValidationError('NOT_FOUND', `Emergency '${id}' was not found.`, { field: 'targetId', expected: 'known emergency', actual: id, statusCode: 404 });
     }
 
     if (["COMPLETED", "CANCELLED", "TERMINAL_ARCHIVED"].includes(emg.status)) {
       return this.state;
     }
 
+    const route = ROUTES_DB[emg.routeId];
+    if (!route) throw new ContractValidationError('INVALID_TARGET', `Emergency route '${emg.routeId}' is invalid.`, { field: 'routeId', expected: Object.keys(ROUTES_DB), actual: emg.routeId });
+
     const oldStatus = emg.status;
     emg.status = EMERGENCY_STATES.CANCELLED;
-    emg.updatedAt = new Date().toISOString();
+    emg.updatedAt = this.clock.nowIso();
     emg.holdTicks = 0;
 
     // Restore all pre-empted signals deterministically
-    const route = ROUTES_DB[emg.routeId] || ROUTES_DB["route-soetomo"];
     route.forEach(pt => {
       if (pt.isIntersection) {
         const node = this.state.intersections.find(n => n.id === pt.id);
@@ -1427,8 +1510,9 @@ export class BackendStateManager {
 
     this.sequence++;
     this.emergencySequence++;
+    this.lastUpdated = this.clock.now();
     this.state.seq = this.sequence;
-    this.state.timestampMs = Date.now();
+    this.state.timestampMs = this.lastUpdated;
 
     const domainEvent = createDomainEventEnvelope({
       entityId: emg.id,
@@ -1446,7 +1530,7 @@ export class BackendStateManager {
       }
     });
 
-    this.recordAuditLog({
+    if (!options.commandManaged) this.recordAuditLog({
       operator: options.actor || "Operator SITS 112 Surabaya",
       action: "DISPATCH_CANCEL",
       entity: `Emergency ${emg.id}`,

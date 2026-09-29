@@ -153,7 +153,7 @@ describe('Phase 18: Realtime Reliability, Ordering & Recovery Hardening Test Sui
     assert.ok(resyncResponse.state.intersections.length > 0);
 
     // REST fallback consistency: compare with GET /api/state/snapshot
-    const restRes = await fetch(`${baseUrl}/api/state/snapshot`);
+    const restRes = await fetch(`${baseUrl}/api/state/snapshot`, { headers: { Authorization: `Bearer ${adminToken}` } });
     assert.strictEqual(restRes.status, 200);
     const restData = await restRes.json();
     assert.strictEqual(restData.success, true);
@@ -338,6 +338,7 @@ describe('Phase 18: Realtime Reliability, Ordering & Recovery Hardening Test Sui
   test('8. SSE Stream (/api/stream-traffic): diagnostic stream format, headers, and clean disconnect', async () => {
     const controller = new AbortController();
     const res = await fetch(`${baseUrl}/api/stream-traffic`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
       signal: controller.signal
     });
 

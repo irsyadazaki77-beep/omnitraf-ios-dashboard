@@ -12,6 +12,9 @@ const { server } = await import('../../server.js');
 
 describe('REST API Integration Tests', () => {
   let baseUrl;
+  let viewerToken;
+  let operatorToken;
+  let adminToken;
 
   before(async () => {
     // Wait for the server to be listening
@@ -27,6 +30,14 @@ describe('REST API Integration Tests', () => {
 
     const port = server.address().port;
     baseUrl = `http://127.0.0.1:${port}`;
+    const login = async username => {
+      const response = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password: `${username}123` })
+      });
+      return (await response.json()).token;
+    };
+    [viewerToken, operatorToken, adminToken] = await Promise.all(['viewer', 'operator', 'admin'].map(login));
   });
 
   after(() => {
@@ -40,7 +51,7 @@ describe('REST API Integration Tests', () => {
   });
 
   test('GET /api/state/snapshot should return correct JSON schema and status code 200', async () => {
-    const res = await fetch(`${baseUrl}/api/state/snapshot`);
+    const res = await fetch(`${baseUrl}/api/state/snapshot`, { headers: { Authorization: `Bearer ${viewerToken}` } });
     assert.strictEqual(res.status, 200);
 
     const contentType = res.headers.get('content-type');
@@ -98,9 +109,9 @@ describe('REST API Integration Tests', () => {
     const healthzData = await resHealthz.json();
     assert.strictEqual(healthzData.success, true);
     assert.strictEqual(healthzData.status, 'OK');
-    assert.ok(typeof healthzData.uptime === 'number');
+    assert.equal(healthzData.pid, undefined);
 
-    const resReady = await fetch(`${baseUrl}/ready`);
+    const resReady = await fetch(`${baseUrl}/ready`, { headers: { Authorization: `Bearer ${adminToken}` } });
     assert.strictEqual(resReady.status, 200);
     const readyData = await resReady.json();
     assert.strictEqual(readyData.success, true);
@@ -186,7 +197,7 @@ describe('REST API Integration Tests', () => {
     assert.strictEqual(resInvalidFps.status, 422);
     const invalidFpsData = await resInvalidFps.json();
     assert.strictEqual(invalidFpsData.success, false);
-    assert.strictEqual(invalidFpsData.error.code, 'UNPROCESSABLE_ENTITY');
+    assert.strictEqual(invalidFpsData.error.code, 'INVALID_COMMAND');
 
     // 8. Admin with valid config -> 200
     const resValidConfig = await fetch(`${baseUrl}/api/devices/config`, {
@@ -204,7 +215,7 @@ describe('REST API Integration Tests', () => {
   });
 
   test('PDF report download endpoint should produce valid application/pdf', async () => {
-    const res = await fetch(`${baseUrl}/api/reports/download`);
+    const res = await fetch(`${baseUrl}/api/reports/download`, { headers: { Authorization: `Bearer ${operatorToken}` } });
     assert.strictEqual(res.status, 200);
     const contentType = res.headers.get('content-type');
     assert.ok(contentType && contentType.includes('application/pdf'));
@@ -216,15 +227,16 @@ describe('REST API Integration Tests', () => {
   });
 
   test('Forecast API should validate hour parameter and return structured metadata', async () => {
-    // 1. Invalid hour string -> 400
-    const resInvalid = await fetch(`${baseUrl}/api/prediction/v1/forecast?hour=invalid_input`);
-    assert.strictEqual(resInvalid.status, 400);
+    // 1. Invalid hour string -> canonical 422 contract error
+    const headers = { Authorization: `Bearer ${viewerToken}` };
+    const resInvalid = await fetch(`${baseUrl}/api/prediction/v1/forecast?hour=invalid_input`, { headers });
+    assert.strictEqual(resInvalid.status, 422);
     const invalidData = await resInvalid.json();
     assert.strictEqual(invalidData.success, false);
-    assert.strictEqual(invalidData.error.code, 'VALIDATION_ERROR');
+    assert.strictEqual(invalidData.error.code, 'INVALID_COMMAND');
 
     // 2. Valid hour -> 200 with scenario comparison and metadata
-    const resValid = await fetch(`${baseUrl}/api/prediction/v1/forecast?hour=17.5`);
+    const resValid = await fetch(`${baseUrl}/api/prediction/v1/forecast?hour=17.5`, { headers });
     assert.strictEqual(resValid.status, 200);
     const forecastData = await resValid.json();
     assert.strictEqual(forecastData.success, true);
@@ -242,7 +254,7 @@ describe('REST API Integration Tests', () => {
     });
     const opToken = (await resOp.json()).token;
 
-    // 1. Validation error on missing fields -> 400
+    // 1. Missing canonical fields -> 422 INVALID_COMMAND
     const resBad = await fetch(`${baseUrl}/api/incidents`, {
       method: 'POST',
       headers: {
@@ -251,7 +263,8 @@ describe('REST API Integration Tests', () => {
       },
       body: JSON.stringify({})
     });
-    assert.strictEqual(resBad.status, 400);
+    assert.strictEqual(resBad.status, 422);
+    assert.strictEqual((await resBad.json()).error.code, 'INVALID_COMMAND');
 
     // 2. Invalid category -> 422 UNPROCESSABLE_ENTITY
     const resInvalidCat = await fetch(`${baseUrl}/api/incidents`, {
@@ -391,7 +404,7 @@ describe('REST API Integration Tests', () => {
 
   test('Device Ping, Fault Injection and Audit Trail contract', async () => {
     // 1. Ping device -> 200 with latencyMs and actionId
-    const resPing = await fetch(`${baseUrl}/api/devices/ping?deviceId=NODE-EDGE-01`);
+    const resPing = await fetch(`${baseUrl}/api/devices/ping?deviceId=NODE-EDGE-01`, { headers: { Authorization: `Bearer ${operatorToken}` } });
     assert.strictEqual(resPing.status, 200);
     const pingData = await resPing.json();
     assert.strictEqual(pingData.success, true);
@@ -399,7 +412,7 @@ describe('REST API Integration Tests', () => {
     assert.ok(typeof pingData.data.latencyMs === 'number');
 
     // 2. Fetch device audit trail -> 200 with list
-    const resAudit = await fetch(`${baseUrl}/api/devices/audit?deviceId=NODE-EDGE-01`);
+    const resAudit = await fetch(`${baseUrl}/api/devices/audit?deviceId=NODE-EDGE-01`, { headers: { Authorization: `Bearer ${operatorToken}` } });
     assert.strictEqual(resAudit.status, 200);
     const auditData = await resAudit.json();
     assert.strictEqual(auditData.success, true);
@@ -506,11 +519,12 @@ describe('REST API Integration Tests', () => {
   });
 
   test('State snapshot & resync alias consistency', async () => {
-    const resSnapshot = await fetch(`${baseUrl}/api/state/snapshot`);
+    const authHeaders = { Authorization: `Bearer ${viewerToken}` };
+    const resSnapshot = await fetch(`${baseUrl}/api/state/snapshot`, { headers: authHeaders });
     assert.strictEqual(resSnapshot.status, 200);
     const snapData = await resSnapshot.json();
 
-    const resResync = await fetch(`${baseUrl}/api/state/resync`);
+    const resResync = await fetch(`${baseUrl}/api/state/resync`, { headers: authHeaders });
     assert.strictEqual(resResync.status, 200);
     const resyncData = await resResync.json();
 

@@ -9,8 +9,10 @@
 import { backendState } from '../services/stateManager.js';
 import { dbManager } from '../db/database.js';
 import { diagnosticEngine, HEALTH_STATUS, SUBSYSTEMS, EVENT_CATEGORIES, DIAGNOSTIC_LEVELS } from '../services/diagnosticEngine.js';
-import { createApiResponse, createApiErrorResponse } from '../middlewares/errorHandler.js';
+import { createApiResponse, createApiErrorResponse, createCommandErrorResponse, getCommandErrorStatus } from '../middlewares/errorHandler.js';
 import { ROLES } from '../config/constants.js';
+import { commandExecutor } from '../services/commandExecutor.js';
+import { validateDiagnosticEventsQuery } from '../config/contracts.js';
 
 export function getDiagnosticHealth(req, res) {
   const dbReady = dbManager.isInitialized && dbManager.db !== null;
@@ -106,9 +108,10 @@ export function getDiagnosticSnapshot(req, res) {
 }
 
 export function getDiagnosticEvents(req, res) {
-  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 30));
-  const category = req.query.category || null;
-  const level = req.query.level || null;
+  let query;
+  try { query = validateDiagnosticEventsQuery(req.query); }
+  catch (error) { return res.status(error.statusCode || 422).json(createCommandErrorResponse(error)); }
+  const { limit, category, level } = query;
 
   let filtered = diagnosticEngine.events;
   if (category) {
@@ -124,80 +127,111 @@ export function getDiagnosticEvents(req, res) {
   }));
 }
 
-export function injectChaosFault(req, res) {
+export async function injectChaosFault(req, res) {
   const { targetSubsystem, intendedEffect, durationMs, deterministicSeed, params } = req.body || {};
   const correlationId = req.headers['x-correlation-id'] || `CORR-FLT-${Date.now()}`;
-  const faultId = req.body?.faultId || `FLT-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
-
-  if (!targetSubsystem || !intendedEffect) {
-    return res.status(400).json(createApiErrorResponse(
-      400,
-      'VALIDATION_ERROR',
-      'Field targetSubsystem dan intendedEffect wajib disertakan.',
-      { field: !targetSubsystem ? 'targetSubsystem' : 'intendedEffect' }
-    ));
-  }
+  const faultId = req.body?.faultId ?? null;
 
   try {
-    const fault = diagnosticEngine.injectFault({
-      faultId,
-      targetSubsystem,
-      intendedEffect,
-      durationMs: durationMs || 15000,
-      deterministicSeed: deterministicSeed || 42,
-      params: params || {}
+    const outcome = await commandExecutor.executeCommand({
+      action: 'chaos:fault-inject', targetId: faultId,
+      payload: { faultId, targetSubsystem, intendedEffect, durationMs,
+        deterministicSeed, params },
+      commandId: req.body?.commandId, idempotencyKey: req.headers['x-idempotency-key'] || req.body?.idempotencyKey,
+      correlationId, authenticatedUser: req.user, sourceChannel: 'rest'
     });
-
-    // Mirror to backendState chaos mode if whole-system chaos target
-    if (targetSubsystem === 'system' || intendedEffect === 'chaos_spike') {
-      backendState.toggleChaos(true);
-    }
-
-    if (backendState.io) {
-      backendState.io.emit('chaos:fault-injected', {
-        fault,
-        correlationId
-      });
-    }
+    const fault = outcome.newState;
 
     res.status(200).json(createApiResponse({
       type: 'chaos_fault_injected',
-      data: fault
+      data: fault,
+      extra: { command: outcome }
     }));
   } catch (err) {
-    return res.status(403).json(createApiErrorResponse(
-      403,
-      'FAULT_INJECTION_PROHIBITED',
-      err.message
-    ));
+    const response = createCommandErrorResponse(err);
+    const statusCode = getCommandErrorStatus(err);
+    return res.status(statusCode).json(response);
   }
 }
 
-export function clearChaosFault(req, res) {
+export async function clearChaosFault(req, res) {
   const faultId = req.params.faultId || req.body?.faultId;
 
   if (faultId === 'all' || !faultId) {
-    const count = diagnosticEngine.clearAllFaults();
-    if (backendState.state.isChaosMode) {
-      backendState.toggleChaos(false);
-    }
+    let outcome;
+    try {
+      outcome = await commandExecutor.executeCommand({ action: 'chaos:fault-clear', targetId: 'all',
+        payload: { faultId: 'all' }, commandId: req.body?.commandId,
+        idempotencyKey: req.headers['x-idempotency-key'] || req.body?.idempotencyKey,
+        correlationId: req.headers['x-correlation-id'], authenticatedUser: req.user, sourceChannel: 'rest' });
+    } catch (err) { return res.status(getCommandErrorStatus(err, 500)).json(createCommandErrorResponse(err, 500)); }
     return res.status(200).json(createApiResponse({
       type: 'chaos_faults_cleared',
-      data: { clearedCount: count }
+      data: { clearedCount: outcome.newState.clearedCount }, extra: { command: outcome }
     }));
   }
 
-  const success = diagnosticEngine.clearFault(faultId);
-  if (!success) {
-    return res.status(404).json(createApiErrorResponse(
-      404,
-      'NOT_FOUND',
-      `Fault dengan ID '${faultId}' tidak ditemukan di active fault matrix.`
-    ));
+  let outcome;
+  try {
+    outcome = await commandExecutor.executeCommand({ action: 'chaos:fault-clear', targetId: faultId,
+      payload: { faultId }, commandId: req.body?.commandId,
+      idempotencyKey: req.headers['x-idempotency-key'] || req.body?.idempotencyKey,
+      correlationId: req.headers['x-correlation-id'], authenticatedUser: req.user, sourceChannel: 'rest' });
+  } catch (err) {
+    return res.status(getCommandErrorStatus(err)).json(createCommandErrorResponse(err));
   }
 
   res.status(200).json(createApiResponse({
     type: 'chaos_fault_cleared',
-    data: { faultId, status: 'CLEARED' }
+    data: outcome.newState, extra: { command: outcome }
   }));
+}
+
+export function getSimulationDiagnostics(req, res) {
+  const simEngine = backendState.simEngine;
+  const clock = backendState.clock;
+  const randomReg = backendState.randomRegistry;
+
+  res.status(200).json(createApiResponse({
+    type: 'simulation_diagnostics',
+    data: {
+      mode: clock.mode,
+      seed: backendState.simConfig.seed,
+      simulationTimeMs: clock.now(),
+      simulationTimeIso: clock.nowIso(),
+      simulationTimeWib: clock.nowWibString(),
+      wallTimeMs: clock.wallNow(),
+      wallTimeIso: clock.wallNowIso(),
+      speedMultiplier: clock.speedMultiplier,
+      paused: clock.paused,
+      tickResolution: backendState.simConfig.tickResolution,
+      tickSequence: simEngine.tickSequence,
+      eventSequence: simEngine.eventSequence,
+      lastTickDurationMs: simEngine.lastTickDurationMs,
+      journalLength: simEngine.eventJournal.length,
+      activeDomains: Array.from(simEngine.domains.keys()),
+      devicesCount: backendState.devicesRegistry.length,
+      activeEmergenciesCount: backendState.state.activeEmergencies.length,
+      checkpoint: {
+        supported: true,
+        schemaVersion: "v19.0.0-deterministic"
+      }
+    }
+  }));
+}
+
+export async function controlSimulation(req, res) {
+  const { action, ...payload } = req.body || {};
+  try {
+    const outcome = await commandExecutor.executeCommand({
+      action: 'simulation:control', targetId: 'simulation-runtime', payload: { ...payload, operation: action },
+      commandId: req.body?.commandId, idempotencyKey: req.headers['x-idempotency-key'] || req.body?.idempotencyKey,
+      correlationId: req.headers['x-correlation-id'], authenticatedUser: req.user, sourceChannel: 'rest'
+    });
+    res.status(200).json(createApiResponse({ type: 'simulation_control_applied', data: {
+      action, ...outcome.newState, simTimeIso: backendState.clock.nowIso(), seed: backendState.simConfig.seed
+    }, extra: { command: outcome } }));
+  } catch (err) {
+    res.status(getCommandErrorStatus(err)).json(createCommandErrorResponse(err));
+  }
 }

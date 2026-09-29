@@ -1,8 +1,7 @@
 import { Server } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import Redis from 'ioredis';
-import { isOriginAllowed } from '../config/env.js';
-import { ROLES } from '../config/constants.js';
+import { isOriginAllowed, ALLOW_TEST_QUERY_TOKEN_AUTH, NODE_ENV } from '../config/env.js';
 import { verifyToken } from '../middlewares/auth.js';
 import { backendState } from '../services/stateManager.js';
 import { cvEngine } from '../services/visionEngine.js';
@@ -64,28 +63,17 @@ export function initializeSocketServer(httpServer) {
 
   // Handshake Authentication Middleware
   io.use((socket, next) => {
+    const header = socket.handshake.headers?.authorization;
+    const queryTokenAllowed = NODE_ENV === 'test' && ALLOW_TEST_QUERY_TOKEN_AUTH;
     const token = socket.handshake.auth?.token ||
-                  socket.handshake.headers?.authorization?.replace('Bearer ', '') ||
-                  socket.handshake.query?.token;
+      (typeof header === 'string' && /^Bearer\s+/i.test(header) ? header.replace(/^Bearer\s+/i, '').trim() : null) ||
+      (queryTokenAllowed ? socket.handshake.query?.token : null);
 
-    if (token) {
-      const decoded = verifyToken(token);
-      if (decoded) {
-        socket.user = decoded;
-        return next();
-      }
-      // Explicit token supplied but invalid/expired: do NOT silently downgrade to viewer
-      return next(new Error('AUTHENTICATION_FAILED: Token tidak valid atau telah kedaluwarsa.'));
-    }
-
-    // Default public viewer role ONLY when no token was provided at all
-    socket.user = {
-      id: 'usr-anonymous',
-      username: 'anonymous',
-      role: ROLES.VIEWER,
-      name: 'Publik / Dishub Viewer'
-    };
-    next();
+    if (!token) return next(new Error('AUTHENTICATION_REQUIRED: JWT Bearer token wajib disertakan.'));
+    const principal = verifyToken(token);
+    if (!principal) return next(new Error('AUTHENTICATION_FAILED: Token tidak valid atau telah kedaluwarsa.'));
+    socket.user = principal;
+    return next();
   });
 
   // Client Connection Handler
@@ -153,10 +141,15 @@ export function initializeSocketServer(httpServer) {
     });
   });
 
-  // 1. Core Telemetry & APILL Ticker Loop (1000ms)
+  // 1. Core Telemetry & APILL Ticker Loop (1000ms with elapsed delta tracking)
+  let lastTrafficTickMonotonic = backendState.clock.monotonic();
   setInterval(() => {
+    const nowMono = backendState.clock.monotonic();
+    const elapsedMs = Math.max(100, Math.round(nowMono - lastTrafficTickMonotonic));
+    lastTrafficTickMonotonic = nowMono;
+
     if (io.engine.clientsCount === 0) return;
-    const updatedState = backendState.tick();
+    const updatedState = backendState.tick(elapsedMs);
     io.emit('traffic:update', updatedState);
   }, 1000).unref();
 

@@ -1,5 +1,11 @@
+import { systemClock } from './unifiedClock.js';
+import { defaultRandomRegistry, SeededRandom } from './seededRandom.js';
+
 export class ComputerVisionEngine {
-  constructor() {
+  constructor(options = {}) {
+    this.clock = options.clock || systemClock;
+    this.randomRegistry = options.randomRegistry || defaultRandomRegistry;
+    this.prng = options.randomStream || (this.randomRegistry ? this.randomRegistry.getStream('cctv') : new SeededRandom(42));
     this.frameSequence = 1;
     this.cameras = ['dashCameraCanvas', 'cctvCanvas1', 'cctvCanvas2', 'cctvCanvas3', 'cctvCanvas4'];
     this.classes = ['car', 'bus', 'truck', 'motorcycle', 'ambulance', 'person'];
@@ -22,10 +28,10 @@ export class ComputerVisionEngine {
       vehicles.push({
         id: `${camId}-v${i}`,
         lane: lane,
-        progress: (i / count) + Math.random() * 0.1,
-        speed: 0.008 + Math.random() * 0.006,
+        progress: (i / count) + this.prng.nextFloat() * 0.1,
+        speed: 0.008 + this.prng.nextFloat() * 0.006,
         class: cls,
-        confidence: Math.floor(91 + Math.random() * 8)
+        confidence: Math.floor(91 + this.prng.nextFloat() * 8)
       });
     }
     return vehicles;
@@ -40,8 +46,8 @@ export class ComputerVisionEngine {
         v.progress += effSpeed;
         if (v.progress > 1.0) {
           v.progress = 0;
-          v.lane = Math.floor(Math.random() * 4);
-          v.confidence = Math.floor(90 + Math.random() * 9);
+          v.lane = Math.floor(this.prng.nextFloat() * 4);
+          v.confidence = Math.floor(90 + this.prng.nextFloat() * 9);
         }
       });
     });
@@ -49,7 +55,7 @@ export class ComputerVisionEngine {
 
   generateFramePayload(isChaosMode) {
     this.frameSequence++;
-    const timestamp = Date.now();
+    const timestamp = this.clock.now();
     const camerasData = {};
 
     // First, step the simulation
@@ -92,7 +98,7 @@ export class ComputerVisionEngine {
           y: Math.max(0.01, Math.min(0.95, yNorm - hNorm / 2)),
           w: wNorm,
           h: hNorm,
-          speedKmh: Math.round((isChaosMode ? 8 : 42) + Math.random() * 6 - 3)
+          speedKmh: Math.round((isChaosMode ? 8 : 42) + this.prng.nextFloat() * 6 - 3)
         });
       });
 
@@ -100,10 +106,10 @@ export class ComputerVisionEngine {
         cameraId: camId,
         timestamp: timestamp,
         sequence: this.frameSequence,
-        fps: isChaosMode ? Math.floor(15 + Math.random() * 4) : Math.floor(29 + Math.random() * 2),
+        fps: isChaosMode ? Math.floor(15 + this.prng.nextFloat() * 4) : Math.floor(29 + this.prng.nextFloat() * 2),
         resolution: '1920x1080',
         source: 'SITS Edge Vision YOLOv8',
-        processingLatencyMs: isChaosMode ? Math.floor(22 + Math.random() * 15) : Math.floor(4 + Math.random() * 6),
+        processingLatencyMs: isChaosMode ? Math.floor(22 + this.prng.nextFloat() * 15) : Math.floor(4 + this.prng.nextFloat() * 6),
         streamStatus: isChaosMode ? 'DEGRADED' : 'ONLINE',
         detections: detections
       };
@@ -117,6 +123,15 @@ export class ComputerVisionEngine {
       ...Object.fromEntries(Object.entries(camerasData).map(([cid, cam]) => [cid, cam.detections]))
     };
   }
+
+  reset() {
+    this.frameSequence = 1;
+    this.prng.reset();
+    this.cameras.forEach(camId => {
+      this.vehiclesPerCam.set(camId, this._generateInitialVehicles(camId));
+    });
+  }
 }
 
 export const cvEngine = new ComputerVisionEngine();
+export const VisionEngine = ComputerVisionEngine;

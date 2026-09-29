@@ -260,7 +260,7 @@ describe('PHASE 17 — Comprehensive Chaos & Fault Injection Resilience Matrix',
   // 6. Sanitized Diagnostic Snapshot & Health Aggregation API
   test('6. Observability Endpoints: GET /api/diagnostics/health and /api/diagnostics/snapshot return sanitized, structured data', async () => {
     // Check health endpoint
-    const healthRes = await fetch(`${baseUrl}/api/diagnostics/health`);
+    const healthRes = await fetch(`${baseUrl}/api/diagnostics/health`, { headers: { Authorization: `Bearer ${operatorToken}` } });
     assert.strictEqual(healthRes.status, 200);
     const health = await healthRes.json();
     assert.strictEqual(health.success, true);
@@ -268,7 +268,7 @@ describe('PHASE 17 — Comprehensive Chaos & Fault Injection Resilience Matrix',
     assert.strictEqual(health.data.subsystems.database.status, HEALTH_STATUS.HEALTHY);
 
     // Check snapshot endpoint
-    const snapRes = await fetch(`${baseUrl}/api/diagnostics/snapshot`);
+    const snapRes = await fetch(`${baseUrl}/api/diagnostics/snapshot`, { headers: { Authorization: `Bearer ${operatorToken}` } });
     assert.strictEqual(snapRes.status, 200);
     const snap = await snapRes.json();
     assert.strictEqual(snap.success, true);
@@ -338,7 +338,8 @@ describe('PHASE 17 — Comprehensive Chaos & Fault Injection Resilience Matrix',
   // 8. Server Readiness Probe (/ready) reflects degraded health on active critical faults
   test('8. Readiness Check (/ready): Returns 503 DEGRADED when database fault is injected, 200 when cleared', async () => {
     // Baseline -> 200
-    const resReady1 = await fetch(`${baseUrl}/ready`);
+    const readyOptions = { headers: { Authorization: `Bearer ${adminToken}` } };
+    const resReady1 = await fetch(`${baseUrl}/ready`, readyOptions);
     assert.strictEqual(resReady1.status, 200);
 
     // Inject database fault
@@ -348,7 +349,7 @@ describe('PHASE 17 — Comprehensive Chaos & Fault Injection Resilience Matrix',
       intendedEffect: 'database_unavailable'
     });
 
-    const resReady2 = await fetch(`${baseUrl}/ready`);
+    const resReady2 = await fetch(`${baseUrl}/ready`, readyOptions);
     assert.strictEqual(resReady2.status, 503);
     const readyData = await resReady2.json();
     assert.strictEqual(readyData.ready, false);
@@ -356,7 +357,7 @@ describe('PHASE 17 — Comprehensive Chaos & Fault Injection Resilience Matrix',
 
     // Clear fault -> Restores 200
     diagnosticEngine.clearFault('FLT-READY-CHECK');
-    const resReady3 = await fetch(`${baseUrl}/ready`);
+    const resReady3 = await fetch(`${baseUrl}/ready`, readyOptions);
     assert.strictEqual(resReady3.status, 200);
     const restoredData = await resReady3.json();
     assert.strictEqual(restoredData.ready, true);

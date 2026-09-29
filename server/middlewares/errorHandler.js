@@ -22,6 +22,20 @@ export function createApiErrorResponse(statusCode, code, message, details = {}, 
   };
 }
 
+export function getCommandErrorStatus(error, fallbackStatus = 422) {
+  return Number.isInteger(error?.statusCode) ? error.statusCode :
+    (error?.code === 'NOT_FOUND' ? 404 : error?.code === 'FORBIDDEN' ? 403 :
+      error?.code === 'STATE_CONFLICT' ? 409 : error?.code === 'PERSISTENCE_FAILED' ? 500 :
+        error?.code === 'FAULT_INJECTION_PROHIBITED' ? 403 : fallbackStatus);
+}
+
+export function createCommandErrorResponse(error, fallbackStatus = 422) {
+  const statusCode = getCommandErrorStatus(error, fallbackStatus);
+  const code = error?.code || 'EXECUTION_FAIL';
+  const details = error?.field ? { field: error.field, expected: error.expected, actual: error.actual } : (error?.details || {});
+  return createApiErrorResponse(statusCode, code, error?.message || 'Command execution failed.', details);
+}
+
 export function createApiResponse({
   success = true,
   type = 'success',
