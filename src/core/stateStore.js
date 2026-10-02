@@ -14,6 +14,31 @@
 
 import { TRAFFIC_LIMITS } from '../config/trafficConfig.js';
 import { diagnostics } from './diagnostics.js';
+import { eventBus, createEventEnvelope } from './eventBus.js';
+import { smartUpdateDOM, flushPendingDomWrites, clearPendingDomWrites } from './domScheduler.js';
+import {
+  normalizeCanonicalTelemetry,
+  normalizeCanonicalIntersection,
+  normalizeCanonicalDevice,
+  normalizeCanonicalIncident,
+  normalizeCanonicalEmergency,
+  createNormalizedCollection,
+  CompatibilityAdapters
+} from '../config/domainModels.js';
+
+export {
+  normalizeCanonicalTelemetry,
+  normalizeCanonicalIntersection,
+  normalizeCanonicalDevice,
+  normalizeCanonicalIncident,
+  normalizeCanonicalEmergency,
+  createNormalizedCollection,
+  CompatibilityAdapters
+};
+
+// Re-export eventBus and domScheduler utilities for backward compatibility
+export { eventBus, createEventEnvelope };
+export { smartUpdateDOM, flushPendingDomWrites, clearPendingDomWrites };
 
 /**
  * HTML Escaper Utility for Safe DOM Rendering (Phase 9 Security)
@@ -31,7 +56,7 @@ export function escapeHtml(str) {
 /**
  * Deep clone utility yang aman untuk objek JSON murni
  */
-function deepClone(obj) {
+export function deepClone(obj) {
   if (obj === null || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map(deepClone);
   const copy = {};
@@ -44,7 +69,7 @@ function deepClone(obj) {
 /**
  * Deep freeze utility untuk mencegah mutasi state yang tidak disengaja
  */
-function deepFreeze(obj) {
+export function deepFreeze(obj) {
   if (obj === null || typeof obj !== 'object') return obj;
   Object.freeze(obj);
   Object.keys(obj).forEach(key => {
@@ -53,86 +78,6 @@ function deepFreeze(obj) {
     }
   });
   return obj;
-}
-
-/**
- * Smart DOM Update Helper with Diffing & RAF Batching (Phase 8 & 16 Hardened)
- * Writes to DOM only when value has actually changed to prevent layout thrashing and unnecessary repaints.
- * Includes bounded write queue, cleanup helpers, and disconnected node eviction.
- */
-const pendingDomWrites = new Map();
-let domWriteFrameId = null;
-
-export function clearPendingDomWrites() {
-  if (domWriteFrameId) {
-    cancelAnimationFrame(domWriteFrameId);
-    domWriteFrameId = null;
-  }
-  pendingDomWrites.clear();
-}
-
-export function flushPendingDomWrites() {
-  if (domWriteFrameId) {
-    cancelAnimationFrame(domWriteFrameId);
-    domWriteFrameId = null;
-  }
-  if (pendingDomWrites.size === 0) return;
-
-  pendingDomWrites.forEach(({ attr, isHtml, content }, el) => {
-    if (!el || (typeof el.isConnected === 'boolean' && !el.isConnected)) return;
-    if (attr) {
-      el.setAttribute(attr, content);
-    } else if (isHtml) {
-      el.innerHTML = content;
-    } else {
-      el.textContent = content;
-    }
-    diagnostics.recordDomUpdate();
-  });
-  pendingDomWrites.clear();
-}
-
-export function smartUpdateDOM(element, newContent, options = {}) {
-  if (!element) return false;
-  const attr = options.attr || null;
-  const isHtml = options.isHtml || false;
-  const immediate = options.immediate || false;
-
-  const currentVal = attr 
-    ? element.getAttribute(attr) 
-    : (isHtml ? element.innerHTML : element.textContent);
-
-  if (String(currentVal) === String(newContent)) {
-    return false; // No change needed
-  }
-
-  if (immediate) {
-    if (attr) {
-      element.setAttribute(attr, newContent);
-    } else if (isHtml) {
-      element.innerHTML = newContent;
-    } else {
-      element.textContent = newContent;
-    }
-    diagnostics.recordDomUpdate();
-    return true;
-  }
-
-  // Queue write in RAF to batch layout operations
-  // Bound check: if pending queue exceeds 100 entries, flush immediately to prevent unbounded growth
-  if (pendingDomWrites.size > 100) {
-    flushPendingDomWrites();
-  }
-
-  pendingDomWrites.set(element, { attr, isHtml, content: newContent });
-
-  if (!domWriteFrameId) {
-    domWriteFrameId = requestAnimationFrame(() => {
-      domWriteFrameId = null;
-      flushPendingDomWrites();
-    });
-  }
-  return true;
 }
 
 
@@ -306,9 +251,9 @@ export const INITIAL_STATE = {
     },
     {
       deviceId: "NODE-CTRL-01",
-      deviceName: "SITS Controller 01 (Wonokromo)",
+      deviceName: "Controller Demo 01",
       type: "Edge PLC Siemens",
-      location: "SITS Controller Wonokromo",
+      location: "Lokasi demo 01",
       coordinates: [-7.3180, 112.7330],
       status: "ONLINE",
       lastSeenAt: new Date().toISOString(),
@@ -332,21 +277,50 @@ export const INITIAL_STATE = {
       source: "REALTIME-DERIVED",
       history: [8, 8, 9, 7, 8, 8, 9, 8, 7, 8]
     }
-  ]
-};
+  ],
 
-/**
- * Standard Event Envelope Factory
- */
-export function createEventEnvelope(type, payload, source = 'store', version = 1) {
-  return {
-    type,
-    timestamp: new Date().toISOString(),
-    source,
-    version,
-    payload
-  };
-}
+  // Canonical Normalized Domain Collections (Phase 2 Canonical Architecture)
+  provenance: "SIMULATED",
+  canonical: {
+    telemetry: normalizeCanonicalTelemetry({
+      timestamp: "--:--:-- WIB",
+      networkLoad: 72,
+      avgWaitTime: 42,
+      congestionIndex: 62,
+      co2SavedKg: 1420,
+      fuelSavedLiters: 580,
+      vehiclesToday: 128540,
+      sitsUptime: 99.4,
+      cctvOnline: 184,
+      iotOnline: 312,
+      aiScore: 92,
+      aiConfidence: 96,
+      source: "server",
+      provenance: "SIMULATED"
+    }),
+    intersections: createNormalizedCollection([
+      { id: "node-wonokromo", name: "Simpang Wonokromo", state: "green", timer: 35, greenSplit: 35, waitTime: 42, status: "Normal" },
+      { id: "node-jemursari", name: "Simpang Jemursari", state: "red", timer: 25, greenSplit: 28, waitTime: 36, status: "Lancar" },
+      { id: "node-darmo", name: "Simpang Raya Darmo", state: "green", timer: 28, greenSplit: 42, waitTime: 28, status: "Lancar" },
+      { id: "node-tunjungan", name: "Simpang Tunjungan", state: "yellow", timer: 3, greenSplit: 30, waitTime: 48, status: "Padat" },
+      { id: "node-merr", name: "Simpang MERR Kertajaya", state: "green", timer: 45, greenSplit: 45, waitTime: 22, status: "Lancar" }
+    ].map(normalizeCanonicalIntersection)),
+    devices: createNormalizedCollection([
+      { deviceId: "NODE-EDGE-01", deviceName: "Jl. Ahmad Yani (Wonokromo) Node AI", type: "Jetson Orin Nano", location: "Jl. Ahmad Yani (Wonokromo)", coordinates: [-7.2985, 112.7345], status: "ONLINE", latencyMs: 12, fps: 28, resolution: "1080p", temperatureC: 42, cpuPercent: 48, memoryPercent: 45, greenWaveSync: true, healthScore: 100, healthLevel: "HEALTHY" },
+      { deviceId: "NODE-EDGE-02", deviceName: "Jl. Raya Darmo (Taman Bungkul) Node AI", type: "Jetson Orin Nano", location: "Jl. Raya Darmo (Taman Bungkul)", coordinates: [-7.2810, 112.7395], status: "ONLINE", latencyMs: 14, fps: 29, resolution: "1080p", temperatureC: 45, cpuPercent: 52, memoryPercent: 49, greenWaveSync: true, healthScore: 100, healthLevel: "HEALTHY" },
+      { deviceId: "NODE-EDGE-03", deviceName: "Bundaran Waru Node AI", type: "Jetson Xavier NX", location: "Bundaran Waru", coordinates: [-7.3510, 112.7290], status: "ONLINE", latencyMs: 18, fps: 25, resolution: "1080p", temperatureC: 68, cpuPercent: 74, memoryPercent: 62, greenWaveSync: true, healthScore: 92, healthLevel: "HEALTHY" },
+      { deviceId: "NODE-CTRL-01", deviceName: "Controller Demo 01", type: "Perangkat contoh", location: "Lokasi demo 01", coordinates: [-7.3180, 112.7330], status: "SIMULATED", latencyMs: 0, fps: 0, resolution: "N/A", temperatureC: null, cpuPercent: null, memoryPercent: null, greenWaveSync: false, healthScore: null, healthLevel: "SIMULATED" }
+    ].map(normalizeCanonicalDevice)),
+    incidents: createNormalizedCollection([
+      { id: "101", title: "Mogok Truk Treler", location: "Simpang Wonokromo (DTC)", status: "ACTIVE", severity: "danger", category: "accident" },
+      { id: "102", title: "Genangan Air Hujan (15cm)", location: "Koridor Manyar Kertoarjo", status: "ACTIVE", severity: "warning", category: "weather" },
+      { id: "103", title: "Antrean Lampu Merah Pajang", location: "Simpang Jemursari - A. Yani", status: "ACTIVE", severity: "warning", category: "congestion" }
+    ].map(normalizeCanonicalIncident)),
+    emergencies: createNormalizedCollection([
+      { id: "EMG-101", code: "AMB-01", route: "route-soetomo", vehicle: "Ambulans RSU Dr. Soetomo", status: "PRIORITAS AKTIF", timestamp: "" }
+    ].map(normalizeCanonicalEmergency))
+  }
+};
 
 export class StateStore {
   constructor() {
@@ -385,26 +359,54 @@ export class StateStore {
     const partialState = typeof updateArg === 'function' ? updateArg(deepClone(this._state)) : updateArg;
     if (!partialState || typeof partialState !== 'object') return;
 
-    this._version++;
-    const nowIso = new Date().toISOString();
+    // Langkah 16: Granular equality check to prevent repeated identical state updates
+    let hasActualChange = false;
+    const changedKeys = [];
 
-    // Terapkan perubahan ke state internal
     for (const [key, val] of Object.entries(partialState)) {
       if (key === 'telemetry' && typeof val === 'object' && val !== null) {
-        this._state.telemetry = {
-          ...this._state.telemetry,
-          ...deepClone(val)
-        };
+        let telChanged = false;
+        const curTel = this._state.telemetry || {};
+        for (const [tk, tv] of Object.entries(val)) {
+          if (curTel[tk] !== tv) {
+            telChanged = true;
+            break;
+          }
+        }
+        if (telChanged) {
+          this._state.telemetry = {
+            ...this._state.telemetry,
+            ...deepClone(val)
+          };
+          hasActualChange = true;
+          changedKeys.push(key);
+        }
       } else {
-        this._state[key] = deepClone(val);
+        const curVal = this._state[key];
+        // Fast primitive equality check or reference check
+        if (typeof val !== 'object' || val === null) {
+          if (curVal !== val) {
+            this._state[key] = val;
+            hasActualChange = true;
+            changedKeys.push(key);
+          }
+        } else {
+          // Object/array update
+          this._state[key] = deepClone(val);
+          hasActualChange = true;
+          changedKeys.push(key);
+        }
       }
     }
 
+    if (!hasActualChange) return;
+
+    this._version++;
+    const nowIso = new Date().toISOString();
     this._state.stateVersion = this._version;
     this._state.lastUpdated = nowIso;
     diagnostics.recordStateUpdate();
 
-    const changedKeys = Object.keys(partialState);
     const snapshot = this.getState();
 
     // Standard Envelope Event
@@ -494,69 +496,70 @@ export class StateStore {
    * Berlangganan ke event tertentu
    * @param {string} event
    * @param {Function} callback
+  /**
+   * Berlangganan ke event tertentu (Didelegasikan ke EventBus)
+   * @param {string} event
+   * @param {Function} callback
    * @returns {() => void} Fungsi unsubscribe aman
    */
   subscribe(event, callback) {
-    if (typeof callback !== 'function') {
-      return () => {};
-    }
-
-    if (!this._listeners.has(event)) {
-      this._listeners.set(event, new Set());
-    }
-
-    const set = this._listeners.get(event);
-    set.add(callback);
-
-    let isUnsubscribed = false;
-    return () => {
-      if (isUnsubscribed) return;
-      isUnsubscribed = true;
-      set.delete(callback);
-      if (set.size === 0) {
-        this._listeners.delete(event);
-      }
-    };
+    return eventBus.subscribe(event, callback);
   }
 
   /**
-   * Memancarkan event ke semua subscriber
+   * Memancarkan event ke semua subscriber (Didelegasikan ke EventBus)
    * @param {string} event
    * @param {*} [payload]
    */
   publish(event, payload) {
-    const handlers = this._listeners.get(event);
-    if (handlers && handlers.size > 0) {
-      // Buat salinan array agar jika subscriber memanggil unsubscribe di dalam callback tidak mengganggu iterasi
-      const list = Array.from(handlers);
-      list.forEach(fn => {
-        try {
-          fn(payload);
-        } catch (err) {
-          console.error(`[StateStore] Error in listener for event "${event}":`, err);
-        }
-      });
-    }
-
-    // Wildcard subscriber untuk audit / global bridge
-    const wildcardHandlers = this._listeners.get("*");
-    if (wildcardHandlers && wildcardHandlers.size > 0) {
-      const wList = Array.from(wildcardHandlers);
-      wList.forEach(fn => {
-        try {
-          fn(event, payload);
-        } catch (err) {
-          console.error(`[StateStore] Error in wildcard listener for event "${event}":`, err);
-        }
-      });
-    }
+    eventBus.publish(event, payload);
   }
 
   /**
    * Membersihkan seluruh listener (digunakan untuk reset / teardown)
    */
   clearListeners() {
-    this._listeners.clear();
+    eventBus.clearListeners();
+  }
+
+  /**
+   * Mengambil canonical domain slice atau normalized collection
+   * @param {'telemetry'|'intersections'|'devices'|'incidents'|'emergencies'} domainKey
+   */
+  getCanonicalDomain(domainKey) {
+    const canonical = this._state.canonical || {};
+    return canonical[domainKey] || null;
+  }
+
+  /**
+   * O(1) Primary Key Lookups via Normalized Collections
+   */
+  getIntersectionById(id) {
+    if (!id) return null;
+    const strId = String(id);
+    return this._state.canonical?.intersections?.byId?.[strId] ||
+      (this._state.intersections || []).find(n => String(n.id) === strId) || null;
+  }
+
+  getDeviceById(id) {
+    if (!id) return null;
+    const strId = String(id);
+    return this._state.canonical?.devices?.byId?.[strId] ||
+      (this._state.devices || []).find(d => String(d.deviceId) === strId || String(d.id) === strId) || null;
+  }
+
+  getIncidentById(id) {
+    if (!id) return null;
+    const strId = String(id);
+    return this._state.canonical?.incidents?.byId?.[strId] ||
+      (this._state.incidents || []).find(i => String(i.id) === strId) || null;
+  }
+
+  getEmergencyById(id) {
+    if (!id) return null;
+    const strId = String(id);
+    return this._state.canonical?.emergencies?.byId?.[strId] ||
+      (this._state.activeEmergencies || []).find(e => String(e.id) === strId || String(e.vehicleId) === strId) || null;
   }
 }
 
@@ -685,6 +688,33 @@ export function applyServerSnapshot(serverState, source = 'server') {
   if (Object.keys(telemetryUpdate).length > 0) {
     updates.telemetry = telemetryUpdate;
   }
+
+  // Synchronize Canonical Normalized Domain Collections (Phase 2 Canonical Architecture)
+  const incomingIntersections = updates.intersections || currentStore.intersections || [];
+  const incomingDevices = updates.devices || currentStore.devices || [];
+  const incomingIncidents = updates.incidents || currentStore.incidents || [];
+  const incomingEmergencies = updates.activeEmergencies || currentStore.activeEmergencies || [];
+  const incomingTelemetry = updates.telemetry || currentStore.telemetry || {};
+
+  const canonicalIntersections = incomingIntersections.map(normalizeCanonicalIntersection);
+  const canonicalDevices = incomingDevices.map(normalizeCanonicalDevice);
+  const canonicalIncidents = incomingIncidents.map(normalizeCanonicalIncident);
+  const canonicalEmergencies = incomingEmergencies.map(normalizeCanonicalEmergency);
+  const canonicalTelemetry = normalizeCanonicalTelemetry({
+    ...incomingTelemetry,
+    source: 'server',
+    provenance: 'SIMULATED',
+    updatedAt: new Date(timestampMs).toISOString()
+  });
+
+  updates.provenance = 'SIMULATED';
+  updates.canonical = {
+    telemetry: canonicalTelemetry,
+    intersections: createNormalizedCollection(canonicalIntersections),
+    devices: createNormalizedCollection(canonicalDevices),
+    incidents: createNormalizedCollection(canonicalIncidents),
+    emergencies: createNormalizedCollection(canonicalEmergencies)
+  };
 
   stateStore.setState(updates, { source });
   stateStore.publish("state:resynced", createEventEnvelope("state:resynced", updates, source, seq));
@@ -831,6 +861,28 @@ export function updateTrafficState(payload, source = 'server') {
     }
   }
 
+  const curState = stateStore.getState();
+  const curCanonical = deepClone(curState.canonical || {});
+
+  if (updates.telemetry) {
+    curCanonical.telemetry = normalizeCanonicalTelemetry({
+      ...curState.telemetry,
+      ...updates.telemetry,
+      source,
+      provenance: 'SIMULATED',
+      updatedAt: new Date(now).toISOString()
+    });
+  }
+
+  if (updates.intersections && Array.isArray(updates.intersections)) {
+    curCanonical.intersections = createNormalizedCollection(updates.intersections.map(normalizeCanonicalIntersection));
+  }
+
+  if (updates.activeEmergencies && Array.isArray(updates.activeEmergencies)) {
+    curCanonical.emergencies = createNormalizedCollection(updates.activeEmergencies.map(normalizeCanonicalEmergency));
+  }
+
+  updates.canonical = curCanonical;
   stateStore.setState(updates, { source });
 }
 
@@ -854,8 +906,13 @@ export function updateSignalState(nodeId, signalData, source = 'controller') {
   });
 
   if (found) {
+    const curCanonical = deepClone(stateStore.getState().canonical || {});
+    const canonicalList = updated.map(normalizeCanonicalIntersection);
+    curCanonical.intersections = createNormalizedCollection(canonicalList);
+
     stateStore.setState({ 
       intersections: updated,
+      canonical: curCanonical,
       lastReceivedSignalSequence: source === 'server' && incomingSeq > 0 ? incomingSeq : stateStore.getState().lastReceivedSignalSequence
     }, { source });
     stateStore.publish("signal:update", createEventEnvelope("signal:update", { nodeId, signalData, intersections: updated }, source));
@@ -894,6 +951,11 @@ export function updateEmergencyState(emergencyPayload, source = 'controller') {
     updates.activeEmergencies = list;
   }
 
+  const finalEmergencies = updates.activeEmergencies || stateStore.getState().activeEmergencies || [];
+  const curCanonical = deepClone(stateStore.getState().canonical || {});
+  curCanonical.emergencies = createNormalizedCollection(finalEmergencies.map(normalizeCanonicalEmergency));
+  updates.canonical = curCanonical;
+
   stateStore.setState(updates, { source });
   stateStore.publish("emergency:update", createEventEnvelope("emergency:update", emergencyPayload, source));
 }
@@ -920,8 +982,12 @@ export function updateIncidentState(incidentId, updateData, source = 'controller
     updated.unshift({ id: incidentId, ...updateData });
   }
 
+  const curCanonical = deepClone(stateStore.getState().canonical || {});
+  curCanonical.incidents = createNormalizedCollection(updated.map(normalizeCanonicalIncident));
+
   stateStore.setState({ 
     incidents: updated,
+    canonical: curCanonical,
     lastReceivedIncidentSequence: source === 'server' && incomingSeq > 0 ? incomingSeq : stateStore.getState().lastReceivedIncidentSequence
   }, { source });
   stateStore.publish("incident:update", createEventEnvelope("incident:update", { incidentId, updateData, incidents: updated }, source));
@@ -943,8 +1009,12 @@ export function updateDeviceState(deviceId, deviceData, source = 'controller') {
     return dev;
   });
 
+  const curCanonical = deepClone(stateStore.getState().canonical || {});
+  curCanonical.devices = createNormalizedCollection(updated.map(normalizeCanonicalDevice));
+
   stateStore.setState({ 
     devices: updated,
+    canonical: curCanonical,
     lastReceivedDeviceSequence: source === 'server' && incomingSeq > 0 ? incomingSeq : stateStore.getState().lastReceivedDeviceSequence
   }, { source });
   stateStore.publish("device:update", createEventEnvelope("device:update", { deviceId, deviceData, devices: updated }, source));
@@ -955,8 +1025,17 @@ export function updateDeviceState(deviceId, deviceData, source = 'controller') {
  */
 export function updateTelemetryState(telemetryData, source = 'server') {
   const now = Date.now();
+  const curCanonical = deepClone(stateStore.getState().canonical || {});
+  curCanonical.telemetry = normalizeCanonicalTelemetry({
+    ...telemetryData,
+    source,
+    provenance: 'SIMULATED',
+    updatedAt: new Date(now).toISOString()
+  });
+
   stateStore.setState({
     telemetry: telemetryData,
+    canonical: curCanonical,
     lastTelemetryTime: now,
     lastTelemetryAt: now,
     lastTelemetrySource: source,

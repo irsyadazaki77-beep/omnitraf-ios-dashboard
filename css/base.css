@@ -52,6 +52,24 @@ body {
   color: var(--text);
 }
 
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 10000;
+  padding: 10px 14px;
+  color: var(--text, #fff);
+  background: var(--panel-elevated, #172033);
+  border: 2px solid var(--primary, #2563eb);
+  border-radius: var(--radius-md, 8px);
+  transform: translateY(calc(-100% - 16px));
+  transition: transform 120ms ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 /* Tabular Numerals Math Rule: Prevents layout shift on digit transitions */
 .tabular,
 [data-counter],

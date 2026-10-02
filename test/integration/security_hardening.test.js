@@ -44,21 +44,24 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'admin', password: 'admin123' })
     });
-    adminToken = (await adminRes.json()).token;
+    await adminRes.json();
+    adminToken = adminRes.headers.get('set-cookie')?.match(/omnitraf_session=([^;]+)/)?.[1];
 
     const opRes = await fetch(`${baseUrl}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'operator', password: 'operator123' })
     });
-    operatorToken = (await opRes.json()).token;
+    await opRes.json();
+    operatorToken = opRes.headers.get('set-cookie')?.match(/omnitraf_session=([^;]+)/)?.[1];
 
     const viewRes = await fetch(`${baseUrl}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'viewer', password: 'viewer123' })
     });
-    viewerToken = (await viewRes.json()).token;
+    await viewRes.json();
+    viewerToken = viewRes.headers.get('set-cookie')?.match(/omnitraf_session=([^;]+)/)?.[1];
   });
 
   after(() => {
@@ -215,7 +218,7 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${viewerToken}`
+        'Cookie': `omnitraf_session=${viewerToken}`
       },
       body: JSON.stringify({
         deviceId: 'NODE-EDGE-01',
@@ -253,9 +256,9 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
     try {
       const anonymousPing = await fetch(`${baseUrl}/api/devices/ping?deviceId=NODE-EDGE-01`);
       const anonymousAudit = await fetch(`${baseUrl}/api/audit-logs`);
-      const viewerAudit = await fetch(`${baseUrl}/api/audit-logs`, { headers: { Authorization: `Bearer ${viewerToken}` } });
+      const viewerAudit = await fetch(`${baseUrl}/api/audit-logs`, { headers: { Cookie: `omnitraf_session=${viewerToken}` } });
       const anonymousDiagnostics = await fetch(`${baseUrl}/api/diagnostics/health`);
-      const viewerDiagnostics = await fetch(`${baseUrl}/api/diagnostics/snapshot`, { headers: { Authorization: `Bearer ${viewerToken}` } });
+      const viewerDiagnostics = await fetch(`${baseUrl}/api/diagnostics/snapshot`, { headers: { Cookie: `omnitraf_session=${viewerToken}` } });
       const anonymousDeviceAudit = await fetch(`${baseUrl}/api/devices/audit`);
 
       assert.equal(anonymousPing.status, 401);
@@ -286,7 +289,7 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${operatorToken}`
+        'Cookie': `omnitraf_session=${operatorToken}`
       },
       body: JSON.stringify({
         title: 'Macet Uji Keamanan',
@@ -338,7 +341,7 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
 
   // 9. Security Headers Verification Check
   test('9. Security Headers: nosniff, frame protection, referrer policy, and strict CSP present', async () => {
-    const res = await fetch(`${baseUrl}/api/state/snapshot`, { headers: { Authorization: `Bearer ${viewerToken}` } });
+    const res = await fetch(`${baseUrl}/api/state/snapshot`, { headers: { Cookie: `omnitraf_session=${viewerToken}` } });
     assert.strictEqual(res.status, 200);
 
     assert.strictEqual(res.headers.get('x-content-type-options'), 'nosniff');
@@ -386,7 +389,7 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`,
+        'Cookie': `omnitraf_session=${adminToken}`,
         'X-Idempotency-Key': collisionKey
       },
       body: JSON.stringify({
@@ -402,7 +405,7 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`,
+        'Cookie': `omnitraf_session=${adminToken}`,
         'X-Idempotency-Key': collisionKey
       },
       body: JSON.stringify({
@@ -484,7 +487,7 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${operatorToken}`
+        'Cookie': `omnitraf_session=${operatorToken}`
       },
       body: JSON.stringify({
         title: hugeTitle,
@@ -501,7 +504,7 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
   test('15. SSE Stream: Valid headers, chunked streaming, and keep-alive ping', async () => {
     const controller = new AbortController();
     const res = await fetch(`${baseUrl}/api/stream-traffic`, {
-      headers: { Authorization: `Bearer ${viewerToken}` },
+      headers: { Cookie: `omnitraf_session=${viewerToken}` },
       signal: controller.signal
     });
 
@@ -517,5 +520,77 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
     assert.ok(text.includes('traffic_stream'));
 
     controller.abort();
+  });
+
+  // 16. HttpOnly Cookie Authentication & Logout Session Lifecycle
+  test('16. Cookie Auth & Session Logout: Sets HttpOnly cookie, authenticates requests, and clears cookie on logout', async () => {
+    // 16a. Login returns Set-Cookie header
+    const loginRes = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'operator', password: 'operator123' })
+    });
+    assert.strictEqual(loginRes.status, 200);
+    const cookieHeader = loginRes.headers.get('set-cookie');
+    assert.ok(cookieHeader, 'Set-Cookie header must be present on login');
+    assert.ok(cookieHeader.includes('omnitraf_session='), 'Cookie must contain omnitraf_session token');
+    assert.ok(cookieHeader.toLowerCase().includes('httponly'), 'Cookie must be HttpOnly');
+
+    const sessionCookie = cookieHeader.split(';')[0];
+
+    // 16b. Request with cookie succeeds without Bearer header
+    const meRes = await fetch(`${baseUrl}/api/auth/me`, {
+      headers: { 'Cookie': sessionCookie }
+    });
+    assert.strictEqual(meRes.status, 200);
+    const meBody = await meRes.json();
+    assert.strictEqual(meBody.data.user.username, 'operator');
+
+    // 16c. Logout endpoint clears cookie
+    const logoutRes = await fetch(`${baseUrl}/api/auth/logout`, {
+      method: 'POST',
+      headers: { 'Cookie': sessionCookie }
+    });
+    assert.strictEqual(logoutRes.status, 200);
+    const logoutCookie = logoutRes.headers.get('set-cookie');
+    assert.ok(logoutCookie, 'Set-Cookie header must be present on logout');
+    assert.ok(logoutCookie.includes('omnitraf_session=;'), 'Session cookie must be cleared on logout');
+  });
+
+  // 17. Path Traversal & Double-Encoding Protection
+  test('17. Path Traversal Defense: Encoded and double-encoded traversal sequences are rejected with 403', async () => {
+    // Simple traversal attempt
+    const res1 = await fetch(`${baseUrl}/..%2fpackage.json`);
+    assert.ok([400, 403].includes(res1.status), 'Path traversal must be rejected');
+
+    // Double-encoded traversal attempt (%252e%252e%252f)
+    const res2 = await fetch(`${baseUrl}/%252e%252e%252fpackage.json`);
+    assert.ok([400, 403].includes(res2.status), 'Double-encoded traversal must be rejected');
+
+    // Nested internal server file access
+    const res3 = await fetch(`${baseUrl}/server/config/constants.js`);
+    assert.strictEqual(res3.status, 403);
+  });
+
+  // 18. Audit Trail Log Injection Defense
+  test('18. Log Injection Defense: Control characters and newlines are sanitized in audit trails', async () => {
+    const maliciousIncident = {
+      title: 'Valid Title\r\nINJECTED_LOG_ENTRY: ADMIN GRANTED\r\n',
+      location: 'Jl. Pemuda'
+    };
+
+    const res = await fetch(`${baseUrl}/api/incidents`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': `omnitraf_session=${operatorToken}`
+      },
+      body: JSON.stringify(maliciousIncident)
+    });
+
+    assert.strictEqual(res.status, 201);
+    const created = (await res.json()).data;
+    assert.ok(!created.title.includes('\r'), 'Carriage return must be stripped');
+    assert.ok(!created.title.includes('\n'), 'Newline must be stripped');
   });
 });

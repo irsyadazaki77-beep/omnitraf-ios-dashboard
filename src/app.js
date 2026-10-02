@@ -44,12 +44,17 @@ export class App {
     console.info("🚦 [OmniTRAF] Menginisialisasi SITS Command Center Surabaya Kernel...");
 
     // 0. Global Frontend Error Boundary, Accessibility & Health Check
+    diagnostics.startLongTaskObserver();
     this._initGlobalErrorBoundary();
     this._initAccessibleModalHandlers();
     runReleaseHealthCheck();
 
-    // 1. Mount Shell Components & Modals (Marquee, Drawer, Modals)
-    await viewLoader.mountShellComponents();
+    // 1. Mount the first view alongside independent shell template requests.
+    const initialView = stateStore.getState().currentView || (window.location.hash.slice(1) || 'dashboard');
+    await Promise.all([
+      viewLoader.mountView(initialView),
+      viewLoader.mountShellComponents()
+    ]);
 
     // 2. Core Network & Socket Infrastructure
     if (socketClient && typeof socketClient.getSocket === 'function') {
@@ -71,7 +76,6 @@ export class App {
     });
 
     // Initial View Activate
-    const initialView = stateStore.getState().currentView || (window.location.hash.slice(1) || 'dashboard');
     await this._handleViewTransition(initialView, null);
 
     // 5. Expose Global Bridges & Terminal Diagnostics
@@ -96,6 +100,9 @@ export class App {
     // Lazy load & mount HTML partial into DOM
     const { isFirstMount } = await viewLoader.mountView(newView);
 
+    // Dynamic Socket Channel Subscription Management (Langkah 4 & 13)
+    this._manageSocketChannelSubscriptions(newView, oldView);
+
     // Lazy load & activate target view modules
     this._activateViewModules(newView, isFirstMount);
 
@@ -106,6 +113,39 @@ export class App {
         mapManager.debouncedInvalidateSize(120);
       }
     }
+  }
+
+  _manageSocketChannelSubscriptions(newView, oldView) {
+    if (!socketClient || typeof socketClient.subscribeChannels !== 'function') return;
+
+    const cleanNew = (newView || '').replace('#', '').replace('view-', '');
+    const cleanOld = (oldView || '').replace('#', '').replace('view-', '');
+
+    const VIEW_CHANNELS = {
+      'dashboard': ['room:dashboard', 'room:traffic', 'room:signals', 'room:incidents', 'room:emergency', 'room:cctv:all'],
+      'map': ['room:traffic', 'room:incidents', 'room:emergency'],
+      'cctv': ['room:cctv:all', 'room:cctv:dashCameraCanvas', 'room:cctv:cctvCanvas1', 'room:cctv:cctvCanvas2', 'room:cctv:cctvCanvas3', 'room:cctv:cctvCanvas4'],
+      'signals': ['room:signals', 'room:traffic'],
+      'incidents': ['room:incidents'],
+      'emergency': ['room:emergency', 'room:traffic'],
+      'emergencies': ['room:emergency', 'room:traffic'],
+      'analytics': ['room:analytics', 'room:traffic'],
+      'prediction': ['room:analytics'],
+      'devices': ['room:devices'],
+      'reports': ['room:audit']
+    };
+
+    const neededChannels = VIEW_CHANNELS[cleanNew] || ['room:dashboard', 'room:traffic'];
+    const oldChannels = VIEW_CHANNELS[cleanOld] || [];
+
+    // Find channels no longer needed
+    const toUnsubscribe = oldChannels.filter(ch => !neededChannels.includes(ch));
+    if (toUnsubscribe.length > 0) {
+      socketClient.unsubscribeChannels(toUnsubscribe);
+    }
+
+    // Subscribe to newly required channels
+    socketClient.subscribeChannels(neededChannels);
   }
 
   _activateViewModules(view, isFirstMount = false) {
@@ -254,6 +294,11 @@ export class App {
       soundManager.play('click');
     };
 
+    // Delegated listener survives lazy view remounts and works with the strict CSP.
+    document.addEventListener('click', (event) => {
+      if (event.target.closest('#btnDismissAiRec')) window.dismissAiRecommendation();
+    });
+
     window.showToast = (msg, type = "normal") => {
       this._showToastNotification(msg, type);
     };
@@ -286,7 +331,11 @@ export class App {
         gap: 8px;
       `;
       const icon = type === 'warning' || type === 'alert' ? '⚠️' : '✓';
-      item.innerHTML = `<span>${icon}</span><span>${msg}</span>`;
+      const iconEl = document.createElement('span');
+      iconEl.textContent = icon;
+      const messageEl = document.createElement('span');
+      messageEl.textContent = msg == null ? '' : String(msg);
+      item.append(iconEl, messageEl);
       stack.appendChild(item);
 
       setTimeout(() => {
@@ -344,30 +393,126 @@ export class App {
   }
 
   _initAccessibleModalHandlers() {
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        const activeModals = document.querySelectorAll('.modal.active, .modal.show, .modal-backdrop.active, #emergencyModal.show, .dialog.open, .modal-overlay.active');
-        activeModals.forEach(modal => {
-          modal.classList.remove('active', 'show', 'open');
-          if (modal.style && modal.style.display !== 'none' && !modal.classList.contains('modal-backdrop')) {
-            modal.style.display = 'none';
-          }
+    const dialogSelector = '[role="dialog"][aria-modal="true"]';
+    const openerByDialog = new WeakMap();
+    let activeDialog = null;
+
+    const isDialogVisible = (dialog) => {
+      if (dialog.id === 'notifDrawer') return dialog.classList.contains('open');
+      return dialog.classList.contains('show') || dialog.classList.contains('open') ||
+        dialog.classList.contains('active') || (dialog.style.display !== 'none' &&
+          window.getComputedStyle(dialog).display !== 'none');
+    };
+
+    const getFocusableElements = (dialog) => Array.from(dialog.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )).filter((element) => element.getClientRects().length > 0 && !element.hasAttribute('aria-hidden'));
+
+    const closeDialog = (dialog) => {
+      const closeButton = dialog.querySelector('.modal-close, .notif-drawer-close-btn, [data-dialog-close]');
+      if (closeButton) {
+        closeButton.click();
+        return;
+      }
+      dialog.classList.remove('active', 'show', 'open');
+      dialog.style.display = 'none';
+    };
+
+    const syncDialogs = () => {
+      const dialogs = Array.from(document.querySelectorAll(dialogSelector));
+      const visibleDialogs = dialogs.filter(isDialogVisible);
+      const nextActiveDialog = visibleDialogs[visibleDialogs.length - 1] || null;
+
+      dialogs.forEach((dialog) => dialog.setAttribute('aria-hidden', isDialogVisible(dialog) ? 'false' : 'true'));
+
+      if (activeDialog && activeDialog !== nextActiveDialog && !isDialogVisible(activeDialog)) {
+        const opener = openerByDialog.get(activeDialog);
+        if (opener?.isConnected) opener.focus();
+      }
+
+      if (nextActiveDialog && nextActiveDialog !== activeDialog) {
+        openerByDialog.set(nextActiveDialog, document.activeElement);
+        const focusTarget = getFocusableElements(nextActiveDialog)[0];
+        if (focusTarget) focusTarget.focus();
+        else {
+          nextActiveDialog.setAttribute('tabindex', '-1');
+          nextActiveDialog.focus();
+        }
+      }
+      activeDialog = nextActiveDialog;
+    };
+
+    // Templates are mounted after app initialization, and modal state changes are class/style mutations.
+    if (typeof MutationObserver !== 'undefined' && document.body) {
+      const dialogStateObserver = new MutationObserver(syncDialogs);
+      const mountObserver = new MutationObserver(() => {
+        observeDialogs();
+        syncDialogs();
+      });
+      const observedDialogs = new WeakSet();
+      const observeDialogs = () => {
+        document.querySelectorAll(dialogSelector).forEach((dialog) => {
+          if (observedDialogs.has(dialog)) return;
+          observedDialogs.add(dialog);
+          dialogStateObserver.observe(dialog, {
+            attributes: true,
+            attributeFilter: ['class', 'style']
+          });
         });
+      };
+      mountObserver.observe(document.body, { childList: true });
+      ['modalsContainer', 'drawersContainer'].forEach((id) => {
+        const mountPoint = document.getElementById(id);
+        if (mountPoint) mountObserver.observe(mountPoint, { childList: true });
+      });
+      // Discover the initial dialogs before watching only their own open/close state.
+      observeDialogs();
+    }
+    syncDialogs();
+
+    document.addEventListener('keydown', (e) => {
+      if (activeDialog && e.key === 'Tab') {
+        const focusable = getFocusableElements(activeDialog);
+        if (focusable.length === 0) {
+          e.preventDefault();
+          activeDialog.focus();
+          return;
+        }
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && (document.activeElement === first || !activeDialog.contains(document.activeElement))) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && (document.activeElement === last || !activeDialog.contains(document.activeElement))) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+
+      if (e.key === 'Escape' && activeDialog) {
+        e.preventDefault();
+        closeDialog(activeDialog);
+        return;
+      }
+
+      if (e.key === 'Escape') {
         const drawer = document.getElementById('sidebar');
         const backdrop = document.getElementById('drawerBackdrop');
-        if (drawer && drawer.classList.contains('open')) {
+        if (drawer && drawer.classList.contains('open-mobile')) {
           drawer.classList.remove('open');
+          drawer.classList.remove('open-mobile');
+          document.getElementById('menuToggle')?.setAttribute('aria-expanded', 'false');
           if (backdrop) backdrop.classList.remove('show');
+          if (backdrop) backdrop.classList.remove('active');
+          if (backdrop) backdrop.style.display = 'none';
+          document.getElementById('menuToggle')?.focus();
         }
       }
     });
 
-    // Dismiss modal when clicking outside content area on overlay/backdrop
+    // Dismiss dialogs when the user clicks the backdrop outside the dialog content.
     document.addEventListener('click', (e) => {
-      if (e.target && (e.target.classList.contains('modal') || e.target.classList.contains('modal-overlay') || e.target.classList.contains('modal-backdrop'))) {
-        e.target.classList.remove('active', 'show', 'open');
-        if (e.target.style) e.target.style.display = 'none';
-      }
+      if (e.target?.matches?.('.modal-overlay[role="dialog"][aria-modal="true"]') && isDialogVisible(e.target)) closeDialog(e.target);
     });
   }
 }

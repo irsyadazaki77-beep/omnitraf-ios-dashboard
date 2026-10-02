@@ -52,21 +52,23 @@ export function securityHeadersMiddleware(req, res, next) {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
 
-  // Strict CSP tailored to application dependencies (Leaflet, CartoDB tiles, Google Fonts)
+  // Permit only the exact pinned Leaflet scripts/styles used by the page.
+  // Inline event handlers remain forbidden; inline styles are still required by legacy UI templates.
   const cspDirectives = [
     "default-src 'self'",
-    "script-src 'self' https://unpkg.com",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com",
+    "script-src 'self' https://unpkg.com/leaflet@1.9.4/dist/leaflet.js https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js",
+    "script-src-attr 'none'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com/leaflet@1.9.4/dist/leaflet.css https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.cartocdn.com https://*.tile.openstreetmap.org https://unpkg.com",
-    "connect-src 'self' ws: wss: https://*.basemaps.cartocdn.com https://*.cartocdn.com https://*.tile.openstreetmap.org https://unpkg.com",
+    "img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.cartocdn.com https://*.tile.openstreetmap.org https://unpkg.com/leaflet@1.9.4/dist/images/",
+    "connect-src 'self' ws: wss: https://*.basemaps.cartocdn.com https://*.cartocdn.com https://*.tile.openstreetmap.org",
     "frame-ancestors 'self'",
     "base-uri 'self'",
     "form-action 'self'",
+    "manifest-src 'self'",
     "object-src 'none'"
   ];
 
   res.setHeader('Content-Security-Policy', cspDirectives.join('; '));
   next();
 }
-

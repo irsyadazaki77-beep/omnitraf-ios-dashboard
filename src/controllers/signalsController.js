@@ -4,7 +4,7 @@
  * kalkulator metode Webster, dan pengalihan tata letak (Tabel/Grid) persimpangan terpantau.
  */
 
-import { stateStore } from '../core/stateStore.js';
+import { stateStore, escapeHtml } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
 import { socketClient } from '../core/socketClient.js';
 import { TRAFFIC_LIMITS } from '../config/trafficConfig.js';
@@ -12,6 +12,7 @@ import { mapManager } from '../modules/mapManager.js';
 import { SITS_INTERSECTIONS } from '../config/surabayaCoords.js';
 import { commandLayer } from '../core/commandLayer.js';
 import { Disposer } from '../core/disposer.js';
+import { signalsView } from '../ui/adapters/signalsView.js';
 
 export class SignalsController {
   constructor() {
@@ -19,6 +20,7 @@ export class SignalsController {
     this._isInitialized = false;
     this._currentTargetNode = 'node-wonokromo';
     this.disposer = new Disposer('SignalsController');
+    this.view = signalsView;
   }
 
   init() {
@@ -41,19 +43,11 @@ export class SignalsController {
     this._bindDashboardDensityFilterChips();
     this._setupStoreSubscriptions();
 
-    // Initial sync
+    // Initial sync via View Adapter
     const state = stateStore.getState();
     const greenSplit = state.greenSplitWonokromo;
 
-    const greenValEl = document.getElementById("greenValue");
-    if (greenValEl) greenValEl.textContent = `${greenSplit} dtk`;
-
-    const dashboardSlider = document.getElementById("greenRange") || document.getElementById("greenSplitSlider");
-    if (dashboardSlider) dashboardSlider.value = greenSplit;
-
-    const tooltip = document.getElementById("sliderTooltip");
-    if (tooltip) tooltip.textContent = `${greenSplit}s`;
-
+    this.view.updateGreenSplit(greenSplit);
     this._updateDashboardTimeline(greenSplit);
     this._updateActiveOverrideBadges();
   }
@@ -64,17 +58,7 @@ export class SignalsController {
 
   _setupStoreSubscriptions() {
     this.disposer.addStoreSubscription(stateStore, 'state:greenSplitWonokromo', ({ value }) => {
-      const greenValEl = document.getElementById("greenValue");
-      if (greenValEl) greenValEl.textContent = `${value} dtk`;
-
-      const dashboardSlider = document.getElementById("greenRange") || document.getElementById("greenSplitSlider");
-      if (dashboardSlider && parseInt(dashboardSlider.value, 10) !== value) {
-        dashboardSlider.value = value;
-      }
-
-      const tooltip = document.getElementById("sliderTooltip");
-      if (tooltip) tooltip.textContent = `${value}s`;
-
+      this.view.updateGreenSplit(value);
       this._updateDashboardTimeline(value);
     });
 
@@ -288,7 +272,7 @@ export class SignalsController {
 
           closeModal();
           if (typeof window.showToast === "function") {
-            window.showToast(`🛠️ Manual Override Aktif: Sinyal dikunci HIJAU selama ${dur} detik!`, "warning");
+            window.showToast(`Aksi simulasi: fase sinyal contoh diubah selama ${dur} detik; tidak mengendalikan APILL.`, "warning");
           }
         } catch (err) {
           console.warn("[SignalsController] Override failed:", err);
@@ -359,11 +343,11 @@ export class SignalsController {
       warningBox.style.background = "var(--success-soft)";
       if (icon) icon.textContent = "✅";
       if (title) {
-        title.textContent = "DURASI AMAN STANDAR DISHUB";
+        title.textContent = "RENTANG PARAMETER DEMO";
         title.style.color = "var(--success)";
       }
       if (text) {
-        text.textContent = `Durasi ${val} detik berada pada rentang aman baku Dishub SITS Surabaya (20s - 60s) tanpa mengorbankan keselamatan penyeberang jalan.`;
+        text.textContent = `Durasi ${val} detik berada pada rentang input simulasi. Nilai ini bukan standar keselamatan atau rekomendasi Dishub.`;
       }
     }
   }
@@ -414,7 +398,7 @@ export class SignalsController {
           closeModal();
           soundManager.play('success');
           if (typeof window.showToast === "function") {
-            window.showToast("✨ Rekomendasi Webster AI Disetujui: Green Split disesuaikan ke 48s pada siklus berikutnya!");
+            window.showToast("Rekomendasi model contoh diterapkan pada state simulasi; tidak dikirim ke APILL.");
           }
         } catch (err) {
           console.warn("[SignalsController] AI recommendation failed:", err);
@@ -516,17 +500,21 @@ export class SignalsController {
         const status = cells[1].textContent.trim();
         const density = cells[2].textContent.trim();
         const waitTime = cells[3].textContent.trim();
-        const densityClass = r.dataset.density || "moderate";
+        const densityClass = ['low', 'moderate', 'high'].includes(r.dataset.density) ? r.dataset.density : 'moderate';
+        const safeName = escapeHtml(name);
+        const safeStatus = escapeHtml(status);
+        const safeDensity = escapeHtml(density);
+        const safeWaitTime = escapeHtml(waitTime);
 
         return `
-          <div class="intersection-card-item glass-soft" data-name="${name}" style="padding: 14px; border-radius: 12px; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s ease;">
+          <div class="intersection-card-item glass-soft" data-name="${safeName}" style="padding: 14px; border-radius: 12px; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s ease;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-              <strong style="font-size: 13px; color: var(--text);">${name}</strong>
-              <span class="tag tag-${densityClass}">${density}</span>
+              <strong style="font-size: 13px; color: var(--text);">${safeName}</strong>
+              <span class="tag tag-${densityClass}">${safeDensity}</span>
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: var(--text-muted);">
-              <span>Status: <strong style="color: var(--success);">${status}</strong></span>
-              <span>Waktu Tunggu: <strong style="color: var(--text);">${waitTime}</strong></span>
+              <span>Status: <strong style="color: var(--success);">${safeStatus}</strong></span>
+              <span>Waktu Tunggu: <strong style="color: var(--text);">${safeWaitTime}</strong></span>
             </div>
             <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
               <button class="btn btn-ghost compact fly-btn" style="font-size: 10.5px; padding: 3px 8px;">🛰️ Fokus di Peta</button>
@@ -600,15 +588,22 @@ export class SignalsController {
         return;
       }
 
-      suggestionsDiv.innerHTML = filtered.map((item, idx) => `
-        <div class="suggestion-item" data-id="${item.id}" data-name="${item.name}" data-index="${idx}" style="padding: 8px 12px; cursor: pointer; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; transition: background 0.15s ease;">
+      suggestionsDiv.innerHTML = filtered.map((item, idx) => {
+        const safeName = escapeHtml(item.name);
+        const safeCorridor = escapeHtml(item.corridor || '');
+        const safeDistrict = escapeHtml(item.district || '');
+        const safeId = escapeHtml(item.id);
+        const statusClass = ['success', 'warning', 'danger'].includes(item.status) ? item.status : 'success';
+        return `
+        <div class="suggestion-item" data-id="${safeId}" data-name="${safeName}" data-index="${idx}" style="padding: 8px 12px; cursor: pointer; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; transition: background 0.15s ease;">
           <div>
-            <strong style="color: var(--text);">${item.name}</strong>
-            <div style="font-size: 10px; color: var(--text-muted);">${item.corridor || ''} • ${item.district || ''}</div>
+            <strong style="color: var(--text);">${safeName}</strong>
+            <div style="font-size: 10px; color: var(--text-muted);">${safeCorridor} • ${safeDistrict}</div>
           </div>
-          <span class="tag tag-${item.status || 'success'}" style="font-size: 9px; padding: 1px 6px;">${item.status === 'danger' ? 'Macet' : item.status === 'warning' ? 'Padat' : 'Lancar'}</span>
+          <span class="tag tag-${statusClass}" style="font-size: 9px; padding: 1px 6px;">${statusClass === 'danger' ? 'Macet' : statusClass === 'warning' ? 'Padat' : 'Lancar'}</span>
         </div>
-      `).join("");
+      `;
+      }).join("");
 
       suggestionsDiv.classList.remove("is-hidden");
       activeIndex = -1;

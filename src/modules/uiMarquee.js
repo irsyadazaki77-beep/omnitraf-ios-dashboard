@@ -12,10 +12,10 @@ export class UiMarquee {
     this.contentEl = null;
     this._isInitialized = false;
     this.defaultMessages = [
-      "🚨 PEMBERITAHUAN: Rekayasa lalu lintas Simpang Wonokromo sedang berlangsung.",
-      "⚡ SISTEM OVERRIDE: Prioritas Darurat otomatis aktif untuk rute RSU Dr. Soetomo.",
-      "📹 CAMERA ONLINE: Integrasi 184 CCTV SITS Kota Surabaya siap inferensi AI.",
-      "🌿 ESG IMPACT: Efisiensi waktu lampu merah mereduksi 1.420 kg emisi CO2 hari ini."
+      "MODE PROTOTIPE: Rekayasa lalu lintas Simpang Wonokromo sedang disimulasikan.",
+      "MODE PROTOTIPE: Prioritas darurat pada rute RSU Dr. Soetomo adalah skenario simulasi.",
+      "KAMERA SIMULASI: Visual dan deteksi kendaraan dibuat oleh OmniTRAF, bukan feed CCTV SITS.",
+      "ESTIMASI MODEL: Angka emisi dan bahan bakar adalah keluaran simulasi, bukan pengukuran kota."
     ];
 
     this._setupStoreListeners();
@@ -25,9 +25,9 @@ export class UiMarquee {
     stateStore.subscribe('state:isChaosMode', ({ value }) => {
       if (value) {
         this.setAnnouncements([
-          "🔥 SIAGA 1 (MODE KEOS): Terdeteksi lonjakan gridlock massal di seluruh arteri Kota Surabaya!",
-          "⚠️ PROTOKOL DARURAT: Pembagian siklus sinyal dipaksa adaptif ke beban kritis.",
-          "🚨 DISHUB & SATLANTAS: Unit patroli darurat diterjunkan ke koridor utama."
+          "SIMULASI KEOS: Skenario lonjakan kemacetan aktif pada model jaringan jalan.",
+          "SIMULASI DARURAT: Siklus sinyal model menyesuaikan beban skenario.",
+          "DEMO: Tidak ada unit Dishub atau Satlantas yang benar-benar diterjunkan."
         ], "danger");
       } else {
         this.resetToDefault();
@@ -37,8 +37,8 @@ export class UiMarquee {
     stateStore.subscribe('traffic:green-wave', ({ active }) => {
       if (active) {
         this.setAnnouncements([
-          "🚨 EMERGENCY GREEN WAVE AKTIF: Seluruh lampu koridor Jl. A. Yani → Raya Darmo dikunci HIJAU PERMANEN!",
-          "🚑 RUTE DARURAT RSU DR. SOETOMO: Kendaraan umum diimbau memberikan prioritas jalur."
+          "SIMULASI GREEN WAVE: Model koridor Jl. A. Yani → Raya Darmo dikunci hijau.",
+          "SIMULASI RUTE DARURAT: Prioritas ambulans hanya berlaku di model OmniTRAF."
         ], "emergency");
       } else if (!stateStore.getState().isChaosMode) {
         this.resetToDefault();
@@ -50,8 +50,8 @@ export class UiMarquee {
         if (data.congestionIndex > 75) {
           this.setAnnouncements([
             `⚠️ PERINGATAN KEMACETAN: Indeks kepadatan Kota Surabaya mencapai ${Math.round(data.congestionIndex)}%.`,
-            "⚡ ATCS ADAPTIF: Durasi lampu hijau Simpang Wonokromo & Jemursari dioptimalkan otomatis.",
-            "📹 184 CCTV SITS Surabaya beroperasi normal."
+            "OPTIMASI MODEL: Durasi hijau simpang berubah berdasarkan telemetri simulasi.",
+            "MODE PROTOTIPE: Status kamera tidak merepresentasikan perangkat SITS."
           ], "warning");
         }
       }
@@ -78,9 +78,13 @@ export class UiMarquee {
     if (!this.contentEl) this.init();
     if (!this.contentEl) return;
 
-    this.contentEl.innerHTML = messages
-      .map(msg => `<span>${msg}</span>`)
-      .join("");
+    const fragment = document.createDocumentFragment();
+    (Array.isArray(messages) ? messages : []).forEach(message => {
+      const item = document.createElement('span');
+      item.textContent = message == null ? '' : String(message);
+      fragment.appendChild(item);
+    });
+    this.contentEl.replaceChildren(fragment);
 
     if (this.marqueeContainer) {
       this.marqueeContainer.dataset.priority = priority;

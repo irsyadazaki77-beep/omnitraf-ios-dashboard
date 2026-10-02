@@ -2,24 +2,24 @@
         <!-- Section Header / Operations Workspace Summary -->
         <header class="signals-workspace-header">
           <div class="signals-header-title-group">
-            <span class="signals-header-kicker">SITS ADAPTIVE URBAN MOBILITY · APILL CONTROLLER</span>
-            <h1 class="signals-header-title">Traffic Signals & Intersection Control</h1>
-            <p class="signals-header-desc">Manajemen fase adaptif, alokasi green split, dan manual override simpang prioritas Surabaya.</p>
+            <span class="signals-header-kicker">OMNITRAF · KONTROL SINYAL SIMULASI</span>
+            <h1 class="signals-header-title">Model Sinyal Lalu Lintas</h1>
+            <p class="signals-header-desc">Eksplorasi siklus dan Green Split. Perubahan hanya terjadi di prototipe dan tidak mengendalikan APILL.</p>
           </div>
           <div class="signals-header-summary-strip" aria-label="Ringkasan Status Sinyal">
             <div class="signals-summary-item">
-              <span class="signals-summary-label">Persimpangan Terkoneksi</span>
+              <span class="signals-summary-label">Simpang contoh</span>
               <div class="signals-summary-val-row">
                 <span class="signals-status-dot dot-live"></span>
-                <strong class="tabular font-mono">126 / 126</strong>
-                <span class="signals-summary-sub">Online</span>
+                <strong class="tabular font-mono">5</strong>
+                <span class="signals-summary-sub">Model simulasi</span>
               </div>
             </div>
             <div class="signals-summary-item">
               <span class="signals-summary-label">Mode Kontrol</span>
               <div class="signals-summary-val-row">
-                <strong class="text-primary-2">Auto Adaptif</strong>
-                <span class="signals-summary-sub">Webster C₀</span>
+                <strong class="text-primary-2">Model adaptif</strong>
+                <span class="signals-summary-sub">Webster C₀ · simulasi</span>
               </div>
             </div>
             <div class="signals-summary-item hide-mobile">
@@ -30,10 +30,10 @@
               </div>
             </div>
             <div class="signals-summary-item hide-mobile">
-              <span class="signals-summary-label">Telemetri SITS</span>
+              <span class="signals-summary-label">Stream demo</span>
               <div class="signals-summary-val-row">
-                <strong class="tabular font-mono text-cyan">18ms</strong>
-                <span class="signals-summary-sub">Realtime Sync</span>
+                <strong class="tabular font-mono text-cyan">SIM</strong>
+                <span class="signals-summary-sub">Latensi tidak diukur</span>
               </div>
             </div>
           </div>
@@ -48,7 +48,7 @@
                 <h2>Simpang Wonokromo</h2>
                 <p class="signals-card-meta">DEV-CTRL-01 · Koridor A. Yani – Diponegoro · Rata-rata tunggu: 42s</p>
               </div>
-              <span class="pill pill-ai signals-badge-adaptive"><span class="signals-status-dot dot-live"></span> Auto Adaptif</span>
+              <span class="pill pill-ai signals-badge-adaptive"><span class="signals-status-dot dot-live"></span> MODEL SIMULASI</span>
             </div>
 
             <div class="signal-active-panel">
@@ -100,7 +100,7 @@
                 <h2>Simpang Tunjungan (Siola)</h2>
                 <p class="signals-card-meta">DEV-CTRL-02 · Koridor Tunjungan – Praban · Rata-rata tunggu: 38s</p>
               </div>
-              <span class="pill pill-ai signals-badge-adaptive"><span class="signals-status-dot dot-live"></span> Auto Adaptif</span>
+              <span class="pill pill-ai signals-badge-adaptive"><span class="signals-status-dot dot-live"></span> MODEL SIMULASI</span>
             </div>
 
             <div class="signal-active-panel">
@@ -151,7 +151,7 @@
           <div class="section-head">
             <div>
               <h2>Monitored Intersections</h2>
-              <p>Status simpang prioritas Surabaya dan telemetri waktu tunggu real-time.</p>
+              <p>State contoh simpang dan waktu tunggu dari simulator.</p>
             </div>
             <div class="header-actions-flex">
               <button class="btn btn-ghost compact" id="btnToggleIntersectionsLayout" type="button">Grid/Tabel</button>
@@ -173,35 +173,35 @@
               <tbody id="intersectionTable">
                 <tr data-density="high">
                   <td>Simpang Wonokromo (A. Yani)</td>
-                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Online</td>
+                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Simulasi</td>
                   <td><span class="tag tag-high">High</span></td>
                   <td>54 dtk</td>
                   <td><span class="spark spark-danger"></span></td>
                 </tr>
                 <tr data-density="moderate">
                   <td>Simpang Darmo (Polisi Istimewa)</td>
-                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Online</td>
+                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Simulasi</td>
                   <td><span class="tag tag-moderate">Moderate</span></td>
                   <td>38 dtk</td>
                   <td><span class="spark spark-warning"></span></td>
                 </tr>
                 <tr data-density="low">
                   <td>Simpang Kertajaya (Dharmawangsa)</td>
-                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Online</td>
+                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Simulasi</td>
                   <td><span class="tag tag-low">Low</span></td>
                   <td>22 dtk</td>
                   <td><span class="spark spark-success"></span></td>
                 </tr>
                 <tr data-density="moderate">
                   <td>Simpang Tunjungan (Gedung Siola)</td>
-                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Online</td>
+                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Simulasi</td>
                   <td><span class="tag tag-moderate">Moderate</span></td>
                   <td>31 dtk</td>
                   <td><span class="spark spark-warning"></span></td>
                 </tr>
                 <tr data-density="high">
                   <td>Simpang Jemursari (A. Yani)</td>
-                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Online</td>
+                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Simulasi</td>
                   <td><span class="tag tag-high">High</span></td>
                   <td>59 dtk</td>
                   <td><span class="spark spark-danger"></span></td>

@@ -9,6 +9,10 @@ import { socketClient } from './socketClient.js';
 import { soundManager } from './soundManager.js';
 import { authManager } from './authManager.js';
 import { diagnostics, DIAGNOSTIC_LEVELS, EVENT_CATEGORIES } from './diagnostics.js';
+import { confirmationService } from './confirmationService.js';
+import { commandAudit } from './commandAudit.js';
+
+export { confirmationService, commandAudit };
 
 function generateSecureId(prefix = 'CMD') {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -28,51 +32,33 @@ class CommandLayer {
     // Idempotency keys & pending commands maps
     this.executedCommands = new Map(); // idempotencyKey -> result
     this.pendingCommands = new Map(); // commandId -> cmd
-    
-    // In-memory Audit Trail Ring Buffer (Bounded)
-    this.auditHistory = [];
-    this.maxAuditLimit = 150;
 
-    // AI recommendation trace mapping
-    this.recommendationTrace = new Map(); // recommendationId -> commandId -> resulting state
-
-    this._setupUIElements();
     this._subscribeToEvents();
   }
 
-  _setupUIElements() {
-    // Memastikan elemen modal confirmation guard programmatic ada di DOM
-    if (typeof document !== 'undefined') {
-      const existing = document.getElementById("operatorConfirmModal");
-      if (!existing) {
-        const modalHtml = `
-          <div class="modal-overlay" id="operatorConfirmModal" style="display:none; z-index:99999; justify-content:center; align-items:center; background:rgba(15,23,42,0.85); backdrop-filter:blur(4px); transition:opacity 0.2s;">
-            <div class="modal-content glass-panel" style="max-width:480px; width:94vw; border:1px solid rgba(239,68,68,0.4); padding:24px; border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.5);">
-              <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
-                <span style="font-size:32px; color:#ef4444;">⚠️</span>
-                <div>
-                  <h3 style="margin:0; font-size:18px; font-weight:800; color:#fff;" id="confirmModalTitle">KONFIRMASI PERINTAH BERISIKO TINGGI</h3>
-                  <p style="margin:2px 0 0 0; font-size:11px; color:#ef4444; text-transform:uppercase; font-weight:700; letter-spacing:0.5px;" id="confirmModalLevel">CRITICAL ACTION REQUIRED</p>
-                </div>
-              </div>
-              
-              <div style="font-size:12.5px; line-height:1.5; color:#cbd5e1; background:rgba(0,0,0,0.2); padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.05); margin-bottom:18px;">
-                <div style="margin-bottom:6px;"><strong style="color:#94a3b8;">Target / Lokasi:</strong> <span id="confirmModalTarget" style="color:#fff; font-family:'Share Tech Mono'; font-weight:700;">-</span></div>
-                <div style="margin-bottom:6px;"><strong style="color:#94a3b8;">Alasan / Deskripsi:</strong> <span id="confirmModalReason">-</span></div>
-                <div style="margin-bottom:6px;"><strong style="color:#94a3b8;">Estimasi Durasi:</strong> <span id="confirmModalDuration" style="color:#38bdf8;">-</span></div>
-                <div><strong style="color:#94a3b8;">Persimpangan Terdampak:</strong> <span id="confirmModalImpacted" style="color:#f59e0b;">-</span></div>
-              </div>
+  // Delegated getters and methods for backward compatibility
+  get auditHistory() {
+    return commandAudit.auditHistory;
+  }
 
-              <div style="display:flex; justify-content:flex-end; gap:10px;">
-                <button class="btn btn-ghost" id="btnConfirmCancel" style="padding:8px 16px; font-size:12px;">Batalkan</button>
-                <button class="btn btn-primary" id="btnConfirmProceed" style="background:#ef4444; border-color:#ef4444; color:#fff; padding:8px 20px; font-weight:700; font-size:12px;">Setujui & Kirim</button>
-              </div>
-            </div>
-          </div>
-        `;
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-      }
-    }
+  set auditHistory(val) {
+    commandAudit.auditHistory = val;
+  }
+
+  get maxAuditLimit() {
+    return commandAudit.maxAuditLimit;
+  }
+
+  set maxAuditLimit(val) {
+    commandAudit.maxAuditLimit = val;
+  }
+
+  get recommendationTrace() {
+    return commandAudit.recommendationTrace;
+  }
+
+  _setupUIElements() {
+    confirmationService.ensureModalDOM();
   }
 
   _subscribeToEvents() {
@@ -549,86 +535,7 @@ class CommandLayer {
   }
 
   _showConfirmationGuard(intent) {
-    return new Promise((resolve) => {
-      const modal = document.getElementById("operatorConfirmModal");
-      const title = document.getElementById("confirmModalTitle");
-      const target = document.getElementById("confirmModalTarget");
-      const reason = document.getElementById("confirmModalReason");
-      const duration = document.getElementById("confirmModalDuration");
-      const impacted = document.getElementById("confirmModalImpacted");
-      const btnCancel = document.getElementById("btnConfirmCancel");
-      const btnProceed = document.getElementById("btnConfirmProceed");
-
-      if (!modal) {
-        resolve(true);
-        return;
-      }
-
-      // Customize content based on action severity
-      if (intent.action === 'emergency:activate') {
-        title.textContent = "KONFIRMASI DISPATCH KENDARAAN DARURAT (112)";
-        target.textContent = `${intent.payload.code || 'AMBULANCE-02'} (Rute: ${intent.payload.route ? intent.payload.route.replace('route-', '').toUpperCase() : 'SOETOMO'})`;
-        reason.textContent = "Pengaktifan lampu hijau penuh (Preemption Hijau Koridor) berisiko menghentikan arus komuter di persimpangan silang secara tiba-tiba.";
-        duration.textContent = "300 detik (Maksimal / Otomatis nonaktif)";
-        impacted.textContent = "Wonokromo, Raya Darmo, Marmoyo, DTC Wonokromo";
-      } else if (intent.action === 'signal:override') {
-        title.textContent = "KONFIRMASI MANUAL SIGNAL OVERRIDE";
-        target.textContent = intent.targetId;
-        reason.textContent = "Mengunci persimpangan pada fase Hijau selama 45 detik dapat meningkatkan antrean volume kendaraan di arah silang.";
-        duration.textContent = "45 detik berkelanjutan";
-        impacted.textContent = `${intent.targetId} dan koridor terdekat`;
-      } else if (intent.action === 'green-wave:toggle') {
-        title.textContent = "KONFIRMASI GREEN WAVE TIMING LOCK";
-        target.textContent = "Koridor Utama A. Yani - Darmo";
-        reason.textContent = "Melakukan sinkronisasi gelombang hijau penuh untuk mengurai bottleneck. Membatasi kontrol dinamis adaptif AI.";
-        duration.textContent = intent.payload.active ? "Aktif terus-menerus sampai dinonaktifkan" : "Kembali ke mode adaptif SITS";
-        impacted.textContent = "Wonokromo, Jemursari, Darmo, Tunjungan";
-      } else {
-        title.textContent = "KONFIRMASI TINDAKAN OPERATOR CRITICAL";
-        target.textContent = intent.targetId || "Sistem Core SITS";
-        reason.textContent = "Menyesuaikan parameter operasional ATCS Surabaya yang berdampak luas.";
-        duration.textContent = "Seketika (Real-Time)";
-        impacted.textContent = "Seluruh Node AI SITS";
-      }
-
-      modal.style.display = "flex";
-      modal.style.opacity = "1";
-
-      const handleCancel = () => {
-        modal.style.display = "none";
-        btnCancel.removeEventListener("click", handleCancel);
-        btnProceed.removeEventListener("click", handleProceed);
-        modal.removeEventListener("click", handleBackdropClick);
-        window.removeEventListener("keydown", handleEscape);
-        resolve(false);
-      };
-
-      const handleProceed = () => {
-        modal.style.display = "none";
-        btnCancel.removeEventListener("click", handleCancel);
-        btnProceed.removeEventListener("click", handleProceed);
-        modal.removeEventListener("click", handleBackdropClick);
-        window.removeEventListener("keydown", handleEscape);
-        resolve(true);
-      };
-
-      const handleBackdropClick = (e) => {
-        if (e.target === modal) {
-          handleCancel();
-        }
-      };
-
-      const handleEscape = (e) => {
-        if (e.key === "Escape") {
-          handleCancel();
-        }
-      };
-
-      btnCancel.addEventListener("click", handleCancel);
-      btnProceed.addEventListener("click", handleProceed);
-      modal.addEventListener("click", handleBackdropClick);
-      window.addEventListener("keydown", handleEscape);
-    });
+    return confirmationService.confirm(intent);
   }
 
   _captureStateSnapshot(type, id) {
@@ -698,87 +605,11 @@ class CommandLayer {
    * Menambahkan log event baru ke dalam Centralized Audit Trail & Sinkronisasi Terminal
    */
   addAuditEvent(event, broadcast = true) {
-    const timestamp = event.timestamp || new Date().toISOString();
-    const cleanLog = {
-      id: `AUD-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      timestamp,
-      type: event.type || "state:changed",
-      entity: event.entity || "System Core",
-      source: event.source || this.actor,
-      reasonCode: event.reasonCode || "AUDIT_RECORD",
-      result: event.result || "SUCCESS",
-      details: event.details || "",
-      correlationId: event.correlationId || ""
-    };
-
-    // Pencegahan duplikasi event yang identik berurutan (deduplication)
-    const last = this.auditHistory[0];
-    if (last && last.type === cleanLog.type && last.details === cleanLog.details && (Date.now() - Date.parse(last.timestamp)) < 1500) {
-      return; // Deduplicated!
-    }
-
-    this.auditHistory.unshift(cleanLog);
-    if (this.auditHistory.length > this.maxAuditLimit) {
-      this.auditHistory.pop();
-    }
-
-    // Perbarui terminal UI logs secara dinamis
-    this._updateTerminalLogUI(cleanLog);
-
-    if (broadcast) {
-      stateStore.publish("audit:log:new", cleanLog);
-    }
-  }
-
-  _updateTerminalLogUI(log) {
-    const terminal = document.getElementById("terminalLogs");
-    if (!terminal) return;
-
-    const time = new Date(log.timestamp).toLocaleTimeString('id-ID');
-    const levelClass = log.result === "FAILED" || log.result === "REJECTED" ? "log-err" : 
-                       log.type.includes("emergency") || log.type.includes("high-latency") ? "log-crit" : 
-                       log.type.includes("command") ? "log-cmd" : "log-info";
-
-    const label = log.type.replace(':', ' ').toUpperCase();
-    
-    let colorStyle = "color:#94a3b8;"; // default info
-    if (log.result === "FAILED") colorStyle = "color:#f43f5e; font-weight:700;"; // red
-    else if (log.result === "REJECTED") colorStyle = "color:#fbbf24; font-weight:700;"; // orange/yellow
-    else if (log.type.includes("command:acknowledged") || log.details.includes("pulih") || log.details.includes("Selesai")) colorStyle = "color:#10b981; font-weight:700;"; // green success
-    else if (log.type.includes("command:requested") || log.type.includes("validated")) colorStyle = "color:#38bdf8;"; // sky blue
-    else if (log.type.includes("emergency")) colorStyle = "color:#f43f5e;"; // emergency red
-
-    const lineHtml = `
-      <div class="terminal-line" style="margin-bottom:4px; font-family:'Share Tech Mono', monospace; font-size:11.5px; border-bottom:1px solid rgba(255,255,255,0.02); padding-bottom:3px; ${colorStyle}">
-        [${time}] [${label}] • ${log.details}
-      </div>
-    `;
-
-    // Append to container, keeping limit
-    if (terminal && typeof terminal.insertAdjacentHTML === 'function') {
-      terminal.insertAdjacentHTML('beforeend', lineHtml);
-      terminal.scrollTop = terminal.scrollHeight;
-    }
-
-    // Bounded terminal lines in DOM
-    const lines = terminal.querySelectorAll(".terminal-line");
-    if (lines.length > 80) {
-      lines[0].remove();
-    }
+    commandAudit.addAuditEvent(event, broadcast, this.actor);
   }
 
   getAuditTrail(filter = {}) {
-    let list = [...this.auditHistory];
-    if (filter.type) {
-      list = list.filter(l => l.type === filter.type);
-    }
-    if (filter.entity) {
-      list = list.filter(l => l.entity === filter.entity);
-    }
-    if (filter.severity) {
-      list = list.filter(l => l.result === filter.severity);
-    }
-    return list;
+    return commandAudit.getAuditTrail(filter);
   }
 }
 

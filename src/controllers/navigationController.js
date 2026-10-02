@@ -34,13 +34,7 @@ export class NavigationController {
     const sidebar = document.querySelector(".sidebar, .app-sidebar");
     const drawerBackdrop = document.getElementById("drawerBackdrop");
 
-    const closeMobileSidebar = () => {
-      if (sidebar) sidebar.classList.remove("open-mobile");
-      if (drawerBackdrop) {
-        drawerBackdrop.classList.remove("active");
-        drawerBackdrop.style.display = "none";
-      }
-    };
+    const closeMobileSidebar = () => this._setSidebarOpen(false, { returnFocus: true });
 
     const switchView = (targetViewId) => {
       let cleanId = (targetViewId || "dashboard").replace('#', '').replace('view-', '');
@@ -114,7 +108,7 @@ export class NavigationController {
   _initMobileNav() {
     const btnMenu = document.getElementById("mobTabMenu");
     const menuToggle = document.getElementById("menuToggle");
-    const sidebar = document.querySelector(".sidebar, .app-sidebar");
+    const closeDrawer = document.getElementById("closeDrawer");
     let drawerBackdrop = document.getElementById("drawerBackdrop");
 
     // Pastikan drawer backdrop tersedia di DOM
@@ -126,28 +120,20 @@ export class NavigationController {
     }
 
     const toggleSidebar = () => {
+      const sidebar = document.querySelector(".sidebar, .app-sidebar");
       if (!sidebar) return;
-      const isOpen = sidebar.classList.toggle("open-mobile");
-      if (drawerBackdrop) {
-        if (isOpen) {
-          drawerBackdrop.classList.add("active");
-          drawerBackdrop.style.display = "block";
-        } else {
-          drawerBackdrop.classList.remove("active");
-          drawerBackdrop.style.display = "none";
-        }
-      }
+      this._setSidebarOpen(!sidebar.classList.contains("open-mobile"), { returnFocus: false });
       soundManager.play('click');
     };
 
     if (btnMenu) btnMenu.addEventListener("click", toggleSidebar);
     if (menuToggle) menuToggle.addEventListener("click", toggleSidebar);
 
+    if (closeDrawer) closeDrawer.addEventListener("click", () => this._setSidebarOpen(false, { returnFocus: true }));
+
     if (drawerBackdrop) {
       drawerBackdrop.addEventListener("click", () => {
-        if (sidebar) sidebar.classList.remove("open-mobile");
-        drawerBackdrop.classList.remove("active");
-        drawerBackdrop.style.display = "none";
+        this._setSidebarOpen(false, { returnFocus: true });
         soundManager.play('click');
       });
     }
@@ -156,14 +142,28 @@ export class NavigationController {
     document.querySelectorAll(".mobile-tab-item").forEach(item => {
       if (item.id !== "mobTabMenu") {
         item.addEventListener("click", () => {
-          if (sidebar) sidebar.classList.remove("open-mobile");
-          if (drawerBackdrop) {
-            drawerBackdrop.classList.remove("active");
-            drawerBackdrop.style.display = "none";
-          }
+          this._setSidebarOpen(false, { returnFocus: true });
         });
       }
     });
+  }
+
+  _setSidebarOpen(isOpen, { returnFocus = false } = {}) {
+    const sidebar = document.querySelector(".sidebar, .app-sidebar");
+    const backdrop = document.getElementById("drawerBackdrop");
+    const menuToggle = document.getElementById("menuToggle");
+    if (!sidebar) return;
+
+    const wasOpen = sidebar.classList.contains("open-mobile");
+    sidebar.classList.toggle("open-mobile", isOpen);
+    if (backdrop) {
+      backdrop.classList.toggle("active", isOpen);
+      backdrop.style.display = isOpen ? "block" : "none";
+    }
+    menuToggle?.setAttribute("aria-expanded", String(isOpen));
+
+    if (isOpen) document.getElementById("closeDrawer")?.focus();
+    else if (returnFocus && wasOpen) menuToggle?.focus();
   }
 
   /**
@@ -262,6 +262,8 @@ export class NavigationController {
     const toggleNotifDrawer = () => {
       if (!notifDrawer) return;
       const isOpen = notifDrawer.classList.toggle("open");
+      notifDrawer.setAttribute("aria-hidden", String(!isOpen));
+      if (!isOpen) document.getElementById("notifToggle")?.focus();
       if (notifBackdrop) {
         notifBackdrop.style.display = isOpen ? "block" : "none";
         notifBackdrop.classList.toggle("active", isOpen);
@@ -271,6 +273,8 @@ export class NavigationController {
 
     const closeNotif = () => {
       if (notifDrawer) notifDrawer.classList.remove("open");
+      if (notifDrawer) notifDrawer.setAttribute("aria-hidden", "true");
+      document.getElementById("notifToggle")?.focus();
       if (notifBackdrop) {
         notifBackdrop.style.display = "none";
         notifBackdrop.classList.remove("active");

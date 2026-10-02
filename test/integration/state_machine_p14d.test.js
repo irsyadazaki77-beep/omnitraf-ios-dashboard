@@ -48,21 +48,24 @@ describe('PHASE 14D — Formal Incident & Emergency State Machine + Cross-Module
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'admin', password: 'admin123' })
     });
-    adminToken = (await adminRes.json()).token;
+    await adminRes.json();
+    adminToken = adminRes.headers.get('set-cookie')?.match(/omnitraf_session=([^;]+)/)?.[1];
 
     const opRes = await fetch(`${baseUrl}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'operator', password: 'operator123' })
     });
-    operatorToken = (await opRes.json()).token;
+    await opRes.json();
+    operatorToken = opRes.headers.get('set-cookie')?.match(/omnitraf_session=([^;]+)/)?.[1];
 
     const viewRes = await fetch(`${baseUrl}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'viewer', password: 'viewer123' })
     });
-    viewerToken = (await viewRes.json()).token;
+    await viewRes.json();
+    viewerToken = viewRes.headers.get('set-cookie')?.match(/omnitraf_session=([^;]+)/)?.[1];
   });
 
   after(() => {
@@ -363,7 +366,7 @@ describe('PHASE 14D — Formal Incident & Emergency State Machine + Cross-Module
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${operatorToken}`
+        'Cookie': `omnitraf_session=${operatorToken}`
       },
       body: JSON.stringify({ status: 'MITIGATED' })
     });
@@ -384,7 +387,7 @@ describe('PHASE 14D — Formal Incident & Emergency State Machine + Cross-Module
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${operatorToken}`,
+        'Cookie': `omnitraf_session=${operatorToken}`,
         'X-Idempotency-Key': idempKey
       },
       body: JSON.stringify({ code: vCode, route: 'route-soetomo' })
@@ -398,7 +401,7 @@ describe('PHASE 14D — Formal Incident & Emergency State Machine + Cross-Module
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${operatorToken}`,
+        'Cookie': `omnitraf_session=${operatorToken}`,
         'X-Idempotency-Key': idempKey
       },
       body: JSON.stringify({ code: vCode, route: 'route-soetomo' })
@@ -411,7 +414,7 @@ describe('PHASE 14D — Formal Incident & Emergency State Machine + Cross-Module
     // Clean up
     await fetch(`${baseUrl}/api/emergencies/${vCode}`, {
       method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${operatorToken}` }
+      headers: { 'Cookie': `omnitraf_session=${operatorToken}` }
     });
   });
 

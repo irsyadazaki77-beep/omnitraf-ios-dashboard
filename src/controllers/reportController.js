@@ -128,7 +128,7 @@ export class ReportController {
           setTimeout(() => URL.revokeObjectURL(url), 5000);
 
           if (typeof window.showToast === "function") {
-            window.showToast("✓ Dokumen resmi PDF SITS Surabaya berhasil diunduh.");
+            window.showToast("✓ Laporan demo simulasi berhasil diunduh.");
           }
           soundManager.play('success');
         } catch (err) {
@@ -350,7 +350,7 @@ export class ReportController {
         ctx.fillStyle = "rgba(0, 229, 255, 0.85)";
         ctx.font = "bold 10px sans-serif";
         ctx.textAlign = "right";
-        ctx.fillText("SITS SURABAYA SNAPSHOT GRAPH", width - 20, 22);
+        ctx.fillText("OMNITRAF SIMULATION SNAPSHOT", width - 20, 22);
 
         resolve();
       } catch (e) {
@@ -403,7 +403,7 @@ export class ReportController {
     if (waitEl) waitEl.textContent = `${data.waitTime} detik`;
     if (co2El) co2El.textContent = `${data.co2Saved} kg`;
     if (incidentsEl) incidentsEl.textContent = `${data.incidents} insiden`;
-    if (docIdEl) docIdEl.textContent = `DOC-ID: ${data.docId} • TERVERIFIKASI SISTEM`;
+    if (docIdEl) docIdEl.textContent = `ID DEMO: ${data.docId} • DATA SIMULASI, TIDAK TERVERIFIKASI UNTUK OPERASI`;
   }
 
   _showErrorState(message) {
@@ -447,10 +447,12 @@ export class ReportController {
     const item = document.createElement("div");
     item.className = "export-history-item glass-soft";
     item.style.cssText = "padding: 8px 12px; border-radius: 8px; margin-bottom: 6px; display: flex; justify-content: space-between; font-size: 11.5px;";
-    item.innerHTML = `
-      <span>📄 Laporan ${type} (PDF)</span>
-      <span style="color: var(--text-muted);">${time} WIB</span>
-    `;
+    const label = document.createElement('span');
+    label.textContent = `📄 Laporan ${String(type ?? '')} (PDF)`;
+    const timestamp = document.createElement('span');
+    timestamp.style.color = 'var(--text-muted)';
+    timestamp.textContent = `${time} WIB`;
+    item.append(label, timestamp);
     list.insertBefore(item, list.firstChild);
   }
 

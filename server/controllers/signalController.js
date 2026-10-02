@@ -1,5 +1,6 @@
 import { backendState } from '../services/stateManager.js';
 import { createApiResponse } from '../middlewares/errorHandler.js';
+import { SAFETY_BOUNDARY } from '../config/safetyBoundary.js';
 
 export function getStateSnapshot(req, res) {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -22,6 +23,7 @@ export function getStateSnapshot(req, res) {
     type: 'state_snapshot',
     sequence: backendState.sequence,
     data: snapshot.state || backendState.state,
+    canonical: snapshot.canonical || null,
     extra: {
       status: 'success',
       seq: backendState.sequence,
@@ -32,6 +34,9 @@ export function getStateSnapshot(req, res) {
       deviceSeq: backendState.deviceSequence,
       timestamp: backendState.lastUpdated,
       source: 'server',
+      provenance: 'SIMULATED',
+      safetyBoundary: SAFETY_BOUNDARY,
+      canonical: snapshot.canonical || null,
       state: snapshot.state || backendState.state
     }
   }));
@@ -54,7 +59,8 @@ export function streamTrafficSse(req, res) {
     timestamp: backendState.state.timestamp,
     data: backendState.state,
     ...backendState.state,
-    source: 'sse-stream'
+    source: 'sse-stream',
+    ...SAFETY_BOUNDARY
   });
 
   const cleanup = () => {

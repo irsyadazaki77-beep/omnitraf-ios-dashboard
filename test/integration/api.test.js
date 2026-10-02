@@ -12,9 +12,9 @@ const { server } = await import('../../server.js');
 
 describe('REST API Integration Tests', () => {
   let baseUrl;
-  let viewerToken;
-  let operatorToken;
-  let adminToken;
+  let viewerCookie;
+  let operatorCookie;
+  const sessionCookie = (response) => response.headers.get('set-cookie')?.split(';', 1)[0];
 
   before(async () => {
     // Wait for the server to be listening
@@ -35,9 +35,9 @@ describe('REST API Integration Tests', () => {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password: `${username}123` })
       });
-      return (await response.json()).token;
+      return sessionCookie(response);
     };
-    [viewerToken, operatorToken, adminToken] = await Promise.all(['viewer', 'operator', 'admin'].map(login));
+    [viewerCookie, operatorCookie] = await Promise.all(['viewer', 'operator'].map(login));
   });
 
   after(() => {
@@ -51,7 +51,7 @@ describe('REST API Integration Tests', () => {
   });
 
   test('GET /api/state/snapshot should return correct JSON schema and status code 200', async () => {
-    const res = await fetch(`${baseUrl}/api/state/snapshot`, { headers: { Authorization: `Bearer ${viewerToken}` } });
+    const res = await fetch(`${baseUrl}/api/state/snapshot`, { headers: { Cookie: viewerCookie } });
     assert.strictEqual(res.status, 200);
 
     const contentType = res.headers.get('content-type');
@@ -111,7 +111,7 @@ describe('REST API Integration Tests', () => {
     assert.strictEqual(healthzData.status, 'OK');
     assert.equal(healthzData.pid, undefined);
 
-    const resReady = await fetch(`${baseUrl}/ready`, { headers: { Authorization: `Bearer ${adminToken}` } });
+    const resReady = await fetch(`${baseUrl}/ready`, { headers: { Cookie: operatorCookie } });
     assert.strictEqual(resReady.status, 200);
     const readyData = await resReady.json();
     assert.strictEqual(readyData.success, true);
@@ -140,9 +140,10 @@ describe('REST API Integration Tests', () => {
     assert.strictEqual(resOp.status, 200);
     const opData = await resOp.json();
     assert.strictEqual(opData.success, true);
-    assert.ok(opData.token);
+    assert.equal(opData.token, undefined);
     assert.strictEqual(opData.user.role, 'OPERATOR');
-    const operatorToken = opData.token;
+    const operatorSession = sessionCookie(resOp);
+    assert.match(resOp.headers.get('set-cookie') || '', /HttpOnly/i);
 
     // 3. Login Admin
     const resAdmin = await fetch(`${baseUrl}/api/auth/login`, {
@@ -153,7 +154,7 @@ describe('REST API Integration Tests', () => {
     assert.strictEqual(resAdmin.status, 200);
     const adminData = await resAdmin.json();
     assert.strictEqual(adminData.success, true);
-    const adminToken = adminData.token;
+    const adminSession = sessionCookie(resAdmin);
 
     // 4. GET /api/auth/me without token -> 401
     const resNoAuth = await fetch(`${baseUrl}/api/auth/me`);
@@ -162,9 +163,9 @@ describe('REST API Integration Tests', () => {
     assert.strictEqual(noAuthData.success, false);
     assert.strictEqual(noAuthData.error.code, 'UNAUTHORIZED');
 
-    // 5. GET /api/auth/me with Bearer token -> 200
+    // 5. GET /api/auth/me with the HttpOnly session cookie -> 200
     const resWithAuth = await fetch(`${baseUrl}/api/auth/me`, {
-      headers: { 'Authorization': `Bearer ${operatorToken}` }
+      headers: { Cookie: operatorSession }
     });
     assert.strictEqual(resWithAuth.status, 200);
     const meData = await resWithAuth.json();
@@ -176,7 +177,7 @@ describe('REST API Integration Tests', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${operatorToken}`
+        Cookie: operatorSession
       },
       body: JSON.stringify({ deviceId: 'NODE-EDGE-01', fps: 30 })
     });
@@ -190,7 +191,7 @@ describe('REST API Integration Tests', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`
+        Cookie: adminSession
       },
       body: JSON.stringify({ deviceId: 'NODE-EDGE-01', fps: 999 })
     });
@@ -204,7 +205,7 @@ describe('REST API Integration Tests', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`
+        Cookie: adminSession
       },
       body: JSON.stringify({ deviceId: 'NODE-EDGE-01', fps: 30, resolution: '1080p' })
     });
@@ -215,7 +216,7 @@ describe('REST API Integration Tests', () => {
   });
 
   test('PDF report download endpoint should produce valid application/pdf', async () => {
-    const res = await fetch(`${baseUrl}/api/reports/download`, { headers: { Authorization: `Bearer ${operatorToken}` } });
+    const res = await fetch(`${baseUrl}/api/reports/download`, { headers: { Cookie: operatorCookie } });
     assert.strictEqual(res.status, 200);
     const contentType = res.headers.get('content-type');
     assert.ok(contentType && contentType.includes('application/pdf'));
@@ -228,7 +229,7 @@ describe('REST API Integration Tests', () => {
 
   test('Forecast API should validate hour parameter and return structured metadata', async () => {
     // 1. Invalid hour string -> canonical 422 contract error
-    const headers = { Authorization: `Bearer ${viewerToken}` };
+    const headers = { Cookie: viewerCookie };
     const resInvalid = await fetch(`${baseUrl}/api/prediction/v1/forecast?hour=invalid_input`, { headers });
     assert.strictEqual(resInvalid.status, 422);
     const invalidData = await resInvalid.json();
@@ -252,14 +253,14 @@ describe('REST API Integration Tests', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'operator', password: 'operator123' })
     });
-    const opToken = (await resOp.json()).token;
+    const opCookie = sessionCookie(resOp);
 
     // 1. Missing canonical fields -> 422 INVALID_COMMAND
     const resBad = await fetch(`${baseUrl}/api/incidents`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${opToken}`
+        Cookie: opCookie
       },
       body: JSON.stringify({})
     });
@@ -271,7 +272,7 @@ describe('REST API Integration Tests', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${opToken}`
+        Cookie: opCookie
       },
       body: JSON.stringify({
         title: 'Macet Jemursari',
@@ -287,7 +288,7 @@ describe('REST API Integration Tests', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${opToken}`
+        Cookie: opCookie
       },
       body: JSON.stringify({
         id: testIncId,
@@ -308,7 +309,7 @@ describe('REST API Integration Tests', () => {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${opToken}`
+        Cookie: opCookie
       },
       body: JSON.stringify({
         status: 'DISPATCHED',
@@ -326,7 +327,7 @@ describe('REST API Integration Tests', () => {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${opToken}`
+        Cookie: opCookie
       }
     });
     assert.strictEqual(resResolve.status, 200);
@@ -339,7 +340,7 @@ describe('REST API Integration Tests', () => {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${opToken}`
+        Cookie: opCookie
       },
       body: JSON.stringify({
         status: 'ACTIVE'
@@ -356,14 +357,14 @@ describe('REST API Integration Tests', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'operator', password: 'operator123' })
     });
-    const opToken = (await resOp.json()).token;
+    const opCookie = sessionCookie(resOp);
 
     // 1. Invalid emergency route -> 422
     const resInvalidRoute = await fetch(`${baseUrl}/api/emergencies`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${opToken}`
+        Cookie: opCookie
       },
       body: JSON.stringify({
         code: 'AMB-TEST-01',
@@ -377,7 +378,7 @@ describe('REST API Integration Tests', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${opToken}`
+        Cookie: opCookie
       },
       body: JSON.stringify({
         code: 'AMB-TEST-99',
@@ -393,7 +394,7 @@ describe('REST API Integration Tests', () => {
     const resCancel = await fetch(`${baseUrl}/api/emergencies/AMB-TEST-99`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Bearer ${opToken}`
+        Cookie: opCookie
       }
     });
     assert.strictEqual(resCancel.status, 200);
@@ -404,7 +405,7 @@ describe('REST API Integration Tests', () => {
 
   test('Device Ping, Fault Injection and Audit Trail contract', async () => {
     // 1. Ping device -> 200 with latencyMs and actionId
-    const resPing = await fetch(`${baseUrl}/api/devices/ping?deviceId=NODE-EDGE-01`, { headers: { Authorization: `Bearer ${operatorToken}` } });
+    const resPing = await fetch(`${baseUrl}/api/devices/ping?deviceId=NODE-EDGE-01`, { headers: { Cookie: operatorCookie } });
     assert.strictEqual(resPing.status, 200);
     const pingData = await resPing.json();
     assert.strictEqual(pingData.success, true);
@@ -412,7 +413,7 @@ describe('REST API Integration Tests', () => {
     assert.ok(typeof pingData.data.latencyMs === 'number');
 
     // 2. Fetch device audit trail -> 200 with list
-    const resAudit = await fetch(`${baseUrl}/api/devices/audit?deviceId=NODE-EDGE-01`, { headers: { Authorization: `Bearer ${operatorToken}` } });
+    const resAudit = await fetch(`${baseUrl}/api/devices/audit?deviceId=NODE-EDGE-01`, { headers: { Cookie: operatorCookie } });
     assert.strictEqual(resAudit.status, 200);
     const auditData = await resAudit.json();
     assert.strictEqual(auditData.success, true);
@@ -424,14 +425,14 @@ describe('REST API Integration Tests', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'admin', password: 'admin123' })
     });
-    const adminToken = (await resAdmin.json()).token;
+    const adminSession = sessionCookie(resAdmin);
 
     // Invalid fault type -> 422
     const resBadFault = await fetch(`${baseUrl}/api/devices/fault`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`
+        Cookie: adminSession
       },
       body: JSON.stringify({
         deviceId: 'NODE-EDGE-01',
@@ -445,7 +446,7 @@ describe('REST API Integration Tests', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`
+        Cookie: adminSession
       },
       body: JSON.stringify({
         deviceId: 'NODE-EDGE-01',
@@ -462,7 +463,7 @@ describe('REST API Integration Tests', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`
+        Cookie: adminSession
       },
       body: JSON.stringify({
         deviceId: 'NODE-EDGE-01',
@@ -487,14 +488,14 @@ describe('REST API Integration Tests', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'admin', password: 'admin123' })
     });
-    const adminToken = (await resAdmin.json()).token;
+    const adminSession = sessionCookie(resAdmin);
 
     // 3. Rejected command -> 422
     const resReject = await fetch(`${baseUrl}/api/terminal/execute`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`
+        Cookie: adminSession
       },
       body: JSON.stringify({ command: 'rm -rf /' })
     });
@@ -508,7 +509,7 @@ describe('REST API Integration Tests', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`
+        Cookie: adminSession
       },
       body: JSON.stringify({ command: '/status' })
     });
@@ -519,7 +520,7 @@ describe('REST API Integration Tests', () => {
   });
 
   test('State snapshot & resync alias consistency', async () => {
-    const authHeaders = { Authorization: `Bearer ${viewerToken}` };
+    const authHeaders = { Cookie: viewerCookie };
     const resSnapshot = await fetch(`${baseUrl}/api/state/snapshot`, { headers: authHeaders });
     assert.strictEqual(resSnapshot.status, 200);
     const snapData = await resSnapshot.json();

@@ -1,6 +1,6 @@
 /**
  * OmniTRAF Surabaya - Authentication & Session Manager (Client-Side)
- * Mengelola penyimpanan JWT token, profil user yang sedang aktif,
+ * Mengelola sesi cookie HttpOnly dan profil user yang sedang aktif,
  * otentikasi REST API / Socket.io, dan evaluasi izin berbasis Role (RBAC).
  */
 
@@ -25,8 +25,7 @@ class AuthManager {
             this.token = null;
             this.user = null;
             this._notifyListeners();
-          } else if (event.key === AUTH_STORAGE_KEY) {
-            this.token = event.newValue;
+          } else if (event.key === USER_STORAGE_KEY) {
             const userStr = localStorage.getItem(USER_STORAGE_KEY);
             if (userStr) {
               try { this.user = JSON.parse(userStr); } catch (_) {}
@@ -41,49 +40,13 @@ class AuthManager {
   _loadSession() {
     try {
       if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-        const storedToken = localStorage.getItem(AUTH_STORAGE_KEY);
         const storedUser = localStorage.getItem(USER_STORAGE_KEY);
-
-        if (storedToken && storedUser) {
-          if (this.isTokenExpired(storedToken)) {
-            console.warn('[AuthManager] Sesi tersimpan telah kedaluwarsa. Membersihkan...');
-            this.logout();
-          } else {
-            this.token = storedToken;
-            this.user = JSON.parse(storedUser);
-          }
-        }
+        // Remove JWTs persisted by older releases; auth now stays in an HttpOnly cookie.
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        if (storedUser) this.user = JSON.parse(storedUser);
       }
     } catch (e) {
       console.warn('[AuthManager] Gagal memuat session dari storage:', e);
-    }
-  }
-
-  /**
-   * Mengecek apakah JWT token telah kedaluwarsa
-   * @param {string} token
-   * @returns {boolean}
-   */
-  isTokenExpired(token) {
-    if (!token) return true;
-    try {
-      const parts = token.split('.');
-      if (parts.length !== 3) return true;
-      const base64Url = parts[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-      }).join(''));
-
-      const payload = JSON.parse(jsonPayload);
-      if (payload && typeof payload.exp === 'number') {
-        const nowSec = Math.floor(Date.now() / 1000);
-        // Berikan toleransi waktu 10 detik
-        return payload.exp < (nowSec + 10);
-      }
-      return false;
-    } catch (e) {
-      return true;
     }
   }
 
@@ -92,23 +55,6 @@ class AuthManager {
    * @returns {string|null}
    */
   getToken() {
-    if (this.token) {
-      if (this.isTokenExpired(this.token)) {
-        this.logout();
-        return null;
-      }
-      return this.token;
-    }
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      const storedToken = localStorage.getItem(AUTH_STORAGE_KEY);
-      if (storedToken) {
-        if (this.isTokenExpired(storedToken)) {
-          this.logout();
-          return null;
-        }
-        return storedToken;
-      }
-    }
     return null;
   }
 
@@ -142,6 +88,7 @@ class AuthManager {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ username, password })
       });
 
@@ -151,11 +98,11 @@ class AuthManager {
         throw new Error(errorMsg);
       }
 
-      this.token = data.data?.token || data.token;
+      this.token = null;
       this.user = data.data?.user || data.user;
 
       if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-        localStorage.setItem(AUTH_STORAGE_KEY, this.token);
+        localStorage.removeItem(AUTH_STORAGE_KEY);
         localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(this.user));
       }
 
@@ -168,9 +115,19 @@ class AuthManager {
   }
 
   /**
-   * Logout dan bersihkan session
+   * Logout dan bersihkan session di client dan server
    */
-  logout() {
+  async logout() {
+    try {
+      if (typeof fetch === 'function') {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin'
+        }).catch(() => {});
+      }
+    } catch (_) {}
+
     this.token = null;
     this.user = null;
 
@@ -204,15 +161,43 @@ class AuthManager {
   }
 
   /**
-   * Inisialisasi default dev session jika belum ada token
+   * Inisialisasi session jika belum ada token.
+   * Auto-login hanya aktif di mode development bila secara eksplisit diizinkan.
+   * Fail closed di environment production.
    */
   async ensureActiveSession() {
-    if (this.getToken()) return this.getToken();
+    try {
+      const response = await fetch('/api/auth/me', { credentials: 'same-origin' });
+      const result = await response.json();
+      if (response.ok && result.success && (result.data?.user || result.user)) {
+        this.user = result.data?.user || result.user;
+        if (typeof localStorage !== 'undefined') localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(this.user));
+        this._notifyListeners();
+        return true;
+      }
+    } catch (_) {
+      // Network unavailable; cached profile remains display-only until the server responds.
+    }
+
+    this.token = null;
+    this.user = null;
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      localStorage.removeItem(USER_STORAGE_KEY);
+    }
+    this._notifyListeners();
+
+    // Production check: Jangan pernah auto-login di production
+    const isDevAutoLoginEnabled = typeof window !== 'undefined' &&
+      (window.__ENV__?.DEV_AUTO_LOGIN === true || window.localStorage?.getItem('omnitraf_dev_auto_login') === 'true');
+
+    if (!isDevAutoLoginEnabled) {
+      return null;
+    }
 
     try {
-      // Default auto-login sebagai OPERATOR untuk pengalaman dev terintegrasi langsung
-      const result = await this.login('operator', 'operator123');
-      return result.token;
+      await this.login('operator', 'operator123');
+      return true;
     } catch (e) {
       console.warn('[AuthManager] Auto-login fallback notice:', e.message);
       return null;

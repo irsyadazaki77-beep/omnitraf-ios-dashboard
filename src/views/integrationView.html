@@ -3,19 +3,19 @@
           <div class="integration-status-grid">
             <article class="widget glass-panel">
               <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
-                <h3>ATCS SITS Surabaya Connector</h3>
+                <h3>Simulator Protokol Kamera</h3>
                 <span class="provenance-badge simulated">SIMULATED / MOCK</span>
               </div>
               <p>Status: <strong class="text-warning">LOCAL EMULATION</strong></p>
-              <small>Emulasi protokol RTSP SITS Dishub Surabaya untuk pipeline visual & sensor edge.</small>
+              <small>Panel ini mendemonstrasikan alur kamera sintetis. Belum terhubung ke RTSP atau perangkat Dishub.</small>
             </article>
             <article class="widget glass-panel">
               <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
-                <h3>Surabaya Smart City Hub</h3>
-                <span class="provenance-badge derived">CONFIGURED / REST</span>
+                <h3>Mock REST Gateway</h3>
+                <span class="provenance-badge simulated">SIMULASI</span>
               </div>
               <p>Status: <strong class="text-primary-2">SANDBOX GATEWAY</strong></p>
-              <small>Lingkungan uji webhook telemetri kepadatan Kota Surabaya.</small>
+              <small>Endpoint demo lokal; tidak terhubung ke Smart City Hub atau layanan Pemerintah Kota Surabaya.</small>
             </article>
           </div>
 
@@ -23,17 +23,17 @@
           <article class="terminal-logs-card glass-panel">
             <div class="section-head compact">
               <div>
-                <h2>Live Webhook & API Gateway Event Stream</h2>
-                <p>Aliran payload JSON telemetri SITS yang diintegrasikan ke API Smart City Kota Surabaya secara real-time.</p>
+                <h2>Simulasi Webhook & Event Stream</h2>
+                <p>Contoh payload dan log lokal untuk demonstrasi; tidak ada webhook atau integrasi eksternal yang aktif.</p>
               </div>
-              <span class="badge-terminal">Terminal Stream Active</span>
+              <span class="badge-terminal">LOG DEMO</span>
             </div>
             <div class="terminal-body-wrapper">
               <div class="terminal-scanline"></div>
               <div class="terminal-body" id="terminalLogs">
-                <div class="terminal-line">[12:51:30] Webhook push to Surabaya City Hub: status 200 OK</div>
-                <div class="terminal-line">[12:51:24] Computer vision inference completed on NODE-EDGE-01 (Wonokromo)</div>
-                <div class="terminal-line">[12:51:18] Amber phase request sent to NODE-CTRL-01... success</div>
+                <div class="terminal-line">[DEMO] Tidak ada webhook eksternal yang dikirim.</div>
+                <div class="terminal-line">[DEMO] Deteksi kendaraan berasal dari generator visual sintetis.</div>
+                <div class="terminal-line">[DEMO] Perubahan fase hanya memperbarui state simulator.</div>
               </div>
               <!-- Retro terminal input bar -->
               <div class="terminal-input-bar terminal-input-bar-wrap">
@@ -48,7 +48,7 @@
             <div class="section-head compact">
               <div>
                 <h2>REST API Gateway Sandbox</h2>
-                <p>Simulasikan dan uji permintaan API SITS Dinas Perhubungan Kota Surabaya.</p>
+                <p>Jalankan contoh permintaan terhadap endpoint sandbox lokal, bukan API SITS Dishub.</p>
               </div>
               <span class="badge-terminal">REST Explorer</span>
             </div>
@@ -75,18 +75,18 @@
                     <textarea id="apiPayloadEditor" class="api-textarea" spellcheck="false">{}</textarea>
                   </div>
                 </div>
-                <button class="btn btn-primary btn-api-send" id="btnSendApiRequest">Kirim Payload API</button>
+                <button class="btn btn-primary btn-api-send" id="btnSendApiRequest">Kirim ke API Demo</button>
               </div>
               
               <div class="api-response-panel api-response-panel-wrap">
                 <div class="notif-card-header">
                   <label class="form-label-muted">Response Payload (JSON)</label>
-                  <span id="apiStatusBadge" class="api-status-badge">STATUS: 200 OK</span>
+                  <span id="apiStatusBadge" class="api-status-badge">CONTOH RESPONS</span>
                 </div>
                 <div class="api-response-body api-response-box">
                   <pre id="apiResponseContent" class="api-pre-content">{
-  "status": "ready",
-  "message": "Pusat Kendali SITS Surabaya operasional"
+  "status": "demo",
+  "message": "Contoh respons lokal dari prototipe OmniTRAF; bukan status sistem SITS"
 }</pre>
                 </div>
               </div>

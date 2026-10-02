@@ -1,9 +1,9 @@
 # OmniTRAF Surabaya — Intelligent Transport System Command Center
-### Competition-Grade Productization & Showcase Edition
+### Prototipe Simulasi & Showcase
 
-[![WCAG 2.1 AA](https://img.shields.io/badge/Accessibility-WCAG%202.1%20AA%20Compliant-success?style=for-the-badge&logo=w3c)](https://www.w3.org/WAI/WCAG21/quickref/)
-[![PWA Ready](https://img.shields.io/badge/PWA-Offline%20Resilient%20%26%20Installable-blue?style=for-the-badge&logo=pwa)](https://web.dev/progressive-web-apps/)
-[![Real-Time](https://img.shields.io/badge/Socket.io-Bi--Directional%20Telemetri-orange?style=for-the-badge&logo=socketdotio)](https://socket.io/)
+[![Accessibility](https://img.shields.io/badge/Accessibility-Review%20in%20progress-blue?style=for-the-badge&logo=w3c)](https://www.w3.org/WAI/standards-guidelines/wcag/)
+[![PWA](https://img.shields.io/badge/PWA-App%20shell%20offline-blue?style=for-the-badge&logo=pwa)](https://web.dev/progressive-web-apps/)
+[![Simulation](https://img.shields.io/badge/Data-Simulated-yellow?style=for-the-badge)](#status-data--provenance-model)
 [![GIS Engine](https://img.shields.io/badge/Leaflet.js-Euclidean%20Vector%20GIS-brightgreen?style=for-the-badge&logo=leaflet)](https://leafletjs.com/)
 [![ESG Impact](https://img.shields.io/badge/ESG-IPCC%20Carbon%20Emission%20Model%20(Simulated)-emerald?style=for-the-badge&logo=leaf)](https://www.ipcc.ch/)
 
@@ -11,9 +11,9 @@
 
 ## 🏙️ Ringkasan Proyek (Executive Summary)
 
-**OmniTRAF Surabaya Command Center** adalah platform pemantauan dan pengendalian lalu lintas cerdas perkotaan terintegrasi yang mensimulasikan sistem **Surabaya Intelligent Transport System (SITS)** Dinas Perhubungan Kota Surabaya dengan pipeline **Edge Vision Simulation**, **Optimasi Sinyal Adaptif (Dynamic Green Split)**, **Sistem Preemption Koridor Darurat 112**, serta **Kalkulator Transparan Reduksi Emisi Karbon (ESG Model)**.
+**OmniTRAF** adalah prototipe demonstrasi command center mobilitas perkotaan yang menggunakan lokasi dan skenario Surabaya sebagai konteks simulasi. Data lalu lintas, kamera, sensor, petugas, insiden, armada darurat, emisi, dan hasil optimasi adalah data sintetis/contoh. Aplikasi ini **belum terhubung** ke CCTV/RTSP, gateway atau aktuator SITS, layanan 112, GPS armada, maupun data resmi Pemerintah Kota Surabaya. Tombol perintah hanya mengubah state prototipe.
 
-Dirancang khusus dengan estetika **Apple Human Interface Guidelines (HIG)** dan standar **WCAG 2.1 AA**, dashboard ini memberikan kejelasan visual superior pada monitor operator Command Center, laptop, mobile PWA, maupun proyektor presentasi.
+Antarmuka memakai gaya visual yang terinspirasi dashboard operasional. WCAG 2.1 AA belum diaudit atau dinyatakan terpenuhi; aksesibilitas masih perlu diuji pada browser dan perangkat yang dituju. Mode offline menyediakan app shell, bukan pemantauan atau kendali operasional.
 
 ---
 
@@ -23,17 +23,17 @@ Sistem mengadopsi arsitektur event-driven terdistribusi yang memadukan komputasi
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                 INFRASTRUKTUR SENSOR SITS KOTA SURABAYA                    │
+│                 DATA CONTOH UNTUK SIMULASI (BUKAN FEED SITS)               │
 ├───────────────────────────────┬─────────────────────────────────────────────┤
-│  184 Kamera CCTV RTSP/HLS     │  312 Sensor IoT Induktif & Detektor APILL   │
+│  184 Node kamera (nilai demo) │  312 Sensor (nilai demo)                     │
 └───────────────┬───────────────┴──────────────────────┬──────────────────────┘
                 │                                      │
                 ▼                                      ▼
 ┌───────────────────────────────┐      ┌──────────────────────────────────────┐
-│     EDGE VISION SIMULATION    │      │   GATEWAY ATCS SITS SURABAYA (REST)  │
-│  • Model: YOLOv8 / ByteTrack  │      │   • Siklus Lampu Lalu Lintas         │
-│  • Bounding Box Inference     │      │   • Status Insiden Command 112       │
-│  • Lerp Canvas 60 FPS Render  │      │   • Geofence GPS Armada Darurat      │
+│     EDGE VISION SIMULATOR     │      │   MOCK GATEWAY (LOCAL SANDBOX)       │
+│  • Procedural Traffic Model   │      │   • Skenario fase sinyal             │
+│  • Bounding Box Simulasi      │      │   • Status insiden contoh            │
+│  • Canvas Browser Render      │      │   • Rute darurat sintetis            │
 └───────────────┬───────────────┘      └───────────────┬──────────────────────┘
                 │                                      │
                 └──────────────────┬───────────────────┘
@@ -53,9 +53,9 @@ Sistem mengadopsi arsitektur event-driven terdistribusi yang memadukan komputasi
                  ▼                                   ▼
 ┌──────────────────────────────────┐ ┌────────────────────────────────────────┐
 │     CLIENT DASHBOARD (FRONTEND)  │ │      OFFLINE RESILIENCY LAYER (PWA)    │
-│  • StateStore & Event-Bus (ES6)  │ │  • Service Worker Cache-First CDN      │
-│  • GIS Leaflet Vector Animation  │ │  • Local Mock Fallback Simulation      │
-│  • Canvas Edge Vision Lerp Render│ │  • Zero Browser Console Error Guard    │
+│  • StateStore & Event-Bus (ES6)  │ │  • Public App-Shell Cache Only         │
+│  • GIS Leaflet Vector Animation  │ │  • Explicit Live/Offline Provenance    │
+│  • Canvas Edge Vision Lerp Render│ │  • Fault Logging & Isolation           │
 └──────────────────────────────────┘ └────────────────────────────────────────┘
 ```
 
@@ -63,13 +63,31 @@ Sistem mengadopsi arsitektur event-driven terdistribusi yang memadukan komputasi
 
 ## 🌟 Status Data & Provenance Model
 
-Seluruh indikator dan informasi pada dashboard dikategorikan secara eksplisit menggunakan badge status berikut:
-- 🟢 **`LIVE`**: Data yang disinkronisasi secara real-time via WebSocket/Socket.io backend kernel.
-- 🔵 **`REALTIME-DERIVED`**: Metrik hasil kalkulasi otomatis dari stream telemetri aktif.
+Seluruh indikator dan informasi pada dashboard dikategorikan menggunakan badge status berikut. Koneksi Socket.io yang aktif hanya menunjukkan koneksi ke backend prototipe, bukan koneksi ke SITS:
+- 🟢 **`LIVE`**: Label provenance ini hanya untuk sumber eksternal nyata yang terhubung dan dapat dibuktikan. Belum ada integrasi semacam itu pada prototipe ini. Clock internal `LIVE` berarti simulasi berjalan mengikuti waktu nyata; itu bukan feed live atau kontrol perangkat.
+- 🔵 **`REALTIME-DERIVED`**: Metrik turunan dari stream telemetri yang sedang diterima; pada konfigurasi saat ini stream itu berasal dari simulator.
 - 🟡 **`SIMULATED`**: Hasil estimasi model matematika, Webster Optimization, atau prediksi diurnal.
 - 🟠 **`STALE`**: Data telemetri yang belum diperbarui dalam kurun waktu ambang batas.
 - 🔴 **`OFFLINE`**: Status perangkat atau koneksi yang terputus dengan fallback otomatis.
-- 🟣 **`USER-TRIGGERED`**: Aksi intervensi operator (Green Wave, Signal Override, Dispatch 112).
+- 🟣 **`USER-TRIGGERED`**: Aksi pengguna pada state simulasi (Green Wave, Signal Override, Dispatch 112); tidak mengendalikan perangkat lapangan.
+
+Seluruh angka perangkat dan KPI default adalah nilai demo, bukan inventaris atau pengukuran Pemerintah Kota Surabaya. Dokumen PDF/CSV yang dihasilkan adalah keluaran prototipe dan bukan dokumen kedinasan resmi.
+
+### Batas keselamatan operasi
+
+OmniTRAF saat ini terkunci pada `SIMULATION_ONLY`: semua perintah hanya memutasi state simulasi, tidak ada hardware adapter, dan interlock keselamatan belum diverifikasi. Gateway perintah memakai allowlist fail-closed; aksi yang belum diklasifikasikan sebagai simulasi-only ditolak sebelum domain lookup, persistence, audit, atau broadcast. Metadata batas ini disertakan pada hasil perintah, snapshot state, dan stream awal agar integrasi klien tidak menyimpulkan kendali perangkat nyata.
+
+## Simulation lifecycle dan determinisme
+
+Backend menjalankan `BackendStateManager.tick()` melalui `DeterministicSimulationEngine`. Engine memajukan `UnifiedClock`, mengambil stream RNG berdasarkan nama domain, mengeksekusi domain dengan urutan prioritas lalu nama domain, dan menyampaikan event jadwal kepada handler. State manager menjalankan domain dengan urutan: bootstrap clock/sequence, device dan traffic telemetry, emergency response, signal cycle, lalu finalize metadata. Fase memakai domain object yang ada, dengan batas engine dan error isolation per fase.
+
+`SimulationScheduler` menerima waktu absolut pada simulation clock. Event yang jatuh tempo dijalankan satu kali dalam urutan `(at, sequence)`, termasuk saat beberapa event memiliki timestamp sama. `ScenarioRegistry` dan `ScenarioRunner` menyediakan validasi definition, start, pause, resume, completion, event scheduling, dan reset ke checkpoint awal. Belum ada definisi skenario operasional di repo; registry baru kosong kecuali caller mendaftarkan definisi, dan tidak ada tombol/command start scenario. Pause menghentikan tick biasa tanpa mengonsumsi RNG; command `simulation:control` dengan operasi `step` tetap menjalankan satu tick eksplisit. Reset engine memulihkan clock, RNG, queue, sequence dan baseline state manager yang ditangkap setelah database hydration; reset ini mengubah runtime memory, bukan menghapus persistence durable. Emisi dari fase tick masuk ke event buffer lalu dikirim setelah engine selesai, menjaga pemisahan domain simulation dan Socket.io.
+
+Fallback lokal traffic dan CCTV menggunakan seeded RNG tersendiri dan memberi data simulasi hanya ketika koneksi realtime tidak tersedia. Keduanya memajukan logical timestamp dengan delta tetap dari timestamp state terakhir; wall clock hanya dipakai untuk bootstrap bila timestamp state tidak tersedia. Animasi Canvas, timer UI, freshness/reconnect, timestamp transport, audit, dan metadata produksi tetap memakai wall/monotonic time karena bukan sumber kemajuan domain simulation. Efek flicker Canvas masih memakai random visual. Rekaman audit yang tidak memiliki command/correlation ID dan ID report tertentu masih memakai wall-clock/random.
+
+Restart server tidak memulihkan checkpoint simulation. Runtime clock, RNG stream, antrean event, dan progres emergency tidak disimpan sebagai checkpoint; database tetap menyimpan record domain/audit sesuai jalur persistence yang ada. Startup membangun runtime baru, incident durable dimuat dari database, dan dispatch emergency aktif ditandai `CANCELLED_UPON_RESTART` oleh recovery guard yang sudah ada. Seed default engine adalah 42 kecuali caller memberi seed lain.
+
+Jaminan deterministik yang diuji mencakup output handler untuk seed dan jadwal yang sama, urutan event scheduler, pause/resume, reset engine, serta transisi state manager, emergency, dan CCTV backend yang sebelumnya sudah tercakup. Ini bukan klaim bahwa seluruh dashboard atau seluruh event envelope identik lintas restart: metadata wall-clock, command yang dibuat operator, timer UI, dan beberapa metadata realtime memang bergantung pada waktu aktual. Model traffic/vision adalah simulasi/prototipe; dokumentasi ini tidak mengklaim model lalu lintas fisik tervalidasi atau akurasi prediksi.
 
 ---
 
@@ -77,14 +95,15 @@ Seluruh indikator dan informasi pada dashboard dikategorikan secara eksplisit me
 
 | Lapisan / Komponen | Teknologi yang Digunakan | Standar & Kepatuhan |
 | :--- | :--- | :--- |
-| **Frontend Core** | HTML5 Semantik, Vanilla ES6 Modules | W3C Valid, Zero Heavy Frameworks |
-| **Styling & Motion** | Modern CSS, Custom Design System | WCAG 2.1 AA, `prefers-reduced-motion` |
+| **Frontend Core** | HTML5 Semantik, Vanilla ES6 Modules | Belum divalidasi lintas browser |
+| **Styling & Motion** | Modern CSS, Custom Design System | `prefers-reduced-motion` tersedia; WCAG 2.1 AA belum diaudit |
 | **Geospatial GIS** | Leaflet.js 1.9.4, MarkerCluster | CartoDB Dark Matter / Positron |
 | **Edge Vision HUD** | HTML5 Canvas API (2D Context) | Lerp Bounding Box Rendering |
-| **Offline & PWA** | Service Worker v5 (Stale-While-Revalidate) | Offline Resilient PWA |
+| **Offline & PWA** | Service Worker v9 (App shell + bounded public assets) | API, auth, commands, tiles, and third-party resources are network-only |
 | **Performance Engine**| `content-visibility`, Tabular Nums, LERP Canvas | Bounded Memory & CPU Optimization |
 | **Backend Runtime** | Node.js (ESM), Express.js | REST API Level 2, Strict CSP Headers |
 | **Real-Time Engine**| Socket.io v4.8 | Low-latency WebSockets |
+| **Security & Auth** | JWT (HS256), HttpOnly Cookies, RBAC | Implementasi tersedia; belum diaudit independen (lihat [SECURITY.md](SECURITY.md)) |
 
 ---
 
@@ -109,6 +128,8 @@ Buka peramban (browser) di alamat:
 ```bash
 npm run lint
 ```
+
+`npm run build` menjalankan validasi statis manifest, app shell, stylesheet, dan versi service worker. Project ini tidak memiliki bundler atau langkah kompilasi; `npm run lint` merupakan pemeriksaan sintaks Node untuk daftar file tertentu, bukan lint penuh. Rincian baseline dan batas pengukuran Phase 9 ada di [PHASE9_PERFORMANCE.md](PHASE9_PERFORMANCE.md).
 
 ---
 

@@ -40,16 +40,16 @@ describe('PHASE 17 — Comprehensive Chaos & Fault Injection Resilience Matrix',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'admin', password: 'admin123' })
     });
-    const adminData = await adminRes.json();
-    adminToken = adminData.token || adminData.data?.token;
+    await adminRes.json();
+    adminToken = adminRes.headers.get('set-cookie')?.match(/omnitraf_session=([^;]+)/)?.[1];
 
     const opRes = await fetch(`${baseUrl}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'operator', password: 'operator123' })
     });
-    const opData = await opRes.json();
-    operatorToken = opData.token || opData.data?.token;
+    await opRes.json();
+    operatorToken = opRes.headers.get('set-cookie')?.match(/omnitraf_session=([^;]+)/)?.[1];
   });
 
   after(() => {
@@ -243,7 +243,7 @@ describe('PHASE 17 — Comprehensive Chaos & Fault Injection Resilience Matrix',
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${operatorToken}`
+        'Cookie': `omnitraf_session=${operatorToken}`
       },
       body: JSON.stringify({ status: 'RESOLVED' })
     });
@@ -260,7 +260,7 @@ describe('PHASE 17 — Comprehensive Chaos & Fault Injection Resilience Matrix',
   // 6. Sanitized Diagnostic Snapshot & Health Aggregation API
   test('6. Observability Endpoints: GET /api/diagnostics/health and /api/diagnostics/snapshot return sanitized, structured data', async () => {
     // Check health endpoint
-    const healthRes = await fetch(`${baseUrl}/api/diagnostics/health`, { headers: { Authorization: `Bearer ${operatorToken}` } });
+    const healthRes = await fetch(`${baseUrl}/api/diagnostics/health`, { headers: { Cookie: `omnitraf_session=${operatorToken}` } });
     assert.strictEqual(healthRes.status, 200);
     const health = await healthRes.json();
     assert.strictEqual(health.success, true);
@@ -268,7 +268,7 @@ describe('PHASE 17 — Comprehensive Chaos & Fault Injection Resilience Matrix',
     assert.strictEqual(health.data.subsystems.database.status, HEALTH_STATUS.HEALTHY);
 
     // Check snapshot endpoint
-    const snapRes = await fetch(`${baseUrl}/api/diagnostics/snapshot`, { headers: { Authorization: `Bearer ${operatorToken}` } });
+    const snapRes = await fetch(`${baseUrl}/api/diagnostics/snapshot`, { headers: { Cookie: `omnitraf_session=${operatorToken}` } });
     assert.strictEqual(snapRes.status, 200);
     const snap = await snapRes.json();
     assert.strictEqual(snap.success, true);
@@ -289,7 +289,7 @@ describe('PHASE 17 — Comprehensive Chaos & Fault Injection Resilience Matrix',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${operatorToken}`
+        'Cookie': `omnitraf_session=${operatorToken}`
       },
       body: JSON.stringify({
         faultId: 'FLT-OP-DENIED',
@@ -304,7 +304,7 @@ describe('PHASE 17 — Comprehensive Chaos & Fault Injection Resilience Matrix',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`
+        'Cookie': `omnitraf_session=${adminToken}`
       },
       body: JSON.stringify({
         faultId: 'FLT-ADMIN-ALLOWED',
@@ -327,7 +327,7 @@ describe('PHASE 17 — Comprehensive Chaos & Fault Injection Resilience Matrix',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`
+        'Cookie': `omnitraf_session=${adminToken}`
       },
       body: JSON.stringify({ faultId: 'FLT-ADMIN-ALLOWED' })
     });
@@ -338,7 +338,7 @@ describe('PHASE 17 — Comprehensive Chaos & Fault Injection Resilience Matrix',
   // 8. Server Readiness Probe (/ready) reflects degraded health on active critical faults
   test('8. Readiness Check (/ready): Returns 503 DEGRADED when database fault is injected, 200 when cleared', async () => {
     // Baseline -> 200
-    const readyOptions = { headers: { Authorization: `Bearer ${adminToken}` } };
+    const readyOptions = { headers: { Cookie: `omnitraf_session=${adminToken}` } };
     const resReady1 = await fetch(`${baseUrl}/ready`, readyOptions);
     assert.strictEqual(resReady1.status, 200);
 

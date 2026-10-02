@@ -63,11 +63,13 @@ export function requireAuth(requiredRoles = [], options = {}) {
     let token = null;
     if (authHeader && /^Bearer\s+/i.test(authHeader)) {
       token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    } else if (req.cookies?.omnitraf_session && typeof req.cookies.omnitraf_session === 'string') {
+      token = req.cookies.omnitraf_session.trim();
     } else if (allowQueryToken && typeof req.query?.token === 'string') {
       token = req.query.token.trim();
     }
 
-    if (!token) return sendAuthError(res, 401, 'UNAUTHORIZED', 'Akses ditolak: Token autentikasi Bearer wajib disertakan.');
+    if (!token) return sendAuthError(res, 401, 'UNAUTHORIZED', 'Akses ditolak: Token autentikasi Bearer atau sesi terverifikasi wajib disertakan.');
     const principal = verifyToken(token);
     if (!principal) return sendAuthError(res, 401, 'INVALID_TOKEN', 'Token autentikasi tidak valid atau telah kedaluwarsa.');
 

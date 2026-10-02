@@ -9,6 +9,29 @@ import { registerOperatorHandlers } from './handlers/operatorHandler.js';
 import { registerSignalHandlers } from './handlers/signalHandler.js';
 import { registerEmergencyHandlers } from './handlers/emergencyHandler.js';
 import { registerChaosHandlers } from './handlers/chaosHandler.js';
+import { realtimeDispatcher } from './realtimeDispatcher.js';
+import { REALTIME_ROOMS } from './eventRegistry.js';
+import { SAFETY_BOUNDARY } from '../config/safetyBoundary.js';
+import { ROLES } from '../config/constants.js';
+
+const ROOM_ROLES = new Map([
+  [REALTIME_ROOMS.DASHBOARD, [ROLES.VIEWER, ROLES.OPERATOR, ROLES.ADMIN]],
+  [REALTIME_ROOMS.TRAFFIC, [ROLES.VIEWER, ROLES.OPERATOR, ROLES.ADMIN]],
+  [REALTIME_ROOMS.SIGNALS, [ROLES.VIEWER, ROLES.OPERATOR, ROLES.ADMIN]],
+  [REALTIME_ROOMS.INCIDENTS, [ROLES.VIEWER, ROLES.OPERATOR, ROLES.ADMIN]],
+  [REALTIME_ROOMS.EMERGENCY, [ROLES.VIEWER, ROLES.OPERATOR, ROLES.ADMIN]],
+  [REALTIME_ROOMS.DEVICES, [ROLES.VIEWER, ROLES.OPERATOR, ROLES.ADMIN]],
+  [REALTIME_ROOMS.ANALYTICS, [ROLES.VIEWER, ROLES.OPERATOR, ROLES.ADMIN]],
+  [REALTIME_ROOMS.AUDIT, [ROLES.OPERATOR, ROLES.ADMIN]],
+  [REALTIME_ROOMS.ADMIN, [ROLES.ADMIN]],
+  [REALTIME_ROOMS.CCTV_ALL, [ROLES.OPERATOR, ROLES.ADMIN]]
+]);
+
+function isRoomAllowedForRole(room, role) {
+  const allowedRoles = ROOM_ROLES.get(room) ||
+    (/^room:cctv:[a-z0-9_-]{1,64}$/i.test(room) ? [ROLES.OPERATOR, ROLES.ADMIN] : null);
+  return !!allowedRoles?.includes(role);
+}
 
 export function initializeSocketServer(httpServer) {
   const io = new Server(httpServer, {
@@ -60,13 +83,21 @@ export function initializeSocketServer(httpServer) {
   }
 
   backendState.setIo(io);
+  realtimeDispatcher.setIo(io);
 
   // Handshake Authentication Middleware
   io.use((socket, next) => {
     const header = socket.handshake.headers?.authorization;
+    const cookieHeader = socket.handshake.headers?.cookie;
+    let cookieToken = null;
+    if (typeof cookieHeader === 'string') {
+      const match = cookieHeader.match(/(?:^|;\s*)omnitraf_session=([^;]+)/);
+      if (match) cookieToken = decodeURIComponent(match[1]).trim();
+    }
     const queryTokenAllowed = NODE_ENV === 'test' && ALLOW_TEST_QUERY_TOKEN_AUTH;
     const token = socket.handshake.auth?.token ||
       (typeof header === 'string' && /^Bearer\s+/i.test(header) ? header.replace(/^Bearer\s+/i, '').trim() : null) ||
+      cookieToken ||
       (queryTokenAllowed ? socket.handshake.query?.token : null);
 
     if (!token) return next(new Error('AUTHENTICATION_REQUIRED: JWT Bearer token wajib disertakan.'));
@@ -80,9 +111,21 @@ export function initializeSocketServer(httpServer) {
   io.on('connection', (socket) => {
     console.log(`🔌 [Socket.io] Client terhubung: ${socket.id} (User: ${socket.user?.name}, Role: ${socket.user?.role})`);
 
+    // Join only rooms this authenticated role may read.
+    socket.join(REALTIME_ROOMS.DASHBOARD);
+    socket.join(REALTIME_ROOMS.TRAFFIC);
+    socket.join(REALTIME_ROOMS.SIGNALS);
+    socket.join(REALTIME_ROOMS.INCIDENTS);
+    socket.join(REALTIME_ROOMS.EMERGENCY);
+    socket.join(REALTIME_ROOMS.DEVICES);
+    if (isRoomAllowedForRole(REALTIME_ROOMS.AUDIT, socket.user.role)) socket.join(REALTIME_ROOMS.AUDIT);
+    if (isRoomAllowedForRole(REALTIME_ROOMS.ADMIN, socket.user.role)) socket.join(REALTIME_ROOMS.ADMIN);
+
     // Send initial full canonical state snapshot
+    const initialSnapshot = backendState.getSnapshot();
     socket.emit('traffic:init', {
       state: backendState.state,
+      canonical: initialSnapshot.canonical,
       seq: backendState.sequence,
       cctvSeq: backendState.cctvSequence,
       incidentSeq: backendState.incidentSequence,
@@ -90,15 +133,57 @@ export function initializeSocketServer(httpServer) {
       signalSeq: backendState.signalSequence,
       deviceSeq: backendState.deviceSequence,
       timestampMs: backendState.lastUpdated,
-      source: 'server'
+      source: 'server',
+      provenance: 'SIMULATED',
+      safetyBoundary: SAFETY_BOUNDARY
     });
-    socket.emit('cctv:vision-update', cvEngine.generateFramePayload(backendState.state.isChaosMode));
+    if (isRoomAllowedForRole(REALTIME_ROOMS.CCTV_ALL, socket.user.role)) {
+      socket.emit('cctv:vision-update', cvEngine.generateFramePayload(backendState.state.isChaosMode));
+    }
+
+    // Dynamic Room Subscription Management (Langkah 4 & 13)
+    socket.on('channel:subscribe', (data, callback) => {
+      const { channels, room } = data && typeof data === 'object' ? data : {};
+      const targetChannels = (Array.isArray(channels) ? channels : (room ? [room] : [])).slice(0, 32);
+      const accepted = [];
+      const rejected = [];
+      targetChannels.forEach(ch => {
+        if (typeof ch === 'string' && isRoomAllowedForRole(ch.trim(), socket.user.role)) {
+          socket.join(ch.trim());
+          accepted.push(ch.trim());
+        } else {
+          rejected.push(typeof ch === 'string' ? ch.slice(0, 80) : '[invalid]');
+        }
+      });
+      if (typeof callback === 'function') {
+        callback({ success: rejected.length === 0, subscribed: accepted, rejected });
+      }
+    });
+
+    socket.on('channel:unsubscribe', (data, callback) => {
+      const { channels, room } = data && typeof data === 'object' ? data : {};
+      const targetChannels = (Array.isArray(channels) ? channels : (room ? [room] : [])).slice(0, 32);
+      const accepted = [];
+      const rejected = [];
+      targetChannels.forEach(ch => {
+        if (typeof ch === 'string' && isRoomAllowedForRole(ch.trim(), socket.user.role)) {
+          socket.leave(ch.trim());
+          accepted.push(ch.trim());
+        } else {
+          rejected.push(typeof ch === 'string' ? ch.slice(0, 80) : '[invalid]');
+        }
+      });
+      if (typeof callback === 'function') {
+        callback({ success: rejected.length === 0, unsubscribed: accepted, rejected });
+      }
+    });
 
     // 0. Idempotent State Resync
     socket.on('state:resync', (data, callback) => {
       const snapshot = backendState.getSnapshot();
       socket.emit('traffic:init', {
         state: backendState.state,
+        canonical: snapshot.canonical,
         seq: backendState.sequence,
         cctvSeq: backendState.cctvSequence,
         incidentSeq: backendState.incidentSequence,
@@ -106,7 +191,9 @@ export function initializeSocketServer(httpServer) {
         signalSeq: backendState.signalSequence,
         deviceSeq: backendState.deviceSequence,
         timestampMs: backendState.lastUpdated,
-        source: 'server'
+        source: 'server',
+        provenance: 'SIMULATED',
+        safetyBoundary: SAFETY_BOUNDARY
       });
       if (typeof callback === 'function') {
         callback({
@@ -150,7 +237,8 @@ export function initializeSocketServer(httpServer) {
 
     if (io.engine.clientsCount === 0) return;
     const updatedState = backendState.tick(elapsedMs);
-    io.emit('traffic:update', updatedState);
+    // Broadcast via RealtimeEventDispatcher + direct io.emit fallback for legacy/test clients
+    realtimeDispatcher.dispatchTrafficUpdate(updatedState);
   }, 1000).unref();
 
   // 2. High-Efficiency Computer Vision Detection Stream (300ms)
@@ -158,7 +246,8 @@ export function initializeSocketServer(httpServer) {
     if (io.engine.clientsCount === 0) return;
     const isChaos = backendState.state.isChaosMode;
     const visionPayload = cvEngine.generateFramePayload(isChaos);
-    io.emit('cctv:vision-update', visionPayload);
+    // Dispatched via RealtimeEventDispatcher with per-camera stream separation & aggregate
+    realtimeDispatcher.dispatchCctvVision(visionPayload);
   }, 300).unref();
 
   return io;

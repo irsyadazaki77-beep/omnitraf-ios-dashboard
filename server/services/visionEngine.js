@@ -109,6 +109,7 @@ export class ComputerVisionEngine {
         fps: isChaosMode ? Math.floor(15 + this.prng.nextFloat() * 4) : Math.floor(29 + this.prng.nextFloat() * 2),
         resolution: '1920x1080',
         source: 'SITS Edge Vision YOLOv8',
+        provenance: 'SIMULATED',
         processingLatencyMs: isChaosMode ? Math.floor(22 + this.prng.nextFloat() * 15) : Math.floor(4 + this.prng.nextFloat() * 6),
         streamStatus: isChaosMode ? 'DEGRADED' : 'ONLINE',
         detections: detections

@@ -14,6 +14,7 @@ if (isTest) {
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { normalizeCanonicalIncident, normalizeCanonicalDevice, CompatibilityAdapters } from '../config/domainModels.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -379,7 +380,7 @@ export class DatabaseManager {
           }
         }
 
-        return {
+        const rawMapped = {
           id: item.id,
           title: payloadObj.title || item.type || `Insiden #${item.id}`,
           category: payloadObj.category || item.type || 'congestion',
@@ -396,6 +397,8 @@ export class DatabaseManager {
           acknowledgedAt: item.acknowledged_at || payloadObj.acknowledgedAt || null,
           resolvedAt: item.resolved_at || payloadObj.resolvedAt || null
         };
+        const canonical = normalizeCanonicalIncident(rawMapped);
+        return CompatibilityAdapters.toLegacyIncident(canonical);
       });
 
       return { status: 'OK', data: incidents };
@@ -674,7 +677,7 @@ export class DatabaseManager {
           } catch (_) {}
         }
 
-        return {
+        const rawDevice = {
           deviceId: item.device_id,
           type: item.type,
           status: item.status,
@@ -686,6 +689,8 @@ export class DatabaseManager {
           updatedAt: item.updated_at,
           ...payloadObj
         };
+        const canonical = normalizeCanonicalDevice(rawDevice);
+        return CompatibilityAdapters.toLegacyDevice(canonical);
       });
 
       return { status: 'OK', data };

@@ -4,7 +4,7 @@
  * A. Yani → Darmo, animasi countdown preemption, serta simulasi GIS rute 112 di peta Leaflet.
  */
 
-import { stateStore } from '../core/stateStore.js';
+import { stateStore, escapeHtml } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
 import { socketClient } from '../core/socketClient.js';
 import { trafficEngine } from '../modules/trafficEngine.js';
@@ -129,7 +129,7 @@ export class EmergencyController {
   }
 
   /**
-   * Aktifkan Koridor Darurat 112
+   * Jalankan skenario koridor prioritas di simulator
    */
   async activateGreenWaveWithSafetyTimer(durationSec = 300) {
     try {
@@ -146,7 +146,7 @@ export class EmergencyController {
 
       this.remainingGreenWaveSec = durationSec;
       if (typeof window.showToast === "function") {
-        window.showToast(`🚨 PRIORITAS DARURAT AKTIF: Sinyal rute ${respRoute.replace('route-', '').toUpperCase()} dikunci Hijau!`, "alert");
+        window.showToast(`Skenario prioritas ${respRoute.replace('route-', '').toUpperCase()} aktif di simulator; 112, GPS, dan APILL tidak terhubung.`, "warning");
       }
     } catch (err) {
       throw err;
@@ -185,9 +185,9 @@ export class EmergencyController {
 
       if (typeof window.showToast === "function") {
         if (isAutoTimeout) {
-          window.showToast("⏱️ Timer Keselamatan 5 Menit Berakhir: Koridor Darurat dinormalisasi otomatis.");
+          window.showToast("Timer skenario 5 menit berakhir; state simulasi dikembalikan.");
         } else {
-          window.showToast("✓ Seluruh Koridor Darurat dinormalisasi kembali ke mode adaptif.");
+          window.showToast("State rute simulasi dikembalikan; tidak ada koridor fisik yang diubah.");
         }
       }
     } catch (err) {
@@ -341,17 +341,25 @@ export class EmergencyController {
       const card = document.createElement("div");
       const isPmk = emg.vehicleType === "PMK";
       const isFinished = ["ARRIVED", "COMPLETED", "CANCELLED"].includes(emg.status);
+      const safeVehicleId = escapeHtml(emg.vehicleId);
+      const safeVehicleType = escapeHtml(emg.vehicleType);
+      const safeStatus = escapeHtml(emg.status);
+      const safeRoute = escapeHtml(emg.routeId ? emg.routeId.replace('route-', '').toUpperCase() : 'SURABAYA CORRIDOR');
+      const safeEta = escapeHtml(emg.ETA || '0s');
+      const safeSpeed = escapeHtml(emg.speed || 0);
+      const safeIntersection = escapeHtml(emg.nextIntersection || 'Selesai');
+
       card.className = `emergency-card-item pulse-red-border ${isFinished ? 'opacity-70' : ''}`;
       card.innerHTML = `
         <div class="em-header">
-          <span class="badge-em red" style="background: ${isPmk ? '#f97316' : '#ef4444'};">🚨 ${emg.vehicleId} (${emg.vehicleType})</span>
-          <strong class="em-status" style="color: ${isFinished ? '#22c55e' : '#ef4444'};">${emg.status}</strong>
+          <span class="badge-em red" style="background: ${isPmk ? '#f97316' : '#ef4444'};">🚨 ${safeVehicleId} (${safeVehicleType})</span>
+          <strong class="em-status" style="color: ${isFinished ? '#22c55e' : '#ef4444'};">${safeStatus}</strong>
         </div>
-        <p>Rute: ${emg.routeId ? emg.routeId.replace('route-', '').toUpperCase() : 'SURABAYA CORRIDOR'}</p>
+        <p>Rute: ${safeRoute}</p>
         <div class="em-meta-row">
-          <div><small>ETA</small><strong>${emg.ETA || '0s'}</strong></div>
-          <div><small>Kecepatan</small><strong>${emg.speed || 0} km/jam</strong></div>
-          <div><small>Status Persimpangan</small><strong class="${isFinished ? 'text-slate-400' : 'text-emerald-400'}">${emg.nextIntersection || 'Selesai'}</strong></div>
+          <div><small>ETA</small><strong>${safeEta}</strong></div>
+          <div><small>Kecepatan</small><strong>${safeSpeed} km/jam</strong></div>
+          <div><small>Status Persimpangan</small><strong class="${isFinished ? 'text-slate-400' : 'text-emerald-400'}">${safeIntersection}</strong></div>
         </div>
       `;
       emergencyListGrid.appendChild(card);

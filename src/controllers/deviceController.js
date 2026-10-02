@@ -7,7 +7,7 @@
 
 import { soundManager } from '../core/soundManager.js';
 import { SYSTEM_CONFIG } from '../config/systemConfig.js';
-import { stateStore, updateDeviceState } from '../core/stateStore.js';
+import { stateStore, updateDeviceState, escapeHtml } from '../core/stateStore.js';
 import { socketClient, fetchWithCacheAndDedupe } from '../core/socketClient.js';
 import { authManager } from '../core/authManager.js';
 import { Disposer } from '../core/disposer.js';
@@ -123,47 +123,58 @@ export class DeviceController {
 
     let html = "";
     devices.forEach(dev => {
+      const safeDeviceId = escapeHtml(dev.deviceId);
+      const safeDeviceName = escapeHtml(dev.deviceName);
+      const safeLocation = escapeHtml(dev.location);
+      const safeType = escapeHtml(dev.type);
+      const safeHealthLevel = ['HEALTHY', 'DEGRADED', 'STALE', 'FAULT', 'RECOVERING', 'OFFLINE'].includes(dev.healthLevel) ? dev.healthLevel : 'OFFLINE';
+      const numericValue = value => Number.isFinite(Number(value)) ? Number(value) : 0;
+      const cpuPercent = Math.max(0, Math.min(100, numericValue(dev.cpuPercent)));
+      const temperatureC = Math.max(0, Math.min(150, numericValue(dev.temperatureC)));
+      const latencyMs = Math.max(0, numericValue(dev.latencyMs));
+      const fps = Math.max(0, numericValue(dev.fps));
       // Tentukan status badge HTML
       let badgeHtml = "";
-      if (dev.healthLevel === "HEALTHY") {
-        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#22c55e;"></span><span class="pulse-ring-inner" style="background:#22c55e;"></span></span><span style="color:#22c55e; font-weight:700;">HEALTHY</span>`;
-      } else if (dev.healthLevel === "DEGRADED") {
-        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#f59e0b;"></span><span class="pulse-ring-inner" style="background:#f59e0b;"></span></span><span style="color:#f59e0b; font-weight:700;">DEGRADED</span>`;
-      } else if (dev.healthLevel === "STALE") {
-        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#94a3b8;"></span><span class="pulse-ring-inner" style="background:#94a3b8;"></span></span><span style="color:#94a3b8; font-weight:700;">STALE</span>`;
-      } else if (dev.healthLevel === "FAULT") {
-        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#ef4444;"></span><span class="pulse-ring-inner" style="background:#ef4444;"></span></span><span style="color:#ef4444; font-weight:700;">FAULT</span>`;
-      } else if (dev.healthLevel === "RECOVERING") {
-        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#38bdf8;"></span><span class="pulse-ring-inner" style="background:#38bdf8;"></span></span><span style="color:#38bdf8; font-weight:700;">RECOVERING</span>`;
+      if (safeHealthLevel === "HEALTHY") {
+        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#22c55e;"></span><span class="pulse-ring-inner" style="background:#22c55e;"></span></span><span style="color:#22c55e; font-weight:700;">DEMO · HEALTHY</span>`;
+      } else if (safeHealthLevel === "DEGRADED") {
+        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#f59e0b;"></span><span class="pulse-ring-inner" style="background:#f59e0b;"></span></span><span style="color:#f59e0b; font-weight:700;">DEMO · DEGRADED</span>`;
+      } else if (safeHealthLevel === "STALE") {
+        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#94a3b8;"></span><span class="pulse-ring-inner" style="background:#94a3b8;"></span></span><span style="color:#94a3b8; font-weight:700;">DEMO · STALE</span>`;
+      } else if (safeHealthLevel === "FAULT") {
+        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#ef4444;"></span><span class="pulse-ring-inner" style="background:#ef4444;"></span></span><span style="color:#ef4444; font-weight:700;">FAULT DEMO</span>`;
+      } else if (safeHealthLevel === "RECOVERING") {
+        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#38bdf8;"></span><span class="pulse-ring-inner" style="background:#38bdf8;"></span></span><span style="color:#38bdf8; font-weight:700;">DEMO · RECOVERING</span>`;
       } else { // OFFLINE
-        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#64748b;"></span><span class="pulse-ring-inner" style="background:#64748b;"></span></span><span style="color:#64748b; font-weight:700;">OFFLINE</span>`;
+        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#64748b;"></span><span class="pulse-ring-inner" style="background:#64748b;"></span></span><span style="color:#64748b; font-weight:700;">OFFLINE DEMO</span>`;
       }
 
       // Bar indikator CPU load
-      const cpuColor = dev.cpuPercent > 80 ? 'load-orange' : 'load-green';
+      const cpuColor = cpuPercent > 80 ? 'load-orange' : 'load-green';
       const cpuBarHtml = `
         <div class="diag-bar-wrap">
           <div class="diag-bar-track">
-            <div class="diag-bar-fill ${cpuColor}" style="width: ${dev.cpuPercent}%;"></div>
+            <div class="diag-bar-fill ${cpuColor}" style="width: ${cpuPercent}%;"></div>
           </div>
-          <span class="diag-val" style="font-family:'Share Tech Mono';">${dev.cpuPercent}%</span>
+          <span class="diag-val" style="font-family:'Share Tech Mono';">${cpuPercent}%</span>
         </div>
       `;
 
       // Bar indikator suhu
-      const tempColorClass = dev.temperatureC > 75 ? 'temp-warm-fill' : 'temp-cool-fill';
-      const tempBadgeClass = dev.temperatureC > 75 ? 'temp-warm' : 'temp-cool';
+      const tempColorClass = temperatureC > 75 ? 'temp-warm-fill' : 'temp-cool-fill';
+      const tempBadgeClass = temperatureC > 75 ? 'temp-warm' : 'temp-cool';
       const tempBarHtml = `
         <div class="diag-temp-wrap">
           <div class="diag-temp-bar">
-            <div class="diag-temp-fill ${tempColorClass}" style="width: ${Math.min(100, (dev.temperatureC / 100) * 100)}%;"></div>
+            <div class="diag-temp-fill ${tempColorClass}" style="width: ${Math.min(100, (temperatureC / 100) * 100)}%;"></div>
           </div>
-          <span class="badge-temp ${tempBadgeClass}" style="font-family:'Share Tech Mono';">${dev.temperatureC}°C</span>
+          <span class="badge-temp ${tempBadgeClass}" style="font-family:'Share Tech Mono';">${temperatureC}°C</span>
         </div>
       `;
 
       // Sparkline SVG mini berbasis ring buffer history murni
-      const history = dev.history || [12, 11, 14, 10, 13, 12];
+      const history = (Array.isArray(dev.history) ? dev.history : [12, 11, 14, 10, 13, 12])
+        .filter(value => Number.isFinite(Number(value))).slice(-64).map(Number);
       const minVal = Math.min(...history) || 1;
       const maxVal = Math.max(...history) || 50;
       const range = maxVal - minVal || 1;
@@ -178,28 +189,28 @@ export class DeviceController {
 
       const sparklineHtml = `
         <svg viewBox="0 0 50 15" width="50" height="15" style="overflow:visible;">
-          <path d="${points}" fill="none" stroke="${dev.healthLevel === 'OFFLINE' ? '#64748b' : dev.healthLevel === 'DEGRADED' ? '#f59e0b' : '#00e5ff'}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="${points}" fill="none" stroke="${safeHealthLevel === 'OFFLINE' ? '#64748b' : safeHealthLevel === 'DEGRADED' ? '#f59e0b' : '#00e5ff'}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       `;
 
-      const inferenceRateText = dev.fps > 0 ? `${dev.fps} FPS` : (dev.type && dev.type.includes("PLC")) ? "Active Telemetry" : "N/A";
+      const inferenceRateText = fps > 0 ? `${fps} FPS simulasi` : (typeof dev.type === 'string' && dev.type.includes("PLC")) ? "Telemetri demo" : "N/A";
 
       // Row layout HTML murni
       html += `
-        <tr class="clickable-device-row ${this.selectedDeviceId === dev.deviceId ? 'active-row-highlight' : ''}" data-device="${dev.deviceId}" style="border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.2s;">
-          <td><strong style="font-family:'Share Tech Mono'; color:#00e5ff;">${dev.deviceId}</strong></td>
+        <tr class="clickable-device-row ${this.selectedDeviceId === dev.deviceId ? 'active-row-highlight' : ''}" data-device="${safeDeviceId}" style="border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.2s;">
+          <td><strong style="font-family:'Share Tech Mono'; color:#00e5ff;">${safeDeviceId}</strong></td>
           <td>
-            <div style="font-weight:600;">${dev.deviceName}</div>
-            <small style="color:#64748b; font-size:10px;">${dev.location}</small>
+            <div style="font-weight:600;">${safeDeviceName}</div>
+            <small style="color:#64748b; font-size:10px;">${safeLocation}</small>
           </td>
-          <td style="font-size:11px; color:#94a3b8;">${dev.type}</td>
+          <td style="font-size:11px; color:#94a3b8;">${safeType}</td>
           <td>${badgeHtml}</td>
           <td>${cpuBarHtml}</td>
           <td>${tempBarHtml}</td>
-          <td class="device-ping" style="font-family:'Share Tech Mono';">${dev.healthLevel === 'OFFLINE' ? '--' : dev.latencyMs + ' ms'}</td>
+          <td class="device-ping" style="font-family:'Share Tech Mono';">${safeHealthLevel === 'OFFLINE' ? '--' : latencyMs + ' ms demo'}</td>
           <td class="device-ping-spark">${sparklineHtml}</td>
           <td style="font-size:11px; font-family:'Share Tech Mono';">${inferenceRateText}</td>
-          <td><button class="btn btn-ghost compact btn-ping-device-row" data-device="${dev.deviceId}" style="font-size:10px; padding:3px 8px;">Ping</button></td>
+          <td><button class="btn btn-ghost compact btn-ping-device-row" data-device="${safeDeviceId}" style="font-size:10px; padding:3px 8px;">Ping demo</button></td>
         </tr>
       `;
     });
@@ -286,7 +297,7 @@ export class DeviceController {
 
       if (payload && payload.success) {
         const latency = payload.data?.latencyMs || payload.latencyMs || 8;
-        window.showToast(`✓ Ping ${deviceId} Sukses: ${latency} ms respon balik.`);
+        window.showToast(`Ping demo ${deviceId}: ${latency} ms waktu simulasi; tidak menguji perangkat fisik.`);
         soundManager.play('success');
       } else {
         throw new Error(payload?.error?.message || "Ping gagal diproses.");
@@ -329,6 +340,20 @@ export class DeviceController {
   _updateDrawerDetailsLive(devices, isInitialSelect = false) {
     const dev = devices.find(d => d.deviceId === this.selectedDeviceId);
     if (!dev) return;
+    const deviceType = typeof dev.type === "string" ? dev.type : "";
+    const numericMetric = (value, fallback = 0) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+    const temperatureC = numericMetric(dev.temperatureC);
+    const cpuPercent = numericMetric(dev.cpuPercent);
+    const healthScore = numericMetric(dev.healthScore);
+    const packetLossPercent = numericMetric(dev.packetLossPercent);
+    const uptimePercent = numericMetric(dev.uptimePercent);
+    const heartbeatTime = new Date(dev.lastHeartbeatAt);
+    const heartbeatLabel = Number.isNaN(heartbeatTime.getTime())
+      ? "Tidak diketahui"
+      : heartbeatTime.toLocaleTimeString("id-ID");
 
     const drawer = document.getElementById("deviceDrawerConfig") || document.getElementById("deviceConfigDrawer");
     if (!drawer || (drawer.style.display === "none" && !isInitialSelect)) return;
@@ -343,7 +368,7 @@ export class DeviceController {
     if (fpsInput && (isInitialSelect || document.activeElement !== fpsInput)) {
       fpsInput.value = dev.fps || 30;
       if (fpsInput.parentElement && fpsInput.parentElement.style) {
-        if (dev.type.includes("PLC")) {
+        if (deviceType.includes("PLC")) {
           fpsInput.parentElement.style.display = "none";
         } else {
           fpsInput.parentElement.style.display = "block";
@@ -355,7 +380,7 @@ export class DeviceController {
     if (resSelect && (isInitialSelect || document.activeElement !== resSelect)) {
       resSelect.value = dev.resolution || "1080p";
       if (resSelect.parentElement && resSelect.parentElement.style) {
-        if (dev.type.includes("PLC")) {
+        if (deviceType.includes("PLC")) {
           resSelect.parentElement.style.display = "none";
         } else {
           resSelect.parentElement.style.display = "block";
@@ -368,10 +393,10 @@ export class DeviceController {
     if (diagBox) {
       // Kita buat custom layout di dalam box tersebut agar visualnya sangat premium
       const activeFlags = [];
-      if (dev.latencyMs > 45) activeFlags.push("HIGH_LATENCY");
-      if (dev.fps > 0 && dev.fps < 15) activeFlags.push("LOW_FPS");
-      if (dev.temperatureC > 75) activeFlags.push("HIGH_TEMPERATURE");
-      if (dev.cpuPercent > 80 || dev.memoryPercent > 80) activeFlags.push("RESOURCE_PRESSURE");
+      if (numericMetric(dev.latencyMs) > 45) activeFlags.push("HIGH_LATENCY");
+      if (numericMetric(dev.fps) > 0 && numericMetric(dev.fps) < 15) activeFlags.push("LOW_FPS");
+      if (temperatureC > 75) activeFlags.push("HIGH_TEMPERATURE");
+      if (cpuPercent > 80 || numericMetric(dev.memoryPercent) > 80) activeFlags.push("RESOURCE_PRESSURE");
       if (dev.healthLevel === "STALE") activeFlags.push("STALE_TELEMETRY");
       if (dev.healthLevel === "OFFLINE") activeFlags.push("HEARTBEAT_TIMEOUT");
 
@@ -383,19 +408,19 @@ export class DeviceController {
 
       diagBox.innerHTML = `
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:11px; margin-bottom:12px;">
-          <div>🌡️ Suhu GPU: <strong style="color:${dev.temperatureC > 75 ? '#ef4444' : '#fff'};">${dev.temperatureC}°C</strong></div>
-          <div>📊 CPU/GPU Load: <strong>${dev.cpuPercent}%</strong></div>
-          <div>💾 RAM Node: <strong>${dev.type.includes("PLC") ? "256 KB" : "4.2 / 8.0 GB"}</strong></div>
-          <div>🌀 Fan Speed: <strong>${dev.type.includes("PLC") ? "N/A" : dev.healthLevel === "OFFLINE" ? "0 RPM" : "2400 RPM"}</strong></div>
-          <div>⏳ Uptime %: <strong style="color:#10b981;">${dev.healthLevel === 'OFFLINE' ? '0.0%' : dev.uptimePercent + '%'}</strong></div>
-          <div>❌ Packet Loss: <strong style="color:${dev.packetLossPercent > 5 ? '#ef4444' : '#fff'};">${dev.packetLossPercent}%</strong></div>
-          <div>📶 Status: <strong style="color:${healthColor};">${dev.healthLevel}</strong></div>
-          <div>🎯 Skor Sehat: <strong style="color:${healthColor}; font-size:12px; font-family:'Share Tech Mono';">${dev.healthScore}/100</strong></div>
+          <div>🌡️ Suhu GPU: <strong style="color:${temperatureC > 75 ? '#ef4444' : '#fff'};">${temperatureC}°C</strong></div>
+          <div>📊 CPU/GPU Load: <strong>${cpuPercent}%</strong></div>
+          <div>💾 RAM Node: <strong>${deviceType.includes("PLC") ? "256 KB" : "4.2 / 8.0 GB"}</strong></div>
+          <div>🌀 Fan Speed: <strong>${deviceType.includes("PLC") ? "N/A" : dev.healthLevel === "OFFLINE" ? "0 RPM" : "2400 RPM"}</strong></div>
+          <div>⏳ Uptime %: <strong style="color:#10b981;">${dev.healthLevel === 'OFFLINE' ? '0.0%' : uptimePercent + '%'}</strong></div>
+          <div>❌ Packet Loss: <strong style="color:${packetLossPercent > 5 ? '#ef4444' : '#fff'};">${packetLossPercent}%</strong></div>
+          <div>📶 Status: <strong style="color:${healthColor};">${escapeHtml(dev.healthLevel)}</strong></div>
+          <div>🎯 Skor Sehat: <strong style="color:${healthColor}; font-size:12px; font-family:'Share Tech Mono';">${healthScore}/100</strong></div>
         </div>
         <div class="diag-extra-details" style="font-size:10.5px; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px; margin-top:10px; color:#94a3b8;">
           <div style="margin-bottom:6px;">🚩 Active Flags: ${flagsText}</div>
-          <div style="margin-bottom:4px;">⏰ Last Heartbeat: <strong style="color:#fff;">${new Date(dev.lastHeartbeatAt).toLocaleTimeString('id-ID')} WIB</strong></div>
-          <div style="margin-bottom:6px;">📦 Provenance: <strong style="color:#00e5ff; font-family:'Share Tech Mono';">${dev.source}</strong></div>
+          <div style="margin-bottom:4px;">⏰ Last Heartbeat: <strong style="color:#fff;">${escapeHtml(heartbeatLabel)} WIB</strong></div>
+          <div style="margin-bottom:6px;">📦 Provenance: <strong style="color:#00e5ff; font-family:'Share Tech Mono';">${escapeHtml(dev.source)}</strong></div>
           <div style="border-top:1px solid rgba(255,255,255,0.05); margin-top:8px; padding-top:8px;">
             <strong>Last Action / Command Audit:</strong>
             <div id="diagLastCommand" style="font-family:'Share Tech Mono', monospace; font-size:10px; color:#38bdf8; margin-top:3px; word-break:break-all; line-height:1.3;">Memuat histori audit...</div>
@@ -407,7 +432,7 @@ export class DeviceController {
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
             <button class="btn btn-ghost compact btn-inject-fault" type="button" data-fault="latency_spike" style="font-size:9.5px; padding:4px 6px;">Latency Spike</button>
             <button class="btn btn-ghost compact btn-inject-fault" type="button" data-fault="packet_loss" style="font-size:9.5px; padding:4px 6px;">Packet Loss</button>
-            <button class="btn btn-ghost compact btn-inject-fault" type="button" data-fault="low_fps" style="font-size:9.5px; padding:4px 6px;" ${dev.type.includes("PLC") ? 'disabled' : ''}>Low FPS</button>
+            <button class="btn btn-ghost compact btn-inject-fault" type="button" data-fault="low_fps" style="font-size:9.5px; padding:4px 6px;" ${deviceType.includes("PLC") ? 'disabled' : ''}>Low FPS</button>
             <button class="btn btn-ghost compact btn-inject-fault" type="button" data-fault="thermal_warning" style="font-size:9.5px; padding:4px 6px;">Thermal Warning</button>
             <button class="btn btn-ghost compact btn-inject-fault" type="button" data-fault="heartbeat_timeout" style="font-size:9.5px; padding:4px 6px;">HB Timeout</button>
             <button class="btn btn-primary compact btn-inject-fault" type="button" data-fault="recover" style="font-size:9.5px; padding:4px 6px; background:#10b981; border-color:#10b981; color:#fff;">Recover Node</button>
@@ -511,9 +536,9 @@ export class DeviceController {
         }
 
         el.innerHTML = `
-          <strong>[${time} WIB] ID: ${cmd.actionId ? cmd.actionId.slice(-6) : '-'}</strong><br/>
-          <span style="color:#10b981;">• Status: ${cmd.status || 'APPLIED'}</span><br/>
-          <span>• Detail: ${desc}</span>
+          <strong>[${time} WIB] ID: ${escapeHtml(typeof cmd.actionId === 'string' ? cmd.actionId.slice(-6) : '-')}</strong><br/>
+          <span style="color:#10b981;">• Status: ${escapeHtml(cmd.status || 'APPLIED')}</span><br/>
+          <span>• Detail: ${escapeHtml(desc)}</span>
         `;
       } else {
         el.textContent = "Belum ada riwayat audit perintah.";
@@ -572,7 +597,7 @@ export class DeviceController {
           payload
         }, false); // low risk
 
-        window.showToast(`✓ Konfigurasi parameter ${this.selectedDeviceId} berhasil disimpan & disinkronkan.`);
+        window.showToast(`State konfigurasi demo ${this.selectedDeviceId} diperbarui lokal; tidak dikirim ke hardware.`);
         soundManager.play('success');
         closeDrawer();
       } catch (err) {
@@ -617,10 +642,10 @@ export class DeviceController {
 
       if (payload && payload.success) {
         if (faultType === "recover") {
-          window.showToast(`✓ Perangkat ${deviceId} berhasil dipulihkan secara normal (HEALTHY).`);
+          window.showToast(`State perangkat demo ${deviceId} dipulihkan di simulator.`);
           soundManager.play('success');
         } else {
-          window.showToast(`⚠️ Gangguan "${faultType.toUpperCase()}" disuntikkan secara deterministik pada ${deviceId}.`, "warning");
+          window.showToast(`Gangguan demo "${faultType.toUpperCase()}" disimulasikan untuk ${deviceId}; tidak memengaruhi perangkat fisik.`, "warning");
           soundManager.play('alert');
         }
         // Force update drawer live details
@@ -639,20 +664,24 @@ export class DeviceController {
 
   _handleConfigTransitionEvent(data) {
     if (!data || data.deviceId !== this.selectedDeviceId) return;
+    const timestamp = new Date(data.timestamp);
+    const time = Number.isNaN(timestamp.getTime()) ? "--:--:--" : timestamp.toLocaleTimeString('id-ID');
+    const fps = Number(data.newState?.fps);
+    const safeFps = Number.isFinite(fps) ? fps : "-";
+    const safeResolution = typeof data.newState?.resolution === 'string' ? data.newState.resolution : '-';
 
     // Tampilkan di log audit real-time
     const el = document.getElementById("diagLastCommand");
     if (el) {
-      const time = new Date(data.timestamp).toLocaleTimeString('id-ID');
       let statusColor = "#38bdf8"; // requested
       if (data.status === "VALIDATING") statusColor = "#f59e0b";
       else if (data.status === "APPLIED") statusColor = "#22c55e";
       else if (data.status === "REJECTED") statusColor = "#ef4444";
 
       el.innerHTML = `
-        <strong>[${time} WIB] ID: ${data.actionId.slice(-6)}</strong><br/>
-        <span style="color:${statusColor}; font-weight:700;">• Status: ${data.status}</span><br/>
-        <span>• Param: FPS:${data.newState.fps}, Res:${data.newState.resolution}</span>
+        <strong>[${time} WIB] ID: ${escapeHtml(typeof data.actionId === 'string' ? data.actionId.slice(-6) : '-')}</strong><br/>
+        <span style="color:${statusColor}; font-weight:700;">• Status: ${escapeHtml(data.status)}</span><br/>
+        <span>• Param: FPS:${escapeHtml(safeFps)}, Res:${escapeHtml(safeResolution)}</span>
       `;
     }
   }

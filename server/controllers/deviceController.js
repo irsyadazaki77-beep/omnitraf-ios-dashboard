@@ -1,17 +1,22 @@
 import { backendState } from '../services/stateManager.js';
 import { dbManager } from '../db/database.js';
 import { commandExecutor } from '../services/commandExecutor.js';
-import { createApiResponse, createApiErrorResponse, createCommandErrorResponse, getCommandErrorStatus } from '../middlewares/errorHandler.js';
+import { createApiResponse, createApiErrorResponse, createCommandErrorResponse, getCommandErrorStatus, sanitizeString } from '../middlewares/errorHandler.js';
 import { DEVICE_FAULTS, DEVICE_RESOLUTIONS } from '../config/contracts.js';
 
 export const VALID_RESOLUTIONS = DEVICE_RESOLUTIONS;
 export const VALID_FAULTS = DEVICE_FAULTS;
 
 export async function updateDeviceConfig(req, res) {
-  const { deviceId, fps, resolution, mode, greenWaveSync } = req.body || {};
+  const deviceId = typeof req.body?.deviceId === 'string' ? sanitizeString(req.body.deviceId, 64) : req.body?.deviceId;
+  const fps = req.body?.fps;
+  const resolution = req.body?.resolution;
+  const mode = typeof req.body?.mode === 'string' ? sanitizeString(req.body.mode, 60) : req.body?.mode;
+  const greenWaveSync = req.body?.greenWaveSync;
+
   const commandId = req.body?.commandId || `CMD-REST-CFG-${Date.now()}`;
   const correlationId = req.headers['x-correlation-id'] || req.body?.correlationId || `CORR-REST-${Date.now()}`;
-  const idempotencyKey = req.headers['x-idempotency-key'] || req.body?.idempotencyKey || `IDEMP-REST-CFG-${deviceId}-${JSON.stringify(req.body)}`;
+  const idempotencyKey = req.headers['x-idempotency-key'] || req.body?.idempotencyKey || `IDEMP-REST-CFG-${deviceId}-${JSON.stringify({ deviceId, fps, resolution, mode, greenWaveSync })}`;
 
   try {
     const authenticatedUser = {

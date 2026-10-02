@@ -112,8 +112,8 @@ describe('Phase 15: Product Polish, Honest Provenance & UI/UX Refinements', () =
       const titleEl = document.getElementById('dashEmergencyTitle');
       const badgeEl = document.getElementById('dashEmergencyBadge');
 
-      assert.strictEqual(titleEl.textContent, 'Tidak Ada Armada Darurat Aktif');
-      assert.strictEqual(badgeEl.textContent, 'Standby');
+      assert.strictEqual(titleEl.textContent, 'Tidak ada skenario prioritas aktif');
+      assert.strictEqual(badgeEl.textContent, 'DEMO');
     });
 
     test('renders active priority state when activeEmergencies contains an active vehicle', () => {
@@ -138,7 +138,7 @@ describe('Phase 15: Product Polish, Honest Provenance & UI/UX Refinements', () =
 
       assert.ok(titleEl.textContent.includes('AMB-112-POLISH'));
       assert.ok(etaEl.textContent.includes('2m 30s'));
-      assert.strictEqual(badgeEl.textContent, 'Aktif');
+      assert.strictEqual(badgeEl.textContent, 'SIMULASI');
     });
   });
 

@@ -1,10 +1,10 @@
 /**
  * OmniTRAF Surabaya - Incidents & Context Menu Controller
- * Mengelola deteksi insiden real-time, resolusi insiden (PATCH API & State Sync),
- * modal detail kronologi insiden, disposisi petugas 112, serta context menu interaktif peta.
+ * Mengelola skenario insiden pada prototipe, sinkronisasi state demo,
+ * modal kronologi contoh, serta context menu interaktif peta.
  */
 
-import { stateStore, updateIncidentState } from '../core/stateStore.js';
+import { stateStore, updateIncidentState, escapeHtml } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
 import { socketClient } from '../core/socketClient.js';
 import { mapManager } from '../modules/mapManager.js';
@@ -63,16 +63,16 @@ export class IncidentController {
         targetId: id,
         payload: {
           status: 'DISPATCHED',
-          assignedUnit: 'Patroli Dishub & Tim 112 Surabaya',
-          notes: 'Tim lapangan & armada derek telah didisposisikan ke lokasi.'
+          assignedUnit: 'Unit Demo',
+          notes: 'Status penugasan hanya berubah pada simulator; tidak ada petugas yang dihubungi.'
         }
       }, false); // low risk
 
-      window.showToast(`🚨 Tim Lapangan & SITS 112 didisposisikan ke lokasi insiden #${id}.`, 'success');
+      window.showToast(`Skenario penugasan #${id} diperbarui di simulator; tidak ada petugas yang dikirim.`, 'success');
       soundManager.play('alert');
     } catch (err) {
       console.warn("[IncidentController] Dispatch error:", err);
-      window.showToast(`❌ Gagal mendisposisi petugas: ${err.message}`, "danger");
+      window.showToast(`Aksi simulasi gagal diproses: ${err.message}`, "danger");
       soundManager.play('alert');
     }
   }
@@ -129,7 +129,7 @@ export class IncidentController {
             targetId: 'node-wonokromo',
             payload: { duration: 45 }
           }, true).then(() => {
-            window.showToast(`✓ Sinyal ${target} berhasil di-override: HIJAU 45s.`);
+            window.showToast(`State simulasi ${target} diperbarui ke fase contoh 45 detik; APILL tidak terhubung.`);
             soundManager.play('success');
           }).catch((err) => {
             window.showToast(`❌ Gagal override sinyal: ${err.message}`, "danger");
@@ -175,9 +175,9 @@ export class IncidentController {
       this.disposer.addEventListener(btnIncDispatch, "click", () => {
         closeModal();
         if (this.activeIncidentId) {
-          this.updateIncidentStatus(this.activeIncidentId, "DISPATCHED", "Patroli Dishub & Tim 112");
+          this.updateIncidentStatus(this.activeIncidentId, "DISPATCHED", "Unit Demo");
         } else {
-          window.showToast("🚨 Petugas Patroli Dishub & SITS 112 didisposisikan ke lokasi insiden.");
+          window.showToast("Status skenario diperbarui pada simulator; tidak ada petugas yang dihubungi.");
           soundManager.play('alert');
         }
       });
@@ -219,14 +219,14 @@ export class IncidentController {
 
     this.disposer.addEventListener(btnExport, "click", () => {
       const incidents = [
-        { time: new Date().toLocaleTimeString('id-ID'), loc: "Simpang Wonokromo (Bemo)", type: "Antrean Padat Koridor", status: "Ditangani SITS 112", officer: "Regu Patroli Dishub Timur" },
-        { time: "18:24:10", loc: "Jl. Darmo (Taman Bungkul)", type: "Volume Tinggi Jam Pulang", status: "Fase Hijau +12s", officer: "Operator ATCS Ruang Kontrol" },
-        { time: "17:45:00", loc: "Jemursari Indah", type: "Pohon Tumbang Sebagian", status: "Selesai Ditangani", officer: "DLH & Satlantas Polrestabes" },
-        { time: "16:30:15", loc: "Bundaran Waru (Masuk Kota)", type: "Penyempitan Lajur Tol", status: "Normal Kembali", officer: "PJR Polda Jatim" },
-        { time: "15:10:02", loc: "Jl. Pemuda - Simpang Yos Sudarso", type: "Prioritas Rombongan Dinas", status: "Selesai", officer: "Satlantas Polrestabes Surabaya" }
+        { time: "Contoh", loc: "Simpang Demo 01", type: "Skenario antrean padat", status: "Simulasi", officer: "Unit Demo" },
+        { time: "Contoh", loc: "Koridor Demo 02", type: "Skenario volume tinggi", status: "Simulasi", officer: "Operator Demo" },
+        { time: "Contoh", loc: "Jalan Demo 03", type: "Skenario hambatan jalan", status: "Simulasi", officer: "Unit Demo" },
+        { time: "Contoh", loc: "Simpang Demo 04", type: "Skenario penyempitan lajur", status: "Simulasi", officer: "Unit Demo" },
+        { time: "Contoh", loc: "Koridor Demo 05", type: "Skenario prioritas kendaraan", status: "Simulasi", officer: "Operator Demo" }
       ];
 
-      const csvHeader = "Waktu Laporkan,Lokasi Persimpangan,Tipe Insiden / Hambatan,Status Penanganan SITS,Unit Disposisi Petugas\n";
+      const csvHeader = "Waktu Contoh,Lokasi Demo,Skenario,Status Simulasi,Unit Demo\n";
       let csvRows = "";
       incidents.forEach(inc => {
         csvRows += `"${inc.time}","${inc.loc}","${inc.type}","${inc.status}","${inc.officer}"\n`;
@@ -239,14 +239,14 @@ export class IncidentController {
 
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `OmniTRAF-SITS-Log-Insiden-${new Date().toISOString().slice(0, 10)}.csv`);
+      link.setAttribute("download", `OmniTRAF-Simulasi-Insiden-${new Date().toISOString().slice(0, 10)}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
 
       if (typeof window.showToast === "function") {
-        window.showToast("✓ Berkas CSV Log Insiden SITS Surabaya (UTF-8 Excel) berhasil diunduh.");
+        window.showToast("✓ Berkas CSV skenario demo berhasil diunduh.");
       }
       soundManager.play('success');
     });
@@ -328,9 +328,11 @@ export class IncidentController {
     if (!notifContainer) return;
 
     const list = Array.isArray(incidents) ? incidents : [];
-    if (list.length === 0) return;
-
     notifContainer.innerHTML = "";
+    if (list.length === 0) {
+      notifContainer.innerHTML = '<p class="text-muted" style="margin:0;">Belum ada skenario demo.</p>';
+      return;
+    }
 
     list.forEach(inc => {
       const isResolved = ["RESOLVED", "ARCHIVED"].includes(inc.status);
@@ -358,13 +360,17 @@ export class IncidentController {
       card.className = "notif-item-card glass-soft";
       card.style.cssText = "padding: 12px; border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px;";
 
+      const safeTitle = escapeHtml(inc.title);
+      const safeLocation = escapeHtml(inc.location);
+      const safeNotes = escapeHtml(inc.notes || 'Skenario contoh pada simulator; bukan laporan lapangan.');
+
       card.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span class="status-badge ${badgeClass}">${badgeLabel}</span>
           <small style="font-size: 10px; color: var(--text-muted);">${inc.reportedAt ? new Date(inc.reportedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : 'Baru saja'}</small>
         </div>
-        <strong style="font-size: 12.5px; color: var(--text);">${inc.title} - ${inc.location}</strong>
-        <p style="margin: 0; font-size: 11px; color: var(--text-muted); line-height: 1.4;">${inc.notes || 'Hambatan lajur terdeteksi SITS 112.'}</p>
+        <strong style="font-size: 12.5px; color: var(--text);">${safeTitle} - ${safeLocation}</strong>
+        <p style="margin: 0; font-size: 11px; color: var(--text-muted); line-height: 1.4;">${safeNotes}</p>
         
         ${isResolved ? `
           <div style="font-size: 10.5px; color: var(--success); font-weight: 600;">
@@ -373,21 +379,24 @@ export class IncidentController {
         ` : ''}
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.06);">
-          <button class="btn btn-ghost compact btn-map-shortcut" style="padding: 4px 8px; font-size: 10.5px;" onclick="openIncidentOnMap('${inc.location.replace(/'/g, "\\'")}', '${inc.title.replace(/'/g, "\\'")}')">
+          <button class="btn btn-ghost compact btn-map-shortcut" style="padding: 4px 8px; font-size: 10.5px;">
             📍 Buka di Peta
           </button>
           
           ${!isResolved ? `
             ${!isDispatched ? `
-              <button class="btn btn-primary compact" style="padding: 4px 8px; font-size: 10.5px;" onclick="dispatchIncident('${inc.id}')">🚀 Dispatch</button>
+              <button class="btn btn-primary compact incident-dispatch-btn" style="padding: 4px 8px; font-size: 10.5px;">▶ Simulasikan</button>
             ` : `
-              <button class="btn btn-success compact" style="padding: 4px 8px; font-size: 10.5px; background: var(--success); border-color: var(--success);" onclick="resolveDynamicIncident('${inc.id}')">✓ Selesaikan</button>
+              <button class="btn btn-success compact incident-resolve-btn" style="padding: 4px 8px; font-size: 10.5px; background: var(--success); border-color: var(--success);">✓ Selesaikan</button>
             `}
           ` : ''}
         </div>
       `;
 
       notifContainer.appendChild(card);
+      card.querySelector('.btn-map-shortcut')?.addEventListener('click', () => mapManager.flyToIncident(inc.location || '', inc.title || ''));
+      card.querySelector('.incident-dispatch-btn')?.addEventListener('click', () => this.dispatchIncident(inc.id));
+      card.querySelector('.incident-resolve-btn')?.addEventListener('click', () => this.resolveIncident(inc.id));
     });
   }
 
@@ -424,11 +433,17 @@ export class IncidentController {
       item.className = `incident-log-item ${isResolved ? 'resolved' : 'unresolved'}`;
       item.id = `incident-${inc.id}`;
 
-      let statusBadgeHtml = `<span class="pill inc-badge-new" style="font-size: 11px; padding: 3px 8px;">⚠️ BARU (Open)</span>`;
+      const safeTitle = escapeHtml(inc.title);
+      const safeLocation = escapeHtml(inc.location);
+      const safeNotes = escapeHtml(inc.notes || 'Skenario contoh pada simulator; bukan laporan lapangan.');
+      const safeCategory = escapeHtml(inc.category ? inc.category.toUpperCase() : 'UMUM');
+      const safeUnit = escapeHtml(inc.assignedUnit || 'Unit Demo');
+
+      let statusBadgeHtml = `<span class="pill inc-badge-new" style="font-size: 11px; padding: 3px 8px;">⚠️ BARU (Demo)</span>`;
       if (isDispatched) {
-        statusBadgeHtml = `<span class="pill inc-badge-dispatched" style="font-size: 11px; padding: 3px 8px;">🚔 DITANGANI (${inc.assignedUnit || 'Patroli 112'})</span>`;
+        statusBadgeHtml = `<span class="pill inc-badge-dispatched" style="font-size: 11px; padding: 3px 8px;">▶ SIMULASI (${safeUnit})</span>`;
       } else if (isResolved) {
-        statusBadgeHtml = `<span class="pill inc-badge-resolved" style="font-size: 11px; padding: 3px 8px;">✅ SELESAI (Resolved)</span>`;
+        statusBadgeHtml = `<span class="pill inc-badge-resolved" style="font-size: 11px; padding: 3px 8px;">✅ SKENARIO SELESAI</span>`;
       }
 
       let responseTimeStr = "";
@@ -444,41 +459,45 @@ export class IncidentController {
           ${statusBadgeHtml}
           <span class="inc-time" style="font-size: 11px; color: var(--text-muted);">${inc.reportedAt ? new Date(inc.reportedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : 'Baru saja'}</span>
         </div>
-        <strong style="font-size: 14px; color: var(--text);">${inc.title} - ${inc.location}</strong>
-        <p style="margin: 6px 0; font-size: 12px; color: var(--text-muted); line-height: 1.45;">${inc.notes || 'Hambatan lajur terdeteksi oleh sistem SITS Command Center 112.'}</p>
+        <strong style="font-size: 14px; color: var(--text);">${safeTitle} - ${safeLocation}</strong>
+        <p style="margin: 6px 0; font-size: 12px; color: var(--text-muted); line-height: 1.45;">${safeNotes}</p>
         
         <div class="inc-meta-row" style="margin-top: 8px; display: flex; gap: 16px; font-size: 11px; color: #94a3b8; background: rgba(255,255,255,0.02); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
-          <div>Kategori: <strong style="color: var(--text);">${inc.category ? inc.category.toUpperCase() : 'UMUM'}</strong></div>
-          <div>Unit Disposisi: <strong style="color: var(--cyan);">${inc.assignedUnit || 'Belum Ditugaskan'}</strong></div>
+          <div>Kategori: <strong style="color: var(--text);">${safeCategory}</strong></div>
+          <div>Unit Disposisi: <strong style="color: var(--cyan);">${safeUnit}</strong></div>
           ${isResolved ? `<div>Durasi Respon: <strong style="color: var(--success);">${responseTimeStr || '3 menit'}</strong></div>` : `<div>Durasi Berjalan: <strong style="color: var(--amber);">${responseTimeStr || '1 menit'}</strong></div>`}
         </div>
 
         <div class="inc-actions" style="margin-top: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-          <button class="btn btn-ghost compact btn-map-shortcut" style="padding: 5px 12px; font-size: 11.5px;" onclick="openIncidentOnMap('${inc.location.replace(/'/g, "\\'")}', '${inc.title.replace(/'/g, "\\'")}')">
+          <button class="btn btn-ghost compact btn-map-shortcut" style="padding: 5px 12px; font-size: 11.5px;">
             📍 Buka di Peta
           </button>
 
           ${!isResolved ? `
             ${!isDispatched ? `
-              <button class="btn btn-primary compact dispatch-btn" style="padding: 5px 12px; font-size: 11.5px;" onclick="dispatchIncident('${inc.id}')">
-                🚀 Kirim Tim Lapangan (Dispatch)
+              <button class="btn btn-primary compact dispatch-btn" style="padding: 5px 12px; font-size: 11.5px;">
+                ▶ Simulasikan Penugasan
               </button>
             ` : `
-              <button class="btn btn-success compact resolve-btn" style="padding: 5px 12px; font-size: 11.5px; background: var(--success); border-color: var(--success);" onclick="resolveDynamicIncident('${inc.id}')">
+              <button class="btn btn-success compact resolve-btn" style="padding: 5px 12px; font-size: 11.5px; background: var(--success); border-color: var(--success);">
                 ✓ Selesaikan Insiden
               </button>
             `}
-            <button class="btn btn-ghost compact" style="padding: 5px 10px; font-size: 11px; color: var(--text-muted);" onclick="openIncidentDetail('${inc.id}', '${inc.location.replace(/'/g, "\\'")}', '${inc.reportedAt}', '${inc.notes ? inc.notes.replace(/'/g, "\\'") : ''}')">
+            <button class="btn btn-ghost compact incident-detail-btn" style="padding: 5px 10px; font-size: 11px; color: var(--text-muted);">
               📋 Kronologi & Disposisi
             </button>
           ` : `
             <span class="text-emerald-400 font-semibold" style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--success);">
-              ✓ Selesai Ditangani SITS | Response Time: ${responseTimeStr || '3 menit'}
+              ✓ Skenario selesai | Waktu simulasi: ${responseTimeStr || '3 menit'}
             </span>
           `}
         </div>
       `;
       listContainer.appendChild(item);
+      item.querySelector('.btn-map-shortcut')?.addEventListener('click', () => mapManager.flyToIncident(inc.location || '', inc.title || ''));
+      item.querySelector('.dispatch-btn')?.addEventListener('click', () => this.dispatchIncident(inc.id));
+      item.querySelector('.resolve-btn')?.addEventListener('click', () => this.resolveIncident(inc.id));
+      item.querySelector('.incident-detail-btn')?.addEventListener('click', () => this.openIncidentDetail(inc.id, inc.location || '', inc.reportedAt || '', inc.notes || ''));
     });
 
     this._renderDashboardTimeline(list);
@@ -512,12 +531,15 @@ export class IncidentController {
       if (isDispatched) dotClass = "warning";
       else if (isResolved) dotClass = "success";
 
+      const safeTitle = escapeHtml(inc.title || 'Insiden Lalu Lintas');
+      const safeLocation = escapeHtml(inc.location || 'Koridor demo');
+
       const li = document.createElement("li");
       li.innerHTML = `
         <span class="timeline-dot ${dotClass}"></span>
         <div>
-          <strong>${inc.title || 'Insiden Lalu Lintas'}</strong>
-          <small>${inc.location || 'Koridor SITS'} • ${isResolved ? 'selesai' : (inc.reportedAt ? new Date(inc.reportedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : 'baru saja')}</small>
+          <strong>${safeTitle}</strong>
+          <small>${safeLocation} • ${isResolved ? 'selesai' : (inc.reportedAt ? new Date(inc.reportedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : 'baru saja')}</small>
         </div>
       `;
       timelineEl.appendChild(li);

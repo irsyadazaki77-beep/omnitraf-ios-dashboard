@@ -6,9 +6,9 @@
         <div style="display: flex; align-items: center; gap: 12px;">
           <span style="font-size: 32px; background: rgba(0, 122, 255, 0.15); border: 1px solid rgba(0, 122, 255, 0.3); border-radius: 12px; padding: 6px 12px;">🧠</span>
           <div>
-            <h2 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.5px;">OmniTRAF Engine Architecture & ESG Scientific Modeling</h2>
+            <h2 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.5px;">Arsitektur Prototipe Simulasi OmniTRAF</h2>
             <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--text-muted);">
-              Sistem Manajemen Mobilitas Cerdas Terintegrasi ATCS SITS Surabaya — Edge AI, Sinyal Adaptif, & Formula Reduksi Emisi Karbon
+              Model demonstrasi mobilitas perkotaan — data dan perintah belum terhubung ke infrastruktur SITS.
             </p>
           </div>
         </div>
@@ -21,15 +21,14 @@
             <span>⚡</span> 1. Pipeline Data Edge AI & Inferensi YOLOv8 dengan 60 FPS LERP (Canvas API)
           </h3>
           <p style="font-size: 12px; color: var(--text); line-height: 1.6; margin: 0 0 10px 0;">
-            OmniTRAF mengakuisisi stream video 184 node CCTV ATCS SITS Kota Surabaya via RTSP/HLS. Pemrosesan deteksi objek dilakukan di level Edge Gateway menggunakan model <strong>YOLOv8s INT8 TensorRT</strong> dan tracking multi-objek <strong>ByteTrack (Kalman Filter)</strong>.
+            Prototipe ini <strong>tidak mengakuisisi stream CCTV</strong> dan tidak menjalankan YOLOv8, TensorRT, atau ByteTrack. Adegan dan deteksi yang terlihat dibuat oleh generator simulasi di browser/server; belum ada koneksi RTSP/HLS atau edge gateway SITS.
           </p>
           <div style="background: rgba(0,0,0,0.25); border-radius: 10px; padding: 12px 16px; font-family: 'Share Tech Mono', monospace; font-size: 11.5px; color: #38bdf8; line-height: 1.5; overflow-x: auto; margin-bottom: 12px;">
-            [184 CCTV RTSP SITS] ──► [Edge AI TensorRT YOLOv8] ──► [WebSocket Telemetry 300ms] ──► [Client 60 FPS LERP Canvas API]
+            [Generator lalu lintas simulasi] ──► [Deteksi sintetis] ──► [Socket.io prototipe] ──► [Canvas browser]
           </div>
           <div style="padding: 10px 14px; background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; border-radius: 6px; font-size: 11.5px; line-height: 1.6; color: #cbd5e1;">
-            <strong>Arsitektur 60 FPS Linear Interpolation (LERP):</strong><br/>
-            Untuk menghemat bandwidth jaringan tanpa mengorbankan fluiditas tampilan, server mengirimkan pembaruan koordinat bounding box setiap 300ms. Browser menginterpolasi posisi koordinat secara linier:
-            <code style="background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px; color: #38bdf8; font-family: 'Share Tech Mono', monospace;">pos_t = pos_current + (pos_target - pos_current) × (dt × 12.0)</code> pada loop <strong>Canvas 2D Context API 60 Hz</strong>, menghasilkan animasi kendaraan yang sangat halus tanpa lonjakan GPU (zero-bottleneck).
+            <strong>Visualisasi Canvas:</strong><br/>
+            Browser menggambar adegan dan kotak deteksi sintetis pada Canvas. Laju gambar mengikuti kemampuan perangkat dan browser; ini bukan inferensi video lapangan atau jaminan 60 FPS.
           </div>
         </section>
 
@@ -39,7 +38,7 @@
             <span>🚥</span> 2. Optimasi Sinyal Adaptif (Dynamic Webster Minimum Delay Method)
           </h3>
           <p style="font-size: 12px; color: var(--text); line-height: 1.6; margin: 0 0 10px 0;">
-            Algoritma SITS menghitung alokasi Green Split secara dinamis berdasarkan derajat kejenuhan antrean ($x_i = q_i / (s_i \cdot \lambda_i)$). Mengadaptasi formula klasik Webster untuk meminimalkan keterlambatan total persimpangan:
+            Model demonstrasi menghitung rekomendasi alokasi Green Split dari parameter yang dimasukkan pengguna, menggunakan rumus Webster sederhana. Hasilnya tidak diterapkan ke persimpangan fisik dan belum divalidasi untuk kondisi lapangan:
           </p>
           <div style="background: rgba(0,0,0,0.25); border-radius: 10px; padding: 12px 16px; font-family: 'Share Tech Mono', monospace; font-size: 13px; color: #4ade80;">
             C₀ = (1.5 × L + 5) / (1 - Y) &nbsp;&nbsp;|&nbsp;&nbsp; gᵢ = (C₀ - L) × (yᵢ / Y)
@@ -74,7 +73,7 @@
             <span>🌱</span> 3. Metodologi Ilmiah Estimasi Reduksi Emisi Karbon (ESG Score)
           </h3>
           <p style="font-size: 12px; color: var(--text); line-height: 1.6; margin: 0 0 10px 0;">
-            Reduksi emisi dihitung transparan mengacu pada <em>IPCC 2006 Guidelines for National Greenhouse Gas Inventories</em> dan siklus uji perkotaan Dishub Surabaya. Menghitung penghematan konsumsi bahan bakar saat mesin kendaraan diam (idling) akibat antrean lampu merah:
+            Kalkulator menampilkan estimasi ilustratif berbasis asumsi laju konsumsi dan faktor emisi yang dapat diubah. Angka yang tampil bukan hasil pengukuran Surabaya atau evaluasi Dishub, dan belum divalidasi sebagai inventaris emisi IPCC:
           </p>
           <div style="background: rgba(0,0,0,0.25); border-radius: 10px; padding: 14px 16px; font-family: 'Share Tech Mono', monospace; font-size: 12px; color: #a5f3fc; line-height: 1.6;">
             <strong>Formula Reduksi CO₂ Harian:</strong><br/>
@@ -106,7 +105,7 @@
             <span>🚨</span> 4. Protokol Preemption Koridor Darurat 112 (Emergency Green Wave)
           </h3>
           <p style="font-size: 12px; color: var(--text); line-height: 1.6; margin: 0;">
-            Saat armada Ambulans RSU Dr. Soetomo atau Pemadam Kebakaran 112 meminta prioritas rute, sistem mengunci seluruh fase sinyal APILL pada koridor target ke <strong>HIJAU PERMANEN (Green Wave Locked)</strong>. Integrasi geofencing GPS mendeteksi armada hingga radius 200 meter di setiap persimpangan, memangkas waktu tanggap darurat perkotaan hingga <strong>42% lebih cepat</strong>.
+            Perintah Green Wave dan dispatch hanya mengubah state dalam simulasi. Prototipe ini tidak menerima GPS armada, tidak menghubungi layanan 112, dan tidak mengendalikan APILL. Tidak ada pengukuran yang mendukung klaim pengurangan waktu tanggap.
           </p>
         </section>
 
@@ -116,7 +115,7 @@
             <span>🌐</span> 5. Kepatuhan Standar ISO Smart Transportation Kota Cerdas
           </h3>
           <p style="font-size: 12px; color: var(--text); line-height: 1.6; margin: 0 0 10px 0;">
-            Arsitektur OmniTRAF Surabaya dirancang mengacu pada standar internasional transportasi cerdas:
+            Nama dan indikator standar berikut hanya menjadi referensi diskusi. Prototipe ini belum dinilai, diuji kesesuaian, atau disertifikasi terhadap standar tersebut:
           </p>
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
             <div style="background: rgba(0,0,0,0.25); padding: 10px; border-radius: 8px; border-left: 3px solid #eab308;">
@@ -125,15 +124,15 @@
             </div>
             <div style="background: rgba(0,0,0,0.25); padding: 10px; border-radius: 8px; border-left: 3px solid #38bdf8;">
               <strong style="font-size: 12px; color: #bae6fd;">ISO 37122 (Smart Cities Indicators)</strong>
-              <p style="font-size: 11px; color: #94a3b8; margin: 4px 0 0 0;">Pengendali APILL real-time terkoneksi, telemetri bus terbuka, dan preemption armada tanggap darurat.</p>
+              <p style="font-size: 11px; color: #94a3b8; margin: 4px 0 0 0;">Indikator rujukan; integrasi APILL, telemetri bus, dan preemption nyata belum tersedia.</p>
             </div>
           </div>
         </section>
       </div>
 
       <div class="modal-footer" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-size: 11.5px; color: var(--text-muted);">SITS Smart City Innovation Showcase &copy; Pemerintah Kota Surabaya</span>
-        <button class="btn btn-primary" type="button" onclick="document.getElementById('engineInfoModal').style.display='none';document.getElementById('engineInfoModal').classList.remove('show');">Mengerti &amp; Tutup</button>
+        <span style="font-size: 11.5px; color: var(--text-muted);">OmniTRAF • Prototipe demonstrasi nonresmi</span>
+        <button class="btn btn-primary" type="button" id="btnCloseEngineInfoFooter">Mengerti &amp; Tutup</button>
       </div>
     </div>
   </div>
@@ -141,7 +140,7 @@
   <!-- PIP Camera Hover Overlay -->
   <div class="pip-camera-card glass-panel" id="pipCameraCard">
     <div class="pip-header">
-      <span class="pip-live-indicator">● LIVE SITS FEED</span>
+      <span class="pip-live-indicator">● VISI SIMULASI</span>
       <strong id="pipNodeName">Simpang Wonokromo</strong>
     </div>
     <div class="pip-body">

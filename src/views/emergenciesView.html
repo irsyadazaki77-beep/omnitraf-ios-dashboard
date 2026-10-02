@@ -5,16 +5,16 @@
             <div class="emergency-hero-info">
               <div class="emergency-kicker-row">
                 <span class="badge emergency-kicker-badge">
-                  <span class="signals-status-dot dot-live"></span> SITS EMERGENCY PREEMPTION
+                  <span class="signals-status-dot dot-live"></span> SIMULASI PREEMPTION DARURAT
                 </span>
                 <span class="unboxed-meta-sep">·</span>
                 <span class="emergency-kicker-sub">Command Center 112 Surabaya</span>
               </div>
               <h2 class="emergency-hero-title">
-                Simulasi Koridor Tanggap Darurat 112 (Bundaran Waru → RSUD Dr. Soetomo)
+                Simulasi Koridor Demo (Bundaran Waru → RSUD Dr. Soetomo)
               </h2>
               <p class="emergency-hero-desc">
-                Mendemonstrasikan algoritma <strong>Green Wave Clearance</strong> otomatis: saat armada darurat berada pada radius &lt;200 meter dari persimpangan prioritas (Jemursari, Wonokromo, Darmo/Diponegoro), fase lampu lalu lintas otomatis dipaksa <strong>HIJAU PENUH</strong> dan mengunci lajur konflik dengan telemetri spasial real-time.
+                Mendemonstrasikan aturan <strong>Green Wave Clearance</strong> pada state sintetis. Tidak ada GPS, armada, APILL, atau telemetri lapangan yang terhubung.
               </p>
             </div>
             <div class="emergency-hero-actions">
@@ -35,8 +35,8 @@
           <article class="emergency-dispatcher glass-panel">
             <div class="section-head">
               <div>
-                <h2>Emergency Preemption Actuator</h2>
-                <p>Kirim sinyal preemption darurat dan intervensi fase lampu hijau persimpangan SITS.</p>
+                <h2>Kontrol Skenario Preemption</h2>
+                <p>Ubah state simulasi prioritas dan fase sinyal. Tidak mengirim perintah ke persimpangan SITS.</p>
               </div>
             </div>
             <form id="emergencyActuatorForm" class="actuator-form">
@@ -45,7 +45,7 @@
                 <select id="respType" class="selector select-full">
                   <option value="Ambulans">✚ Ambulans Medis</option>
                   <option value="Pemadam">🚒 Pemadam Kebakaran</option>
-                  <option value="Patroli">🚔 Patroli SITS / Dishub</option>
+                  <option value="Patroli">🚔 Kendaraan patroli contoh</option>
                 </select>
               </div>
               
@@ -60,7 +60,7 @@
               
               <div class="form-group form-group-mb-16">
                 <label class="form-label-muted" for="respName">Identitas Armada / Nomor Lambung</label>
-                <input type="text" id="respName" class="search-box input input-full" value="Ambulans SITS-08" placeholder="Contoh: Ambulans 08, PMK 11" required />
+                <input type="text" id="respName" class="search-box input input-full" value="Ambulans Demo-08" placeholder="Contoh: Ambulans Demo 08, PMK Demo 11" required />
               </div>
               
               <button type="submit" class="btn btn-primary btn-full" id="btnLaunchPreemption">Aktifkan Sinyal Prioritas</button>
@@ -84,7 +84,7 @@
             <div class="section-head">
               <div>
                 <h2>Active Emergency Responders Surabaya</h2>
-                <p>Integrasi GPS SITS ambulans & pemadam darurat prioritas.</p>
+                <p>Posisi dan status kendaraan dibuat oleh model; tidak ada integrasi GPS SITS.</p>
               </div>
               <span class="pill pill-danger" id="activePriorityCount">2 Active priority</span>
             </div>
@@ -92,7 +92,7 @@
             <div class="emergency-list-grid" id="emergencyListGrid">
               <div class="glass-panel text-center" style="padding: 24px; color: var(--text-dim); grid-column: 1 / -1;">
                 <span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>
-                <span>Memuat data armada darurat SITS 112...</span>
+                <span>Memuat armada simulasi...</span>
               </div>
             </div>
           </div>

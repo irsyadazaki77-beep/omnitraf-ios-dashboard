@@ -23,14 +23,15 @@ test('REST and Socket use the same canonical device command and expose matching 
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: 'admin', password: 'admin123' })
   });
-  adminToken = (await login.json()).token;
+  await login.json();
+  adminToken = login.headers.get('set-cookie')?.match(/omnitraf_session=([^;]+)/)?.[1];
   socket = Client(baseUrl, { transports: ['websocket'], forceNew: true, auth: { token: adminToken } });
   await new Promise((resolve, reject) => { socket.once('connect', resolve); socket.once('connect_error', reject); });
 
   const payload = { deviceId: 'NODE-EDGE-02', fps: 32, resolution: '1080p', greenWaveSync: true };
   const restResponse = await fetch(`${baseUrl}/api/devices/config`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}`, 'X-Idempotency-Key': 'CONTRACT-PARITY-REST-01' },
+    headers: { 'Content-Type': 'application/json', Cookie: `omnitraf_session=${adminToken}`, 'X-Idempotency-Key': 'CONTRACT-PARITY-REST-01' },
     body: JSON.stringify({ ...payload, commandId: 'CONTRACT-PARITY-REST-CMD' })
   });
   assert.equal(restResponse.status, 200);
@@ -54,7 +55,7 @@ test('invalid REST and Socket commands return the same contract error and cause 
   try {
     const restResponse = await fetch(`${baseUrl}/api/devices/config`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+      headers: { 'Content-Type': 'application/json', Cookie: `omnitraf_session=${adminToken}` },
       body: JSON.stringify({ deviceId: 'NODE-EDGE-02', fps: 91 })
     });
     const restBody = await restResponse.json();

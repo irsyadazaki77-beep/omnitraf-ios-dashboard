@@ -6,6 +6,7 @@ export const PUBLIC = 'PUBLIC';
 export const CAPABILITIES = {
   // Public access is limited to non-sensitive service entry points.
   'auth:login': [PUBLIC],
+  'auth:logout': [PUBLIC],
   'health:liveness': [PUBLIC],
 
   // Viewer data access. Operational snapshots are authenticated, even when read-only.
@@ -88,7 +89,8 @@ export const ROUTE_CAPABILITIES = {
   'GET /api/v1/signals/cycle': 'traffic:read',
   'GET /api/v1/cctv/detections': 'devices:read',
   'GET /api/v1/*': 'traffic:read',
-  'GET /api/auth/me': 'identity:read'
+  'GET /api/auth/me': 'identity:read',
+  'POST /api/auth/logout': 'auth:logout'
 };
 
 export function isActionAuthorized(role, action) {

@@ -7,7 +7,7 @@
 
 import { soundManager } from '../core/soundManager.js';
 import { mapManager } from '../modules/mapManager.js';
-import { stateStore } from '../core/stateStore.js';
+import { stateStore, escapeHtml } from '../core/stateStore.js';
 import { generateForecastSnapshot, runForecastTestSuite, MODEL_VERSION } from '../modules/forecastEngine.js';
 import { Disposer } from '../core/disposer.js';
 
@@ -271,13 +271,13 @@ export class AnalyticsController {
       const provColor = provenance === 'REALTIME-DERIVED' ? '#10b981' : provenance === 'DEGRADED' ? '#f59e0b' : '#38bdf8';
       qualityBadge.innerHTML = `
         <span class="badge" style="background: rgba(15, 23, 42, 0.8); border: 1px solid ${provColor}; color: ${provColor}; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 20px;">
-          🏷️ SOURCE: ${provenance}
+          🏷️ SOURCE: ${escapeHtml(provenance)}
         </span>
         <span class="badge" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(0, 229, 255, 0.4); color: #00e5ff; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 20px;">
-          🎯 CONFIDENCE: ${confidence}%
+          🎯 CONFIDENCE: ${escapeHtml(confidence)}%
         </span>
         <span class="badge" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); color: #94a3b8; font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 20px;">
-          ⚙️ MODEL: ${snapshot.modelVersion || MODEL_VERSION}
+          ⚙️ MODEL: ${escapeHtml(snapshot.modelVersion || MODEL_VERSION)}
         </span>
       `;
     }
@@ -290,12 +290,12 @@ export class AnalyticsController {
     if (recTextEl && rec) {
       recTextEl.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 4px;">
-          <strong style="color: #00e5ff; font-size: 11px;">[ID: ${rec.recommendationId || 'REC-AI'}]</strong>
-          <span style="font-size: 10px; color: var(--text-muted);">Impact: ${rec.expectedImpact}</span>
+          <strong style="color: #00e5ff; font-size: 11px;">[ID: ${escapeHtml(rec.recommendationId || 'REC-AI')}]</strong>
+          <span style="font-size: 10px; color: var(--text-muted);">Impact: ${escapeHtml(rec.expectedImpact)}</span>
         </div>
-        <div style="font-size: 13px; font-weight: 600; color: #e2e8f0; line-height: 1.4;">${rec.text}</div>
+        <div style="font-size: 13px; font-weight: 600; color: #e2e8f0; line-height: 1.4;">${escapeHtml(rec.text)}</div>
         <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;">
-          ${(rec.reasonCodes || []).map(r => `<span style="font-size: 9.5px; padding: 2px 6px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 4px;">${r}</span>`).join('')}
+          ${(Array.isArray(rec.reasonCodes) ? rec.reasonCodes : []).map(r => `<span style="font-size: 9.5px; padding: 2px 6px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 4px;">${escapeHtml(r)}</span>`).join('')}
         </div>
       `;
     }
@@ -321,7 +321,7 @@ export class AnalyticsController {
       scenarioCard.innerHTML = `
         <div class="section-head compact" style="margin-bottom: 12px;">
           <div>
-            <h2>⚖️ Simulasi Skenario: Baseline vs AI Optimized (${snapshot.hourLabel})</h2>
+            <h2>⚖️ Simulasi Skenario: Baseline vs AI Optimized (${escapeHtml(snapshot.hourLabel)})</h2>
             <p>Eksplisit membandingkan parameter kondisi saat ini (Baseline) dengan rekayasa sinyal adaptif AI SITS.</p>
           </div>
           <span class="badge" style="background: rgba(0, 229, 255, 0.15); color: #00e5ff; font-weight: 700; padding: 4px 10px; border-radius: 8px;">Deterministic Scenario Model</span>
@@ -331,45 +331,45 @@ export class AnalyticsController {
           <div style="background: rgba(15, 23, 42, 0.7); padding: 14px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08);">
             <div style="font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px;">📊 BASELINE SITS</div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Waktu Tunggu:</span><strong>${sc.baseline.waitTimeSec}s</strong>
+              <span>Waktu Tunggu:</span><strong>${escapeHtml(sc.baseline.waitTimeSec)}s</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Panjang Antrean:</span><strong>${sc.baseline.queueMeters} m</strong>
+              <span>Panjang Antrean:</span><strong>${escapeHtml(sc.baseline.queueMeters)} m</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Kecepatan Rerata:</span><strong>${sc.baseline.speedKmh} km/h</strong>
+              <span>Kecepatan Rerata:</span><strong>${escapeHtml(sc.baseline.speedKmh)} km/h</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between;">
-              <span>Throughput:</span><strong>${sc.baseline.throughputVehPerHour} veh/h</strong>
+              <span>Throughput:</span><strong>${escapeHtml(sc.baseline.throughputVehPerHour)} veh/h</strong>
             </div>
           </div>
 
           <div style="background: rgba(15, 23, 42, 0.7); padding: 14px; border-radius: 10px; border: 1px solid rgba(0, 229, 255, 0.3);">
             <div style="font-size: 11px; font-weight: 800; color: #00e5ff; text-transform: uppercase; margin-bottom: 8px;">✨ AI OPTIMIZED</div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Waktu Tunggu:</span><strong style="color: #10b981;">${sc.optimized.waitTimeSec}s (-${sc.delta.waitTimeReductionPct}%)</strong>
+              <span>Waktu Tunggu:</span><strong style="color: #10b981;">${escapeHtml(sc.optimized.waitTimeSec)}s (-${escapeHtml(sc.delta.waitTimeReductionPct)}%)</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Panjang Antrean:</span><strong style="color: #10b981;">${sc.optimized.queueMeters} m (-${sc.delta.queueReductionPct}%)</strong>
+              <span>Panjang Antrean:</span><strong style="color: #10b981;">${escapeHtml(sc.optimized.queueMeters)} m (-${escapeHtml(sc.delta.queueReductionPct)}%)</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Kecepatan Rerata:</span><strong style="color: #38bdf8;">${sc.optimized.speedKmh} km/h (+${sc.delta.speedGainPct}%)</strong>
+              <span>Kecepatan Rerata:</span><strong style="color: #38bdf8;">${escapeHtml(sc.optimized.speedKmh)} km/h (+${escapeHtml(sc.delta.speedGainPct)}%)</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between;">
-              <span>Throughput:</span><strong style="color: #38bdf8;">${sc.optimized.throughputVehPerHour} veh/h (+${sc.delta.throughputGainPct}%)</strong>
+              <span>Throughput:</span><strong style="color: #38bdf8;">${escapeHtml(sc.optimized.throughputVehPerHour)} veh/h (+${escapeHtml(sc.delta.throughputGainPct)}%)</strong>
             </div>
           </div>
 
           <div style="background: rgba(15, 23, 42, 0.7); padding: 14px; border-radius: 10px; border: 1px solid rgba(16, 185, 129, 0.3);">
             <div style="font-size: 11px; font-weight: 800; color: #10b981; text-transform: uppercase; margin-bottom: 8px;">🌱 IMPACT SCENARIO PROJECTION</div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>BBM Diselamatkan:</span><strong style="color: #10b981;">${sc.delta.fuelSavedLiters} Litres</strong>
+              <span>BBM Diselamatkan:</span><strong style="color: #10b981;">${escapeHtml(sc.delta.fuelSavedLiters)} Litres</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>CO₂ Tereduksi:</span><strong style="color: #34d399;">${sc.delta.co2SavedKg} Kg</strong>
+              <span>CO₂ Tereduksi:</span><strong style="color: #34d399;">${escapeHtml(sc.delta.co2SavedKg)} Kg</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Nilai Subsidi:</span><strong style="color: #f59e0b;">Rp ${sc.delta.monetarySavedRp.toLocaleString('id-ID')}</strong>
+              <span>Nilai Subsidi:</span><strong style="color: #f59e0b;">Rp ${Number(sc.delta.monetarySavedRp || 0).toLocaleString('id-ID')}</strong>
             </div>
             <small style="color: var(--text-muted); font-size: 10px; display: block; margin-top: 6px;">Catatan: Angka ini merupakan estimasi simulasi berbasis asumsi PKJI / HCM.</small>
           </div>
@@ -423,13 +423,13 @@ export class AnalyticsController {
                 const riskBadge = c.riskLevel === 'CRITICAL' ? '<span style="color:#ef4444; font-weight:800;">🔴 KRITIS</span>' : c.riskLevel === 'WARNING' ? '<span style="color:#f59e0b; font-weight:800;">🟡 WASPADA</span>' : '<span style="color:#10b981; font-weight:800;">🟢 NORMAL</span>';
                 return `
                   <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                    <td style="padding: 10px 8px; font-weight: 700; color: #ffffff;">${c.name}</td>
-                    <td style="padding: 10px 8px;">${c.volume} / ${c.capacity} veh/h</td>
-                    <td style="padding: 10px 8px; color: #00e5ff; font-weight: 700;">${c.speed} km/h</td>
-                    <td style="padding: 10px 8px;">${c.density} veh/km</td>
-                    <td style="padding: 10px 8px;">${c.queueMeters} m</td>
-                    <td style="padding: 10px 8px;">${c.delaySec}s</td>
-                    <td style="padding: 10px 8px; color: #10b981; font-weight: 700;">${c.signalEfficiencyPct}%</td>
+                    <td style="padding: 10px 8px; font-weight: 700; color: #ffffff;">${escapeHtml(c.name)}</td>
+                    <td style="padding: 10px 8px;">${escapeHtml(c.volume)} / ${escapeHtml(c.capacity)} veh/h</td>
+                    <td style="padding: 10px 8px; color: #00e5ff; font-weight: 700;">${escapeHtml(c.speed)} km/h</td>
+                    <td style="padding: 10px 8px;">${escapeHtml(c.density)} veh/km</td>
+                    <td style="padding: 10px 8px;">${escapeHtml(c.queueMeters)} m</td>
+                    <td style="padding: 10px 8px;">${escapeHtml(c.delaySec)}s</td>
+                    <td style="padding: 10px 8px; color: #10b981; font-weight: 700;">${escapeHtml(c.signalEfficiencyPct)}%</td>
                     <td style="padding: 10px 8px;">${riskBadge}</td>
                   </tr>
                 `;
@@ -450,14 +450,14 @@ export class AnalyticsController {
 
     if (co2SavedEl) {
       co2SavedEl.innerHTML = `
-        <span>${esg.observedSavings.co2SavedKg.toLocaleString('id-ID')} kg</span>
-        <small style="font-size: 10px; color: #10b981; display: block;">(Observed Realtime) • Simulasi Scenario: ${esg.simulatedScenarioSavings.co2SavedKg} kg</small>
+        <span>${escapeHtml(Number(esg.observedSavings.co2SavedKg || 0).toLocaleString('id-ID'))} kg</span>
+        <small style="font-size: 10px; color: #10b981; display: block;">(Observed Realtime) • Simulasi Scenario: ${escapeHtml(esg.simulatedScenarioSavings.co2SavedKg)} kg</small>
       `;
     }
     if (fuelSavedEl) {
       fuelSavedEl.innerHTML = `
-        <span>${esg.observedSavings.fuelSavedLiters.toLocaleString('id-ID')} Liter</span>
-        <small style="font-size: 10px; color: #10b981; display: block;">(Observed Realtime) • Simulasi Scenario: ${esg.simulatedScenarioSavings.fuelSavedLiters} L</small>
+        <span>${escapeHtml(Number(esg.observedSavings.fuelSavedLiters || 0).toLocaleString('id-ID'))} Liter</span>
+        <small style="font-size: 10px; color: #10b981; display: block;">(Observed Realtime) • Simulasi Scenario: ${escapeHtml(esg.simulatedScenarioSavings.fuelSavedLiters)} L</small>
       `;
     }
   }

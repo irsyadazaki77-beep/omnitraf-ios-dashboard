@@ -1,11 +1,13 @@
 import { backendState } from '../services/stateManager.js';
-import { createApiResponse, createApiErrorResponse } from '../middlewares/errorHandler.js';
+import { createApiResponse, createApiErrorResponse, sanitizeString } from '../middlewares/errorHandler.js';
 import { diagnosticEngine } from '../services/diagnosticEngine.js';
+import { REALTIME_ROOMS } from '../sockets/eventRegistry.js';
 
 export function executeTerminalCommand(req, res) {
   const { command } = req.body || {};
-  const cmd = (command || '').trim();
-  const lower = cmd.toLowerCase().split(' ')[0];
+  const invalidCommandFormat = typeof command !== 'string' || command.length > 40 || /[\x00-\x1F\x7F]/.test(command);
+  const cmd = typeof command === 'string' ? sanitizeString(command, 40).trim() : '';
+  const lower = cmd.toLowerCase();
   const time = backendState._getWibTimeString();
   const executionId = `EXEC-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
   // Security: authenticated user strictly from verified principal (req.user), never client body
@@ -14,17 +16,19 @@ export function executeTerminalCommand(req, res) {
   let responseLines = [];
   let color = "var(--text)";
 
-  if (!cmd) {
+  if (!cmd || invalidCommandFormat) {
     return res.status(400).json(createApiErrorResponse(
       400,
       "VALIDATION_ERROR",
-      "Perintah terminal tidak boleh kosong.",
+      "Perintah terminal harus berupa teks singkat tanpa karakter kontrol.",
       { field: "command" }
     ));
   }
 
   const allowedCommands = ['/help', 'help', '/status', 'status', '/ping', 'ping', '/telemetry', 'telemetry', '/nodes', 'nodes', '/chaos', 'chaos', '/clear', 'clear', '/perf', 'perf', '/sys-metrics', '/diagnostics', 'diagnostics', '/sim', 'sim'];
 
+  // Commands are read-only simulator shortcuts; require an exact token so a
+  // valid prefix cannot hide arbitrary suffixes in responses or audit records.
   if (!allowedCommands.includes(lower)) {
     responseLines = [
       `❌ PERINTAH DITOLAK: Perintah '${cmd}' tidak aman atau tidak diizinkan.`,
@@ -67,12 +71,12 @@ export function executeTerminalCommand(req, res) {
 
   if (lower === '/help' || lower === 'help') {
     responseLines = [
-      "Perintah SITS Gateway yang tersedia:",
-      "  • /status     - Cek kesehatan gateway & node SITS",
-      "  • /telemetry  - Ringkasan statistik & jaringan real-time",
-      "  • /nodes      - Daftar kluster sensor persimpangan",
-      "  • /ping       - Tes latensi ke edge node",
-      "  • /chaos      - Status mode keos SITS",
+      "Perintah terminal prototipe:",
+      "  • /status     - Status backend dan ringkasan data demo",
+      "  • /telemetry  - Ringkasan statistik simulasi",
+      "  • /nodes      - Daftar simpang pada model contoh",
+      "  • /ping       - Tampilkan contoh hasil ping simulasi",
+      "  • /chaos      - Status mode fault-injection simulator",
       "  • /perf       - Diagnostics performa & statistik memori server",
       "  • /clear      - Bersihkan log tampilan terminal"
     ];
@@ -81,7 +85,7 @@ export function executeTerminalCommand(req, res) {
     const mem = process.memoryUsage();
     const clientsCount = backendState.io ? backendState.io.engine?.clientsCount || 0 : 0;
     responseLines = [
-      `📊 DIAGNOSTIK PERFORMA SERVER SITS:`,
+      `📊 DIAGNOSTIK BACKEND PROTOTIPE:`,
       `  • Heap Used  : ${(mem.heapUsed / 1024 / 1024).toFixed(2)} MB`,
       `  • Heap Total : ${(mem.heapTotal / 1024 / 1024).toFixed(2)} MB`,
       `  • RSS        : ${(mem.rss / 1024 / 1024).toFixed(2)} MB`,
@@ -106,24 +110,25 @@ export function executeTerminalCommand(req, res) {
 
   } else if (lower === '/status' || lower === 'status') {
     responseLines = [
-      `[HTTP 200 OK] SITS Enterprise Server: ONLINE`,
-      `Backend Uptime: ${backendState.state.sitsUptime}% | CCTV Online: ${backendState.state.cctvOnline}/184`,
-      `IoT Sensors: ${backendState.state.iotOnline}/312 | AI Confidence: ${backendState.state.aiConfidence}%`
+      `[HTTP 200 OK] Backend prototipe: ONLINE`,
+      `Uptime model: ${backendState.state.sitsUptime}% | Kamera simulasi: ${backendState.state.cctvOnline}/184`,
+      `Sensor contoh: ${backendState.state.iotOnline}/312 | Skor model: ${backendState.state.aiConfidence}%`,
+      `Tidak terhubung ke SITS, CCTV, atau perangkat lapangan.`
     ];
     color = "var(--success)";
   } else if (lower === '/ping' || lower === 'ping') {
     responseLines = [
-      `Memulai ping ke 4 Edge Node SITS Surabaya...`,
-      `  • Node Wonokromo (DTC)     : 8 ms  [ONLINE]`,
-      `  • Node Raya Darmo          : 11 ms [ONLINE]`,
-      `  • Node Tunjungan / Siola   : 14 ms [ONLINE]`,
-      `  • Node MERR Kertajaya      : 9 ms  [ONLINE]`,
-      `Semua node merespons dalam <15ms.`
+      `Contoh hasil ping ke node simulasi (bukan perangkat fisik):`,
+      `  • Node demo Wonokromo      : 8 ms  [SIMULASI]`,
+      `  • Node demo Raya Darmo     : 11 ms [SIMULASI]`,
+      `  • Node demo Tunjungan      : 14 ms [SIMULASI]`,
+      `  • Node demo Kertajaya      : 9 ms  [SIMULASI]`,
+      `Angka latensi ini adalah nilai contoh, bukan hasil ping jaringan.`
     ];
     color = "var(--success)";
   } else if (lower === '/telemetry' || lower === 'telemetry') {
     responseLines = [
-      `Ringkasan Telemetri SITS (${time}):`,
+      `Ringkasan telemetri simulasi (${time}):`,
       `  • Beban Jaringan : ${backendState.state.networkLoad}%`,
       `  • Waktu Tunggu   : ${backendState.state.avgWaitTime}s`,
       `  • Indeks Macet   : ${backendState.state.congestionIndex}`,
@@ -132,12 +137,12 @@ export function executeTerminalCommand(req, res) {
     color = "var(--text)";
   } else if (lower === '/nodes' || lower === 'nodes') {
     responseLines = [
-      `Daftar Edge Cluster Nodes Active:`,
-      `  [NODE-01] Wonokromo  (Status: ${backendState.state.intersections[0].status})`,
-      `  [NODE-02] Jemursari  (Status: ${backendState.state.intersections[1].status})`,
-      `  [NODE-03] Raya Darmo (Status: ${backendState.state.intersections[2].status})`,
-      `  [NODE-04] Tunjungan  (Status: ${backendState.state.intersections[3].status})`,
-      `  [NODE-05] MERR       (Status: ${backendState.state.intersections[4].status})`
+      `Daftar simpang dalam model demo:`,
+      `  [DEMO-01] Wonokromo  (Status model: ${backendState.state.intersections[0].status})`,
+      `  [DEMO-02] Jemursari  (Status model: ${backendState.state.intersections[1].status})`,
+      `  [DEMO-03] Raya Darmo (Status model: ${backendState.state.intersections[2].status})`,
+      `  [DEMO-04] Tunjungan  (Status model: ${backendState.state.intersections[3].status})`,
+      `  [DEMO-05] MERR       (Status model: ${backendState.state.intersections[4].status})`
     ];
     color = "var(--primary-2)";
   } else if (lower === '/chaos' || lower === 'chaos') {
@@ -149,7 +154,7 @@ export function executeTerminalCommand(req, res) {
     const clk = backendState.clock;
     const sim = backendState.simEngine;
     responseLines = [
-      `⏱️ SITS UNIFIED DETERMINISTIC SIMULATION:`,
+      `⏱️ SIMULATOR DETERMINISTIK PROTOTIPE:`,
       `  • Mode            : ${clk.mode} (Paused: ${clk.paused})`,
       `  • Speed Multiplier: ${clk.speedMultiplier}x`,
       `  • Simulation Time : ${clk.nowWibString()} (${clk.now()} ms)`,
@@ -172,7 +177,7 @@ export function executeTerminalCommand(req, res) {
   backendState.auditLogs.unshift(auditRecord);
 
   if (lower !== '/clear' && lower !== 'clear' && backendState.io) {
-    backendState.io.emit('audit:log', {
+    backendState.io.to(REALTIME_ROOMS.AUDIT).emit('audit:log', {
       type: "terminal:executed",
       timestamp: new Date().toISOString(),
       entity: `Terminal ${executionId}`,

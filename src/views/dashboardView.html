@@ -2,12 +2,12 @@
         <!-- Dashboard Executive Command Header -->
         <header class="dash-hero-header">
           <div class="dash-hero-title-group">
-            <span class="eyebrow">SITS ADAPTIVE URBAN MOBILITY CONTROL CENTER</span>
-            <h1 class="dash-hero-title">Dashboard Command Center Surabaya</h1>
+            <span class="eyebrow">OMNITRAF • PROTOTIPE SIMULASI</span>
+            <h1 class="dash-hero-title">Simulasi Command Center Surabaya</h1>
           </div>
           <div class="dash-hero-status-strip">
             <div class="dash-status-item">
-              <span class="provenance-badge live" id="dashHeaderProv">SITS GATEWAY LIVE</span>
+              <span class="provenance-badge simulated" id="dashHeaderProv">SIMULASI • STREAM SERVER</span>
             </div>
             <div class="dash-status-item hide-mobile">
               <span class="dash-status-label">Uptime:</span>
@@ -26,30 +26,30 @@
             <div class="briefing-title-group">
               <span class="briefing-pulse-dot" id="briefingStatusDot"></span>
               <h2 class="briefing-title">Briefing Operasional Lalu Lintas Kota</h2>
-              <span class="provenance-badge live" id="briefingProvenance">REALTIME SITS</span>
+              <span class="provenance-badge simulated" id="briefingProvenance">SIMULASI SERVER</span>
             </div>
             <div class="briefing-timestamp" id="briefingTimestamp">Waktu Lokal: <span id="dashLocalTime">--:-- WIB</span></div>
           </div>
           <div class="briefing-grid">
             <div class="briefing-item briefing-severity-moderate" id="briefingCongestionState">
               <small class="briefing-label">Status Beban Kota</small>
-              <strong class="briefing-value" id="briefingCongestionVal">68% — Beban Sedang-Tinggi</strong>
-              <span class="briefing-sub" id="briefingCongestionSub">Peak Hour SITS Surabaya</span>
+              <strong class="briefing-value" id="briefingCongestionVal">68% — contoh model</strong>
+              <span class="briefing-sub" id="briefingCongestionSub">Nilai contoh model simulasi</span>
             </div>
             <div class="briefing-item" id="briefingAffectedCorridors">
               <small class="briefing-label">Koridor Terdampak Utama</small>
-              <strong class="briefing-value text-amber" id="briefingCorridorsVal">Ahmad Yani (83%) & Darmo (61%)</strong>
-              <span class="briefing-sub" id="briefingCorridorsSub">Simpang Wonokromo Antrean +180m</span>
+              <strong class="briefing-value text-amber" id="briefingCorridorsVal">Koridor Demo A (83%) & B (61%)</strong>
+              <span class="briefing-sub" id="briefingCorridorsSub">Angka contoh; bukan pengukuran lapangan</span>
             </div>
             <div class="briefing-item" id="briefingSignalCondition">
               <small class="briefing-label">Sistem Kontrol APILL</small>
-              <strong class="briefing-value text-cyan" id="briefingSignalVal">ATCS Adaptif Synchro Active</strong>
-              <span class="briefing-sub" id="briefingSignalSub">126 Simpang Terkoneksi (100%)</span>
+              <strong class="briefing-value text-cyan" id="briefingSignalVal">Model fase sinyal demo</strong>
+              <span class="briefing-sub" id="briefingSignalSub">Tidak terhubung ke APILL</span>
             </div>
             <div class="briefing-item" id="briefingActiveAlert">
               <small class="briefing-label">Intervensi / Peringatan Aktif</small>
-              <strong class="briefing-value text-emerald" id="briefingAlertVal">Prioritas Ambulans RSU Dr. Soetomo</strong>
-              <span class="briefing-sub" id="briefingAlertSub">ETA 1m 45s • Rute Darmo Hijau</span>
+              <strong class="briefing-value text-emerald" id="briefingAlertVal">Contoh skenario kendaraan darurat</strong>
+              <span class="briefing-sub" id="briefingAlertSub">Tidak ada armada nyata atau ETA terukur</span>
             </div>
           </div>
         </article>
@@ -95,10 +95,10 @@
               <div class="bento-content-wrap">
                 <div class="bento-header-badge">
                   <span class="stat-icon amber-tone">↗</span>
-                  <span class="bento-pill-tag">Live Koridor SITS</span>
+              <span class="bento-pill-tag">Model Koridor</span>
                 </div>
                 <div class="bento-meta-body">
-                  <p>Indeks Kemacetan Kota</p>
+              <p>Indeks Kemacetan (simulasi)</p>
                   <h2><span class="counter-val" data-counter="68">68</span><span class="denom-val">/100</span></h2>
                   <span class="metric-warn pill-trend"><span class="trend-arrow">▲</span> Padat • Wonokromo</span>
                 </div>
@@ -149,12 +149,12 @@
           <article class="stat-card bento-card glass-panel reveal-card">
             <div class="bento-card-header-row">
               <div class="stat-icon blue-tone">⌁</div>
-              <span class="pill pill-live">100% Online</span>
+                  <span class="pill pill-ai">Skenario</span>
             </div>
             <div>
-              <p>Persimpangan SITS Aktif</p>
-              <h2 data-counter="126">126</h2>
-              <span class="metric-up pill-trend">Siklus Adaptif Terkoneksi</span>
+              <p>Simpang dalam model</p>
+              <h2 data-counter="5">5</h2>
+              <span class="metric-up pill-trend">Contoh simpang simulasi</span>
             </div>
             <div class="stat-progress-bar"><div class="progress-fill blue-bar w-84p"></div></div>
           </article>
@@ -163,10 +163,10 @@
           <article class="stat-card bento-card glass-panel reveal-card">
             <div class="bento-card-header-row">
               <div class="stat-icon green-tone">⏱</div>
-              <span class="pill pill-live">-6s vs Rata-rata</span>
+              <span class="pill pill-ai">Estimasi model</span>
             </div>
             <div>
-              <p>Rata-rata Waktu Tunggu</p>
+              <p>Waktu Tunggu Estimasi</p>
               <h2><span class="counter-val" data-counter="42">42</span><span class="denom-val"> dtk</span></h2>
               <span class="metric-up pill-trend">Antrean Terkendali</span>
             </div>
@@ -180,9 +180,9 @@
               <span class="pill pill-danger">Prioritas 112</span>
             </div>
             <div>
-              <p>Armada Darurat Aktif</p>
-              <h2 data-counter="3">3</h2>
-              <span class="metric-down pill-trend">Green Wave Siaga</span>
+              <p>Skenario Darurat</p>
+              <h2 data-counter="1">1</h2>
+              <span class="metric-down pill-trend">Contoh data simulasi</span>
             </div>
             <div class="stat-progress-bar"><div class="progress-fill red-bar w-30p"></div></div>
           </article>
@@ -191,10 +191,10 @@
           <article class="stat-card bento-card glass-panel reveal-card">
             <div class="bento-card-header-row">
               <div class="stat-icon blue-tone">🚗</div>
-              <span class="pill pill-live">SITS Sensor Flow</span>
+              <span class="pill pill-ai">Arus simulasi</span>
             </div>
             <div>
-              <p>Volume Kendaraan Hari Ini</p>
+              <p>Volume Kendaraan (simulasi)</p>
               <h2 data-counter="128540">128.540</h2>
               <span class="metric-up pill-trend">+14.8% vs normal</span>
             </div>
@@ -236,10 +236,10 @@
             <div class="section-head">
               <div>
                 <h2>Situational Map Preview</h2>
-                <p>Visualisasi geospasial real-time koridor Ahmad Yani, Wonokromo, Raya Darmo, Kertajaya, dan Tunjungan.</p>
+                <p>Peta demo koridor Surabaya; posisi dan kepadatan bukan data geospasial real-time.</p>
               </div>
               <div class="map-head-actions" style="display: flex; align-items: center; gap: 8px;">
-                <span class="pill pill-live">SITS GIS</span>
+                <span class="pill pill-ai">PETA DEMO</span>
                 <a href="#map" class="btn btn-primary compact" data-view="map" style="text-decoration: none;">Buka Peta Lengkap ↗</a>
               </div>
             </div>
@@ -258,7 +258,7 @@
                 <div class="holo-hud-header">
                   <div class="holo-scan-badge">
                     <span class="holo-pulse-dot"></span>
-                    <span class="holo-badge-label">SITS SURABAYA GIS</span>
+                    <span class="holo-badge-label">PETA DEMO SURABAYA</span>
                   </div>
                   <button class="close-landmark-card holo-close-btn" id="btnCloseLandmarkCard" type="button" aria-label="Tutup info node">&times;</button>
                 </div>
@@ -346,14 +346,14 @@
               <div class="section-head compact">
                 <div>
                   <h2 class="widget-title-sm">CCTV Intelligence Summary</h2>
-                  <p class="widget-subtitle-sm">Inferensi Computer Vision Edge AI SITS.</p>
+                  <p class="widget-subtitle-sm">Animasi visi komputer sintetis untuk demonstrasi.</p>
                 </div>
                 <div class="camera-head-actions">
                   <!-- iOS Segmented Pill Bar Camera Switcher -->
                   <div class="cctv-mini-switch ios-segmented-cctv-pill" id="dashCctvSwitcher" aria-label="Pilihan CCTV Simpang">
-                    <button class="cctv-mini-btn active" type="button" data-cam="1" data-name="Jl. Ahmad Yani (Wonokromo)" data-sub="Camera 01 • SITS Stable feed">CCTV-01</button>
-                    <button class="cctv-mini-btn" type="button" data-cam="2" data-name="Jl. Raya Darmo (Al-Falah)" data-sub="Camera 02 • SITS Stable feed">CCTV-02</button>
-                    <button class="cctv-mini-btn" type="button" data-cam="3" data-name="Jl. Tunjungan (Siola)" data-sub="Camera 03 • SITS Stable feed">CCTV-03</button>
+                    <button class="cctv-mini-btn active" type="button" data-cam="1" data-name="Jl. Ahmad Yani (Wonokromo)" data-sub="Kamera sintetis • Simulasi OmniTRAF">CCTV-01</button>
+                    <button class="cctv-mini-btn" type="button" data-cam="2" data-name="Jl. Raya Darmo (Al-Falah)" data-sub="Kamera sintetis • Simulasi OmniTRAF">CCTV-02</button>
+                    <button class="cctv-mini-btn" type="button" data-cam="3" data-name="Jl. Tunjungan (Siola)" data-sub="Kamera sintetis • Simulasi OmniTRAF">CCTV-03</button>
                   </div>
                   <a href="#cctv" class="btn btn-ghost compact" data-view="cctv" style="text-decoration: none;">CCTV Full ↗</a>
                 </div>
@@ -362,7 +362,7 @@
               <!-- 16:9 Aspect Ratio Camera Viewport with Crisp Overlays -->
               <div class="camera-box tactical-camera-box" id="cameraBox">
                 <canvas class="cctv-canvas" id="dashCameraCanvas" width="640" height="360"></canvas>
-                <div class="camera-badge hud-pill"><span class="rec-dot"></span>LIVE</div>
+                <div class="camera-badge hud-pill">VISI SIMULASI</div>
                 <div class="camera-timestamp cctv-time hud-pill" id="cameraTime">--</div>
 
                 <!-- Glitch Overlay -->
@@ -373,7 +373,7 @@
 
                 <div class="camera-caption">
                   <strong id="dashCamTitle">Jl. Ahmad Yani (Wonokromo)</strong>
-                  <small id="dashCamSub">Camera 01 • SITS Stable feed</small>
+                  <small id="dashCamSub">Kamera sintetis • Simulasi OmniTRAF</small>
                 </div>
               </div>
             </article>
@@ -382,32 +382,32 @@
             <article class="widget glass-panel reveal-card" id="widgetAiRec">
               <div class="section-head compact">
                 <div>
-                  <h2 class="widget-title-sm">AI Recommendation</h2>
-                  <p class="widget-subtitle-sm">Optimasi siklus adaptif ATCS berbasis Edge AI.</p>
+                  <h2 class="widget-title-sm">Rekomendasi Model</h2>
+                  <p class="widget-subtitle-sm">Contoh perhitungan Webster pada data simulasi.</p>
                 </div>
-                <span class="pill pill-ai">🤖 AI Optimization Active</span>
+                <span class="pill pill-ai">MODEL DEMO</span>
               </div>
 
               <div class="ai-rec-card-body">
                 <div class="ai-rec-badge-row">
                   <span class="ai-rec-tag">
-                    <span class="pulse-dot-ai"></span> Skenario SITS Surabaya
+                    <span class="pulse-dot-ai"></span> Skenario simulasi
                   </span>
-                  <span class="ai-confidence-badge">Confidence 94%</span>
+                  <span class="ai-confidence-badge">Nilai contoh: 94%</span>
                 </div>
                 <p class="ai-rec-text" id="aiRecText">
-                  Deteksi antrean <strong>180m</strong> di <strong>Jl. Raya Darmo</strong>. Rekomendasi penambahan <strong>+15 detik</strong> durasi fase hijau pada <strong>Simpang Darmo–Polisi Istimewa</strong>.
+                  Skenario antrean <strong>180m (contoh)</strong> di <strong>Koridor Demo</strong>. Model menghitung tambahan fase <strong>+15 detik (contoh)</strong>; tidak dikirim ke pengendali sinyal.
                 </p>
                 <div class="ai-rec-meta-row">
-                  <span>🎯 Dampak: <strong class="text-success">-35% Kepadatan</strong></span>
-                  <span>⏱ Efek: <strong>2 Menit</strong></span>
-                  <span>⚡ Sinyal: <strong class="text-primary-2">Adaptive Green Wave</strong></span>
+                  <span>🎯 Dampak model: <strong class="text-success">contoh, belum diukur</strong></span>
+                  <span>⏱ Horizon: <strong>simulasi</strong></span>
+                  <span>⚡ Sinyal: <strong class="text-primary-2">tidak terhubung ke APILL</strong></span>
                 </div>
               </div>
 
               <div class="ai-rec-actions">
-                <button class="btn btn-ghost compact" type="button" id="btnDismissAiRec" onclick="dismissAiRecommendation()">Abaikan</button>
-                <button class="btn btn-primary compact" type="button" id="btnApplyAiRec" data-action="apply-ai">Terapkan Rekomendasi</button>
+                <button class="btn btn-ghost compact" type="button" id="btnDismissAiRec">Abaikan</button>
+                <button class="btn btn-primary compact" type="button" id="btnApplyAiRec" data-action="apply-ai">Coba di Simulasi</button>
               </div>
             </article>
           </aside>
@@ -420,9 +420,9 @@
             <div class="section-head compact">
               <div>
                 <h2>Signal Phase Control</h2>
-                <p>Durasi siklus adaptif Simpang Wonokromo.</p>
+                <p>Kontrol contoh pada state simulasi; bukan APILL fisik.</p>
               </div>
-              <span class="pill pill-ai">Auto</span>
+              <span class="pill pill-ai">DEMO</span>
             </div>
             <div class="phase-control">
               <div class="phase-row">
@@ -453,9 +453,9 @@
             <div class="section-head compact">
               <div>
                 <h2>Indeks Kepadatan Koridor</h2>
-                <p>Peringkat kemacetan koridor utama (Real-time).</p>
+                <p>Peringkat contoh dari model simulasi.</p>
               </div>
-              <span class="pill pill-live">Peringkat</span>
+              <span class="pill pill-ai">MODEL DEMO</span>
             </div>
             <div class="leaderboard-container leaderboard-flex-col">
               <div class="leaderboard-item leaderboard-row-item" id="leadRoad-0">
@@ -486,18 +486,18 @@
             <div class="section-head compact">
               <div>
                 <h2>Emergency Priority</h2>
-                <p>Prioritas kendaraan darurat terdeteksi.</p>
+                <p>Contoh skenario; tidak ada kendaraan darurat yang terdeteksi atau diarahkan.</p>
               </div>
-              <span class="pill pill-danger" id="dashEmergencyBadge">Aktif</span>
+              <span class="pill pill-danger" id="dashEmergencyBadge">SKENARIO DEMO</span>
             </div>
             <div class="emergency-row" id="dashEmergencyRow">
               <div class="emergency-icon-container">
                 <div class="emergency-icon pulse-red" id="dashEmergencyIcon">✚</div>
               </div>
               <div>
-                <strong id="dashEmergencyTitle">Ambulans menuju RSU Dr. Soetomo</strong>
-                <p id="dashEmergencyEta">ETA 1 menit 45 detik</p>
-                <small id="dashEmergencyRoute">Rute: Jl. Raya Darmo → RSU Dr. Soetomo</small>
+                <strong id="dashEmergencyTitle">Contoh ambulans — simulasi</strong>
+                <p id="dashEmergencyEta">ETA model: 1 menit 45 detik</p>
+                <small id="dashEmergencyRoute">Rute contoh: Jl. Raya Darmo → RSU Dr. Soetomo</small>
               </div>
             </div>
           </article>
@@ -507,7 +507,7 @@
             <div class="section-head compact">
               <div>
                 <h2>Riwayat Ekspor Data</h2>
-                <p>Laporan yang diunduh pada sesi operasional ini.</p>
+                <p>Riwayat berkas yang diunduh pada sesi demo ini.</p>
               </div>
               <span class="pill">Riwayat</span>
             </div>
@@ -519,9 +519,9 @@
             <div class="section-head compact">
               <div>
                 <h2>Incident Timeline</h2>
-                <p>Kronologi insiden lalu lintas terdeteksi.</p>
+                <p>Kronologi contoh dari skenario simulasi.</p>
               </div>
-              <span class="pill pill-danger">3 Alert</span>
+              <span class="pill pill-danger">3 CONTOH</span>
             </div>
             <div class="timeline-container">
               <div class="timeline-line">
@@ -530,15 +530,15 @@
               <ol class="timeline">
                 <li>
                   <span class="timeline-dot danger pulse-red-dot"></span>
-                  <div><strong>Kepadatan tinggi</strong><small>Koridor Wonokromo • 3 menit lalu</small></div>
+                  <div><strong>Contoh kepadatan tinggi</strong><small>Koridor demo • waktu simulasi</small></div>
                 </li>
                 <li>
                   <span class="timeline-dot warning"></span>
-                  <div><strong>Perbaikan marka jalan</strong><small>Kertajaya • 12 menit lalu</small></div>
+                  <div><strong>Contoh perbaikan marka</strong><small>Kertajaya • waktu simulasi</small></div>
                 </li>
                 <li>
                   <span class="timeline-dot success"></span>
-                  <div><strong>Ambulans diberi prioritas</strong><small>Darmo → Dr. Soetomo • selesai</small></div>
+                  <div><strong>Contoh prioritas ambulans</strong><small>Darmo → Dr. Soetomo • skenario demo</small></div>
                 </li>
               </ol>
             </div>
@@ -548,9 +548,9 @@
             <div class="section-head compact">
               <div>
                 <h2>Corridor Performance</h2>
-                <p>Indeks efisiensi koridor utama.</p>
+                <p>Indeks contoh dari simulasi koridor.</p>
               </div>
-              <span class="pill pill-live">Stable</span>
+              <span class="pill pill-ai">MODEL DEMO</span>
             </div>
             <div class="corridor-list">
               <div><span>Koridor A. Yani - Darmo</span><strong>83%</strong><i style="--value: 83%"></i></div>
@@ -562,23 +562,23 @@
           <article class="ops-card glass-panel reveal-card">
             <div class="section-head compact">
               <div>
-                <h2>System Health</h2>
-                <p>Status operasional infrastruktur IoT.</p>
+                <h2>Kondisi Model</h2>
+                <p>Nilai contoh infrastruktur simulasi.</p>
               </div>
-              <span class="pill pill-ai">Healthy</span>
+              <span class="pill pill-ai">SIMULASI</span>
             </div>
             <div class="health-grid">
               <div class="health-item">
                 <strong id="sitsUptimeVal" data-counter="99">99.7%</strong>
-                <span>Uptime SITS</span>
+                <span>Uptime model</span>
               </div>
               <div class="health-item">
                 <strong id="sitsCctvCount" data-counter="184">184</strong>
-                <span>CCTV Surabaya</span>
+                <span>Node kamera simulasi</span>
               </div>
               <div class="health-item">
                 <strong id="sitsIotCount" data-counter="312">312</strong>
-                <span>Sensor IoT</span>
+                <span>Sensor simulasi</span>
               </div>
               <div class="health-item latency-health">
                 <div class="latency-meta">

@@ -1,11 +1,11 @@
 <div class="drawer-backdrop" id="notifDrawerBackdrop"></div>
-  <aside class="notif-drawer glass-panel" id="notifDrawer">
+  <aside class="notif-drawer glass-panel" id="notifDrawer" role="dialog" aria-modal="true" aria-labelledby="notifDrawerTitle" aria-hidden="true">
     <div class="notif-drawer-header" style="display: flex; justify-content: space-between; align-items: center; padding: 16px; border-bottom: 1px solid var(--border);">
       <div style="display: flex; align-items: center; gap: 10px;">
         <span style="font-size: 20px;">🔔</span>
         <div>
-          <h3 style="margin: 0; font-size: 14px; font-weight: 700;">Riwayat Insiden Hari Ini</h3>
-          <p style="margin: 2px 0 0 0; font-size: 11px; color: var(--text-muted);">Laporan SITS Surabaya & Command Center 112</p>
+          <h3 id="notifDrawerTitle" style="margin: 0; font-size: 14px; font-weight: 700;">Contoh Skenario Insiden</h3>
+          <p style="margin: 2px 0 0 0; font-size: 11px; color: var(--text-muted);">Data demo, bukan laporan operasional</p>
         </div>
       </div>
       <button class="notif-drawer-close-btn" id="closeNotifDrawer" type="button" aria-label="Tutup Notifikasi">&times;</button>
@@ -14,30 +14,30 @@
       <article class="notif-item-card glass-soft" id="notifItem1" style="padding: 12px; border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span class="status-badge red">⚠️ Tabrakan Ringan</span>
-          <small style="font-size: 10px; color: var(--text-muted);">08:14 WIB</small>
+          <small style="font-size: 10px; color: var(--text-muted);">Contoh</small>
         </div>
         <strong style="font-size: 12.5px;">Simpang Diponegoro - Dr. Soetomo</strong>
-        <p style="margin: 0; font-size: 11px; color: var(--text-muted); line-height: 1.4;">2 Sepeda motor bersenggolan di lajur kiri. Petugas Satlantas & Tim SITS di lokasi.</p>
+        <p style="margin: 0; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Skenario demo tabrakan ringan; tidak ada petugas yang dikirim.</p>
         <button class="btn btn-ghost compact resolve-notif-btn" data-notif-id="notifItem1" style="align-self: flex-end; margin-top: 4px; font-size: 10.5px; color: var(--success);">✓ Tandai Selesai</button>
       </article>
 
       <article class="notif-item-card glass-soft" id="notifItem2" style="padding: 12px; border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span class="status-badge yellow">🚧 Pohon Tumbang</span>
-          <small style="font-size: 10px; color: var(--text-muted);">07:45 WIB</small>
+          <small style="font-size: 10px; color: var(--text-muted);">Contoh</small>
         </div>
         <strong style="font-size: 12.5px;">Jl. Pemuda (Depan Gedung RRI)</strong>
-        <p style="margin: 0; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Dahan pohon peneduh patah menutupi 1 lajur. Tim DLH Surabaya proses evakuasi.</p>
+        <p style="margin: 0; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Skenario demo hambatan jalan; tidak ada laporan atau evakuasi nyata.</p>
         <button class="btn btn-ghost compact resolve-notif-btn" data-notif-id="notifItem2" style="align-self: flex-end; margin-top: 4px; font-size: 10.5px; color: var(--success);">✓ Tandai Selesai</button>
       </article>
 
       <article class="notif-item-card glass-soft" id="notifItem3" style="padding: 12px; border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span class="status-badge red">🚨 Truk Mogok</span>
-          <small style="font-size: 10px; color: var(--text-muted);">06:30 WIB</small>
+          <small style="font-size: 10px; color: var(--text-muted);">Contoh</small>
         </div>
         <strong style="font-size: 12.5px;">Simpang Kupang / Pasar Kembang</strong>
-        <p style="margin: 0; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Truk engkel patah as roda di tengah persimpangan. Unit Derek Dishub proses evakuasi.</p>
+        <p style="margin: 0; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Skenario demo kendaraan mogok; tidak ada unit derek yang ditugaskan.</p>
         <button class="btn btn-ghost compact resolve-notif-btn" data-notif-id="notifItem3" style="align-self: flex-end; margin-top: 4px; font-size: 10.5px; color: var(--success);">✓ Tandai Selesai</button>
       </article>
     </div>

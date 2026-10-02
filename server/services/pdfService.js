@@ -1,15 +1,13 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 /**
- * OmniTRAF SITS Surabaya - Enterprise Executive PDF Report Generator
- * Menggunakan pdf-lib untuk menghasilkan dokumen PDF A4 resmi Dishub Kota Surabaya
- * dengan tipografi terstandarisasi, tabel terstruktur, metrik ESG, dan digital signature.
+ * OmniTRAF - PDF report generator for the simulation prototype.
  */
 export async function generateSitsPdfBuffer(state = {}) {
   const pdfDoc = await PDFDocument.create();
-  pdfDoc.setTitle("OmniTRAF SITS Surabaya - Laporan Eksekutif Mobilitas Perkotaan");
-  pdfDoc.setAuthor("Dinas Perhubungan Kota Surabaya - SITS Command Center");
-  pdfDoc.setSubject("Laporan Analitik Kinerja Lalu Lintas dan ESG Kota Surabaya");
+  pdfDoc.setTitle("OmniTRAF - Laporan Simulasi Mobilitas");
+  pdfDoc.setAuthor("OmniTRAF prototype");
+  pdfDoc.setSubject("Contoh sintetis untuk demonstrasi; bukan laporan operasional");
   pdfDoc.setProducer("OmniTRAF Intelligent Transport Engine v2.5");
   pdfDoc.setCreationDate(new Date());
 
@@ -18,7 +16,7 @@ export async function generateSitsPdfBuffer(state = {}) {
   const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontMono = await pdfDoc.embedFont(StandardFonts.Courier);
 
-  // Palet Warna Resmi Dishub & Apple HIG Glassmorphism Design Token
+  // Visual theme colors for the demo report.
   const primaryNavy = rgb(0.04, 0.12, 0.28);     // #0a1f47
   const accentCyan = rgb(0.0, 0.72, 0.83);       // #00b8d4
   const darkText = rgb(0.1, 0.14, 0.2);          // #1a2433
@@ -53,14 +51,14 @@ export async function generateSitsPdfBuffer(state = {}) {
     day: 'numeric'
   });
   const timeStr = state.timestamp || (now.toTimeString().slice(0, 8) + ' WIB');
-  const refNumber = `REF/SITS-SUB/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(state.seq || Math.floor(1000 + Math.random() * 9000))}`;
+  const refNumber = `OMNITRAF-SIM-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(state.seq || 'DEMO')}`;
   const vcRatio = 0.68;
   const losGrade = "B/C (Arus Stabil - Terkendali)";
 
   let y = height - 40;
 
   // ==========================================
-  // 1. HEADER SECTION (Kop Surat Resmi Dishub SITS)
+  // 1. Prototype report header
   // ==========================================
   // Header background accent bar
   page.drawRectangle({
@@ -82,7 +80,7 @@ export async function generateSitsPdfBuffer(state = {}) {
   });
 
   // Text inside header
-  page.drawText('PEMERINTAH KOTA SURABAYA - DINAS PERHUBUNGAN', {
+  page.drawText('OMNITRAF - PROTOTIPE SIMULASI NONRESMI', {
     x: margin + 14,
     y: y - 12,
     size: 9.5,
@@ -90,7 +88,7 @@ export async function generateSitsPdfBuffer(state = {}) {
     color: accentCyan
   });
 
-  page.drawText('SURABAYA INTELLIGENT TRANSPORT SYSTEM (SITS)', {
+  page.drawText('LAPORAN DATA MOBILITAS SIMULASI', {
     x: margin + 14,
     y: y - 28,
     size: 13,
@@ -98,7 +96,7 @@ export async function generateSitsPdfBuffer(state = {}) {
     color: white
   });
 
-  page.drawText('LAPORAN EKSEKUTIF KINERJA MOBILITAS PERKOTAAN & ANALITIK ESG', {
+  page.drawText('BUKAN FEED SITS, HASIL UKUR KOTA, ATAU DOKUMEN KEDINASAN', {
     x: margin + 14,
     y: y - 44,
     size: 8.5,
@@ -109,7 +107,7 @@ export async function generateSitsPdfBuffer(state = {}) {
   // Badge Status Operasional (Top Right)
   const isChaos = !!state.isChaosMode;
   const statusColor = isChaos ? dangerRed : successGreen;
-  const statusText = isChaos ? 'MODE KEOS AKTIF' : 'KONDISI NORMAL';
+  const statusText = isChaos ? 'DEMO: SKENARIO KEOS' : 'MODE SIMULASI';
   page.drawRectangle({
     x: width - margin - 125,
     y: y - 46,
@@ -152,7 +150,7 @@ export async function generateSitsPdfBuffer(state = {}) {
   page.drawText(sanitize(timeStr), { x: margin + 82, y: y - 24, size: 7.5, font: fontRegular, color: darkText });
 
   page.drawText('Klasifikasi :', { x: margin + 215, y: y - 24, size: 7.5, font: fontBold, color: mutedText });
-  page.drawText('DOKUMEN RESMI KEDINASAN (TERBATAS)', { x: margin + 275, y: y - 24, size: 7.5, font: fontBold, color: primaryNavy });
+  page.drawText('DATA SIMULASI - BUKAN DOKUMEN RESMI', { x: margin + 275, y: y - 24, size: 7.5, font: fontBold, color: dangerRed });
 
   y -= 46;
 
@@ -185,8 +183,8 @@ export async function generateSitsPdfBuffer(state = {}) {
     { label: 'Indeks Kemacetan Kota', value: `${state.congestionIndex || 62} / 100`, sub: 'Beban Jaringan: ' + (state.networkLoad || 72) + '%' },
     { label: 'Reduksi Emisi CO2', value: `${Number(state.co2SavedKg || 1420).toLocaleString('id-ID')} kg`, sub: 'Kontribusi Target Net-Zero' },
     { label: 'Penghematan Bahan Bakar', value: `${Number(state.fuelSavedLiters || 580).toLocaleString('id-ID')} Liter`, sub: 'Efisiensi Waktu Tunggu APILL' },
-    { label: 'Volume Kendaraan Hari Ini', value: `${Number(state.vehiclesToday || 128540).toLocaleString('id-ID')} Unit`, sub: 'Deteksi YOLOv8 Edge AI' },
-    { label: 'Sistem Uptime SITS', value: `${state.sitsUptime || 99.4}%`, sub: 'CCTV: ' + (state.cctvOnline || 184) + ' | IoT: ' + (state.iotOnline || 312) }
+    { label: 'Volume Kendaraan (Simulasi)', value: `${Number(state.vehiclesToday || 128540).toLocaleString('id-ID')} Unit`, sub: 'Data sintetis; bukan deteksi YOLOv8' },
+    { label: 'Ketersediaan Model', value: `${state.sitsUptime || 99.4}%`, sub: 'Node demo: ' + (state.cctvOnline || 184) + ' | Sensor demo: ' + (state.iotOnline || 312) }
   ];
 
   kpis.forEach((kpi, idx) => {
@@ -310,9 +308,9 @@ export async function generateSitsPdfBuffer(state = {}) {
   y -= 10;
 
   const incidents = state.incidents || [
-    { id: "101", title: "Mogok Truk Treler", location: "Simpang Wonokromo (DTC)", severity: "danger", status: "ACTIVE", assignedUnit: "SITS Patroli Wilayah Selatan" },
-    { id: "102", title: "Genangan Air Hujan (15cm)", location: "Koridor Manyar Kertoarjo", severity: "warning", status: "MONITORING", assignedUnit: "Satgas Drainase DKRTH" },
-    { id: "103", title: "Sepeda Motor Tergelincir", location: "Jl. Pemuda (Depan Delta)", severity: "warning", status: "RESOLVED", assignedUnit: "Pos Pantau SITS Tengah" }
+    { id: "DEMO-101", title: "Skenario kendaraan mogok", location: "Simpang demo", severity: "danger", status: "SIMULASI", assignedUnit: "Patroli Demo" },
+    { id: "DEMO-102", title: "Skenario genangan", location: "Koridor demo", severity: "warning", status: "SIMULASI", assignedUnit: "Unit Demo" },
+    { id: "DEMO-103", title: "Skenario kendaraan tergelincir", location: "Jalan demo", severity: "warning", status: "SIMULASI", assignedUnit: "Pos Demo" }
   ];
 
   const incHeaderY = y - 14;
@@ -373,7 +371,7 @@ export async function generateSitsPdfBuffer(state = {}) {
     borderRadius: 3
   });
 
-  page.drawText('CATATAN REKOMENDASI SISTEM ADAPTIF (WEBSTER & EDGE AI):', {
+  page.drawText('CATATAN CONTOH MODEL (BUKAN REKOMENDASI OPERASIONAL):', {
     x: margin + 10,
     y: y - 11,
     size: 7.5,
@@ -381,7 +379,7 @@ export async function generateSitsPdfBuffer(state = {}) {
     color: primaryNavy
   });
 
-  page.drawText('1. Waktu siklus optimal Simpang Wonokromo - Darmo direkomendasikan 120s pada jam sibuk sore (16:30 - 19:00 WIB).', {
+  page.drawText('1. Nilai siklus pada laporan ini adalah contoh sintetis dan belum divalidasi untuk kondisi jalan.', {
     x: margin + 10,
     y: y - 22,
     size: 7,
@@ -389,7 +387,7 @@ export async function generateSitsPdfBuffer(state = {}) {
     color: darkText
   });
 
-  page.drawText('2. Integrasi Emergency Preemption Command Center 112 dalam status siaga dengan latensi respon rata-rata 12ms.', {
+  page.drawText('2. Dispatch darurat, GPS, dan APILL tidak terhubung; aksi hanya berjalan pada state simulator.', {
     x: margin + 10,
     y: y - 32,
     size: 7,
@@ -400,14 +398,14 @@ export async function generateSitsPdfBuffer(state = {}) {
   y -= 48;
 
   // ==========================================
-  // 7. FOOTER SECTION & DIGITAL SIGNATURE
+  // 7. Footer disclaimer; this output has no official signature.
   // ==========================================
-  // Signature Box (Right Side)
+  // Prototype notice box (Right Side)
   const sigX = width - margin - 200;
-  page.drawText('Surabaya, ' + sanitize(dateStr), { x: sigX, y: y, size: 7.5, font: fontRegular, color: darkText });
-  page.drawText('Kepala Bidang Lalu Lintas Dishub Kota Surabaya', { x: sigX, y: y - 10, size: 7.5, font: fontBold, color: primaryNavy });
+  page.drawText('BUKAN DOKUMEN RESMI', { x: sigX, y: y - 10, size: 9, font: fontBold, color: dangerRed });
+  page.drawText('Tidak memiliki tanda tangan atau verifikasi kedinasan.', { x: sigX, y: y - 22, size: 6.5, font: fontRegular, color: mutedText });
   
-  // Digital Verification Stamp / QR Placeholder
+  // Explicitly unverified prototype notice; no signature or QR verification.
   page.drawRectangle({
     x: sigX,
     y: y - 48,
@@ -417,18 +415,15 @@ export async function generateSitsPdfBuffer(state = {}) {
     borderColor: borderLight,
     borderWidth: 0.75
   });
-  page.drawText('[ TANDA TANGAN DIGITAL TERVERIFIKASI ]', { x: sigX + 6, y: y - 26, size: 5.5, font: fontBold, color: successGreen });
-  page.drawText('SHA256: 8f9b4c2e1a7d6e0b4a1c5d9e', { x: sigX + 6, y: y - 36, size: 5, font: fontMono, color: mutedText });
-  page.drawText('OmniTRAF Enterprise Gateway Security', { x: sigX + 6, y: y - 44, size: 5, font: fontRegular, color: mutedText });
+  page.drawText('SIMULASI - TANPA TANDA TANGAN', { x: sigX + 6, y: y - 26, size: 5.5, font: fontBold, color: dangerRed });
+  page.drawText('Tidak diverifikasi secara kriptografis', { x: sigX + 6, y: y - 36, size: 5, font: fontRegular, color: mutedText });
+  page.drawText('OmniTRAF prototype', { x: sigX + 6, y: y - 44, size: 5, font: fontRegular, color: mutedText });
 
-  page.drawText('Ir. H. Zaki Irrsyad, M.T.', { x: sigX, y: y - 58, size: 8, font: fontBold, color: primaryNavy });
-  page.drawText('NIP. 19850412 201001 1 018', { x: sigX, y: y - 68, size: 7, font: fontMono, color: mutedText });
 
   // Security Note & Bottom Line (Left Side)
-  page.drawText('DISCLAIMER KEAMANAN DOKUMEN:', { x: margin, y: y - 10, size: 7, font: fontBold, color: mutedText });
-  page.drawText('Dokumen ini digenerate secara otomatis oleh sistem SITS Kota Surabaya.', { x: margin, y: y - 22, size: 6.5, font: fontRegular, color: mutedText });
-  page.drawText('Integritas data dijamin oleh sistem enkripsi telemetri ATCS Dinas Perhubungan.', { x: margin, y: y - 32, size: 6.5, font: fontRegular, color: mutedText });
-  page.drawText('Portal Resmi: https://dishub.surabaya.go.id/sits', { x: margin, y: y - 42, size: 6.5, font: fontRegular, color: primaryNavy });
+  page.drawText('BATASAN DATA:', { x: margin, y: y - 10, size: 7, font: fontBold, color: mutedText });
+  page.drawText('Seluruh angka dan status dalam file ini dibuat oleh simulator OmniTRAF.', { x: margin, y: y - 22, size: 6.5, font: fontRegular, color: mutedText });
+  page.drawText('Bukan hasil pengukuran, rekomendasi keselamatan, atau laporan instansi.', { x: margin, y: y - 32, size: 6.5, font: fontRegular, color: mutedText });
 
   // Bottom Line Bar
   page.drawRectangle({
@@ -439,7 +434,7 @@ export async function generateSitsPdfBuffer(state = {}) {
     color: borderLight
   });
 
-  page.drawText('OmniTRAF SITS Surabaya Command Center — Sistem Manajemen Lalu Lintas Cerdas Perkotaan Terintegrasi', {
+  page.drawText('OmniTRAF Simulation Prototype — Data sintetis untuk demonstrasi', {
     x: margin,
     y: 16,
     size: 6.5,

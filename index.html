@@ -8,20 +8,21 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="OmniTRAF" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="description" content="Platform pemantauan lalu lintas cerdas perkotaan terintegrasi ATCS SITS Surabaya, computer vision edge AI, dan optimasi sinyal adaptif." />
-  <title>OmniTRAF Surabaya Command Center</title>
+  <meta name="description" content="Prototipe simulasi command center lalu lintas perkotaan OmniTRAF. Data, CCTV, sensor, dan aksi operasional pada demo ini disimulasikan." />
+  <title>OmniTRAF — Prototipe Simulasi Command Center</title>
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="OmniTRAF Surabaya Command Center" />
-  <meta property="og:description" content="Platform pemantauan lalu lintas cerdas perkotaan terintegrasi ATCS SITS Surabaya, computer vision edge AI, dan optimasi sinyal adaptif." />
+  <meta property="og:locale" content="id_ID" />
+  <meta property="og:site_name" content="OmniTRAF Demo" />
+  <meta property="og:title" content="OmniTRAF — Prototipe Simulasi Command Center" />
+  <meta property="og:description" content="Dashboard demonstrasi dengan data, CCTV, sensor, dan aksi operasional simulasi." />
   <meta property="og:image" content="/assets/omnitraf-logo.png" />
-  <meta property="og:url" content="https://omnitraf-surabaya.id" />
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="OmniTRAF Surabaya Command Center" />
-  <meta name="twitter:description" content="Platform pemantauan lalu lintas cerdas perkotaan terintegrasi ATCS SITS Surabaya, computer vision edge AI, dan optimasi sinyal adaptif." />
+  <meta name="twitter:title" content="OmniTRAF — Prototipe Simulasi Command Center" />
+  <meta name="twitter:description" content="Dashboard demonstrasi dengan data, CCTV, sensor, dan aksi operasional simulasi." />
   <meta name="twitter:image" content="/assets/omnitraf-logo.png" />
 
   <link rel="icon" type="image/png" href="assets/favicon.png" />
@@ -52,6 +53,7 @@
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
+  <a class="skip-link" href="#mainContent">Lewati ke konten utama</a>
   <!-- System Announcement Marquee Mount Target -->
   <div id="marqueeContainer"></div>
 
@@ -111,7 +113,7 @@
               <circle cx="9" cy="12" r="2"></circle>
             </svg>
           </span>
-          <span>Live CCTV</span>
+          <span>CCTV Simulasi</span>
         </a>
         <a href="#signals" class="nav-item" data-view="signals">
           <span class="nav-icon">
@@ -158,7 +160,7 @@
               <line x1="1" y1="15" x2="4" y2="15"></line>
             </svg>
           </span>
-          <span>AI Prediction</span>
+          <span>Prediksi Model</span>
         </a>
         <a href="#incidents" class="nav-item" data-view="incidents">
           <span class="nav-icon">
@@ -226,7 +228,7 @@
           </span>
           <span>Algoritma & Arsitektur</span>
         </a>
-        <button class="nav-item hide-desktop btn-mobile-chat-nav" type="button" id="btnOpenMobileChat" aria-label="Buka Chat Petugas SITS">
+        <button class="nav-item hide-desktop btn-mobile-chat-nav" type="button" id="btnOpenMobileChat" aria-label="Buka Chat Petugas Demo">
           <span class="nav-icon mobile-chat-icon-wrap" aria-hidden="true">💬</span>
           <span>Koordinasi Petugas (Chat)</span>
         </button>
@@ -239,7 +241,7 @@
           <span class="green-light"></span>
         </div>
         <h2>Signal Intelligence</h2>
-        <p>Sistem rekomendasi AI aktif untuk optimasi durasi sinyal lalu lintas, prioritas kendaraan darurat, dan proyeksi kepadatan koridor Surabaya.</p>
+        <p>Contoh rekomendasi model untuk durasi sinyal dan proyeksi kepadatan. Tidak mengatur sinyal atau memprioritaskan kendaraan nyata.</p>
         <button class="btn btn-ghost" type="button" data-action="system-check">Cek Sistem</button>
       </section>
 
@@ -250,7 +252,7 @@
       </div>
     </aside>
 
-    <main class="main-content" id="mainContent">
+    <main class="main-content" id="mainContent" tabindex="-1">
       <!-- Emergency Green Wave Top Red HUD Banner -->
       <div id="emergencyGreenWaveHud" class="emergency-gw-hud" style="display: none;">
         <div class="emergency-gw-hud-content">
@@ -270,7 +272,7 @@
 
       <header class="topbar glass-panel">
         <div class="topbar-left-mobile">
-          <button class="menu-toggle glass-soft" id="menuToggle" aria-label="Buka menu" type="button">
+          <button class="menu-toggle glass-soft" id="menuToggle" aria-label="Buka menu" aria-controls="sidebar" aria-expanded="false" type="button">
             <span class="menu-line"></span>
             <span class="menu-line"></span>
             <span class="menu-line"></span>
@@ -283,25 +285,25 @@
         </div>
 
         <div class="topbar-actions" aria-label="Operational status">
-          <!-- Command Center Status Capsule (Integrated SITS Live 60Hz | 32°C Cerah | 08:45 WIB) -->
-          <div class="status-capsule glass-soft" id="statusCapsule" aria-label="Command Center Status Capsule">
+          <!-- Demo status capsule; no live SITS or weather integrations are connected. -->
+          <div class="status-capsule glass-soft" id="statusCapsule" aria-label="Status prototipe OmniTRAF">
             <!-- Hidden original elements kept for 100% JS compatibility -->
             <span id="clock" class="capsule-item clock-text">--.-- WIB</span>
             <span class="capsule-divider">|</span>
             <span class="capsule-item gateway-status" id="sseStatusPill">
               <span class="capsule-live-dot" id="sseStatusDot"></span>
-              <strong id="sseStatusText">SITS Gateway Live</strong>
+              <strong id="sseStatusText">Server simulasi</strong>
             </span>
             <span class="capsule-divider">|</span>
-            <span class="capsule-item weather-status" id="weatherWidget" onclick="showToast('BMKG Cuaca Surabaya. AI menyesuaikan durasi hijau jika hujan.')" title="Kondisi Cuaca Surabaya">
-              <span id="weatherIcon">☀</span> <span id="weatherTemp">32°C Cerah</span>
+            <span class="capsule-item weather-status" id="weatherWidget" title="Contoh cuaca; bukan data BMKG">
+              <span id="weatherIcon">☀</span> <span id="weatherTemp">Cuaca demo</span>
             </span>
             <span class="capsule-divider sits-heartbeat-sep">|</span>
-            <span class="capsule-item sits-signal-chip hide-mobile" title="Kekuatan Sinyal Gateway SITS">
+            <span class="capsule-item sits-signal-chip hide-mobile" title="Indikator demo; bukan kekuatan sinyal gateway">
               <svg class="heartbeat-svg" viewBox="0 0 100 20" aria-hidden="true">
                 <path class="heartbeat-path" d="M0,10 L30,10 L35,2 L40,18 L45,10 L50,10 L55,5 L60,15 L65,10 L100,10" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
-              <strong id="sitsStatusText" aria-live="polite">98%</strong>
+              <strong id="sitsStatusText" aria-live="polite">DEMO</strong>
             </span>
           </div>
 
@@ -318,10 +320,10 @@
 
           <!-- Minimalist Squircle Action Bar -->
           <div class="topbar-action-buttons">
-            <button class="topbar-squircle-btn glass-soft" type="button" id="btnOpenEngineModal" aria-label="Algoritma & Arsitektur OmniTRAF" title="Algoritma & Arsitektur (Webster Method & YOLOv8)">
+            <button class="topbar-squircle-btn glass-soft" type="button" id="btnOpenEngineModal" aria-label="Algoritma & Arsitektur OmniTRAF" title="Algoritma demonstrasi (Webster; tanpa YOLOv8)">
               <span class="squircle-btn-icon" aria-hidden="true">⚙️</span>
             </button>
-            <button class="topbar-squircle-btn glass-soft hide-desktop" type="button" id="btnTopMobileChat" aria-label="Buka Chat Petugas SITS" title="Koordinasi Petugas SITS">
+            <button class="topbar-squircle-btn glass-soft hide-desktop" type="button" id="btnTopMobileChat" aria-label="Buka Chat Petugas Demo" title="Chat simulasi">
               <span class="squircle-btn-icon" aria-hidden="true">💬</span>
               <span class="chat-online-dot-mini"></span>
             </button>
@@ -341,25 +343,30 @@
           </div>
 
           <!-- Minimalist Operator Profile Squircle -->
-          <div class="profile-squircle glass-soft" aria-label="Operator SITS" title="Zaki Putra — Traffic Supervisor (Online)">
+          <div class="profile-squircle glass-soft" aria-label="Operator demo" title="Profil contoh lokal">
             <div class="avatar-container">
               <div class="avatar" aria-hidden="true">Z</div>
               <span class="avatar-status status-online"></span>
             </div>
             <div class="profile-info-compact hide-mobile">
               <strong>Zaki Putra</strong>
-              <small>Supervisor</small>
+              <small>Operator demo</small>
             </div>
           </div>
         </div>
       </header>
+
+      <div class="prototype-notice" role="note">
+        <strong>SIMULASI-ONLY • TERKUNCI</strong>
+        <span>Semua data dan perintah hanya mengubah model simulasi. Tidak ada adapter hardware atau interlock keselamatan; sistem ini tidak mengendalikan APILL, sensor, CCTV, maupun armada nyata.</span>
+      </div>
 
       <!-- Non-Intrusive Offline Mode Banner -->
       <div class="offline-notification-banner glass-soft is-hidden" id="offlineNotificationBanner" role="status" aria-live="polite">
         <div class="offline-banner-inner">
           <span class="offline-banner-icon" aria-hidden="true">📡</span>
           <div class="offline-banner-text">
-            <strong>Mode Offline Aktif</strong> — Menggunakan Telemetri Cache Lokal SITS Surabaya (PWA Resilient).
+            <strong>Koneksi offline</strong> — Data operasional live tidak tersedia. Sambungkan kembali jaringan untuk melanjutkan pemantauan.
           </div>
         </div>
         <button class="offline-banner-close" id="btnDismissOfflineBanner" type="button" aria-label="Tutup pemberitahuan offline">&times;</button>
@@ -375,7 +382,7 @@
   <div id="modalsContainer"></div>
 
   <!-- Notification Toast Stack Container -->
-  <div class="toast-stack-container" id="toastStack"></div>
+  <div class="toast-stack-container" id="toastStack" role="status" aria-live="polite" aria-atomic="false"></div>
 
   <!-- Container Khusus Format Cetak Dokumen Eksekutif -->
   <div id="printExecutiveReport" class="print-executive-container" style="display: none;"></div>

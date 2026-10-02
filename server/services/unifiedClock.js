@@ -143,6 +143,9 @@ export class UnifiedClock {
    * @returns {number} New simulation timestamp in milliseconds
    */
   advance(deltaMs, force = false) {
+    if (!Number.isFinite(deltaMs) || deltaMs < 0) {
+      throw new TypeError('simulation delta must be a finite non-negative number');
+    }
     if (this.paused && !force) {
       return this.simTimeMs;
     }
@@ -156,10 +159,17 @@ export class UnifiedClock {
    * @param {number} targetMs
    */
   setTime(targetMs) {
-    if (typeof targetMs === 'number' && !isNaN(targetMs)) {
-      this.simTimeMs = Math.round(targetMs);
-    }
+    if (!Number.isFinite(targetMs)) throw new TypeError('simulation time must be finite');
+    this.simTimeMs = Math.round(targetMs);
     return this.simTimeMs;
+  }
+
+  reset(startTime = this.startTime) {
+    if (!Number.isFinite(startTime)) throw new TypeError('startTime must be finite');
+    this.startTime = Math.round(startTime);
+    this.simTimeMs = this.startTime;
+    this.paused = false;
+    return this;
   }
 
   /**
@@ -190,9 +200,8 @@ export class UnifiedClock {
    * Set speed multiplier (e.g. 1.0, 2.0, 4.0).
    */
   setSpeedMultiplier(multiplier) {
-    if (typeof multiplier === 'number' && multiplier > 0 && !isNaN(multiplier)) {
-      this.speedMultiplier = multiplier;
-    }
+    if (typeof multiplier !== 'number' || !Number.isFinite(multiplier) || multiplier <= 0) throw new TypeError('speed multiplier must be finite and positive');
+    this.speedMultiplier = multiplier;
     return this.speedMultiplier;
   }
 
@@ -200,9 +209,8 @@ export class UnifiedClock {
    * Switch mode (LIVE, SIMULATED, REPLAY, TEST).
    */
   setMode(mode) {
-    if (Object.values(SIMULATION_MODES).includes(mode)) {
-      this.mode = mode;
-    }
+    if (!Object.values(SIMULATION_MODES).includes(mode)) throw new TypeError(`invalid simulation mode '${mode}'`);
+    this.mode = mode;
     return this.mode;
   }
 
@@ -227,6 +235,9 @@ export class UnifiedClock {
    */
   restoreSnapshot(snapshot) {
     if (!snapshot) return;
+    if (!Number.isFinite(snapshot.startTime) || !Number.isFinite(snapshot.simTimeMs) || !Number.isFinite(snapshot.speedMultiplier) || snapshot.speedMultiplier <= 0 || !Object.values(SIMULATION_MODES).includes(snapshot.mode) || typeof snapshot.paused !== 'boolean' || typeof snapshot.timezone !== 'string') {
+      throw new TypeError('invalid simulation clock snapshot');
+    }
     if (snapshot.mode) this.mode = snapshot.mode;
     if (typeof snapshot.startTime === 'number') this.startTime = snapshot.startTime;
     if (typeof snapshot.simTimeMs === 'number') this.simTimeMs = snapshot.simTimeMs;

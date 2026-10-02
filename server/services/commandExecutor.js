@@ -4,6 +4,9 @@ import { isActionAuthorized, getRequiredRoles } from '../config/capabilities.js'
 import { ROLES } from '../config/constants.js';
 import { diagnosticEngine } from './diagnosticEngine.js';
 import { parseCommandInput, normalizeCommand, validateCommand, ContractValidationError } from '../config/contracts.js';
+import { REALTIME_ROOMS } from '../sockets/eventRegistry.js';
+import { SAFETY_BOUNDARY, assertSimulationOnlyAction } from '../config/safetyBoundary.js';
+import { assertCommandRateLimit } from './commandRateLimit.js';
 import {
   INCIDENT_STATES,
   EMERGENCY_STATES,
@@ -31,6 +34,28 @@ function commandError(code, message, statusCode) {
 export class CommandExecutor {
   constructor() {
     this.inFlightKeys = new Set();
+  }
+
+  _pruneProcessedCommands(maxAliases = 300) {
+    const cache = backendState.processedCommands;
+    if (!cache) return;
+
+    while (cache.size > maxAliases) {
+      const [oldestKey, oldestRecord] = cache.entries().next().value || [];
+      if (oldestKey === undefined) break;
+
+      const aliases = oldestRecord && typeof oldestRecord === 'object'
+        ? [oldestRecord.idempotencyKey, oldestRecord.commandId, oldestRecord.correlationId]
+        : [];
+      let removed = false;
+      aliases.forEach(alias => {
+        if (alias !== undefined && cache.get(alias) === oldestRecord) {
+          cache.delete(alias);
+          removed = true;
+        }
+      });
+      if (!removed || cache.has(oldestKey)) cache.delete(oldestKey);
+    }
   }
 
   /**
@@ -64,6 +89,7 @@ export class CommandExecutor {
     action = canonical.action;
     targetId = canonical.targetId;
     payload = canonical.payload;
+    assertSimulationOnlyAction(action);
 
     const actorRole = authenticatedUser?.role;
     const actorName = authenticatedUser?.name;
@@ -86,6 +112,7 @@ export class CommandExecutor {
         : `Akses ditolak untuk '${action}'. Memerlukan hak akses [${requiredRoles.join('/')}], peran akun Anda: '${actorRole}'.`;
       
       const rejectionResult = {
+        ...SAFETY_BOUNDARY,
         success: false,
         commandId: finalCommandId,
         correlationId: finalCorrelationId,
@@ -105,6 +132,10 @@ export class CommandExecutor {
       return rejectionResult;
     }
 
+    // Apply after identity/RBAC checks so REST and Socket.IO share one per-user
+    // budget and unauthenticated traffic cannot allocate actor-window entries.
+    assertCommandRateLimit(actorId);
+
     // 3. Idempotency Check & In-Flight Protection
     if (backendState.processedCommands && backendState.processedCommands.has(finalIdempotencyKey)) {
       const cached = backendState.processedCommands.get(finalIdempotencyKey);
@@ -122,6 +153,7 @@ export class CommandExecutor {
 
       console.info(`🔄 [Idempotency Backend] Returning cached authoritative result for key: ${finalIdempotencyKey}`);
       return {
+        ...SAFETY_BOUNDARY,
         success: true,
         commandId: cached.commandId || finalCommandId,
         correlationId: cached.correlationId || finalCorrelationId,
@@ -189,11 +221,8 @@ export class CommandExecutor {
       backendState.processedCommands.set(finalCommandId, record);
       backendState.processedCommands.set(finalCorrelationId, record);
 
-      // Keep bounded LRU
-      if (backendState.processedCommands.size > 300) {
-        const firstKey = backendState.processedCommands.keys().next().value;
-        backendState.processedCommands.delete(firstKey);
-      }
+      // Keep each command's idempotency, command, and correlation aliases together.
+      this._pruneProcessedCommands(300);
 
       // 6. Authoritative Audit Trail Persistence & Broadcast
       const auditLog = {
@@ -208,7 +237,7 @@ export class CommandExecutor {
       if (backendState.auditLogs.length > 250) backendState.auditLogs.pop();
 
       if (backendState.io) {
-        backendState.io.emit('audit:log', {
+        backendState.io.to(REALTIME_ROOMS.AUDIT).emit('audit:log', {
           type: 'command:acknowledged',
           timestamp: new Date().toISOString(),
           entity: entityId || targetId || 'System Core',
@@ -223,6 +252,7 @@ export class CommandExecutor {
 
         // Emit command:ack event
         backendState.io.emit('command:ack', {
+          ...SAFETY_BOUNDARY,
           success: true,
           commandId: finalCommandId,
           correlationId: finalCorrelationId,
@@ -237,6 +267,7 @@ export class CommandExecutor {
       }
 
       return {
+        ...SAFETY_BOUNDARY,
         success: true,
         commandId: finalCommandId,
         correlationId: finalCorrelationId,
@@ -265,7 +296,7 @@ export class CommandExecutor {
       }
 
       if (backendState.io) {
-        backendState.io.emit('audit:log', {
+        backendState.io.to(REALTIME_ROOMS.AUDIT).emit('audit:log', {
           type: 'command:failed',
           timestamp: new Date().toISOString(),
           entity: targetId || 'System Core',
@@ -278,6 +309,7 @@ export class CommandExecutor {
         });
 
         backendState.io.emit('command:ack', {
+          ...SAFETY_BOUNDARY,
           success: false,
           commandId: finalCommandId,
           correlationId: finalCorrelationId,
@@ -700,7 +732,7 @@ export class CommandExecutor {
         if (backendState.io) {
           backendState.io.emit('traffic:update', resultingState);
           backendState.io.emit('system:toast', {
-            message: targetActive ? '🔥 MODE KEOS DIAKTIFKAN SERVER: Lonjakan beban jaringan SITS & gridlock!' : 'Sistem ATCS Surabaya pulih dari kondisi darurat.',
+            message: targetActive ? 'Skenario gangguan simulator diaktifkan.' : 'State simulator kembali dari skenario gangguan.',
             type: targetActive ? 'danger' : 'success'
           });
         }
@@ -746,11 +778,12 @@ export class CommandExecutor {
         const clock = backendState.clock;
         if (operation === 'pause') { clock.pause(); backendState.simConfig.paused = true; }
         else if (operation === 'resume') { clock.resume(); backendState.simConfig.paused = false; }
-        else if (operation === 'step') backendState.tick(deltaMs || 1000);
+        else if (operation === 'step') backendState.tick(deltaMs || 1000, { force: true });
         else if (operation === 'set_speed' && typeof speedMultiplier === 'number') {
           clock.setSpeedMultiplier(speedMultiplier); backendState.simConfig.speedMultiplier = speedMultiplier;
         } else if (operation === 'set_mode' && mode) {
-          clock.setMode(mode); backendState.simConfig.mode = mode;
+          const simulationMode = { realtime: 'LIVE', accelerated: 'SIMULATED', deterministic: 'TEST' }[mode];
+          clock.setMode(simulationMode); backendState.simConfig.mode = simulationMode;
         } else if (operation === 'reset_seed' && seed !== undefined) {
           backendState.randomRegistry.resetAll(seed); backendState.simConfig.seed = seed;
         } else throw new Error(`Operasi kontrol simulasi '${operation}' tidak valid.`);
@@ -861,7 +894,7 @@ export class CommandExecutor {
           status: INCIDENT_STATES.ACTIVE,
           priority: severity === 'critical' || severity === 'high' ? 'high' : 'normal',
           source: `Operator (${actorName})`, assignedUnit: assignedUnit || 'Menunggu Disposisi Petugas',
-          notes: notes || 'Laporan insiden baru masuk antrean verifikasi SITS.',
+          notes: notes || 'Skenario contoh menunggu pembaruan di simulator.',
           reportedAt: now, updatedAt: now, acknowledgedAt: null, resolvedAt: null
         };
         backendState.state.incidents.unshift(incident);
@@ -914,8 +947,8 @@ export class CommandExecutor {
         const previousState = existingInc ? { ...existingInc } : null;
 
         const targetStatus = payload.status;
-        const assignedUnit = payload?.assignedUnit || 'Patroli Dishub & Tim 112 Surabaya';
-        const notes = payload?.notes || 'Tim lapangan telah didisposisikan ke lokasi.';
+        const assignedUnit = payload?.assignedUnit || 'Unit Demo';
+        const notes = payload?.notes || 'Status penugasan contoh diubah pada simulator; tidak ada petugas yang dihubungi.';
         const inc = backendState.updateIncidentStatus(id, targetStatus, assignedUnit, notes, {
           commandId: finalCommandId,
           correlationId: finalCorrelationId,

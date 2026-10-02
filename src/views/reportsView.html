@@ -2,9 +2,9 @@
         <!-- Section Header / Operations Workspace Summary -->
         <header class="workspace-header">
           <div class="workspace-header-title-group">
-            <span class="workspace-header-kicker">SITS SURABAYA · EXECUTIVE MOBILITY SYNTHESIS</span>
-            <h1 class="workspace-header-title">Mobility Snapshots & Official Reports</h1>
-            <p class="workspace-header-desc">Kompilasi analitik operasional, ringkasan kinerja lampu lalu lintas adaptif, dan ekspor dokumen kedinasan Pemerintah Kota Surabaya.</p>
+            <span class="workspace-header-kicker">OMNITRAF · LAPORAN DEMO SIMULASI</span>
+            <h1 class="workspace-header-title">Laporan Mobilitas Simulasi</h1>
+            <p class="workspace-header-desc">Kompilasi data sintetis untuk demonstrasi. Angka dan dokumen yang diekspor bukan hasil ukur lapangan maupun laporan resmi.</p>
           </div>
           <div class="workspace-header-summary-strip" aria-label="Ringkasan Status Laporan">
             <div class="workspace-summary-item">
@@ -12,28 +12,28 @@
               <div class="workspace-summary-val-row">
                 <span class="signals-status-dot dot-live"></span>
                 <strong class="tabular font-mono text-cyan">PDF · CSV · JSON</strong>
-                <span class="workspace-summary-sub">Standar Dishub</span>
+                <span class="workspace-summary-sub">Format demo</span>
               </div>
             </div>
             <div class="workspace-summary-item">
               <span class="workspace-summary-label">Kompilasi Harian</span>
               <div class="workspace-summary-val-row">
                 <strong class="text-success">Siap Diekspor</strong>
-                <span class="workspace-summary-sub">Real-time Sync</span>
+                <span class="workspace-summary-sub">State simulator</span>
               </div>
             </div>
             <div class="workspace-summary-item hide-mobile">
-              <span class="workspace-summary-label">Verifikasi Sistem</span>
+                <span class="workspace-summary-label">Standar rujukan</span>
               <div class="workspace-summary-val-row">
-                <strong class="tabular font-mono text-primary-2">ISO 37120 / 37122</strong>
-                <span class="workspace-summary-sub">Terakreditasi</span>
+                <strong class="tabular font-mono text-primary-2">Belum dinilai</strong>
+                <span class="workspace-summary-sub">Tidak tersertifikasi</span>
               </div>
             </div>
             <div class="workspace-summary-item hide-mobile">
-              <span class="workspace-summary-label">Indeks SPM Kota</span>
+                <span class="workspace-summary-label">Indeks SPM simulasi</span>
               <div class="workspace-summary-val-row">
-                <strong class="tabular font-mono text-success">98.4% Sesuai</strong>
-                <span class="workspace-summary-sub">Waktu Tunggu &lt; 60s</span>
+                <strong class="tabular font-mono text-success">Contoh</strong>
+                <span class="workspace-summary-sub">Bukan evaluasi resmi</span>
               </div>
             </div>
           </div>
@@ -49,7 +49,7 @@
                 <span class="report-kicker-meta">Snapshot Harian</span>
               </div>
               <h2 class="report-card-title">Daily Mobility Snapshot</h2>
-              <p class="report-card-desc">Ringkasan harian performa lalu lintas Kota Surabaya siap pakai untuk pimpinan, stakeholder, dan evaluasi SPM Dishub.</p>
+              <p class="report-card-desc">Contoh ringkasan dari model lalu lintas OmniTRAF; tidak ditujukan untuk keputusan atau evaluasi operasional.</p>
             </div>
             <button class="btn btn-primary compact report-action-btn" type="button" data-action="download-report">Generate Report</button>
           </article>
@@ -59,35 +59,35 @@
             <div class="section-head">
               <div>
                 <h2>Mobility Snapshots & PDF Report</h2>
-                <p>Unduh kompilasi data performa operasional lalu lintas SITS untuk laporan analisis dinas.</p>
+                <p>Unduh kompilasi data simulasi untuk ditinjau sebagai bahan demonstrasi.</p>
               </div>
             </div>
             <div class="report-snapshots-list">
               <div class="report-snapshot-item">
                 <div class="snap-info">
-                  <strong>Daily Mobility Report Surabaya — 30-05-2026 (Today)</strong>
-                  <p>Kompilasi telemetri 126 persimpangan, indeks kemacetan harian, serta log preemption kendaraan darurat.</p>
+                  <strong>Contoh snapshot harian — data sintetis</strong>
+                  <p>Angka simpang, indeks kemacetan, dan log prioritas kendaraan berasal dari skenario demo.</p>
                 </div>
                 <button class="btn btn-primary compact" data-action="download-report" data-report-type="Daily Mobility">Generate & Download</button>
               </div>
               <div class="report-snapshot-item">
                 <div class="snap-info">
-                  <strong>Weekly Traffic Synthesis Surabaya — Week 21</strong>
-                  <p>Kompilasi performa mingguan sistem adaptif SITS, perbandingan SPM, dan reduksi emisi karbon.</p>
+                  <strong>Contoh sintesis mingguan — data sintetis</strong>
+                  <p>Bukan histori mingguan aktual, perbandingan SPM, atau pengukuran reduksi emisi.</p>
                 </div>
                 <button class="btn btn-ghost compact" data-action="download-report" data-report-type="Weekly Synthesis">Generate & Download</button>
               </div>
             </div>
           </article>
 
-          <!-- Enterprise Reporting Engine (Dishub Surabaya) -->
+          <!-- Reporting tools for the simulation prototype -->
           <article class="reports-enterprise glass-panel">
             <div class="section-head">
               <div>
-                <h2>Enterprise Reporting Engine (Dinas Perhubungan Kota Surabaya)</h2>
-                <p>Ekspor log insiden real-time ke format spreadsheet CSV, cetak format resmi dokumen kedinasan PDF, atau salin payload telemetri API.</p>
+                <h2>Ekspor Data Prototipe</h2>
+                <p>Ekspor data prototipe simulasi ke CSV, PDF demo, atau salin payload telemetri. Berkas yang dihasilkan bukan dokumen resmi atau laporan operasional Dishub.</p>
               </div>
-              <span class="badge badge-primary-soft">Government Ready</span>
+              <span class="badge badge-simulated">SIMULASI</span>
             </div>
             
             <div class="reports-enterprise-actions">
@@ -107,33 +107,32 @@
           </article>
         </section>
 
-        <!-- Official Executive Print Document Template (Rendered only on print / @media print) -->
+        <!-- Simulation report template (Rendered only on print / @media print) -->
         <div id="executivePrintDoc" class="print-only-container" style="display: none;">
           <div class="print-letterhead" style="display: flex; align-items: center; gap: 16px; border-bottom: 3px double #000; padding-bottom: 12px; margin-bottom: 16px;">
             <div class="print-logo-col">
-              <img src="/assets/omnitraf-logo-original.png" alt="SITS Logo" style="height: 65px; width: auto;" />
+              <img src="/assets/omnitraf-logo-original.png" alt="Logo OmniTRAF" style="height: 65px; width: auto;" />
             </div>
             <div class="print-title-col">
-              <h1 style="font-size: 15pt; font-weight: 800; margin: 0; text-transform: uppercase; color: #000; font-family: serif;">PEMERINTAH KOTA SURABAYA</h1>
-              <h2 style="font-size: 13pt; font-weight: 700; margin: 2px 0; text-transform: uppercase; color: #000; font-family: serif;">DINAS PERHUBUNGAN</h2>
-              <h3 style="font-size: 11pt; font-weight: 700; margin: 0; color: #1e3a8a; font-family: sans-serif;">SITS COMMAND CENTER (SURABAYA INTELLIGENT TRANSPORT SYSTEM)</h3>
-              <p style="font-size: 8.5pt; margin: 3px 0 0 0; color: #334155;">Jl. Dukuh Menanggal X No. 1, Gayungan, Surabaya | Telp (031) 8292123 | Email: sits@surabaya.go.id</p>
+              <h1 style="font-size: 15pt; font-weight: 800; margin: 0; text-transform: uppercase; color: #000; font-family: serif;">OMNITRAF</h1>
+              <h2 style="font-size: 13pt; font-weight: 700; margin: 2px 0; text-transform: uppercase; color: #000; font-family: serif;">PROTOTIPE SIMULASI MOBILITAS</h2>
+              <h3 style="font-size: 11pt; font-weight: 700; margin: 0; color: #1e3a8a; font-family: sans-serif;">DEMO NONRESMI • BUKAN SISTEM OPERASIONAL SITS</h3>
             </div>
           </div>
 
           <div style="text-align: center; margin-bottom: 20px;">
             <h3 style="font-size: 13pt; font-weight: 800; margin: 0; text-decoration: underline; text-transform: uppercase; color: #000;">LAPORAN EKSEKUTIF MOBILITAS & KINERJA APILL ADAPTIF</h3>
-            <p style="font-size: 9.5pt; margin: 4px 0; color: #475569;">Nomor Dokumen: SITS-EKS/2026/09/REC-8842 &nbsp;|&nbsp; Tanggal Pengesahan: <span id="printDateStr">26 September 2026</span></p>
-            <p style="font-size: 8pt; margin: 2px 0; color: #64748b; font-style: italic;">[PROTOTYPE / SIMULATION REPORT — OmniTRAF SITS Intelligent Mobility Engine]</p>
+            <p style="font-size: 9.5pt; margin: 4px 0; color: #475569;">ID Demo: OMNITRAF-SIM &nbsp;|&nbsp; Waktu pembuatan: <span id="printDateStr">—</span></p>
+            <p style="font-size: 8pt; margin: 2px 0; color: #b91c1c; font-weight: 800;">DATA SIMULASI • BUKAN DOKUMEN RESMI ATAU HASIL PENGUKURAN KOTA</p>
           </div>
 
-          <h4 style="font-size: 10.5pt; margin-bottom: 6px; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 4px; color: #000;">I. RINGKASAN CAPAIAN PERFORMA UTAMA (KPI) & DOKUMEN SPM DISHUB</h4>
+          <h4 style="font-size: 10.5pt; margin-bottom: 6px; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 4px; color: #000;">I. RINGKASAN KPI SIMULASI</h4>
           <table class="print-summary-table" style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9.5pt; color: #000;">
             <thead>
               <tr style="background: #e2e8f0; border: 1px solid #000;">
                 <th style="padding: 6px; text-align: left; border: 1px solid #000;">Indikator Performa Utama</th>
                 <th style="padding: 6px; text-align: center; border: 1px solid #000;">Capaian Hari Ini</th>
-                <th style="padding: 6px; text-align: center; border: 1px solid #000;">Target SPM Dishub</th>
+                <th style="padding: 6px; text-align: center; border: 1px solid #000;">Pembanding model</th>
                 <th style="padding: 6px; text-align: center; border: 1px solid #000;">Status Evaluasi</th>
               </tr>
             </thead>
@@ -157,7 +156,7 @@
                 <td style="padding: 6px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">✓ Melampaui Target</td>
               </tr>
               <tr style="border: 1px solid #000;">
-                <td style="padding: 6px; border: 1px solid #000;">Total Insiden Lalu Lintas Tertangani (SITS 112)</td>
+                <td style="padding: 6px; border: 1px solid #000;">Jumlah contoh skenario insiden (bukan data SITS 112)</td>
                 <td style="padding: 6px; text-align: center; font-weight: bold; border: 1px solid #000;" id="printIncVal">12 Insiden Selesai</td>
                 <td style="padding: 6px; text-align: center; border: 1px solid #000;">100% Resolved</td>
                 <td style="padding: 6px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">✓ 100% Selesai</td>
@@ -181,7 +180,7 @@
                 <td style="padding: 5px; border: 1px solid #000;">Koridor A. Yani / Wonokromo</td>
                 <td style="padding: 5px; text-align: center; border: 1px solid #000;">3.120 smp/jam</td>
                 <td style="padding: 5px; text-align: center; border: 1px solid #000;">38 km/jam</td>
-                <td style="padding: 5px; text-align: center; border: 1px solid #000;">Webster Optimised (48s)</td>
+                <td style="padding: 5px; text-align: center; border: 1px solid #000;">Contoh perhitungan Webster (48s; belum divalidasi)</td>
                 <td style="padding: 5px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">Lancar Terkendali</td>
               </tr>
               <tr style="border: 1px solid #000;">
@@ -208,18 +207,8 @@
             </tbody>
           </table>
 
-          <!-- Signature Approval Blocks -->
-          <div class="print-signatures" style="display: flex; justify-content: space-between; margin-top: 35px; font-size: 9.5pt; color: #000; page-break-inside: avoid;">
-            <div style="text-align: center; width: 45%;">
-              <p style="margin-bottom: 55px;">Operator Jaga ATCS SITS Surabaya,<br/><br/><br/></p>
-              <strong style="text-decoration: underline;">RACHMAT PRATAMA, S.STP</strong><br/>
-              <span>NIP. 19880412 201212 1 002</span>
-            </div>
-            <div style="text-align: center; width: 45%;">
-              <p style="margin-bottom: 55px;">Mengetahui,<br/>Supervisor SITS Command Center 112,<br/><br/><br/></p>
-              <strong style="text-decoration: underline;">IR. H. BAMBANG SURYADI, M.T.</strong><br/>
-              <span>NIP. 19750815 200003 1 004</span>
-            </div>
-          </div>
+          <p style="margin-top: 32px; padding: 10px; border: 1px solid #b91c1c; color: #b91c1c; text-align: center; font-weight: 800;">
+            SIMULASI • TIDAK DITANDATANGANI • BUKAN DOKUMEN PEMERINTAH
+          </p>
         </div>
       </div>

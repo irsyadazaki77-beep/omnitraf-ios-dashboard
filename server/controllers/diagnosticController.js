@@ -12,6 +12,7 @@ import { diagnosticEngine, HEALTH_STATUS, SUBSYSTEMS, EVENT_CATEGORIES, DIAGNOST
 import { createApiResponse, createApiErrorResponse, createCommandErrorResponse, getCommandErrorStatus } from '../middlewares/errorHandler.js';
 import { ROLES } from '../config/constants.js';
 import { commandExecutor } from '../services/commandExecutor.js';
+import { SAFETY_BOUNDARY } from '../config/safetyBoundary.js';
 import { validateDiagnosticEventsQuery } from '../config/contracts.js';
 
 export function getDiagnosticHealth(req, res) {
@@ -190,12 +191,14 @@ export async function clearChaosFault(req, res) {
 export function getSimulationDiagnostics(req, res) {
   const simEngine = backendState.simEngine;
   const clock = backendState.clock;
-  const randomReg = backendState.randomRegistry;
+  const engineDiagnostics = simEngine.getDiagnostics();
 
   res.status(200).json(createApiResponse({
     type: 'simulation_diagnostics',
     data: {
       mode: clock.mode,
+      clockBehavior: clock.mode === 'LIVE' ? 'REALTIME_SIMULATION' : clock.mode,
+      safetyBoundary: SAFETY_BOUNDARY,
       seed: backendState.simConfig.seed,
       simulationTimeMs: clock.now(),
       simulationTimeIso: clock.nowIso(),
@@ -208,6 +211,10 @@ export function getSimulationDiagnostics(req, res) {
       tickSequence: simEngine.tickSequence,
       eventSequence: simEngine.eventSequence,
       lastTickDurationMs: simEngine.lastTickDurationMs,
+      health: engineDiagnostics.health,
+      eventQueueSize: engineDiagnostics.eventQueueSize,
+      lastEventType: engineDiagnostics.lastEventType,
+      moduleErrors: engineDiagnostics.errors,
       journalLength: simEngine.eventJournal.length,
       activeDomains: Array.from(simEngine.domains.keys()),
       devicesCount: backendState.devicesRegistry.length,

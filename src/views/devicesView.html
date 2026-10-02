@@ -2,24 +2,24 @@
         <!-- Section Header / Operations Workspace Summary -->
         <header class="workspace-header">
           <div class="workspace-header-title-group">
-            <span class="workspace-header-kicker">SITS SURABAYA · EDGE AI INFRASTRUCTURE</span>
-            <h1 class="workspace-header-title">Edge AI Nodes & Hardware Monitoring</h1>
-            <p class="workspace-header-desc">Pemantauan kesehatan komputasi Edge AI Nvidia Jetson, latensi jaringan, temperatur operasi, dan konfigurasi node IoT Surabaya.</p>
+            <span class="workspace-header-kicker">OMNITRAF · MODEL PERANGKAT SIMULASI</span>
+            <h1 class="workspace-header-title">Node Perangkat Demo</h1>
+            <p class="workspace-header-desc">Nilai kesehatan, latensi, suhu, dan konfigurasi perangkat adalah telemetri sintetis, bukan koneksi hardware Surabaya.</p>
           </div>
           <div class="workspace-header-summary-strip" aria-label="Ringkasan Status Perangkat">
             <div class="workspace-summary-item">
-              <span class="workspace-summary-label">Total Node Terhubung</span>
+              <span class="workspace-summary-label">Node pada model</span>
               <div class="workspace-summary-val-row">
                 <span class="signals-status-dot dot-live"></span>
                 <strong class="tabular font-mono">4 Perangkat</strong>
-                <span class="workspace-summary-sub">Online</span>
+                <span class="workspace-summary-sub">Simulasi</span>
               </div>
             </div>
             <div class="workspace-summary-item">
-              <span class="workspace-summary-label">Status Kesehatan Node</span>
+              <span class="workspace-summary-label">Status model node</span>
               <div class="workspace-summary-val-row">
-                <strong class="text-success" id="nodeStatusSummary">4 Online</strong>
-                <span class="workspace-summary-sub">100% Siap</span>
+                <strong class="text-success" id="nodeStatusSummary">4 Demo</strong>
+                <span class="workspace-summary-sub">Nilai sintetis</span>
               </div>
             </div>
             <div class="workspace-summary-item hide-mobile">
@@ -43,10 +43,10 @@
           <article class="devices-list-panel glass-panel">
             <div class="section-head">
               <div>
-                <h2>Daftar Node Edge AI SITS Surabaya</h2>
-                <p>Unit pemrosesan Edge AI Nvidia Jetson pada SITS Surabaya. Klik baris untuk membuka parameter konfigurasi.</p>
+                <h2>Daftar Node Contoh</h2>
+                <p>Perangkat representatif untuk demonstrasi. Status tidak berasal dari Nvidia Jetson atau node SITS yang terhubung.</p>
               </div>
-              <button class="btn btn-ghost compact" id="btnPingAll" type="button">Ping All Nodes</button>
+              <button class="btn btn-ghost compact" id="btnPingAll" type="button">Simulasikan Ping Semua Node</button>
             </div>
             
             <div class="table-wrap">
@@ -70,7 +70,7 @@
                     <td><strong>NODE-EDGE-01</strong></td>
                     <td>Jl. Ahmad Yani (Wonokromo) Node AI</td>
                     <td>Jetson Orin Nano</td>
-                    <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span><span class="status-online-text">ONLINE</span></td>
+                    <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span><span class="status-online-text">SIMULASI</span></td>
                     <td>
                       <div class="diag-bar-wrap">
                         <div class="diag-bar-track">
@@ -96,7 +96,7 @@
                     <td><strong>NODE-EDGE-02</strong></td>
                     <td>Jl. Raya Darmo (Taman Bungkul) Node AI</td>
                     <td>Jetson Orin Nano</td>
-                    <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span><span class="status-online-text">ONLINE</span></td>
+                    <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span><span class="status-online-text">SIMULASI</span></td>
                     <td>
                       <div class="diag-bar-wrap">
                         <div class="diag-bar-track">
@@ -122,7 +122,7 @@
                     <td><strong>NODE-EDGE-03</strong></td>
                     <td>Jl. Tunjungan Node AI</td>
                     <td>Jetson Xavier NX</td>
-                    <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span><span class="status-online-text">ONLINE</span></td>
+                    <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span><span class="status-online-text">SIMULASI</span></td>
                     <td>
                       <div class="diag-bar-wrap">
                         <div class="diag-bar-track">
@@ -146,9 +146,9 @@
                   </tr>
                   <tr class="clickable-device-row" data-device="NODE-CTRL-01">
                     <td><strong>NODE-CTRL-01</strong></td>
-                    <td>SITS Controller 01 (Wonokromo)</td>
-                    <td>Edge PLC Siemens</td>
-                    <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span><span class="status-online-text">ONLINE</span></td>
+                    <td>Controller Demo 01</td>
+                    <td>Perangkat contoh</td>
+                    <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span><span class="status-online-text">SIMULASI</span></td>
                     <td>
                       <div class="diag-bar-wrap">
                         <div class="diag-bar-track">

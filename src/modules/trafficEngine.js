@@ -16,9 +16,11 @@ import { stateStore, updateTrafficState, updateSignalState } from '../core/state
 import { soundManager } from '../core/soundManager.js';
 import { socketClient } from '../core/socketClient.js';
 import { commandLayer } from '../core/commandLayer.js';
+import { SeededRandom } from '../../shared/seededRandom.js';
 
 export class TrafficEngine {
   constructor() {
+    this.localSimRandom = new SeededRandom('omnitraf-traffic-local-fallback');
     this.localSimInterval = null;
     this.graceTimer = null;
     this._localSimulationRunning = false;
@@ -151,12 +153,13 @@ export class TrafficEngine {
     const isConnected = state.connectionStatus === 'connected';
     const isResync = state.connectionStatus === 'resyncing';
     
-    // Header Status Strip
-    const provText = isConnected ? 'SITS GATEWAY LIVE' : isResync ? 'RESYNCING SITS' : 'SIMULATED CACHE';
-    const provClass = isConnected ? 'provenance-badge live' : isResync ? 'provenance-badge derived' : 'provenance-badge simulated';
+    // A live socket only confirms a connection to this prototype's simulator,
+    // not to the real SITS infrastructure.
+    const provText = isConnected ? 'SIMULASI • STREAM SERVER' : isResync ? 'SINKRON ULANG • SIMULASI' : 'SIMULASI LOKAL';
+    const provClass = 'provenance-badge simulated';
     
     this._smartUpdateDOM('dashHeaderProv', provText, provClass);
-    this._smartUpdateDOM('briefingProvenance', isConnected ? 'REALTIME SITS' : 'LOCAL SIMULATION', provClass);
+    this._smartUpdateDOM('briefingProvenance', isConnected ? 'SIMULASI SERVER' : 'SIMULASI LOKAL', provClass);
     
     // Local Time Clock
     const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
@@ -339,7 +342,7 @@ export class TrafficEngine {
     if (!Array.isArray(emergencies)) return;
     const countEl = document.getElementById("activePriorityCount");
     if (countEl) {
-      this._smartUpdateDOM(countEl, `${emergencies.length} Active priority`);
+      this._smartUpdateDOM(countEl, `${emergencies.length} skenario demo`);
     }
 
     // Dynamic sync for dashboard Emergency Priority card
@@ -353,16 +356,16 @@ export class TrafficEngine {
       if (emergencies.length > 0) {
         const emg = emergencies[0];
         const isFinished = ["ARRIVED", "COMPLETED", "CANCELLED"].includes(emg.status);
-        this._smartUpdateDOM(titleEl, `${emg.vehicleId || 'Ambulans'} (${emg.vehicleType || '112'})`);
-        if (etaEl) this._smartUpdateDOM(etaEl, isFinished ? `Status: ${emg.status}` : `ETA ${emg.ETA || '1m 45s'} • Kecepatan: ${emg.speed || 60} km/j`);
-        if (routeEl) this._smartUpdateDOM(routeEl, `Rute: ${emg.routeId ? emg.routeId.replace('route-', '').toUpperCase() : 'Jl. Raya Darmo → RSU Dr. Soetomo'}`);
-        if (badgeEl) this._smartUpdateDOM(badgeEl, isFinished ? 'Selesai' : 'Aktif', isFinished ? 'pill pill-live' : 'pill pill-danger');
+        this._smartUpdateDOM(titleEl, `Skenario demo: ${emg.vehicleId || 'Ambulans'} (${emg.vehicleType || '112'})`);
+        if (etaEl) this._smartUpdateDOM(etaEl, isFinished ? `Status simulasi: ${emg.status}` : `ETA simulasi ${emg.ETA || '1m 45s'} • Kecepatan model: ${emg.speed || 60} km/j`);
+        if (routeEl) this._smartUpdateDOM(routeEl, `Rute contoh: ${emg.routeId ? emg.routeId.replace('route-', '').toUpperCase() : 'Jl. Raya Darmo → RSU Dr. Soetomo'}`);
+        if (badgeEl) this._smartUpdateDOM(badgeEl, 'SIMULASI', 'pill pill-ai');
         if (iconEl) iconEl.className = isFinished ? 'emergency-icon' : 'emergency-icon pulse-red';
       } else {
-        this._smartUpdateDOM(titleEl, 'Tidak Ada Armada Darurat Aktif');
-        if (etaEl) this._smartUpdateDOM(etaEl, 'Sistem Siaga Dispatch 112 Surabaya');
-        if (routeEl) this._smartUpdateDOM(routeEl, 'Koridor dalam mode operasi normal');
-        if (badgeEl) this._smartUpdateDOM(badgeEl, 'Standby', 'pill');
+        this._smartUpdateDOM(titleEl, 'Tidak ada skenario prioritas aktif');
+        if (etaEl) this._smartUpdateDOM(etaEl, 'Simulator siap untuk demonstrasi');
+        if (routeEl) this._smartUpdateDOM(routeEl, 'Tidak ada armada atau koridor lapangan yang terhubung');
+        if (badgeEl) this._smartUpdateDOM(badgeEl, 'DEMO', 'pill pill-ai');
         if (iconEl) iconEl.className = 'emergency-icon';
       }
     }
@@ -454,6 +457,9 @@ export class TrafficEngine {
   startLocalSimulation() {
     if (this._localSimulationRunning) return;
     this._localSimulationRunning = true;
+    this.localSimRandom.reset('omnitraf-traffic-local-fallback');
+    const initialState = stateStore.getState();
+    this.localSimTimeMs = Number(initialState.timestampMs || initialState.telemetry?.timestampMs) || Date.now();
     console.info("⚡ [TrafficEngine] Local Simulation Loop Active (Melanjutkan dari Last Known Good State).");
 
     if (this.localSimInterval) clearInterval(this.localSimInterval);
@@ -467,12 +473,13 @@ export class TrafficEngine {
       }
 
       const curTel = curState.telemetry || {};
-      const newVehicles = (curTel.vehiclesToday || 128540) + Math.floor(Math.random() * 4) + 1;
+      this.localSimTimeMs += 1000;
+      const newVehicles = (curTel.vehiclesToday || 128540) + this.localSimRandom.rangeInt(1, 4);
       const newCo2 = (curTel.co2SavedKg || 1420) + 0.2;
       const newFuel = (curTel.fuelSavedLiters || 580) + 0.08;
-      const timeStr = new Date().toLocaleTimeString('id-ID') + ' WIB';
+      const timeStr = new Date(this.localSimTimeMs).toLocaleTimeString('id-ID') + ' WIB';
 
-      const nowLocal = Date.now();
+      const nowLocal = this.localSimTimeMs;
       const updatedIntersections = (curState.intersections || []).map(node => {
         const nextNode = { ...node };
 
@@ -546,12 +553,12 @@ export class TrafficEngine {
       // Handle chaos level decay in local simulation
       let nextChaosLevel = curState.chaosLevel;
       let nextIsChaos = curState.isChaosMode;
-      if (curState.isChaosMode && nextChaosLevel > 0 && Math.random() < 0.1) {
+      if (curState.isChaosMode && nextChaosLevel > 0 && this.localSimRandom.chance(0.1)) {
         nextChaosLevel--;
         if (nextChaosLevel <= 0) {
           nextIsChaos = false;
           if (typeof window.showToast === "function") {
-            window.showToast("Sistem ATCS Surabaya pulih otomatis dari Mode Keos.");
+            window.showToast("State simulator kembali dari skenario gangguan.");
           }
         }
       }
@@ -561,13 +568,14 @@ export class TrafficEngine {
         isChaosMode: nextIsChaos,
         chaosLevel: nextChaosLevel,
         intersections: updatedIntersections,
-        networkLoad: nextIsChaos ? Math.floor(90 + Math.random() * 8) : Math.floor(65 + Math.random() * 8),
-        avgWaitTime: nextIsChaos ? Math.floor(100 + Math.random() * 15) : Math.floor(38 + Math.random() * 6),
-        congestionIndex: nextIsChaos ? Math.floor(88 + Math.random() * 8) : Math.floor(58 + Math.random() * 6),
+        networkLoad: nextIsChaos ? this.localSimRandom.rangeInt(90, 97) : this.localSimRandom.rangeInt(65, 72),
+        avgWaitTime: nextIsChaos ? this.localSimRandom.rangeInt(100, 114) : this.localSimRandom.rangeInt(38, 43),
+        congestionIndex: nextIsChaos ? this.localSimRandom.rangeInt(88, 95) : this.localSimRandom.rangeInt(58, 63),
         vehiclesToday: newVehicles,
         co2SavedKg: Math.round(newCo2),
         fuelSavedLiters: Math.round(newFuel),
-        timestamp: timeStr
+        timestamp: timeStr,
+        timestampMs: nowLocal
       }, 'local-simulator');
 
     }, 1000);

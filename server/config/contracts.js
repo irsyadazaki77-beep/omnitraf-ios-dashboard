@@ -29,8 +29,8 @@ const ENTITY_ID = /^[A-Z0-9][A-Z0-9_-]{1,63}$/i;
 const field = (type, options = {}) => Object.freeze({ type, ...options });
 /**
  * Command contracts describe target type, required/optional inputs, normalization
- * and business bounds. Unknown extra payload keys are tolerated for wire compatibility;
- * actor and transport metadata keys are always removed before domain execution.
+ * and business bounds. Known target aliases are normalized, unrecognized payload
+ * keys are stripped, and actor/transport metadata is removed before execution.
  * Shape errors return INVALID_COMMAND; bad target shapes return INVALID_TARGET;
  * well-formed but unknown entity identifiers return NOT_FOUND.
  */
@@ -48,10 +48,10 @@ export const COMMAND_CONTRACTS = Object.freeze({
   'simulation:control': { target: 'runtimeId', targetType: 'simulation-runtime-identifier', required: ['targetId', 'operation'], fields: { operation: field('enum', { values: ['pause', 'resume', 'step', 'set_speed', 'set_mode', 'reset_seed'] }), speedMultiplier: field('number', { min: 0.1, max: 10, optional: true }), seed: field('non-negative-safe-integer-or-string', { optional: true }), deltaMs: field('integer', { min: 1, max: 60000, default: 1000, optional: true }), mode: field('enum', { values: ['realtime', 'accelerated', 'deterministic'], optional: true }) } },
   'emergency:activate': { target: 'vehicleId', targetType: 'vehicle-identifier', required: ['targetId', 'code'], fields: { code: field('identifier', { maxLength: 50 }), route: field('route-id', { default: 'route-soetomo', optional: true }), type: field('string', { maxLength: 40, optional: true }), incidentId: field('identifier', { optional: true }) } },
   'emergency:cancel': { target: 'emergencyId', targetType: 'emergency-identifier', required: ['targetId'], fields: { id: field('identifier', { optional: true }) } },
-  'incident:create': { target: 'incidentId', targetType: 'incident-identifier', targetGeneratedIfOmitted: true, required: ['title', 'location'], fields: { id: field('identifier', { optional: true, generatedIfOmitted: true }), title: field('string', { maxLength: 200 }), category: field('enum', { values: INCIDENT_CATEGORIES, default: 'congestion', optional: true, case: 'lower' }), severity: field('enum', { values: INCIDENT_SEVERITIES, default: 'medium', optional: true, case: 'lower' }), location: field('string', { maxLength: 250 }), assignedUnit: field('string', { maxLength: 120, default: 'Menunggu Disposisi Petugas', optional: true }), notes: field('string', { maxLength: 1000, default: 'Laporan insiden baru masuk antrean verifikasi SITS.', optional: true }) } },
+  'incident:create': { target: 'incidentId', targetType: 'incident-identifier', targetGeneratedIfOmitted: true, required: ['title', 'location'], fields: { id: field('identifier', { optional: true, generatedIfOmitted: true }), title: field('string', { maxLength: 200 }), category: field('enum', { values: INCIDENT_CATEGORIES, default: 'congestion', optional: true, case: 'lower' }), severity: field('enum', { values: INCIDENT_SEVERITIES, default: 'medium', optional: true, case: 'lower' }), location: field('string', { maxLength: 250 }), assignedUnit: field('string', { maxLength: 120, default: 'Unit Demo', optional: true }), notes: field('string', { maxLength: 1000, default: 'Skenario contoh menunggu pembaruan di simulator.', optional: true }) } },
   'incident:acknowledge': { target: 'incidentId', targetType: 'incident-identifier', required: ['targetId'], fields: { id: field('identifier', { optional: true }), assignedUnit: field('string', { maxLength: 120, optional: true }), notes: field('string', { maxLength: 1000, optional: true }) } },
   'incident:update-status': { target: 'incidentId', targetType: 'incident-identifier', required: ['targetId', 'status'], fields: { id: field('identifier', { optional: true }), status: field('enum', { values: INCIDENT_STATUS_VALUES, case: 'upper', legacyAlias: { 'DISPATCHED/RESPONDING': 'DISPATCHED' } }), assignedUnit: field('string', { maxLength: 120, optional: true }), notes: field('string', { maxLength: 1000, optional: true }) } },
-  'incident:dispatch': { target: 'incidentId', targetType: 'incident-identifier', required: ['targetId'], fields: { id: field('identifier', { optional: true }), status: field('enum', { values: INCIDENT_STATUS_VALUES, default: 'DISPATCHED', optional: true, case: 'upper' }), assignedUnit: field('string', { maxLength: 120, default: 'Patroli Dishub & Tim 112 Surabaya', optional: true }), notes: field('string', { maxLength: 1000, default: 'Tim lapangan telah didisposisikan ke lokasi.', optional: true }) } },
+  'incident:dispatch': { target: 'incidentId', targetType: 'incident-identifier', required: ['targetId'], fields: { id: field('identifier', { optional: true }), status: field('enum', { values: INCIDENT_STATUS_VALUES, default: 'DISPATCHED', optional: true, case: 'upper' }), assignedUnit: field('string', { maxLength: 120, default: 'Unit Demo', optional: true }), notes: field('string', { maxLength: 1000, default: 'Status penugasan contoh diubah pada simulator; tidak ada petugas yang dihubungi.', optional: true }) } },
   'incident:resolve': { target: 'incidentId', targetType: 'incident-identifier', required: ['targetId'], fields: { id: field('identifier', { optional: true }), assignedUnit: field('string', { maxLength: 120, optional: true }), notes: field('string', { maxLength: 1000, optional: true }) } },
   'siren:mute': { target: 'audioId', targetType: 'audio-identifier', required: ['targetId', 'muted'], fields: { muted: field('boolean') } },
   'cctv:snapshot': { target: 'cameraId', targetType: 'camera-identifier', required: ['targetId'], fields: {} }
@@ -67,7 +67,8 @@ function fail(field, expected, actual, code = 'INVALID_COMMAND') {
 function requireString(value, field, { max = 128, pattern = null, trim = true, code = null } = {}) {
   const errorCode = code || (field === 'targetId' || field.endsWith('Id') || field === 'code' || field === 'route' ? 'INVALID_TARGET' : 'INVALID_COMMAND');
   if (typeof value !== 'string') fail(field, 'non-empty string', value, errorCode);
-  const normalized = trim ? value.trim() : value;
+  const cleaned = value.replace(/[\r\n]+/g, ' ').replace(/[\x00-\x1F\x7F]/g, '');
+  const normalized = trim ? cleaned.trim() : cleaned;
   if (!normalized || normalized.length > max || (pattern && !pattern.test(normalized))) {
     fail(field, `non-empty string (max ${max})${pattern ? ' matching identifier format' : ''}`, value, errorCode);
   }
@@ -83,10 +84,43 @@ function integer(value, field, min, max) {
 
 function optionalString(payload, field, max, { allowEmpty = false } = {}) {
   if (payload[field] === undefined || payload[field] === null) return;
-  if (typeof payload[field] !== 'string' || payload[field].length > max || (!allowEmpty && !payload[field].trim())) {
+  if (typeof payload[field] !== 'string') {
     fail(field, `string${allowEmpty ? '' : ' (non-empty)'} max ${max}`, payload[field]);
   }
-  payload[field] = payload[field].trim();
+  const cleaned = payload[field].replace(/[\r\n]+/g, ' ').replace(/[\x00-\x1F\x7F]/g, '').trim();
+  if (cleaned.length > max || (!allowEmpty && !cleaned)) {
+    fail(field, `string${allowEmpty ? '' : ' (non-empty)'} max ${max}`, payload[field]);
+  }
+  payload[field] = cleaned;
+}
+
+function validateSafeParams(value, field = 'params', depth = 0, state = { entries: 0 }) {
+  if (depth > 4 || ++state.entries > 128) fail(field, 'JSON object with depth <= 4 and <= 128 values', 'too large or deeply nested');
+  if (value === null || typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) fail(field, 'finite JSON values', value);
+    return value;
+  }
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/[\r\n]+/g, ' ').replace(/[\x00-\x1F\x7F]/g, '').trim();
+    if (cleaned.length > 256) fail(field, 'string max 256 characters', 'too long');
+    return cleaned;
+  }
+  if (Array.isArray(value)) {
+    if (value.length > 32) fail(field, 'array max 32 items', value.length);
+    return value.map(item => validateSafeParams(item, field, depth + 1, state));
+  }
+  if (!value || typeof value !== 'object' || (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)) {
+    fail(field, 'plain JSON object', typeof value);
+  }
+  const entries = Object.entries(value);
+  if (entries.length > 32) fail(field, 'object max 32 properties', entries.length);
+  const cleanObject = {};
+  for (const [key, item] of entries) {
+    if (key.length > 64 || /[\x00-\x1F\x7F]/.test(key) || ['__proto__', 'prototype', 'constructor'].includes(key)) fail(field, 'safe property names max 64 characters', key);
+    cleanObject[key] = validateSafeParams(item, field, depth + 1, state);
+  }
+  return cleanObject;
 }
 
 function resolveTarget(action, targetId, payload) {
@@ -143,9 +177,28 @@ export function validateCommand(normalized) {
   const action = normalizedAction;
   const targetId = resolveTarget(action, command.targetId, payload);
 
+  // Keep only fields declared by the action contract and known target aliases.
+  // This preserves legacy wire shapes while preventing arbitrary client fields
+  // from leaking into persistence, audit, realtime events, or idempotency data.
+  const inputContract = COMMAND_CONTRACTS[action];
+  const allowedPayloadKeys = new Set([
+    ...Object.keys(inputContract.fields || {}),
+    inputContract.target
+  ]);
+  if (inputContract.target === 'incidentId') allowedPayloadKeys.add('id');
+  if (inputContract.target === 'emergencyId') {
+    allowedPayloadKeys.add('id');
+    allowedPayloadKeys.add('vehicleId');
+  }
+  for (const key of Object.keys(payload)) {
+    if (!allowedPayloadKeys.has(key)) delete payload[key];
+  }
+
   for (const key of ['commandId', 'idempotencyKey', 'correlationId']) {
-    if (command[key] !== undefined && command[key] !== null && (typeof command[key] !== 'string' || !command[key].trim() || command[key].length > 160)) {
-      fail(key, 'non-empty string max 160', command[key]);
+    if (command[key] !== undefined && command[key] !== null) {
+      if (typeof command[key] !== 'string') fail(key, 'non-empty string max 160', command[key]);
+      command[key] = command[key].replace(/[\r\n]+/g, ' ').replace(/[\x00-\x1F\x7F]/g, '').trim();
+      if (!command[key] || command[key].length > 160) fail(key, 'non-empty string max 160', command[key]);
     }
   }
 
@@ -177,6 +230,10 @@ export function validateCommand(normalized) {
       payload.durationMs = payload.durationMs === undefined ? 15000 : integer(payload.durationMs, 'durationMs', 1, 3600000);
       if (payload.deterministicSeed !== undefined && (!Number.isSafeInteger(payload.deterministicSeed) || payload.deterministicSeed < 0)) fail('deterministicSeed', 'non-negative safe integer', payload.deterministicSeed);
       if (payload.params !== undefined && (!payload.params || typeof payload.params !== 'object' || Array.isArray(payload.params))) fail('params', 'object', payload.params);
+      if (payload.params !== undefined) {
+        payload.params = validateSafeParams(payload.params);
+        if (JSON.stringify(payload.params).length > 4096) fail('params', 'serialized JSON max 4096 characters', 'too large');
+      }
       payload.deterministicSeed = payload.deterministicSeed === undefined ? 42 : payload.deterministicSeed;
       payload.params = payload.params === undefined ? {} : payload.params;
       break;
@@ -214,7 +271,7 @@ export function validateCommand(normalized) {
       if (!INCIDENT_CATEGORIES.includes(payload.category)) fail('category', INCIDENT_CATEGORIES, payload.category);
       if (!INCIDENT_SEVERITIES.includes(payload.severity)) fail('severity', INCIDENT_SEVERITIES, payload.severity);
       if (payload.assignedUnit === undefined) payload.assignedUnit = 'Menunggu Disposisi Petugas';
-      if (payload.notes === undefined) payload.notes = 'Laporan insiden baru masuk antrean verifikasi SITS.';
+      if (payload.notes === undefined) payload.notes = 'Skenario contoh menunggu pembaruan di simulator.';
       optionalString(payload, 'assignedUnit', 120);
       optionalString(payload, 'notes', 1000, { allowEmpty: true });
       break;
@@ -230,8 +287,8 @@ export function validateCommand(normalized) {
       if (payload.status !== 'DISPATCHED/RESPONDING' && !Object.values(INCIDENT_STATES).includes(payload.status)) fail('status', INCIDENT_STATUS_VALUES, payload.status);
       if (normalizedAction === 'incident:update-status' && payload.status === INCIDENT_STATES.ACKNOWLEDGED) normalizedAction = 'incident:acknowledge';
       if (normalizedAction === 'incident:update-status' && payload.status === INCIDENT_STATES.RESOLVED) normalizedAction = 'incident:resolve';
-      if (normalizedAction === 'incident:dispatch' && payload.assignedUnit === undefined) payload.assignedUnit = 'Patroli Dishub & Tim 112 Surabaya';
-      if (normalizedAction === 'incident:dispatch' && payload.notes === undefined) payload.notes = 'Tim lapangan telah didisposisikan ke lokasi.';
+      if (normalizedAction === 'incident:dispatch' && payload.assignedUnit === undefined) payload.assignedUnit = 'Unit Demo';
+      if (normalizedAction === 'incident:dispatch' && payload.notes === undefined) payload.notes = 'Status penugasan contoh diubah pada simulator; tidak ada petugas yang dihubungi.';
       optionalString(payload, 'assignedUnit', 120); optionalString(payload, 'notes', 1000, { allowEmpty: true });
       break;
     }

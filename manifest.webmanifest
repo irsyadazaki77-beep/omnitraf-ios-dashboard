@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "OmniTRAF Surabaya — Command Center Dashboard",
+  "name": "OmniTRAF — Prototipe Simulasi Mobilitas",
   "short_name": "OmniTRAF",
-  "description": "SITS Surabaya - OmniTRAF Command Center Dashboard - Adaptive Urban Mobility System",
+  "description": "Prototipe demonstrasi mobilitas. Data, kamera, sensor, dan perintah pada aplikasi disimulasikan.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -13,8 +13,7 @@
   "dir": "ltr",
   "categories": [
     "transportation",
-    "utilities",
-    "government"
+    "utilities"
   ],
   "icons": [
     {

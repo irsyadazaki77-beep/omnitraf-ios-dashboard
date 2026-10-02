@@ -24,25 +24,49 @@ import {
   createDomainEventEnvelope
 } from '../config/stateMachine.js';
 import { UnifiedClock, SIMULATION_MODES, systemClock } from './unifiedClock.js';
-import { DeterministicRandomRegistry, defaultRandomRegistry } from './seededRandom.js';
-import { DeterministicSimulationEngine, defaultSimEngine } from './simulationEngine.js';
+import { SAFETY_BOUNDARY } from '../config/safetyBoundary.js';
+import { DeterministicRandomRegistry } from './seededRandom.js';
+import { DeterministicSimulationEngine } from './simulationEngine.js';
 import { validateDomainCommand, ContractValidationError } from '../config/contracts.js';
+import {
+  normalizeCanonicalTelemetry,
+  normalizeCanonicalIntersection,
+  normalizeCanonicalDevice,
+  normalizeCanonicalIncident,
+  normalizeCanonicalEmergency,
+  createNormalizedCollection
+} from '../config/domainModels.js';
 
 export class BackendStateManager {
   constructor(options = {}) {
     this.clock = options.clock || systemClock;
-    this.randomRegistry = options.randomRegistry || defaultRandomRegistry;
-    this.simEngine = options.simEngine || defaultSimEngine;
+    this.randomRegistry = options.randomRegistry || new DeterministicRandomRegistry(options.seed ?? 42);
 
     this.simConfig = {
       mode: options.mode || this.clock.mode || SIMULATION_MODES.LIVE,
-      seed: options.seed || this.randomRegistry.masterSeed || 42,
-      startTime: options.startTime || this.clock.now(),
+      seed: options.seed ?? this.randomRegistry.masterSeed ?? 42,
+      startTime: options.startTime ?? this.clock.now(),
       tickResolution: options.tickResolution || 1000,
       speedMultiplier: options.speedMultiplier || this.clock.speedMultiplier || 1.0,
       paused: options.paused !== undefined ? !!options.paused : this.clock.paused,
       timezone: 'Asia/Jakarta'
     };
+
+    this.simEngine = options.simEngine || new DeterministicSimulationEngine({
+      clock: this.clock,
+      randomRegistry: this.randomRegistry,
+      tickResolution: this.simConfig.tickResolution
+    });
+    this._simulationBaseline = null;
+    this.simEngine.registerDomain('state-bootstrap', 10, () => this._beginSimulationTick(), {
+      snapshot: () => this._snapshotSimulationState(),
+      restore: snapshot => this._restoreSimulationState(snapshot),
+      reset: () => this._resetSimulationState()
+    });
+    this.simEngine.registerDomain('device-telemetry', 20, context => this._stepDeviceTelemetry(context.deltaMs));
+    this.simEngine.registerDomain('emergency-response', 30, context => this._stepEmergencySimulation(context.deltaMs));
+    this.simEngine.registerDomain('signal-cycle', 40, () => this._stepSignalSimulation());
+    this.simEngine.registerDomain('state-finalize', 50, () => this._finishSimulationTick());
 
     this.sequence = 1;
     this.cctvSequence = 1;
@@ -55,6 +79,7 @@ export class BackendStateManager {
     this.co2SavedKg = 1420;
     this.fuelSavedLiters = 580;
     this.io = null;
+    this.pendingSimulationEvents = [];
     this.processedCommands = new Map();
 
     this.auditLogs = [
@@ -155,9 +180,9 @@ export class BackendStateManager {
       },
       {
         deviceId: "NODE-CTRL-01",
-        deviceName: "SITS Controller 01 (Wonokromo)",
+        deviceName: "Controller Demo 01",
         type: "Edge PLC Siemens",
-        location: "SITS Controller Wonokromo",
+        location: "Lokasi demo 01",
         coordinates: [-7.3180, 112.7330],
         status: "ONLINE",
         lastSeenAt: new Date().toISOString(),
@@ -232,48 +257,48 @@ export class BackendStateManager {
       incidents: [
         {
           id: "101",
-          title: "Mogok Truk Treler",
+          title: "Skenario kendaraan mogok",
           category: "accident",
           severity: "danger",
-          location: "Simpang Wonokromo (DTC)",
+          location: "Simpang demo 01",
           coordinates: [-7.2985, 112.7345],
           reportedAt: new Date(Date.now() - 300000).toISOString(),
           updatedAt: new Date(Date.now() - 300000).toISOString(),
           status: "ACTIVE",
           priority: "high",
           source: "AI_VISION",
-          assignedUnit: "SITS Patroli Wilayah Selatan",
-          notes: "Truk treler mogok di lajur tengah, sedang menunggu derek Dinas Perhubungan."
+          assignedUnit: "Unit Demo",
+          notes: "Skenario contoh; tidak ada petugas atau unit derek yang ditugaskan."
         },
         {
           id: "102",
-          title: "Genangan Air Hujan (15cm)",
+          title: "Skenario genangan air",
           category: "weather",
           severity: "warning",
-          location: "Koridor Manyar Kertoarjo",
+          location: "Koridor demo 02",
           coordinates: [-7.2725, 112.7690],
           reportedAt: new Date(Date.now() - 900000).toISOString(),
           updatedAt: new Date(Date.now() - 900000).toISOString(),
           status: "ACKNOWLEDGED",
           priority: "medium",
           source: "OPERATOR",
-          assignedUnit: "BPBD Kota Surabaya",
-          notes: "Genangan air setinggi 15cm terpantau di lajur lambat, tim BPBD mengoperasikan pompa portabel."
+          assignedUnit: "Unit Demo",
+          notes: "Skenario contoh genangan; bukan pengukuran atau laporan lapangan."
         },
         {
           id: "103",
-          title: "Antrean Lampu Merah Panjang",
+          title: "Skenario antrean panjang",
           category: "congestion",
           severity: "warning",
-          location: "Simpang Jemursari - A. Yani",
+          location: "Simpang demo 03",
           coordinates: [-7.3180, 112.7330],
           reportedAt: new Date(Date.now() - 600000).toISOString(),
           updatedAt: new Date(Date.now() - 600000).toISOString(),
           status: "ACTIVE",
           priority: "medium",
           source: "AI_VISION",
-          assignedUnit: "Regu ATCS Surabaya Selatan",
-          notes: "Antrean terdeteksi sepanjang 180 meter di frontage road Ahmad Yani."
+          assignedUnit: "Unit Demo",
+          notes: "Antrean sintetis 180 meter pada skenario simulator."
         }
       ],
 
@@ -438,6 +463,7 @@ export class BackendStateManager {
         }
 
         this.isHydrated = true;
+        this._simulationBaseline = this._snapshotSimulationState();
         return this;
       } catch (err) {
         console.error('❌ [State Manager] Gagal menginisialisasi SQLite persistence:', err);
@@ -615,16 +641,13 @@ export class BackendStateManager {
         existingInc.updatedAt = nowStr;
         existingInc.notes = `Koneksi terputus. consecutiveFailures: ${dev.consecutiveFailures}. Terakhir aktif: ${dev.lastHeartbeatAt}.`;
         this.incidentSequence++;
-        if (this.io) {
-          this.io.emit('incident:update', {
+        this._queueSimulationEvent('incident:update', {
             id: existingInc.id,
             seq: this.incidentSequence,
             incidentSeq: this.incidentSequence,
-            timestamp: Date.now(),
             source: 'server',
             payload: existingInc
-          });
-        }
+        });
       } else {
         const newInc = {
           id: `INC-${id}`,
@@ -643,24 +666,19 @@ export class BackendStateManager {
         };
         this.state.incidents.unshift(newInc);
         this.incidentSequence++;
-        if (this.io) {
-          this.io.emit('incident:update', {
+        this._queueSimulationEvent('incident:update', {
             id: newInc.id,
             seq: this.incidentSequence,
             incidentSeq: this.incidentSequence,
-            timestamp: Date.now(),
             source: 'server',
             payload: newInc
-          });
-        }
-      }
-
-      if (this.io) {
-        this.io.emit('system:toast', {
-          message: `⚠️ GANGGUAN JARINGAN: Edge Node ${id} sekarang ${newLevel}!`,
-          type: 'danger'
         });
       }
+
+      this._queueSimulationEvent('system:toast', {
+        message: `⚠️ GANGGUAN JARINGAN: Edge Node ${id} sekarang ${newLevel}!`,
+        type: 'danger'
+      });
     } else if (newLevel === "DEGRADED") {
       if (existingInc) {
         existingInc.severity = "warning";
@@ -668,16 +686,13 @@ export class BackendStateManager {
         existingInc.updatedAt = nowStr;
         existingInc.notes = `Kinerja menurun. Temp: ${dev.temperatureC}°C, FPS: ${dev.fps}, Latency: ${dev.latencyMs}ms.`;
         this.incidentSequence++;
-        if (this.io) {
-          this.io.emit('incident:update', {
+        this._queueSimulationEvent('incident:update', {
             id: existingInc.id,
             seq: this.incidentSequence,
             incidentSeq: this.incidentSequence,
-            timestamp: Date.now(),
             source: 'server',
             payload: existingInc
-          });
-        }
+        });
       } else {
         const newInc = {
           id: `INC-${id}`,
@@ -696,24 +711,19 @@ export class BackendStateManager {
         };
         this.state.incidents.unshift(newInc);
         this.incidentSequence++;
-        if (this.io) {
-          this.io.emit('incident:update', {
+        this._queueSimulationEvent('incident:update', {
             id: newInc.id,
             seq: this.incidentSequence,
             incidentSeq: this.incidentSequence,
-            timestamp: Date.now(),
             source: 'server',
             payload: newInc
-          });
-        }
-      }
-
-      if (this.io) {
-        this.io.emit('system:toast', {
-          message: `⚠️ PENURUNAN KINERJA: Edge Node ${id} terdegradasi!`,
-          type: 'warning'
         });
       }
+
+      this._queueSimulationEvent('system:toast', {
+        message: `⚠️ PENURUNAN KINERJA: Edge Node ${id} terdegradasi!`,
+        type: 'warning'
+      });
     } else if (newLevel === "HEALTHY") {
       if (existingInc) {
         existingInc.status = "RESOLVED";
@@ -721,28 +731,39 @@ export class BackendStateManager {
         existingInc.resolvedAt = nowStr;
         existingInc.notes += ` [PULIH] Node kembali ke status HEALTHY pada ${nowStr}.`;
         this.incidentSequence++;
-        if (this.io) {
-          this.io.emit('incident:update', {
+        this._queueSimulationEvent('incident:update', {
             id: existingInc.id,
             seq: this.incidentSequence,
             incidentSeq: this.incidentSequence,
-            timestamp: Date.now(),
             source: 'server',
             payload: existingInc
-          });
-        }
+        });
         
-        if (this.io) {
-          this.io.emit('system:toast', {
-            message: `✅ KONEKSI PULIH: Edge Node ${id} kembali normal (HEALTHY).`,
-            type: 'success'
-          });
-        }
+        this._queueSimulationEvent('system:toast', {
+          message: `✅ KONEKSI PULIH: Edge Node ${id} kembali normal (HEALTHY).`,
+          type: 'success'
+        });
       }
     }
   }
 
   getSnapshot() {
+    const canonicalTelemetry = normalizeCanonicalTelemetry({
+      ...this.state,
+      source: 'server',
+      provenance: 'SIMULATED',
+      updatedAt: this.clock.nowIso()
+    });
+    const canonicalIntersections = (this.state.intersections || []).map(normalizeCanonicalIntersection);
+    const canonicalDevices = (this.state.devices || []).map(normalizeCanonicalDevice);
+    const canonicalIncidents = (this.state.incidents || []).map(normalizeCanonicalIncident);
+    const canonicalEmergencies = (this.state.activeEmergencies || []).map(normalizeCanonicalEmergency);
+
+    const intersectionsCollection = createNormalizedCollection(canonicalIntersections);
+    const devicesCollection = createNormalizedCollection(canonicalDevices);
+    const incidentsCollection = createNormalizedCollection(canonicalIncidents);
+    const emergenciesCollection = createNormalizedCollection(canonicalEmergencies);
+
     return {
       seq: this.sequence,
       cctvSeq: this.cctvSequence,
@@ -753,22 +774,151 @@ export class BackendStateManager {
       timestamp: this.lastUpdated,
       isoTime: this.clock.nowIso(),
       source: 'server',
+      provenance: 'SIMULATED',
+      safetyBoundary: SAFETY_BOUNDARY,
       simConfig: { ...this.simConfig, mode: this.clock.mode, paused: this.clock.paused, speedMultiplier: this.clock.speedMultiplier },
+      canonical: {
+        telemetry: canonicalTelemetry,
+        intersections: intersectionsCollection,
+        devices: devicesCollection,
+        incidents: incidentsCollection,
+        emergencies: emergenciesCollection
+      },
       state: JSON.parse(JSON.stringify(this.state))
     };
   }
 
-  tick(deltaMs = 1000) {
-    // 1. Advance sequence and simulation clock
+  tick(deltaMs = 1000, options = {}) {
+    this.pendingSimulationEvents = [];
+    const result = this.simEngine.step(deltaMs, options);
+    this._dispatchSimulationEvents();
+    return result.domainResults?.['state-finalize'] || this.state;
+  }
+
+  _queueSimulationEvent(name, payload) {
+    this.pendingSimulationEvents.push({ name, payload });
+    this.simEngine.recordEvent({
+      type: 'domain.transition',
+      source: 'simulation',
+      domain: 'state-manager',
+      payload: { eventName: name, eventPayload: payload }
+    });
+  }
+
+  _dispatchSimulationEvents() {
+    if (!this.io || this.pendingSimulationEvents.length === 0) return;
+    const events = this.pendingSimulationEvents.splice(0);
+    for (const event of events) {
+      const payload = event.name === 'incident:update' && event.payload && event.payload.timestamp === undefined
+        ? { ...event.payload, timestamp: Date.now() }
+        : event.payload;
+      this.io.emit(event.name, payload);
+    }
+  }
+
+  _snapshotSimulationState() {
+    return cloneSimulationValue({
+      state: this.state,
+      devicesRegistry: this.devicesRegistry,
+      activeFaults: this.activeFaults,
+      deviceAuditTrail: this.deviceAuditTrail,
+      sequence: this.sequence,
+      cctvSequence: this.cctvSequence,
+      incidentSequence: this.incidentSequence,
+      emergencySequence: this.emergencySequence,
+      signalSequence: this.signalSequence,
+      deviceSequence: this.deviceSequence,
+      lastUpdated: this.lastUpdated,
+      vehiclesCountToday: this.vehiclesCountToday,
+      co2SavedKg: this.co2SavedKg,
+      fuelSavedLiters: this.fuelSavedLiters
+    });
+  }
+
+  _restoreSimulationState(snapshot) {
+    if (!snapshot || !snapshot.state || !Array.isArray(snapshot.devicesRegistry)) {
+      throw new TypeError('invalid state-manager simulation snapshot');
+    }
+    for (const key of ['sequence', 'cctvSequence', 'incidentSequence', 'emergencySequence', 'signalSequence', 'deviceSequence', 'lastUpdated', 'vehiclesCountToday', 'co2SavedKg', 'fuelSavedLiters']) {
+      if (!Number.isFinite(snapshot[key])) throw new TypeError(`invalid state-manager snapshot field '${key}'`);
+    }
+    const restored = cloneSimulationValue(snapshot);
+    this.state = restored.state;
+    this.devicesRegistry = restored.devicesRegistry;
+    this.state.devices = this.devicesRegistry;
+    this.activeFaults = restored.activeFaults || {};
+    this.deviceAuditTrail = restored.deviceAuditTrail || [];
+    for (const key of ['sequence', 'cctvSequence', 'incidentSequence', 'emergencySequence', 'signalSequence', 'deviceSequence', 'lastUpdated', 'vehiclesCountToday', 'co2SavedKg', 'fuelSavedLiters']) {
+      this[key] = restored[key];
+    }
+    return this.state;
+  }
+
+  _resetSimulationState() {
+    if (!this._simulationBaseline) throw new Error('simulation baseline is unavailable before state hydration');
+    const current = this._snapshotSimulationState();
+    this._restoreSimulationState(this._simulationBaseline);
+
+    // Keep durable/operator-owned records and monotonic command sequences.
+    this.state.incidents = current.state.incidents;
+    this.sequence = Math.max(current.sequence, this.sequence);
+    this.incidentSequence = Math.max(current.incidentSequence, this.incidentSequence);
+    this.emergencySequence = Math.max(current.emergencySequence, this.emergencySequence);
+    this.signalSequence = Math.max(current.signalSequence, this.signalSequence);
+    this.deviceSequence = Math.max(current.deviceSequence, this.deviceSequence);
+    this.cctvSequence = Math.max(current.cctvSequence, this.cctvSequence);
+    this.state.seq = this.sequence;
+
+    const currentNodes = new Map(current.state.intersections.map(node => [node.id, node]));
+    this.state.intersections.forEach(node => {
+      const persistedNode = currentNodes.get(node.id);
+      if (!persistedNode) return;
+      node.greenSplit = persistedNode.greenSplit;
+      node.pendingGreenSplit = persistedNode.pendingGreenSplit;
+    });
+    this.state.greenSplitWonokromo = current.state.greenSplitWonokromo;
+
+    const currentDevices = new Map(current.devicesRegistry.map(device => [device.deviceId, device]));
+    this.devicesRegistry.forEach(device => {
+      const persistedDevice = currentDevices.get(device.deviceId);
+      if (!persistedDevice) return;
+      for (const key of ['fps', 'resolution', 'mode', 'greenWaveSync']) {
+        if (persistedDevice[key] !== undefined) device[key] = persistedDevice[key];
+      }
+    });
+    this.state.devices = this.devicesRegistry;
+    this.simConfig.seed = this.randomRegistry.masterSeed;
+    this.simConfig.mode = this.clock.mode;
+    this.simConfig.speedMultiplier = this.clock.speedMultiplier;
+    this.simConfig.paused = this.clock.paused;
+    this.lastUpdated = this.clock.now();
+    this.state.timestampMs = this.lastUpdated;
+    this.state.timestamp = this._getWibTimeString();
+    this.state.simulation = {
+      mode: this.clock.mode,
+      seed: this.simConfig.seed,
+      speedMultiplier: this.clock.speedMultiplier,
+      paused: this.clock.paused,
+      tickResolution: this.simConfig.tickResolution
+    };
+    if (this.resolutionInterval) clearInterval(this.resolutionInterval);
+    this.resolutionInterval = null;
+    this.activeFaults = {};
+    this.pendingSimulationEvents = [];
+    return this.state;
+  }
+
+  _beginSimulationTick() {
     this.sequence++;
-    this.lastUpdated = this.clock.advance(deltaMs, false);
+    this.lastUpdated = this.clock.now();
     this.state.seq = this.sequence;
     this.state.timestampMs = this.lastUpdated;
     this.state.timestamp = this._getWibTimeString();
+  }
 
+  _stepDeviceTelemetry(deltaMs) {
     const trafficPrng = this.randomRegistry.getStream('traffic');
     const chaosPrng = this.randomRegistry.getStream('chaos');
-
     // 2. Simulasikan kesehatan & telemetri device
     this.tickDevices();
 
@@ -811,7 +961,10 @@ export class BackendStateManager {
       const confReduction = (offlineCount * 15) + (degradedCount * 5);
       this.state.aiConfidence = Math.max(10, normalConfidence - confReduction);
     }
+  }
 
+  _stepEmergencySimulation(deltaMs) {
+    const effectiveDeltaSec = Math.max(0.1, deltaMs / 1000);
     // Advance Active Emergencies (Simulation Time Based)
     const emgNowIso = this.clock.nowIso();
     const emgNowMs = this.clock.now();
@@ -829,7 +982,7 @@ export class BackendStateManager {
         } else if (emg.status === "DISPATCHED") {
           emg.status = "EN_ROUTE";
           emg.updatedAt = emgNowIso;
-          if (this.io) this.io.emit('emergency:dispatch-alert', emg);
+          this._queueSimulationEvent('emergency:dispatch-alert', emg);
         } else if (emg.status === "EN_ROUTE") {
           const speedFactor = this.state.isChaosMode ? 0.6 : 1.0;
           emg.speed = Math.round((this.state.isChaosMode ? 42 : 65) + Math.sin(emgNowMs / 1000) * 5);
@@ -853,12 +1006,10 @@ export class BackendStateManager {
               timestamp: emgNowIso
             });
 
-            if (this.io) {
-              this.io.emit('system:toast', {
-                message: `✅ DISPATCH BERHASIL: ${emg.vehicleId} (${emg.vehicleType}) telah sampai di RSUD Dr. Soetomo.`,
-                type: 'success'
-              });
-            }
+            this._queueSimulationEvent('system:toast', {
+              message: `✅ DISPATCH BERHASIL: ${emg.vehicleId} (${emg.vehicleType}) telah sampai di RSUD Dr. Soetomo.`,
+              type: 'success'
+            });
 
             route.forEach(pt => {
               if (pt.isIntersection) {
@@ -908,12 +1059,10 @@ export class BackendStateManager {
                 const node = this.state.intersections.find(n => n.id === pt.id);
                 if (node) {
                   if (node.status === "Manual Override" && !node.isPreempted) {
-                    if (this.io) {
-                      this.io.emit('system:toast', {
-                        message: `⚠️ KONFLIK PRIORITAS: Sinyal Darurat mengesampingkan Override Manual di ${node.name}!`,
-                        type: 'warning'
-                      });
-                    }
+                    this._queueSimulationEvent('system:toast', {
+                      message: `⚠️ KONFLIK PRIORITAS: Sinyal Darurat mengesampingkan Override Manual di ${node.name}!`,
+                      type: 'warning'
+                    });
                     this.recordAuditLog({
                       operator: "SITS Preemption Guard",
                       action: "CONFLICT_RESOLVED",
@@ -991,7 +1140,9 @@ export class BackendStateManager {
         this.state.greenWaveActive = false;
       }
     }
+  }
 
+  _stepSignalSimulation() {
     // Advance APILL Light Timers using Epoch Timestamp Synchronization (from this.clock.now())
     const nowMs = this.clock.now();
     this.state.intersections.forEach(node => {
@@ -1086,7 +1237,9 @@ export class BackendStateManager {
         node.status = this.state.isChaosMode ? "Macet Total" : "Padat";
       }
     });
+  }
 
+  _finishSimulationTick() {
     // Mirror simulation metadata in state
     this.state.simulation = {
       mode: this.clock.mode,
@@ -1114,7 +1267,7 @@ export class BackendStateManager {
         if (this.state.chaosLevel <= 1) {
           this.toggleChaos(false);
           if (this.io) {
-            this.io.emit('system:toast', { message: 'Sistem ATCS Surabaya pulih otomatis dari Mode Keos.', type: 'info' });
+            this.io.emit('system:toast', { message: 'State simulator kembali dari skenario gangguan.', type: 'info' });
             this.io.emit('traffic:update', this.state);
           }
         } else {
@@ -1313,7 +1466,7 @@ export class BackendStateManager {
 
     const stableCorrId = options.correlationId || `STATUS-${id}-${cleanStatus}-${incNowMs}`;
     const logEntry = {
-      operator: options.actor || "Operator SITS 112 Surabaya",
+        operator: options.actor || "Operator Demo",
       action: `TRANSITION_${cleanStatus}`,
       entity: `Incident ${id}`,
       result: `SUCCESS (dari ${oldStatus} ke ${cleanStatus})`,
@@ -1329,7 +1482,7 @@ export class BackendStateManager {
       nextState: cleanStatus,
       commandId: options.commandId,
       correlationId: stableCorrId,
-      actor: options.actor || "Operator SITS 112 Surabaya",
+      actor: options.actor || "Operator Demo",
       reason: options.reason || `Status insiden diubah dari ${oldStatus} ke ${cleanStatus}`,
       sequence: this.incidentSequence,
       details: {
@@ -1445,7 +1598,7 @@ export class BackendStateManager {
       nextState: EMERGENCY_STATES.REQUESTED,
       commandId: options.commandId,
       correlationId: options.correlationId,
-      actor: options.actor || "Operator SITS 112 Surabaya",
+      actor: options.actor || "Operator Demo",
       reason: `Dispatch darurat diaktifkan untuk kendaraan ${code} pada rute ${routeId}`,
       sequence: this.emergencySequence,
       details: {
@@ -1456,7 +1609,7 @@ export class BackendStateManager {
     });
 
     if (!options.commandManaged) this.recordAuditLog({
-      operator: options.actor || "Operator SITS 112 Surabaya",
+      operator: options.actor || "Operator Demo",
       action: "DISPATCH_REQUEST",
       entity: `Emergency ${id}`,
       result: `SUCCESS (Vehicle ${code} requested for ${routeId})`,
@@ -1521,7 +1674,7 @@ export class BackendStateManager {
       nextState: EMERGENCY_STATES.CANCELLED,
       commandId: options.commandId,
       correlationId: options.correlationId,
-      actor: options.actor || "Operator SITS 112 Surabaya",
+      actor: options.actor || "Operator Demo",
       reason: `Prioritas darurat #${emg.id} (${emg.vehicleId}) dibatalkan oleh operator.`,
       sequence: this.emergencySequence,
       details: {
@@ -1531,7 +1684,7 @@ export class BackendStateManager {
     });
 
     if (!options.commandManaged) this.recordAuditLog({
-      operator: options.actor || "Operator SITS 112 Surabaya",
+      operator: options.actor || "Operator Demo",
       action: "DISPATCH_CANCEL",
       entity: `Emergency ${emg.id}`,
       result: `SUCCESS (Vehicle ${emg.vehicleId} cancelled by operator)`,
@@ -1561,6 +1714,13 @@ export class BackendStateManager {
 
     return this.state;
   }
+}
+
+function cloneSimulationValue(value) {
+  if (typeof structuredClone === 'function') return structuredClone(value);
+  return JSON.parse(JSON.stringify(value, (_key, item) => item instanceof Map
+    ? { __simulationType: 'Map', entries: Array.from(item.entries()) }
+    : item), (_key, item) => item && item.__simulationType === 'Map' ? new Map(item.entries) : item);
 }
 
 export const backendState = new BackendStateManager();

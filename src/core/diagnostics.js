@@ -100,6 +100,9 @@ class DiagnosticsManager {
     this.fpsLastCheck = Date.now();
     this.jankCount = 0; // Frames exceeding 50ms (Long Task budget)
     this.maxFrameTimeMs = 0;
+    this.longTaskCount = 0;
+    this.maxLongTaskDurationMs = 0;
+    this.longTaskObserver = null;
     this.renderTimes = []; // rolling 30 items
     this.activeMapLayersCount = 0;
     this.trackedCctvObjectsCount = 0;
@@ -329,6 +332,32 @@ class DiagnosticsManager {
     this.recordFrame(durationMs);
   }
 
+  startLongTaskObserver() {
+    const search = typeof window !== 'undefined' ? window.location?.search || '' : '';
+    if (new URLSearchParams(search).get('diagnostics') !== '1' || this.longTaskObserver) return false;
+    if (typeof PerformanceObserver === 'undefined' ||
+        !PerformanceObserver.supportedEntryTypes?.includes('longtask')) return false;
+
+    try {
+      this.longTaskObserver = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          this.longTaskCount++;
+          this.maxLongTaskDurationMs = Math.max(this.maxLongTaskDurationMs, Number(entry.duration.toFixed(1)));
+        }
+      });
+      this.longTaskObserver.observe({ type: 'longtask', buffered: true });
+      return true;
+    } catch (_) {
+      this.longTaskObserver = null;
+      return false;
+    }
+  }
+
+  stopLongTaskObserver() {
+    this.longTaskObserver?.disconnect();
+    this.longTaskObserver = null;
+  }
+
   recordMapLayersCount(count) {
     this.activeMapLayersCount = Math.max(0, count);
   }
@@ -365,6 +394,8 @@ class DiagnosticsManager {
       fps: this.lastFps,
       jankCount: this.jankCount,
       maxFrameTimeMs: `${this.maxFrameTimeMs}ms`,
+      longTaskCount: this.longTaskCount,
+      maxLongTaskDurationMs: `${this.maxLongTaskDurationMs}ms`,
       avgRenderDurationMs: `${this.getAverageRenderDuration()}ms`,
       lastRenderDurationMs: `${this.lastRenderDuration}ms`,
       activeMapLayers: this.activeMapLayersCount,
@@ -414,6 +445,7 @@ class DiagnosticsManager {
   }
 
   reset() {
+    this.stopLongTaskObserver();
     this.resetAllTimers();
     this.initCount = 0;
     this.activeSocketListenersCount = 0;
@@ -425,6 +457,8 @@ class DiagnosticsManager {
     this.lastRenderDuration = 0;
     this.jankCount = 0;
     this.maxFrameTimeMs = 0;
+    this.longTaskCount = 0;
+    this.maxLongTaskDurationMs = 0;
     this.renderTimes = [];
     this.activeMapLayersCount = 0;
     this.trackedCctvObjectsCount = 0;

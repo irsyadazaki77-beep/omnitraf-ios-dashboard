@@ -2,9 +2,9 @@
         <!-- Section Header / Operations Workspace Summary -->
         <header class="workspace-header">
           <div class="workspace-header-title-group">
-            <span class="workspace-header-kicker">SITS SURABAYA · COMPUTER VISION INCIDENT SURVEILLANCE</span>
-            <h1 class="workspace-header-title">Active Traffic Incidents & Road Anomalies</h1>
-            <p class="workspace-header-desc">Deteksi anomali real-time, klasifikasi keparahan insiden, disposisi armada lapangan 112, dan sinkronisasi log penanganan.</p>
+            <span class="workspace-header-kicker">OMNITRAF · SKENARIO INSIDEN SIMULASI</span>
+            <h1 class="workspace-header-title">Contoh Insiden Lalu Lintas</h1>
+            <p class="workspace-header-desc">Insiden dibuat untuk demonstrasi; deteksi visi, disposisi petugas, dan status penanganan tidak berasal dari operasi lapangan.</p>
           </div>
           <div class="workspace-header-summary-strip" aria-label="Ringkasan Status Insiden">
             <div class="workspace-summary-item">
@@ -12,7 +12,7 @@
               <div class="workspace-summary-val-row">
                 <span class="signals-status-dot dot-live" style="background: var(--danger); box-shadow: 0 0 6px var(--danger);"></span>
                 <strong class="tabular font-mono text-danger" id="summaryActiveIncidents">2 Insiden</strong>
-                <span class="workspace-summary-sub">Perlu Penanganan</span>
+                <span class="workspace-summary-sub">Contoh simulasi</span>
               </div>
             </div>
             <div class="workspace-summary-item">
@@ -25,8 +25,8 @@
             <div class="workspace-summary-item hide-mobile">
               <span class="workspace-summary-label">Status Deteksi CV</span>
               <div class="workspace-summary-val-row">
-                <strong class="text-success">YOLOv8 Active</strong>
-                <span class="workspace-summary-sub">184 Node SITS</span>
+                <strong class="text-success">Visi sintetis</strong>
+                <span class="workspace-summary-sub">Node demo</span>
               </div>
             </div>
             <div class="workspace-summary-item hide-mobile">
@@ -42,8 +42,8 @@
         <article class="incidents-active glass-panel">
           <div class="section-head">
             <div>
-              <h2>Daftar Insiden Aktif Surabaya</h2>
-              <p>Klasifikasi hambatan lalu lintas, kecelakaan, dan penyempitan jalur terdeteksi.</p>
+              <h2>Daftar Insiden Contoh</h2>
+              <p>Simulasi hambatan lalu lintas, kecelakaan, dan penyempitan jalur.</p>
             </div>
             <span class="pill pill-danger" id="unresolvedAlertsBadge">3 Unresolved Alerts</span>
           </div>
@@ -59,7 +59,7 @@
           <div class="incident-logs-list" id="incidentLogsList">
             <div class="glass-panel text-center" style="padding: 24px; color: var(--text-dim);">
               <span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>
-              <span>Memuat data insiden aktif SITS...</span>
+              <span>Memuat state insiden simulasi...</span>
             </div>
           </div>
         </article>

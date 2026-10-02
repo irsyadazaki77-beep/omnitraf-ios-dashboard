@@ -93,17 +93,19 @@ export class PwaController {
 
     const updateOnlineStatus = () => {
       const isOnline = navigator.onLine;
-      if (!banner) return;
 
       if (!isOnline) {
-        banner.classList.remove("is-hidden");
         stateStore.setState({ sseConnected: false });
         stateStore.publish("socket:status", "fallback");
         if (typeof window.showToast === 'function') {
-          window.showToast("📡 Jaringan terputus. Mode Offline Aktif dengan Cache PWA.", "warning");
+          window.showToast("Jaringan terputus. Aplikasi beralih ke shell lokal; data tetap simulasi.", "warning");
         }
-      } else {
+      }
+
+      if (banner && isOnline) {
         banner.classList.add("is-hidden");
+      } else if (banner) {
+        banner.classList.remove("is-hidden");
       }
     };
 

@@ -39,24 +39,24 @@ describe('PHASE 14C — Command Authority, Idempotency, Authorization & Audit In
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'admin', password: 'admin123' })
     });
-    const adminData = await adminRes.json();
-    adminToken = adminData.token || adminData.data?.token;
+    await adminRes.json();
+    adminToken = adminRes.headers.get('set-cookie')?.match(/omnitraf_session=([^;]+)/)?.[1];
 
     const opRes = await fetch(`${baseUrl}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'operator', password: 'operator123' })
     });
-    const opData = await opRes.json();
-    operatorToken = opData.token || opData.data?.token;
+    await opRes.json();
+    operatorToken = opRes.headers.get('set-cookie')?.match(/omnitraf_session=([^;]+)/)?.[1];
 
     const viewRes = await fetch(`${baseUrl}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'viewer', password: 'viewer123' })
     });
-    const viewData = await viewRes.json();
-    viewerToken = viewData.token || viewData.data?.token;
+    await viewRes.json();
+    viewerToken = viewRes.headers.get('set-cookie')?.match(/omnitraf_session=([^;]+)/)?.[1];
   });
 
   after(() => {
@@ -223,7 +223,7 @@ describe('PHASE 14C — Command Authority, Idempotency, Authorization & Audit In
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`,
+        'Cookie': `omnitraf_session=${adminToken}`,
         'X-Command-Id': 'CMD-REST-UNIFIED-01',
         'X-Idempotency-Key': 'IDEMP-REST-UNIFIED-01',
         'X-Correlation-Id': 'CORR-REST-UNIFIED-01'
@@ -273,7 +273,7 @@ describe('PHASE 14C — Command Authority, Idempotency, Authorization & Audit In
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${operatorToken}`
+        'Cookie': `omnitraf_session=${operatorToken}`
       },
       body: JSON.stringify({ status: 'ACTIVE' })
     });
@@ -290,7 +290,7 @@ describe('PHASE 14C — Command Authority, Idempotency, Authorization & Audit In
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`
+        'Cookie': `omnitraf_session=${adminToken}`
       },
       body: JSON.stringify({
         command: '/status',

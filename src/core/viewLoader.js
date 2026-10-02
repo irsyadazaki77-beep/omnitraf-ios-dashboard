@@ -69,6 +69,21 @@ export class ViewLoader {
     }
   }
 
+  async _fetchShellTemplates() {
+    const modalRequests = this.componentMap.modals.map((modalUrl) =>
+      this.fetchTemplate(modalUrl).catch((err) => {
+        console.warn(`[ViewLoader] Skipping modal ${modalUrl}:`, err);
+        return null;
+      })
+    );
+    const [marqueeHtml, notifHtml, ...modalHtmls] = await Promise.all([
+      this.fetchTemplate(this.componentMap.marquee.file),
+      this.fetchTemplate(this.componentMap.notifDrawer.file),
+      ...modalRequests
+    ]);
+    return { marqueeHtml, notifHtml, modalHtmls };
+  }
+
   /**
    * Mount shell components & modals sekali saat app boot
    */
@@ -77,9 +92,11 @@ export class ViewLoader {
     this.isComponentsMounted = true;
 
     try {
+      // Fetch independent shell templates concurrently, then preserve DOM order.
+      const { marqueeHtml, notifHtml, modalHtmls } = await this._fetchShellTemplates();
+
       // 1. Mount Marquee
       const marqueeTarget = document.getElementById(this.componentMap.marquee.targetId) || document.body;
-      const marqueeHtml = await this.fetchTemplate(this.componentMap.marquee.file);
       const marqueeWrap = document.createElement('div');
       marqueeWrap.innerHTML = marqueeHtml.trim();
       if (marqueeTarget.id === this.componentMap.marquee.targetId) {
@@ -90,22 +107,17 @@ export class ViewLoader {
 
       // 2. Mount Notif Drawer
       const drawersTarget = document.getElementById(this.componentMap.notifDrawer.targetId) || document.body;
-      const notifHtml = await this.fetchTemplate(this.componentMap.notifDrawer.file);
       const notifWrap = document.createElement('div');
       notifWrap.innerHTML = notifHtml.trim();
       drawersTarget.append(...notifWrap.childNodes);
 
       // 3. Mount Modals & Floating Shell Overlays
       const modalsTarget = document.getElementById('modalsContainer') || document.body;
-      for (const modalUrl of this.componentMap.modals) {
-        try {
-          const mHtml = await this.fetchTemplate(modalUrl);
-          const mWrap = document.createElement('div');
-          mWrap.innerHTML = mHtml.trim();
-          modalsTarget.append(...mWrap.childNodes);
-        } catch (mErr) {
-          console.warn(`[ViewLoader] Skipping modal ${modalUrl}:`, mErr);
-        }
+      for (const mHtml of modalHtmls) {
+        if (!mHtml) continue;
+        const mWrap = document.createElement('div');
+        mWrap.innerHTML = mHtml.trim();
+        modalsTarget.append(...mWrap.childNodes);
       }
 
       console.info("✓ [ViewLoader] Shell components & modals mounted successfully.");

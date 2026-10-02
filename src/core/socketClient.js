@@ -30,6 +30,11 @@ import {
 import { soundManager } from './soundManager.js';
 import { diagnostics } from './diagnostics.js';
 import { authManager } from './authManager.js';
+import { realtimeMetrics } from './realtimeMetrics.js';
+import { ResyncManager } from './resyncManager.js';
+import { RealtimeRouter } from './realtimeRouter.js';
+
+export { realtimeMetrics, ResyncManager, RealtimeRouter };
 
 /**
  * Fetch with Deduplication, Timeout & Caching Helper (Phase 16 Hardened)
@@ -118,6 +123,7 @@ export async function fetchWithCacheAndDedupe(url, options = {}) {
         method: upperMethod,
         headers: mergedHeaders,
         body: finalBody,
+        credentials: 'same-origin',
         signal: controller.signal
       });
 
@@ -198,19 +204,46 @@ export class SocketClient {
     this.lastLatencyMs = 12;
     this.watchdogInterval = null;
     this.heartbeatInterval = null;
-    this.isResyncing = false;
-    this._resyncPromise = null;
-    this._resyncBuffer = [];
     this._pendingPingTimestamp = null;
     this._missedHeartbeats = 0;
 
+    // Phase 3 Subsystem Decomposition: ResyncManager, RealtimeRouter, RealtimeMetrics
+    this.resyncManager = new ResyncManager(this);
+    this.router = new RealtimeRouter(this.resyncManager);
+    this.subscribedChannels = new Set(['global', 'room:dashboard', 'room:traffic']);
+
     this._setupInternalListeners();
+  }
+
+  get isResyncing() {
+    return this.resyncManager.isResyncing;
+  }
+
+  set isResyncing(val) {
+    this.resyncManager.isResyncing = !!val;
+  }
+
+  get _resyncBuffer() {
+    return this.resyncManager._resyncBuffer;
+  }
+
+  set _resyncBuffer(val) {
+    this.resyncManager._resyncBuffer = val;
+  }
+
+  get _resyncPromise() {
+    return this.resyncManager._resyncPromise;
+  }
+
+  set _resyncPromise(val) {
+    this.resyncManager._resyncPromise = val;
   }
 
   _setupInternalListeners() {
     // Gap Detection Auto-Resync
     stateStore.subscribe("socket:gap-detected", (gapInfo) => {
       console.warn(`⚠️ [SocketClient] Sequence gap detected (expected ${gapInfo?.expected}, got ${gapInfo?.received}). Triggering atomic resync...`);
+      realtimeMetrics.recordSequenceGap(gapInfo);
       this.requestResync();
     });
 
@@ -219,7 +252,10 @@ export class SocketClient {
       this._updateDomStatusCapsule();
     });
 
-    stateStore.subscribe("state:stale-changed", () => {
+    stateStore.subscribe("state:stale-changed", ({ isStale }) => {
+      if (isStale) {
+        realtimeMetrics.recordStaleDuration(1000);
+      }
       this._updateDomStatusCapsule();
     });
 
@@ -233,6 +269,32 @@ export class SocketClient {
         }
       }
     });
+  }
+
+  /**
+   * Subscribe to specific room/channel (Langkah 4 & 13)
+   * @param {string|string[]} channels
+   */
+  subscribeChannels(channels) {
+    const list = Array.isArray(channels) ? channels : [channels];
+    list.forEach(ch => this.subscribedChannels.add(ch));
+
+    if (this.socket && this.socket.connected) {
+      this.socket.emit('channel:subscribe', { channels: list });
+    }
+  }
+
+  /**
+   * Unsubscribe from specific room/channel (Langkah 4 & 13)
+   * @param {string|string[]} channels
+   */
+  unsubscribeChannels(channels) {
+    const list = Array.isArray(channels) ? channels : [channels];
+    list.forEach(ch => this.subscribedChannels.delete(ch));
+
+    if (this.socket && this.socket.connected) {
+      this.socket.emit('channel:unsubscribe', { channels: list });
+    }
   }
 
   /**
@@ -256,6 +318,7 @@ export class SocketClient {
     try {
       if (typeof window !== "undefined" && typeof window.io !== "undefined") {
         this.socket = window.io(socketOptions);
+        this.resyncManager.setSocketClient(this);
         this._bindStandardEvents();
         this._flushPendingListeners();
         this._startHealthWatchdog();
@@ -270,6 +333,7 @@ export class SocketClient {
               ...socketOptions,
               auth: { token: currentToken || null }
             });
+            this.resyncManager.setSocketClient(this);
             this._bindStandardEvents();
             this._flushPendingListeners();
             this._startHealthWatchdog();
@@ -299,7 +363,14 @@ export class SocketClient {
     this.socket.on('connect', () => {
       console.info(`⚡ [SocketClient] Socket terhubung (${this.socket.id}). Memulai fase Resyncing Server State...`);
       this.connectionAttemptCount = 0;
-      
+      realtimeMetrics.recordConnect();
+      realtimeMetrics.recordReconnectSuccess();
+
+      // Sinkronisasi room subscription yang sudah didaftarkan
+      if (this.subscribedChannels.size > 0) {
+        this.socket.emit('channel:subscribe', { channels: Array.from(this.subscribedChannels) });
+      }
+
       // Masuk fase resyncing: minta canonical snapshot dari server
       setConnectionLifecycle('resyncing', {
         lastConnectedAt: Date.now(),
@@ -310,7 +381,7 @@ export class SocketClient {
       this.requestResync();
 
       // Trigger command reconciliation if available
-      if (window.commandLayer && typeof window.commandLayer.reconcilePendingCommands === 'function') {
+      if (typeof window !== 'undefined' && window.commandLayer && typeof window.commandLayer.reconcilePendingCommands === 'function') {
         window.commandLayer.reconcilePendingCommands();
       }
     });
@@ -318,6 +389,7 @@ export class SocketClient {
     // 2. Reconnecting / Reconnect Attempts
     this.socket.on('reconnect_attempt', (attempt) => {
       this.connectionAttemptCount = attempt || this.connectionAttemptCount + 1;
+      realtimeMetrics.recordReconnectAttempt();
       setConnectionLifecycle('reconnecting', {
         connectionAttemptCount: this.connectionAttemptCount,
         isStaleData: true
@@ -326,6 +398,7 @@ export class SocketClient {
 
     this.socket.on('reconnecting', (attempt) => {
       this.connectionAttemptCount = attempt || this.connectionAttemptCount + 1;
+      realtimeMetrics.recordReconnectAttempt();
       setConnectionLifecycle('reconnecting', {
         connectionAttemptCount: this.connectionAttemptCount,
         isStaleData: true
@@ -349,10 +422,10 @@ export class SocketClient {
         
         setTimeout(() => {
           authManager.ensureActiveSession()
-            .then((freshToken) => {
-              if (freshToken && this.socket) {
+        .then((sessionRestored) => {
+              if (sessionRestored && this.socket) {
                 console.info('🔑 [SocketClient] Sesi baru berhasil didapatkan. Menghubungkan kembali socket...');
-                this.socket.auth = { token: freshToken };
+                this.socket.auth = { token: null };
                 this.socket.connect();
               }
             })
@@ -375,116 +448,30 @@ export class SocketClient {
         lastDisconnectedAt: Date.now(),
         isStaleData: true
       });
-      if (window.commandLayer && typeof window.commandLayer.handleDisconnect === 'function') {
+      if (typeof window !== 'undefined' && window.commandLayer && typeof window.commandLayer.handleDisconnect === 'function') {
         window.commandLayer.handleDisconnect();
       }
     });
 
-    // 5. Canonical State Inflow Pipeline ke StateStore
-    this.socket.on('traffic:init', (data) => {
-      if (data) {
-        applyServerSnapshot(data, 'server');
-        setConnectionLifecycle('connected', {
-          isStaleData: false,
-          lastTelemetryAt: Date.now()
-        });
-      }
-    });
+    // 5. Canonical State Inflow Pipeline ke Router
+    const standardEvents = [
+      'traffic:init',
+      'traffic:update',
+      'cctv:vision-update',
+      'incident:update',
+      'incident:resolved',
+      'emergency:update',
+      'emergency:dispatch-alert',
+      'signal:update',
+      'device:update',
+      'device:config-transition',
+      'system:toast'
+    ];
 
-    this.socket.on('traffic:update', (data) => {
-      if (this.isResyncing) {
-        this._resyncBuffer.push({ topic: 'traffic', payload: data, fn: () => updateTrafficState(data, 'server') });
-        return;
-      }
-      updateTrafficState(data, 'server');
-    });
-
-    this.socket.on('cctv:vision-update', (data) => {
-      if (this.isResyncing) {
-        this._resyncBuffer.push({ topic: 'cctv', payload: data, fn: () => updateCctvVisionState(data, 'server') });
-        return;
-      }
-      updateCctvVisionState(data, 'server');
-    });
-
-    this.socket.on('incident:update', (data) => {
-      if (data && data.id) {
-        const payload = data.payload || data;
-        payload.seq = data.seq || payload.seq;
-        payload.timestamp = data.timestamp || payload.timestamp || Date.now();
-        payload.source = data.source || payload.source || 'server';
-        if (this.isResyncing) {
-          this._resyncBuffer.push({ topic: 'incident', payload, fn: () => updateIncidentState(data.id, payload, 'server') });
-          return;
-        }
-        updateIncidentState(data.id, payload, 'server');
-      }
-    });
-
-    this.socket.on('emergency:update', (data) => {
-      if (data) {
-        const payload = data.payload || data;
-        payload.seq = data.seq || payload.seq;
-        payload.timestamp = data.timestamp || payload.timestamp || Date.now();
-        payload.source = data.source || payload.source || 'server';
-        if (this.isResyncing) {
-          this._resyncBuffer.push({ topic: 'emergency', payload, fn: () => updateEmergencyState(payload, 'server') });
-          return;
-        }
-        updateEmergencyState(payload, 'server');
-      }
-    });
-
-    this.socket.on('signal:update', (data) => {
-      if (data && data.nodeId) {
-        const payload = data.payload || data.signalData || data;
-        payload.seq = data.seq || payload.seq;
-        payload.timestamp = data.timestamp || payload.timestamp || Date.now();
-        payload.source = data.source || payload.source || 'server';
-        if (this.isResyncing) {
-          this._resyncBuffer.push({ topic: 'signal', payload, fn: () => updateSignalState(data.nodeId, payload, 'server') });
-          return;
-        }
-        updateSignalState(data.nodeId, payload, 'server');
-      }
-    });
-
-    this.socket.on('device:update', (data) => {
-      if (data && data.deviceId) {
-        const payload = data.payload || data.deviceData || data;
-        payload.seq = data.seq || payload.seq;
-        payload.timestamp = data.timestamp || payload.timestamp || Date.now();
-        payload.source = data.source || payload.source || 'server';
-        if (this.isResyncing) {
-          this._resyncBuffer.push({ topic: 'device', payload, fn: () => updateDeviceState(data.deviceId, payload, 'server') });
-          return;
-        }
-        updateDeviceState(data.deviceId, payload, 'server');
-      }
-    });
-
-    this.socket.on('device:config-transition', (data) => {
-      if (data) {
-        stateStore.publish('device:config-transition', createEventEnvelope('device:config-transition', data, 'server'));
-      }
-    });
-
-    this.socket.on('incident:resolved', (data) => {
-      if (data && data.id) {
-        const payload = {
-          seq: data.seq,
-          timestamp: data.timestamp || Date.now(),
-          source: data.source || 'server',
-          status: 'RESOLVED',
-          resolvedAt: data.timestamp ? new Date(data.timestamp).toISOString() : new Date().toISOString(),
-          resolvedBy: data.resolvedBy || 'SITS Command Center'
-        };
-        if (this.isResyncing) {
-          this._resyncBuffer.push({ topic: 'incident', payload, fn: () => updateIncidentState(data.id, payload, 'server') });
-          return;
-        }
-        updateIncidentState(data.id, payload, 'server');
-      }
+    standardEvents.forEach(evt => {
+      this.socket.on(evt, (data) => {
+        this.router.route(evt, data);
+      });
     });
 
     // 6. Heartbeat Pong Listener
@@ -493,6 +480,7 @@ export class SocketClient {
       this._missedHeartbeats = 0;
       if (data && data.clientTimestamp) {
         const rtt = Math.max(1, Date.now() - data.clientTimestamp);
+        realtimeMetrics.recordRtt(rtt);
         this.lastLatencyMs = Math.round(this.lastLatencyMs * 0.7 + rtt * 0.3);
         if (this.lastLatencyMs > 200) {
           setConnectionLifecycle('degraded', { latencyMs: this.lastLatencyMs });
@@ -501,25 +489,6 @@ export class SocketClient {
         }
       }
       this._updatePerformanceChip();
-    });
-
-    // 7. Global Toast & Alert Bridge
-    this.socket.on('system:toast', (data) => {
-      if (data && data.message && typeof window.showToast === "function") {
-        window.showToast(data.message, data.type || 'normal');
-        if (data.type === 'alert' || data.type === 'danger') {
-          soundManager.play('alert');
-        } else {
-          soundManager.play('success');
-        }
-      }
-    });
-
-    this.socket.on('emergency:dispatch-alert', (data) => {
-      if (data && typeof window.showToast === "function") {
-        window.showToast(`🚨 DISPATCH AUTOMATION: ${data.code} (${data.vehicle}) diberikan Hak Utama.`, 'warning');
-        soundManager.play('alert');
-      }
     });
   }
 
@@ -568,105 +537,14 @@ export class SocketClient {
   }
 
   /**
-   * Meminta Sinkronisasi State Kanonikal Penuh dari Server (Single-Flight, Bounded Timeout, Idempotent)
+   * Meminta Sinkronisasi State Kanonikal Penuh dari Server (Delegated to ResyncManager)
    */
   requestResync() {
-    if (this._resyncPromise) {
-      return this._resyncPromise;
-    }
-
-    this._resyncPromise = (async () => {
-      this.isResyncing = true;
-      try {
-        if (this.isConnected()) {
-          const res = await new Promise((resolve) => {
-            const timer = setTimeout(() => {
-              resolve({ success: false, status: 'TIMEOUT', error: 'Socket resync timed out' });
-            }, 4000);
-
-            try {
-              this.socket.emit('state:resync', {}, (response) => {
-                clearTimeout(timer);
-                resolve(response || { success: false, status: 'TIMEOUT' });
-              });
-            } catch (err) {
-              clearTimeout(timer);
-              resolve({ success: false, status: 'SERVER_UNAVAILABLE', error: err.message });
-            }
-          });
-
-          if (res && res.success && (res.state || res.data)) {
-            applyServerSnapshot(res.state || res.data, 'server');
-            this._flushResyncBuffer();
-            setConnectionLifecycle('connected', {
-              isStaleData: false,
-              lastTelemetryAt: Date.now()
-            });
-            return { status: 'SUCCESS', source: 'socket', snapshot: res };
-          }
-        }
-
-        // HTTP REST Snapshot Fallback
-        try {
-          const res = await fetch('/api/state/snapshot', { cache: 'no-store' });
-          if (res.ok) {
-            const json = await res.json();
-            const payload = json.data || json.state || json;
-            if (payload && (payload.intersections || payload.telemetry || payload.seq !== undefined)) {
-              applyServerSnapshot(json, 'server');
-              this._flushResyncBuffer();
-              setConnectionLifecycle('connected', {
-                isStaleData: false,
-                lastTelemetryAt: Date.now()
-              });
-              return { status: 'SUCCESS', source: 'rest', snapshot: json };
-            }
-            return { status: 'INVALID_SNAPSHOT', source: 'rest', error: 'Malformed snapshot payload' };
-          } else {
-            return { status: 'SERVER_UNAVAILABLE', source: 'rest', httpStatus: res.status };
-          }
-        } catch (restErr) {
-          return { status: 'SERVER_UNAVAILABLE', source: 'rest', error: restErr.message };
-        }
-      } catch (err) {
-        console.warn("[SocketClient] Resync attempt notice:", err);
-        return { status: 'TIMEOUT', error: err.message };
-      } finally {
-        this.isResyncing = false;
-        this._resyncPromise = null;
-      }
-    })();
-
-    return this._resyncPromise;
+    return this.resyncManager.requestResync();
   }
 
   _flushResyncBuffer() {
-    if (!this._resyncBuffer || this._resyncBuffer.length === 0) return;
-    const buffer = [...this._resyncBuffer];
-    this._resyncBuffer = [];
-    const currentState = stateStore.getState();
-
-    buffer.forEach(({ topic, payload, fn }) => {
-      const seq = payload?.seq || payload?.sequence || 0;
-      const seqPropMap = {
-        'traffic': 'lastReceivedSequence',
-        'cctv': 'lastReceivedCctvSequence',
-        'incident': 'lastReceivedIncidentSequence',
-        'emergency': 'lastReceivedEmergencySequence',
-        'signal': 'lastReceivedSignalSequence',
-        'device': 'lastReceivedDeviceSequence'
-      };
-      const prop = seqPropMap[topic] || 'lastReceivedSequence';
-      const baselineSeq = currentState[prop] || 0;
-
-      if (seq > baselineSeq) {
-        try {
-          fn();
-        } catch (e) {
-          console.warn(`[SocketClient] Error applying buffered event for ${topic}:`, e);
-        }
-      }
-    });
+    this.resyncManager._flushResyncBuffer();
   }
 
   /**
@@ -784,7 +662,6 @@ export class SocketClient {
     const status = state.connectionStatus;
     const isStale = !!state.isStaleData;
 
-    const ssePill = document.getElementById("sseStatusPill");
     const sseDot = document.getElementById("sseStatusDot");
     const sseText = document.getElementById("sseStatusText");
     const sitsStatusText = document.getElementById("sitsStatusText");
@@ -794,23 +671,23 @@ export class SocketClient {
 
     if (status === 'connected') {
       if (isStale) {
-        sseText.textContent = "SITS Data Stale (Tertahan)";
+        sseText.textContent = "Data Simulasi Tertahan";
         sseDot.style.background = "var(--warning)";
         sseDot.style.boxShadow = "0 0 6px var(--warning)";
       } else {
-        sseText.textContent = "SITS Live 60Hz";
+        sseText.textContent = "Server Simulasi Tersambung";
         sseDot.style.background = "var(--success)";
         sseDot.style.boxShadow = "0 0 6px var(--success)";
       }
       if (offlineBanner) offlineBanner.classList.add("is-hidden");
-      if (sitsStatusText) sitsStatusText.textContent = "98%";
+      if (sitsStatusText) sitsStatusText.textContent = "DEMO";
 
     } else if (status === 'resyncing') {
       sseText.textContent = "Sinkronisasi State...";
       sseDot.style.background = "var(--cyan)";
       sseDot.style.boxShadow = "0 0 6px var(--cyan)";
       if (offlineBanner) offlineBanner.classList.add("is-hidden");
-      if (sitsStatusText) sitsStatusText.textContent = "Sync";
+      if (sitsStatusText) sitsStatusText.textContent = "DEMO";
 
     } else if (status === 'reconnecting') {
       const attempt = state.connectionAttemptCount || 1;
@@ -818,34 +695,34 @@ export class SocketClient {
       sseDot.style.background = "var(--warning)";
       sseDot.style.boxShadow = "0 0 6px var(--warning)";
       if (offlineBanner) offlineBanner.classList.remove("is-hidden");
-      if (sitsStatusText) sitsStatusText.textContent = "42%";
+      if (sitsStatusText) sitsStatusText.textContent = "DEMO";
 
     } else if (status === 'connecting') {
-      sseText.textContent = "Menghubungkan SITS...";
+      sseText.textContent = "Menghubungkan ke server demo...";
       sseDot.style.background = "var(--warning)";
       sseDot.style.boxShadow = "0 0 6px var(--warning)";
-      if (sitsStatusText) sitsStatusText.textContent = "Init";
+      if (sitsStatusText) sitsStatusText.textContent = "DEMO";
 
     } else if (status === 'degraded') {
-      sseText.textContent = "SITS Degraded (Latency Tinggi)";
+      sseText.textContent = "Server simulasi lambat";
       sseDot.style.background = "var(--warning)";
       sseDot.style.boxShadow = "0 0 6px var(--warning)";
       if (offlineBanner) offlineBanner.classList.add("is-hidden");
-      if (sitsStatusText) sitsStatusText.textContent = "Degraded";
+      if (sitsStatusText) sitsStatusText.textContent = "DEMO";
 
     } else if (status === 'auth_failed') {
       sseText.textContent = "Sesi Berakhir (Auth Failed)";
       sseDot.style.background = "var(--danger)";
       sseDot.style.boxShadow = "0 0 6px var(--danger)";
       if (offlineBanner) offlineBanner.classList.remove("is-hidden");
-      if (sitsStatusText) sitsStatusText.textContent = "Auth";
+      if (sitsStatusText) sitsStatusText.textContent = "DEMO";
 
     } else { // 'offline' | 'fallback'
-      sseText.textContent = "Offline (Data Tersimpan)";
+      sseText.textContent = "Offline • simulator lokal";
       sseDot.style.background = "var(--danger)";
       sseDot.style.boxShadow = "0 0 6px var(--danger)";
       if (offlineBanner) offlineBanner.classList.remove("is-hidden");
-      if (sitsStatusText) sitsStatusText.textContent = "Simulasi";
+      if (sitsStatusText) sitsStatusText.textContent = "DEMO";
     }
 
     this._updatePerformanceChip();
@@ -864,7 +741,7 @@ export class SocketClient {
     const status = state.connectionStatus;
 
     if (perfText) {
-      perfText.textContent = `FPS: 60 | Ping: ${latency} | SITS: ${status.toUpperCase()}`;
+      perfText.textContent = `Ping: ${latency} | Server demo: ${status.toUpperCase()}`;
     }
 
     if (perfDot) {
@@ -885,7 +762,7 @@ export class SocketClient {
     }
     this.hasRegisteredListeners = false;
     this.isResyncing = false;
-    this._resyncPromise = null;
+    this.resyncManager._resyncPromise = null;
     this._listeners.clear();
   }
 }

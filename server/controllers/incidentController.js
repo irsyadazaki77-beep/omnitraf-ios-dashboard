@@ -1,5 +1,5 @@
 import { backendState } from '../services/stateManager.js';
-import { createApiResponse, createApiErrorResponse, createCommandErrorResponse, getCommandErrorStatus } from '../middlewares/errorHandler.js';
+import { createApiResponse, createApiErrorResponse, createCommandErrorResponse, getCommandErrorStatus, sanitizeString } from '../middlewares/errorHandler.js';
 import { commandExecutor } from '../services/commandExecutor.js';
 import { INCIDENT_STATUS_VALUES, INCIDENT_SEVERITIES, INCIDENT_CATEGORIES } from '../config/contracts.js';
 
@@ -21,8 +21,16 @@ export function getIncidents(req, res) {
 }
 
 export async function createIncident(req, res) {
-  const { title, category, severity, location, assignedUnit, notes } = req.body || {};
-  const id = req.body.id ?? null;
+  // Mass-assignment defense: extract only allowed fields and sanitize control characters & newlines
+  const cleanField = (val) => (typeof val === 'string' ? val.replace(/[\r\n]+/g, ' ').replace(/[\x00-\x1F\x7F]/g, '').trim() : val);
+  const title = cleanField(req.body?.title);
+  const location = cleanField(req.body?.location);
+  const category = req.body?.category;
+  const severity = req.body?.severity;
+  const assignedUnit = cleanField(req.body?.assignedUnit);
+  const notes = cleanField(req.body?.notes);
+  const id = cleanField(req.body?.id) ?? null;
+
   try {
     const outcome = await commandExecutor.executeCommand({
       action: 'incident:create', targetId: id,
@@ -128,8 +136,10 @@ export function getAuditLogs(req, res) {
 }
 
 export async function updateIncidentStatus(req, res) {
-  const incidentId = req.params.id;
-  const { status, assignedUnit, notes } = req.body || {};
+  const incidentId = typeof req.params?.id === 'string' ? sanitizeString(req.params.id, 64) : req.params?.id;
+  const status = req.body?.status;
+  const assignedUnit = typeof req.body?.assignedUnit === 'string' ? sanitizeString(req.body.assignedUnit, 120) : req.body?.assignedUnit;
+  const notes = typeof req.body?.notes === 'string' ? sanitizeString(req.body.notes, 1000) : req.body?.notes;
 
   try {
     const actorName = req.user.name;
@@ -161,7 +171,7 @@ export async function updateIncidentStatus(req, res) {
 }
 
 export async function resolveIncident(req, res) {
-  const incidentId = req.params.id;
+  const incidentId = typeof req.params?.id === 'string' ? sanitizeString(req.params.id, 64) : req.params?.id;
 
   const commandId = req.headers['x-command-id'] || req.body?.commandId || `CMD-REST-RESOLVE-${Date.now()}`;
   const correlationId = req.headers['x-correlation-id'] || req.body?.correlationId || `CORR-REST-RESOLVE-${Date.now()}`;

@@ -12,24 +12,24 @@ export class TourShortcutsController {
     this._isInitialized = false;
     this.tourSteps = [
       {
-        title: "Langkah 1: Topbar Status & Operasional SITS",
-        text: "Memantau jam operasional WIB, status koneksi 184 node CCTV, serta informasi cuaca BMKG Kota Surabaya."
+        title: "Langkah 1: Status Prototipe",
+        text: "Melihat status koneksi ke server simulasi dan jam lokal. Koneksi ini tidak menunjukkan status CCTV atau layanan BMKG."
       },
       {
         title: "Langkah 2: Peta Geospasial Arteri Surabaya",
         text: "Peta interaktif Leaflet menyajikan koridor utama A. Yani, Darmo, Basuki Rahmat, dan rute Green Wave aktif."
       },
       {
-        title: "Langkah 3: Manajemen APILL & Green Split",
-        text: "Optimasi fase sinyal lampu lalu lintas adaptif otomatis berbasis AI untuk meminimalkan antrean kendaraan."
+        title: "Langkah 3: Model Sinyal & Green Split",
+        text: "Menjelajahi contoh perhitungan dan skenario sinyal. Perintah hanya memperbarui simulator, bukan APILL lapangan."
       },
       {
-        title: "Langkah 4: Jaringan CCTV Edge Computer Vision",
-        text: "Kamera SITS terintegrasi model deteksi objek YOLOv8 dengan kalkulasi kecepatan dan klasifikasi kendaraan."
+        title: "Langkah 4: Visualisasi Kamera Simulasi",
+        text: "Melihat adegan dan deteksi kendaraan sintetis; tidak ada feed CCTV SITS atau model YOLOv8 yang berjalan."
       },
       {
-        title: "Langkah 5: Koordinasi Cepat Dishub & 112",
-        text: "Kanal chat real-time untuk sinergi petugas lapangan, operator ATCS, dan unit tanggap darurat ambulans."
+        title: "Langkah 5: Skenario Koordinasi",
+        text: "Mencoba alur chat dan dispatch contoh. Tidak ada pesan ke petugas atau layanan 112 yang dikirim."
       }
     ];
   }
@@ -181,6 +181,7 @@ export class TourShortcutsController {
     const openBtn1 = document.getElementById("btnOpenEngineModal");
     const openBtn2 = document.getElementById("navAboutEngine");
     const closeBtn = document.getElementById("closeEngineModal");
+    const footerCloseBtn = document.getElementById("btnCloseEngineInfoFooter");
 
     const openEngine = (e) => {
       if (e) e.preventDefault();
@@ -202,6 +203,7 @@ export class TourShortcutsController {
     if (openBtn1) openBtn1.addEventListener("click", openEngine);
     if (openBtn2) openBtn2.addEventListener("click", openEngine);
     if (closeBtn) closeBtn.addEventListener("click", closeEngine);
+    if (footerCloseBtn) footerCloseBtn.addEventListener("click", closeEngine);
 
     // Close on overlay backdrop click
     if (engineModal) {
@@ -303,7 +305,10 @@ export class TourShortcutsController {
         // 4. Close Notification Drawer
         const notifDrawer = document.getElementById("notifDrawer");
         const notifBackdrop = document.getElementById("notifDrawerBackdrop");
-        if (notifDrawer) notifDrawer.classList.remove("open");
+        if (notifDrawer) {
+          notifDrawer.classList.remove("open");
+          notifDrawer.setAttribute("aria-hidden", "true");
+        }
         if (notifBackdrop) {
           notifBackdrop.style.display = "none";
           notifBackdrop.classList.remove("active");

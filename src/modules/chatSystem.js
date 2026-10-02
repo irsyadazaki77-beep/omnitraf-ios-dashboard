@@ -1,7 +1,7 @@
 /**
  * OmniTRAF Surabaya - Staff Coordination Chat System
- * Menangani perpesanan koordinasi langsung antar petugas lapangan Dishub,
- * operator ATCS SITS, dan dispatcher tanggap darurat 112 Kota Surabaya.
+ * Menangani percakapan contoh di dalam simulator; tidak menghubungkan petugas,
+ * operator ATCS, atau dispatcher layanan darurat.
  */
 
 import { stateStore } from '../core/stateStore.js';
@@ -22,21 +22,21 @@ export class ChatSystem {
   constructor() {
     this.messages = [
       {
-        sender: "Budi Santoso (Admin SITS)",
+        sender: "Admin Demo",
         role: "admin",
-        text: "Pagi tim koordinasi. Seluruh 184 node CCTV SITS dan koridor arteri Surabaya telah aktif tersinkronisasi.",
+        text: "Contoh percakapan: node kamera dan koridor pada layar ini adalah data simulasi.",
         time: "07:45"
       },
       {
-        sender: "Rian (Dishub Wonokromo)",
+        sender: "Petugas Demo 01",
         role: "field",
-        text: "Copy pusat. Titik temu Frontage Jemursari - Wonokromo mulai merayap 200m arah utara.",
+        text: "Contoh laporan: antrean pada skenario koridor demo bertambah.",
         time: "07:52"
       },
       {
-        sender: "Dewi (Dispatcher 112)",
+        sender: "Dispatcher Demo",
         role: "dispatcher",
-        text: "Siaga, Ambulans AMB-02 bersiap meluncur dari Bundaran Waru menuju RSU Dr. Soetomo.",
+        text: "Tidak ada ambulans yang dikirim. Pesan ini hanya contoh alur koordinasi.",
         time: "08:02"
       }
     ];
@@ -149,16 +149,16 @@ export class ChatSystem {
       btnAttach.addEventListener("click", () => {
         const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
         const attachMsg = {
-          sender: "Zaki (Operator SITS)",
+          sender: "Operator Demo",
           role: "user",
-          text: "📷 [Lampiran Snapshot CCTV] Wonokromo Node-01 — Tingkat kemacetan 68%, antrean teridentifikasi 140m.",
+          text: "📷 [Cuplikan Kamera Demo] Node contoh — metrik antrean sintetis.",
           time
         };
         this.messages.push(attachMsg);
         this._appendMessageDom(attachMsg);
         this._scrollToBottom();
         if (typeof window.showToast === "function") {
-          window.showToast("Snapshot CCTV SITS berhasil dibagikan ke kanal koordinasi.");
+          window.showToast("Cuplikan demo ditambahkan ke chat lokal; tidak ada CCTV atau kanal petugas yang terhubung.");
         }
         this._triggerAutoReply(attachMsg.text);
       });
@@ -187,7 +187,7 @@ export class ChatSystem {
     if (!msg || !msg.text) return;
     const time = msg.time || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     const formatted = {
-      sender: msg.sender || "Petugas SITS",
+      sender: msg.sender || "Pengguna Demo",
       role: msg.role || "user",
       text: msg.text,
       time
@@ -214,7 +214,7 @@ export class ChatSystem {
 
     const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     const userMsg = {
-      sender: "Zaki (Operator SITS)",
+      sender: "Operator Demo",
       role: "user",
       text,
       time
@@ -245,45 +245,45 @@ export class ChatSystem {
         this.typingWrapper.classList.add("is-hidden");
       }
 
-      let replySender = "Rian (Dishub Wonokromo)";
+      let replySender = "Petugas Demo 01";
       let replyRole = "field";
-      let replyText = "Copy pusat kendali. Koordinasi dipahami, monitor terus perkembangan arus.";
+      let replyText = "Balasan otomatis demo. Pesan ini tidak dikirim ke petugas dan tidak memantau arus nyata.";
 
       const lower = userText.toLowerCase();
       if (lower.includes("satlantas") || lower.includes("polisi") || lower.includes("kirim petugas")) {
-        replySender = "Aipda Wahyudi (Satlantas Polrestabes)";
+        replySender = "Petugas Simulasi";
         replyRole = "field";
-        replyText = "8-1-3 Dimengerti pusat kendali SITS! 2 personil Satlantas dan unit motor patroli meluncur ke lokasi untuk penguraian antrean.";
+        replyText = "Skenario demo: permintaan petugas dicatat sebagai contoh saja. Tidak ada personel yang dikirim.";
       } else if (lower.includes("sirine") || lower.includes("suara")) {
-        replySender = "Sistem Otomasi ATCS SITS";
+        replySender = "Sistem Demo";
         replyRole = "admin";
-        replyText = "🔊 Sirine peringatan audio persimpangan Wonokromo telah diaktifkan dengan volume terkalibrasi dari Command Center.";
+        replyText = "Aksi sirine hanya disimulasikan di antarmuka; tidak ada sirine persimpangan yang diaktifkan.";
         soundManager.play('alert');
       } else if (lower.includes("pohon") || lower.includes("tumbang") || lower.includes("dkrth")) {
-        replySender = "Regu DKRTH & PMK Surabaya";
+        replySender = "Unit Demo";
         replyRole = "field";
-        replyText = "Lapor pusat: Evakuasi ranting dan pohon tumbang telah rampung 100%. Dua lajur jalan kini steril dan aman dilalui kendaraan.";
+        replyText = "Contoh respons untuk skenario hambatan jalan. Tidak ada evakuasi atau konfirmasi kondisi jalan.";
       } else if (lower.includes("ambulans") || lower.includes("darurat") || lower.includes("112")) {
-        replySender = "Dewi (Dispatcher 112)";
+        replySender = "Dispatcher Demo";
         replyRole = "dispatcher";
-        replyText = "🚨 Siaga darurat: Koridor prioritas Ambulans Bundaran Waru - RSUD Dr. Soetomo aktif! Sinyal Jemursari, Wonokromo, dan Darmo dikunci hijau.";
+        replyText = "Skenario prioritas kendaraan berjalan di simulator saja. Layanan 112, GPS, dan APILL tidak terhubung.";
         soundManager.play('siren');
       } else if (lower.includes("patroli") || lower.includes("dishub")) {
-        replySender = "Patroli Dishub Unit 04";
+        replySender = "Patroli Demo";
         replyRole = "field";
-        replyText = "Patroli bergerak merapat ke Simpang Wonokromo dalam 4 menit untuk pengaturan manual.";
+        replyText = "Contoh status patroli; tidak ada kendaraan atau petugas nyata yang bergerak.";
       } else if (lower.includes("hijau") || lower.includes("siklus") || lower.includes("preemption")) {
-        replySender = "Budi Santoso (Admin SITS)";
+        replySender = "Admin Demo";
         replyRole = "admin";
-        replyText = "Fase hijau Wonokromo disesuaikan via ATCS. Koridor Darmo dialokasikan prioritas tambahan.";
+        replyText = "Nilai fase sinyal contoh diperbarui di simulator; tidak dikirim ke ATCS.";
       } else if (lower.includes("cctv") || lower.includes("kamera")) {
-        replySender = "Dewi (Dispatcher 112)";
+        replySender = "Operator Demo";
         replyRole = "dispatcher";
-        replyText = "Telemetri CCTV Wonokromo jernih, analitik CV mendeteksi kecepatan rata-rata 24 km/jam.";
+        replyText = "Kamera pada prototipe menggunakan adegan sintetis; tidak ada telemetri CCTV nyata.";
       } else if (lower.includes("copy") || lower.includes("lancar")) {
-        replySender = "Budi Santoso (Admin SITS)";
+        replySender = "Admin Demo";
         replyRole = "admin";
-        replyText = "Terima kasih konfirmasinya. Sistem SITS menjaga headway sinyal optimal.";
+        replyText = "Contoh balasan demo. Prototipe tidak terhubung ke SITS atau pengendali sinyal.";
       }
 
       const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });

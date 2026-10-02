@@ -1,5 +1,6 @@
 import { createApiErrorResponse } from './errorHandler.js';
-import { TRUST_PROXY } from '../config/env.js';
+import { isIP } from 'node:net';
+import { IS_TEST, TRUSTED_PROXY_IPS } from '../config/env.js';
 
 // In-Memory Bounded Rate Limiter
 export const rateLimitStore = new Map();
@@ -19,21 +20,33 @@ setInterval(() => {
  * Safely resolves client IP address based on trusted proxy configuration
  */
 export function getClientIp(req) {
-  const isTrustedProxy = TRUST_PROXY ||
-                         process.env.TRUST_PROXY === 'true' ||
-                         process.env.TRUST_PROXY === '1' ||
-                         process.env.NODE_ENV === 'test' ||
-                         process.env.PORT === '0' ||
-                         (process.env.DB_PATH && process.env.DB_PATH.includes('test'));
+  const normalizeIp = value => {
+    if (typeof value !== 'string') return null;
+    let ip = value.trim().toLowerCase();
+    if (ip.startsWith('[') && ip.includes(']')) ip = ip.slice(1, ip.indexOf(']'));
+    if (ip.startsWith('::ffff:') && isIP(ip.slice(7)) === 4) ip = ip.slice(7);
+    return isIP(ip) ? ip : null;
+  };
 
-  if (isTrustedProxy) {
-    const forwarded = req.headers['x-forwarded-for'];
-    if (forwarded && typeof forwarded === 'string') {
-      // Pick first IP in the chain from trusted reverse proxy
-      return forwarded.split(',')[0].trim();
-    }
+  const socketIp = normalizeIp(req.socket?.remoteAddress || req.connection?.remoteAddress);
+  const forwarded = req.headers['x-forwarded-for'];
+
+  // Tests use synthetic forwarded addresses to seed deterministic limiter cases.
+  if (IS_TEST && typeof forwarded === 'string') {
+    return normalizeIp(forwarded.split(',')[0]) || socketIp || '127.0.0.1';
   }
-  return req.socket?.remoteAddress || req.connection?.remoteAddress || '127.0.0.1';
+
+  if (!socketIp || !TRUSTED_PROXY_IPS.has(socketIp) || typeof forwarded !== 'string') {
+    return socketIp || '127.0.0.1';
+  }
+
+  // Walk from the server toward the client, trusting only explicitly listed
+  // proxy peers. Stop at the first untrusted hop to ignore spoofed left entries.
+  const chain = forwarded.split(',').map(normalizeIp).filter(Boolean);
+  chain.push(socketIp);
+  let hop = chain.length - 1;
+  while (hop > 0 && TRUSTED_PROXY_IPS.has(chain[hop])) hop--;
+  return chain[hop] || socketIp;
 }
 
 export function rateLimiter(options = {}) {
@@ -78,7 +91,7 @@ export function rateLimiter(options = {}) {
 
 // Preset rate limiters for specific critical resource categories
 export const authRateLimiter = rateLimiter({ windowMs: 60000, max: 20, keyPrefix: 'auth-login' });
+export const authSessionRateLimiter = rateLimiter({ windowMs: 60000, max: 30, keyPrefix: 'auth-session' });
 export const mutationRateLimiter = rateLimiter({ windowMs: 10000, max: 60, keyPrefix: 'cmd-mutation' });
 export const reportRateLimiter = rateLimiter({ windowMs: 30000, max: 15, keyPrefix: 'report-export' });
 export const diagnosticRateLimiter = rateLimiter({ windowMs: 15000, max: 50, keyPrefix: 'diag-inspection' });
-

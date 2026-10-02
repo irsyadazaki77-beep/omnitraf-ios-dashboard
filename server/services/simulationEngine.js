@@ -16,6 +16,7 @@
 
 import { UnifiedClock, SIMULATION_MODES, systemClock } from './unifiedClock.js';
 import { DeterministicRandomRegistry, defaultRandomRegistry } from './seededRandom.js';
+import { SimulationScheduler } from './simulationScheduler.js';
 
 export class DeterministicSimulationEngine {
   /**
@@ -28,7 +29,10 @@ export class DeterministicSimulationEngine {
   constructor(options = {}) {
     this.clock = options.clock || systemClock;
     this.randomRegistry = options.randomRegistry || defaultRandomRegistry;
-    this.tickResolution = options.tickResolution || 1000;
+    this.tickResolution = options.tickResolution ?? 1000;
+    if (!Number.isFinite(this.tickResolution) || this.tickResolution <= 0) {
+      throw new TypeError('tickResolution must be a finite positive number');
+    }
     this.tickSequence = 0;
     this.eventSequence = 0;
     this.domains = new Map(); // domainName -> { priority: number, handler: Function }
@@ -38,6 +42,9 @@ export class DeterministicSimulationEngine {
     this._intervalId = null;
     this.lastTickMonotonic = 0;
     this.lastTickDurationMs = 0;
+    this.lastErrors = [];
+    this.diagnostics = options.diagnostics || null;
+    this.scheduler = options.scheduler || new SimulationScheduler();
   }
 
   /**
@@ -45,8 +52,14 @@ export class DeterministicSimulationEngine {
    * Lower priority numbers run first.
    * e.g. Priority 10: Faults/inputs, 20: Devices, 30: Emergencies, 40: Traffic signals, 50: Metrics
    */
-  registerDomain(name, priority, handler) {
-    this.domains.set(name, { priority: Number(priority) || 50, handler });
+  registerDomain(name, priority, handler, lifecycle = {}) {
+    if (typeof name !== 'string' || !name.trim()) throw new TypeError('domain name is required');
+    if (typeof handler !== 'function') throw new TypeError(`handler for '${name}' must be a function`);
+    if (!Number.isFinite(Number(priority))) throw new TypeError(`priority for '${name}' must be finite`);
+    for (const key of ['reset', 'snapshot', 'restore']) {
+      if (lifecycle[key] !== undefined && typeof lifecycle[key] !== 'function') throw new TypeError(`${key} lifecycle hook for '${name}' must be a function`);
+    }
+    this.domains.set(name, { priority: Number(priority), handler, lifecycle });
     return this;
   }
 
@@ -63,22 +76,42 @@ export class DeterministicSimulationEngine {
     return this.step(customDeltaMs);
   }
 
-  step(customDeltaMs = null) {
+  step(customDeltaMs = null, { force = false } = {}) {
+    const requestedDelta = customDeltaMs === null ? this.tickResolution : customDeltaMs;
+    if (!Number.isFinite(requestedDelta) || requestedDelta <= 0) {
+      throw new TypeError('simulation delta must be a finite positive number');
+    }
+    // A paused engine does not run domains or consume random values. Use the
+    // clock's explicit force option for future/manual single-step support.
+    if (this.clock.paused && !force) {
+      return { tickSequence: this.tickSequence, simTimeMs: this.clock.now(), simDeltaMs: 0, durationMs: 0, domainResults: {}, paused: true };
+    }
     const t0 = this.clock.monotonic();
-    const deltaMs = typeof customDeltaMs === 'number' ? customDeltaMs : this.tickResolution;
+    const deltaMs = requestedDelta;
 
     // 1. Advance simulation clock (accounting for pause and speed multiplier)
     const prevSimTime = this.clock.now();
-    const newSimTime = this.clock.advance(deltaMs, false);
+    const newSimTime = this.clock.advance(deltaMs, force);
     const actualSimDelta = newSimTime - prevSimTime;
 
     this.tickSequence++;
+    const scheduledEvents = this.scheduler.drainThrough(newSimTime);
+    for (const event of scheduledEvents) {
+      this.recordEvent({
+        type: event.type,
+        source: 'scenario',
+        domain: 'scenario-scheduler',
+        payload: event.payload,
+        metadata: { scheduledAt: event.at, schedulerSequence: event.sequence }
+      });
+    }
 
     // 2. Sort domains deterministically by priority
-    const sortedDomains = Array.from(this.domains.entries()).sort((a, b) => a[1].priority - b[1].priority);
+    const sortedDomains = Array.from(this.domains.entries()).sort((a, b) => a[1].priority - b[1].priority || a[0].localeCompare(b[0]));
 
     // 3. Execute domain handlers in order
     const domainResults = {};
+    this.lastErrors = [];
     for (const [domainName, entry] of sortedDomains) {
       const stream = this.randomRegistry.getStream(domainName);
       try {
@@ -87,13 +120,14 @@ export class DeterministicSimulationEngine {
           simTimeMs: newSimTime,
           deltaMs: actualSimDelta,
           clock: this.clock,
-          prng: stream
+          prng: stream,
+          scheduledEvents
         });
         if (res !== undefined) {
           domainResults[domainName] = res;
         }
       } catch (err) {
-        console.error(`❌ [SimulationEngine] Error in domain '${domainName}':`, err);
+        this._recordError(domainName, err);
       }
     }
 
@@ -122,6 +156,8 @@ export class DeterministicSimulationEngine {
     domain = 'default',
     metadata = {}
   }) {
+    if (typeof type !== 'string' || !type.trim()) throw new TypeError('simulation event type is required');
+    const stablePayload = serializeSnapshot(payload);
     this.eventSequence++;
     const simTime = this.clock.now();
     const wallTime = this.clock.wallNowIso();
@@ -137,7 +173,7 @@ export class DeterministicSimulationEngine {
       entityType: entityType ? String(entityType) : null,
       source,
       domain,
-      payload,
+      payload: stablePayload,
       metadata: {
         ...metadata,
         mode: this.clock.mode,
@@ -158,10 +194,15 @@ export class DeterministicSimulationEngine {
    */
   start(customIntervalMs = null) {
     if (this.isRunning) return;
+    const interval = customIntervalMs ?? this.tickResolution;
+    if (!Number.isFinite(interval) || interval <= 0) throw new TypeError('interval must be a finite positive number');
     this.isRunning = true;
-    const interval = customIntervalMs || this.tickResolution;
     this._intervalId = setInterval(() => {
-      this.step(this.tickResolution);
+      try { this.step(this.tickResolution); }
+      catch (err) {
+        this.lastErrors = [];
+        this._recordError('engine', err);
+      }
     }, interval);
     if (this._intervalId.unref) this._intervalId.unref();
   }
@@ -174,11 +215,65 @@ export class DeterministicSimulationEngine {
     }
   }
 
+  scheduleEvent(at, type, payload = null) { return this.scheduler.schedule(at, type, payload); }
+
+  pause() { this.clock.pause(); return this; }
+  resume() { this.clock.resume(); return this; }
+
+  reset({ startTime = this.clock.startTime, seed = this.randomRegistry.masterSeed } = {}) {
+    if (!Number.isFinite(startTime)) throw new TypeError('startTime must be finite');
+    this.stop();
+    this.clock.reset(startTime);
+    this.randomRegistry.resetAll(seed);
+    this.tickSequence = 0;
+    this.eventSequence = 0;
+    this.eventJournal.length = 0;
+    this.scheduler.clear();
+    this.lastErrors = [];
+    for (const [name, domain] of this.domains) {
+      try { domain.lifecycle.reset?.({ clock: this.clock, rng: this.randomRegistry.getStream(name) }); }
+      catch (error) { this._recordError(name, error); }
+    }
+    this.lastTickDurationMs = 0;
+    this.lastTickMonotonic = 0;
+    return this;
+  }
+
+  getDiagnostics() {
+    return Object.freeze({
+      running: this.isRunning,
+      paused: this.clock.paused,
+      simulationTimeMs: this.clock.now(),
+      speedMultiplier: this.clock.speedMultiplier,
+      seed: this.randomRegistry.masterSeed,
+      tickSequence: this.tickSequence,
+      eventSequence: this.eventSequence,
+      eventQueueSize: this.scheduler.size,
+      activeModules: Array.from(this.domains.keys()).sort(),
+      lastEventType: this.eventJournal.at(-1)?.type || null,
+      lastTickDurationMs: this.lastTickDurationMs,
+      health: this.lastErrors.length ? 'degraded' : 'healthy',
+      errors: this.lastErrors.slice()
+    });
+  }
+
+  _recordError(domain, error) {
+    const diagnostic = { domain, tickSequence: this.tickSequence, message: error?.message || String(error) };
+    this.lastErrors.push(diagnostic);
+    if (typeof this.diagnostics === 'function') {
+      try { this.diagnostics(diagnostic); } catch { /* diagnostics must not break simulation */ }
+    }
+  }
+
   /**
    * Capture a full deterministic checkpoint for resumption / replay comparison.
    * Strips out circular or non-serializable objects (DOM, Canvas, Socket, Leaflet).
    */
   createCheckpoint(extraState = {}) {
+    const domains = {};
+    for (const [name, domain] of this.domains) {
+      if (domain.lifecycle.snapshot) domains[name] = domain.lifecycle.snapshot();
+    }
     return {
       schemaVersion: "v19.0.0-deterministic",
       capturedAtWall: this.clock.wallNowIso(),
@@ -186,7 +281,9 @@ export class DeterministicSimulationEngine {
       eventSequence: this.eventSequence,
       clock: this.clock.getSnapshot(),
       randomRegistry: this.randomRegistry.getSnapshot(),
-      extraState: JSON.parse(JSON.stringify(extraState))
+      scheduler: this.scheduler.getSnapshot(),
+      domains: serializeSnapshot(domains),
+      extraState: serializeSnapshot(extraState)
     };
   }
 
@@ -194,12 +291,32 @@ export class DeterministicSimulationEngine {
    * Restore engine state from a checkpoint.
    */
   restoreCheckpoint(checkpoint) {
-    if (!checkpoint) return;
-    if (typeof checkpoint.tickSequence === 'number') this.tickSequence = checkpoint.tickSequence;
-    if (typeof checkpoint.eventSequence === 'number') this.eventSequence = checkpoint.eventSequence;
-    if (checkpoint.clock) this.clock.restoreSnapshot(checkpoint.clock);
-    if (checkpoint.randomRegistry) this.randomRegistry.restoreSnapshot(checkpoint.randomRegistry);
-    return checkpoint.extraState;
+    if (!checkpoint || typeof checkpoint !== 'object' || !Number.isSafeInteger(checkpoint.tickSequence) || checkpoint.tickSequence < 0 || !Number.isSafeInteger(checkpoint.eventSequence) || checkpoint.eventSequence < 0 || !checkpoint.clock || !checkpoint.randomRegistry || !checkpoint.scheduler) {
+      throw new TypeError('invalid simulation checkpoint');
+    }
+    const clockValidator = new UnifiedClock({ mode: checkpoint.clock.mode, startTime: checkpoint.clock.startTime, speedMultiplier: checkpoint.clock.speedMultiplier, paused: checkpoint.clock.paused, timezone: checkpoint.clock.timezone });
+    clockValidator.restoreSnapshot(checkpoint.clock);
+    const randomValidator = new DeterministicRandomRegistry(checkpoint.randomRegistry.masterSeed);
+    randomValidator.restoreSnapshot(checkpoint.randomRegistry);
+    const schedulerValidator = new SimulationScheduler();
+    schedulerValidator.restoreSnapshot(checkpoint.scheduler);
+    const domainSnapshots = deserializeSnapshot(checkpoint.domains || {});
+    if (!domainSnapshots || typeof domainSnapshots !== 'object' || Array.isArray(domainSnapshots)) throw new TypeError('invalid simulation domain snapshots');
+    for (const name of Object.keys(domainSnapshots)) {
+      if (!this.domains.get(name)?.lifecycle.restore) throw new TypeError(`checkpoint requires unavailable domain '${name}'`);
+    }
+    const extraState = deserializeSnapshot(checkpoint.extraState);
+
+    this.clock.restoreSnapshot(checkpoint.clock);
+    this.randomRegistry.restoreSnapshot(checkpoint.randomRegistry);
+    this.scheduler.restoreSnapshot(checkpoint.scheduler);
+    this.tickSequence = checkpoint.tickSequence;
+    this.eventSequence = checkpoint.eventSequence;
+    for (const [name, snapshot] of Object.entries(domainSnapshots)) {
+      const domain = this.domains.get(name);
+      domain.lifecycle.restore(snapshot);
+    }
+    return extraState;
   }
 
   /**
@@ -221,6 +338,18 @@ export class DeterministicSimulationEngine {
       results
     };
   }
+}
+
+function serializeSnapshot(value) {
+  return JSON.parse(JSON.stringify(value, (_key, item) => item instanceof Map
+    ? { __simulationType: 'Map', entries: Array.from(item.entries()) }
+    : item));
+}
+
+function deserializeSnapshot(value) {
+  return JSON.parse(JSON.stringify(value), (_key, item) => item && item.__simulationType === 'Map'
+    ? new Map(item.entries)
+    : item);
 }
 
 export const defaultSimEngine = new DeterministicSimulationEngine({

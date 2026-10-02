@@ -9,7 +9,7 @@ export async function downloadPdfReport(req, res) {
     const currentState = backendState.getSnapshot ? (backendState.getSnapshot().state || backendState.state) : backendState.state;
     const pdfBuffer = await generateSitsPdfBuffer(currentState);
     const dateStamp = new Date().toISOString().slice(0, 10);
-    const filename = `OmniTRAF-SITS-Surabaya-Mobility-Report-${dateStamp}.pdf`;
+    const filename = `OmniTRAF-Simulation-Report-${dateStamp}.pdf`;
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -20,7 +20,7 @@ export async function downloadPdfReport(req, res) {
     res.status(500).json(createApiErrorResponse(
       500,
       'REPORT_GENERATION_FAILED',
-      'Gagal menghasilkan dokumen laporan PDF mobilitas SITS.',
+      'Gagal menghasilkan laporan demo simulasi OmniTRAF.',
       { details: err.message }
     ));
   }

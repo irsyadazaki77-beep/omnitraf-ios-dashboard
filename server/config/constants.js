@@ -16,24 +16,24 @@ const DEV_USERS = [
     username: 'admin',
     passwordHash: bcrypt.hashSync('admin123', 10),
     role: ROLES.ADMIN,
-    name: 'Administrator SITS Surabaya',
-    email: 'admin@sits.surabaya.go.id'
+    name: 'Administrator Demo',
+    email: null
   },
   {
     id: 'usr-operator-01',
     username: 'operator',
     passwordHash: bcrypt.hashSync('operator123', 10),
     role: ROLES.OPERATOR,
-    name: 'Zaki Putra (Operator SITS)',
-    email: 'zaki.putra@sits.surabaya.go.id'
+    name: 'Operator Demo',
+    email: null
   },
   {
     id: 'usr-viewer-01',
     username: 'viewer',
     passwordHash: bcrypt.hashSync('viewer123', 10),
     role: ROLES.VIEWER,
-    name: 'Publik / Dishub Viewer',
-    email: 'viewer@sits.surabaya.go.id'
+    name: 'Viewer Demo',
+    email: null
   }
 ];
 
@@ -45,7 +45,7 @@ export const USERS_DB = IS_PRODUCTION
         passwordHash: process.env.ADMIN_PASSWORD_HASH,
         role: ROLES.ADMIN,
         name: 'Production Administrator',
-        email: 'admin@sits.surabaya.go.id'
+        email: null
       }
     ] : [])
   : DEV_USERS;
