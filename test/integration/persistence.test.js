@@ -4,9 +4,10 @@ import fs from 'fs';
 import path from 'path';
 import { DatabaseManager } from '../../server/db/database.js';
 import { BackendStateManager } from '../../server/services/stateManager.js';
+import { testDatabasePath } from '../helpers/testDatabasePath.js';
 
 describe('Phase 17: Persistence, Recovery & Data Integrity Hardening Test Suite', () => {
-  const testDir = path.resolve(process.cwd(), 'data/test_persistence_' + Date.now());
+  const testDir = testDatabasePath('persistence');
   const testDbPath = path.join(testDir, 'test_omnitraf.sqlite');
 
   before(() => {

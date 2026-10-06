@@ -241,6 +241,7 @@ export class TourShortcutsController {
   _bindGlobalKeydown() {
     window.addEventListener("keydown", (e) => {
       if (e.target.matches("input, textarea, select")) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
 
       const key = e.key.toLowerCase();
       if (key === "k") {
@@ -312,15 +313,6 @@ export class TourShortcutsController {
         if (notifBackdrop) {
           notifBackdrop.style.display = "none";
           notifBackdrop.classList.remove("active");
-        }
-
-        // 5. Close Mobile Sidebar Drawer
-        const sidebar = document.querySelector(".sidebar, .app-sidebar");
-        const drawerBackdrop = document.getElementById("drawerBackdrop");
-        if (sidebar) sidebar.classList.remove("open-mobile");
-        if (drawerBackdrop) {
-          drawerBackdrop.style.display = "none";
-          drawerBackdrop.classList.remove("active");
         }
 
         soundManager.play('click');

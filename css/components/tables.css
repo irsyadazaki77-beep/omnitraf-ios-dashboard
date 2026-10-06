@@ -17,6 +17,13 @@
   margin-top: 14px;
 }
 
+.table-wrap:focus-within { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+.table-wrap table { min-width: 100%; }
+
+td.numeric,
+th.numeric { text-align: right; font-variant-numeric: tabular-nums; }
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -45,8 +52,10 @@ tbody td {
 }
 
 tbody tr:hover {
-  background: var(--panel-elevated);
+  background: var(--surface-hover);
 }
+
+tbody tr:focus-within { outline: 2px solid var(--border-focus); outline-offset: -2px; }
 
 tbody tr.active-row-highlight {
   background: var(--primary-soft);

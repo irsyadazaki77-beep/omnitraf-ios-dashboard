@@ -450,7 +450,7 @@ export class ReportController {
     const label = document.createElement('span');
     label.textContent = `📄 Laporan ${String(type ?? '')} (PDF)`;
     const timestamp = document.createElement('span');
-    timestamp.style.color = 'var(--text-muted)';
+    timestamp.className = 'report-timestamp';
     timestamp.textContent = `${time} WIB`;
     item.append(label, timestamp);
     list.insertBefore(item, list.firstChild);

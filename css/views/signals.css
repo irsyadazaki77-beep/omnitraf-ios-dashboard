@@ -364,6 +364,13 @@
   opacity: 0.95;
 }
 
+.signal-phase-plan-a .phase-red { width: 30%; }
+.signal-phase-plan-a .phase-yellow { width: 10%; }
+.signal-phase-plan-a .phase-green { width: 60%; }
+.signal-phase-plan-b .phase-red { width: 35%; }
+.signal-phase-plan-b .phase-yellow { width: 10%; }
+.signal-phase-plan-b .phase-green { width: 55%; }
+
 .phase-indicator {
   position: absolute;
   top: -2px;
@@ -372,6 +379,7 @@
   background: #ffffff;
   box-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
   border-radius: 1px;
+  left: 0;
 }
 
 /* Manual Override High-Impact Action Button */

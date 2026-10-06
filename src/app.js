@@ -496,17 +496,7 @@ export class App {
       }
 
       if (e.key === 'Escape') {
-        const drawer = document.getElementById('sidebar');
-        const backdrop = document.getElementById('drawerBackdrop');
-        if (drawer && drawer.classList.contains('open-mobile')) {
-          drawer.classList.remove('open');
-          drawer.classList.remove('open-mobile');
-          document.getElementById('menuToggle')?.setAttribute('aria-expanded', 'false');
-          if (backdrop) backdrop.classList.remove('show');
-          if (backdrop) backdrop.classList.remove('active');
-          if (backdrop) backdrop.style.display = 'none';
-          document.getElementById('menuToggle')?.focus();
-        }
+        navigationController.closeMobileSidebar();
       }
     });
 

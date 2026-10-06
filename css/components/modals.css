@@ -19,8 +19,8 @@
 }
 
 .modal-content {
-  background: var(--panel);
-  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-xl);
   padding: 22px;
   position: relative;
@@ -28,6 +28,26 @@
   max-width: 600px;
   width: 100%;
   animation: modalScaleUp var(--duration-normal) var(--ease);
+}
+
+.modal-content :where(h2, h3, h4) { color: var(--text-primary); line-height: var(--line-height-tight); }
+.modal-content :where(p, small) { color: var(--text-secondary); line-height: var(--line-height-body); }
+.modal-content .modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.modal-content .modal-body { min-width: 0; }
+.modal-content .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-default);
 }
 
 @keyframes modalScaleUp {

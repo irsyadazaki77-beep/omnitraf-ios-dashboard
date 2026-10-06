@@ -14,10 +14,11 @@ import {
   normalizeEmergencyStatus,
   createDomainEventEnvelope
 } from '../../server/config/stateMachine.js';
+import { testDatabasePath } from '../helpers/testDatabasePath.js';
 
 // Setup environment variables before importing server
 process.env.PORT = '0';
-const testDbPath = 'data/test_state_machine_p14d.sqlite';
+const testDbPath = testDatabasePath('state-machine-p14d.sqlite');
 process.env.DB_PATH = testDbPath;
 
 const { server } = await import('../../server.js');

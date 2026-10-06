@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { io as Client } from 'socket.io-client';
+import { testDatabasePath } from '../helpers/testDatabasePath.js';
 
 process.env.PORT = '0';
-process.env.DB_PATH = 'data/test_command_contract_parity.sqlite';
+process.env.DB_PATH = testDatabasePath('command-contract-parity.sqlite');
 process.env.NODE_ENV = 'test';
 
 const [{ server }, { backendState }, { dbManager }] = await Promise.all([

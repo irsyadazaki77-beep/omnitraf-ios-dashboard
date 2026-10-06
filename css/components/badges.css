@@ -30,7 +30,7 @@
 .status-badge.green,
 .provenance-badge.live {
   background: var(--success-soft);
-  color: var(--success);
+  color: var(--provenance-live);
   border-color: var(--success-border);
 }
 
@@ -56,7 +56,7 @@
 
 .provenance-badge.derived {
   background: var(--primary-soft);
-  color: var(--primary-2);
+  color: var(--provenance-derived);
   border-color: var(--border-focus);
 }
 
@@ -64,7 +64,7 @@
 .badge-stale,
 .pill-stale {
   background: var(--stale-soft);
-  color: var(--stale);
+  color: var(--provenance-stale);
   border-color: var(--stale-border);
 }
 
@@ -88,7 +88,7 @@
 .badge-simulated,
 .pill-simulated {
   background: var(--warning-soft);
-  color: var(--warning);
+  color: var(--provenance-simulated);
   border-color: var(--warning-border);
 }
 
@@ -123,9 +123,9 @@
 }
 
 .provenance-badge.user-triggered {
-  background: rgba(168, 85, 247, 0.12);
-  color: #c084fc;
-  border-color: rgba(168, 85, 247, 0.25);
+  background: color-mix(in srgb, var(--provenance-user-triggered) 12%, transparent);
+  color: var(--provenance-user-triggered);
+  border-color: color-mix(in srgb, var(--provenance-user-triggered) 25%, transparent);
 }
 
 .pulse-dot,
@@ -159,4 +159,37 @@
   height: 5px;
   border-radius: var(--radius-full);
   background: currentColor;
+}
+
+/* ==========================================================================
+   Incident Status Badges & Action Buttons
+   ========================================================================== */
+.inc-badge-new {
+  background: rgba(239, 68, 68, 0.2) !important;
+  color: #f87171 !important;
+  border: 1px solid rgba(239, 68, 68, 0.4) !important;
+}
+
+.inc-badge-dispatched {
+  background: rgba(56, 189, 248, 0.2) !important;
+  color: #38bdf8 !important;
+  border: 1px solid rgba(56, 189, 248, 0.4) !important;
+}
+
+.inc-badge-resolved {
+  background: rgba(34, 197, 94, 0.2) !important;
+  color: #4ade80 !important;
+  border: 1px solid rgba(34, 197, 94, 0.4) !important;
+}
+
+.btn-map-shortcut {
+  background: rgba(14, 165, 233, 0.15) !important;
+  border: 1px solid rgba(14, 165, 233, 0.35) !important;
+  color: #38bdf8 !important;
+  font-weight: 600 !important;
+}
+
+.btn-map-shortcut:hover {
+  background: rgba(14, 165, 233, 0.3) !important;
+  border-color: rgba(14, 165, 233, 0.6) !important;
 }

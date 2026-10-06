@@ -3,17 +3,14 @@ FROM node:20-alpine AS builder
 
 WORKDIR /usr/src/app
 
-# Copy package descriptors
-COPY package.json ./
+# Copy canonical npm package descriptors
+COPY package.json package-lock.json ./
 
-# Install all dependencies (including devDependencies)
-RUN npm install
+# Install the exact production dependency tree from the lockfile
+RUN npm ci --omit=dev
 
 # Copy application files
 COPY . .
-
-# Prune development dependencies for production
-RUN npm prune --production
 
 # Stage 2: Secure Production Release Stage
 FROM node:20-alpine
@@ -24,7 +21,7 @@ ENV PORT=3000
 
 WORKDIR /usr/src/app
 
-# Copy pruned node_modules from builder
+# Copy locked production dependencies
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 
 # Copy application files from builder

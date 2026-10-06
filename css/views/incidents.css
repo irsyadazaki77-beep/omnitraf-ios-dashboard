@@ -1,0 +1,6 @@
+.incident-alert-dot {
+  background: var(--status-danger);
+  box-shadow: 0 0 6px var(--status-danger);
+}
+
+.incident-empty-state { padding: var(--space-6); color: var(--text-tertiary); }

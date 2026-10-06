@@ -1,0 +1,46 @@
+/* Forecast metrics use the same operational surfaces as other view summaries. */
+.prediction-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+
+.prediction-metric-card {
+  min-width: 0;
+  padding: var(--space-3) 14px;
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--primary-2);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-raised) 76%, transparent);
+}
+
+.prediction-metric-card.risk { border-left-color: var(--status-danger); }
+.prediction-metric-card.recommendation { grid-column: span 2; border-left-color: var(--status-success); }
+
+.prediction-metric-label {
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  text-transform: uppercase;
+}
+
+.prediction-metric-value {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.prediction-metric-card.risk .prediction-metric-value { color: var(--status-danger); }
+.prediction-metric-card.recommendation .prediction-metric-value {
+  color: var(--chart-primary);
+  font-size: var(--font-size-body);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .prediction-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .prediction-metric-card.recommendation { grid-column: 1 / -1; }
+}

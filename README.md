@@ -110,12 +110,13 @@ Jaminan deterministik yang diuji mencakup output handler untuk seed dan jadwal y
 ## 🚀 Panduan Menjalankan Project (1-Command Run)
 
 ### Prasyarat
-- Node.js versi 18 atau lebih baru.
+- Node.js versi 20.
+- `npm` adalah package manager canonical project ini.
 
 ### Langkah Menjalankan
 ```bash
-# 1. Pasang dependensi
-npm install
+# 1. Pasang dependensi secara reproducible
+npm ci
 
 # 2. Jalankan server (Otomatis mendeteksi port 3000 atau port bebas berikutnya)
 npm start
@@ -124,12 +125,15 @@ npm start
 Buka peramban (browser) di alamat:
 **`http://localhost:3000`**
 
-### Menjalankan Lint & Cek Sintaks
+### Development checks
 ```bash
+npm ci
 npm run lint
+npm run validate
+npm test
 ```
 
-`npm run build` menjalankan validasi statis manifest, app shell, stylesheet, dan versi service worker. Project ini tidak memiliki bundler atau langkah kompilasi; `npm run lint` merupakan pemeriksaan sintaks Node untuk daftar file tertentu, bukan lint penuh. Rincian baseline dan batas pengukuran Phase 9 ada di [PHASE9_PERFORMANCE.md](PHASE9_PERFORMANCE.md).
+`npm run lint` memeriksa sintaks JavaScript, sedangkan `npm run validate` memvalidasi PWA dan static assets. `npm test` menemukan dan menjalankan seluruh unit serta integration test. `npm run build` menjalankan lint dan validasi statis; project ini tidak memiliki bundler atau langkah kompilasi. Rincian baseline dan batas pengukuran Phase 9 ada di [PHASE9_PERFORMANCE.md](PHASE9_PERFORMANCE.md).
 
 ---
 

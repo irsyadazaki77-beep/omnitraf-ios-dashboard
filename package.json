@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "node server.js",
-    "build": "npm run validate",
+    "build": "npm run lint && npm run validate",
     "validate": "node scripts/validate-pwa.mjs",
+    "lint": "node scripts/run-lint.mjs",
     "start": "node server.js",
-    "lint": "node --check server.js && node --check src/app.js && node --check src/core/socketClient.js && node --check src/core/realtimeRouter.js && node --check src/core/resyncManager.js && node --check src/core/realtimeMetrics.js && node --check server/sockets/realtimeDispatcher.js && node --check server/sockets/eventRegistry.js && node --check src/core/stateStore.js && node --check src/core/eventBus.js && node --check src/core/domScheduler.js && node --check src/core/commandLayer.js && node --check src/core/commandAudit.js && node --check src/core/confirmationService.js && node --check src/core/diagnostics.js && node --check src/modules/cctvController.js && node --check src/modules/cctv/index.js && node --check src/modules/cctv/cameraRegistry.js && node --check src/modules/cctv/detectionEngine.js && node --check src/modules/cctv/detectionFilter.js && node --check src/modules/cctv/trackingEngine.js && node --check src/modules/cctv/smoothingEngine.js && node --check src/modules/cctv/telemetryBuilder.js && node --check src/modules/cctv/snapshotService.js && node --check src/modules/cctv/canvasRenderer.js && node --check src/modules/cctv/cctvRealtimeAdapter.js && node --check src/modules/cctv/cctvStateAdapter.js && node --check src/modules/cctv/cctvTelemetry.js && node --check src/modules/mapManager.js && node --check src/modules/map/coordinateUtils.js && node --check src/modules/map/spatialDomainAdapter.js && node --check src/modules/map/layerManager.js && node --check src/modules/map/markerManager.js && node --check src/modules/map/popupManager.js && node --check src/modules/map/mapControls.js && node --check src/modules/map/spatialStateSync.js && node --check src/modules/map/emergencyRouteAnimator.js && node --check src/modules/chatSystem.js",
     "test": "node scripts/run-tests.mjs"
   },
   "dependencies": {
@@ -20,7 +20,9 @@
     "jsonwebtoken": "^9.0.3",
     "pdf-lib": "^1.17.1",
     "socket.io": "^4.8.3",
-    "socket.io-client": "^4.8.3",
     "sql.js": "^1.14.2"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.3"
   }
 }

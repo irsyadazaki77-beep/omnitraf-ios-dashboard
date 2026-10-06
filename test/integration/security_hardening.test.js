@@ -9,10 +9,11 @@ import { backendState } from '../../server/services/stateManager.js';
 import { rateLimitStore } from '../../server/middlewares/rateLimiter.js';
 import { dbManager } from '../../server/db/database.js';
 import { commandExecutor } from '../../server/services/commandExecutor.js';
+import { testDatabasePath } from '../helpers/testDatabasePath.js';
 
 // Run isolated server on dynamic port (0) with test SQLite database
 process.env.PORT = '0';
-const testDbPath = 'data/test_security_hardening.sqlite';
+const testDbPath = testDatabasePath('security-hardening.sqlite');
 process.env.DB_PATH = testDbPath;
 process.env.NODE_ENV = 'test';
 

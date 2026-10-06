@@ -7,11 +7,15 @@
 import { stateStore } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
 import { mapManager } from '../modules/mapManager.js';
+import { viewLoader } from '../core/viewLoader.js';
+
+const SIDEBAR_PREFERENCE_KEY = 'omnitraf.sidebar.collapsed';
 
 export class NavigationController {
   constructor() {
     this.clockInterval = null;
     this._isInitialized = false;
+    this._sidebarReturnFocus = null;
   }
 
   init() {
@@ -19,7 +23,9 @@ export class NavigationController {
     this._isInitialized = true;
 
     this._initRouter();
+    this._initSidebarCollapse();
     this._initMobileNav();
+    this._initCommandPalette();
     this._initThemeToggle();
     this._initClock();
     this._initDrawersAndPanels();
@@ -29,26 +35,32 @@ export class NavigationController {
    * 1. SPA Router (Hash & Data-View)
    */
   _initRouter() {
-    const navLinks = document.querySelectorAll("nav a[data-view], .sidebar a[data-view], .mobile-tab-item[data-view], a[href^='#']");
-    const views = document.querySelectorAll(".view-pane");
-    const sidebar = document.querySelector(".sidebar, .app-sidebar");
-    const drawerBackdrop = document.getElementById("drawerBackdrop");
-
     const closeMobileSidebar = () => this._setSidebarOpen(false, { returnFocus: true });
 
     const switchView = (targetViewId) => {
       let cleanId = (targetViewId || "dashboard").replace('#', '').replace('view-', '');
       if (!cleanId || cleanId === "about-engine") return;
+      if (cleanId === "emergencies") cleanId = "emergency";
 
       // Sync active state on navigation elements
       document.querySelectorAll("[data-view]").forEach(link => {
         const v = link.dataset.view?.replace('view-', '');
-        if (v === cleanId || (cleanId === 'emergencies' && v === 'emergency')) {
+        const isActive = v === cleanId;
+        if (isActive) {
           link.classList.add("active");
+          link.setAttribute("aria-current", "page");
         } else {
           link.classList.remove("active");
+          link.removeAttribute("aria-current");
         }
       });
+
+      document.querySelectorAll('[data-nav-group]').forEach(group => {
+        group.classList.toggle('has-active', Boolean(group.querySelector(`[data-view="${cleanId}"]`)));
+      });
+
+      const pageTitle = viewLoader.viewMap[cleanId]?.title || viewLoader.viewMap.dashboard.title;
+      document.title = `OmniTRAF — ${pageTitle}`;
 
       // Trigger stateStore update which invokes app._handleViewTransition & viewLoader.mountView
       stateStore.setState({ currentView: cleanId });
@@ -64,35 +76,35 @@ export class NavigationController {
       }
     });
 
-    navLinks.forEach(link => {
-      link.addEventListener("click", (e) => {
-        const href = link.getAttribute("href");
-        const dataView = link.dataset.view;
-        const dataAction = link.dataset.action;
+    document.addEventListener("click", (e) => {
+      const link = e.target?.closest?.('a[href^="#"]');
+      if (!link) return;
+      const href = link.getAttribute("href");
+      const dataView = link.dataset.view;
+      const dataAction = link.dataset.action;
 
-        if (dataAction === "about-engine" || href === "#about-engine") {
-          e.preventDefault();
-          closeMobileSidebar();
-          const engineModal = document.getElementById("engineInfoModal");
-          if (engineModal) {
-            engineModal.style.display = "flex";
-            engineModal.classList.add("show");
-            soundManager.play('click');
-          }
-          return;
-        }
-
-        const target = dataView || (href && href.startsWith("#") ? href.slice(1) : null);
-
-        if (target) {
-          e.preventDefault();
-          if (window.location.hash !== `#${target}`) {
-            window.location.hash = target;
-          }
-          switchView(target);
+      if (dataAction === "about-engine" || href === "#about-engine") {
+        e.preventDefault();
+        closeMobileSidebar();
+        const engineModal = document.getElementById("engineInfoModal");
+        if (engineModal) {
+          engineModal.style.display = "flex";
+          engineModal.classList.add("show");
           soundManager.play('click');
         }
-      });
+        return;
+      }
+
+      const target = dataView || (href && href.startsWith("#") ? href.slice(1) : null);
+
+      if (target) {
+        e.preventDefault();
+        if (window.location.hash !== `#${target}`) {
+          window.location.hash = target;
+        }
+        switchView(target);
+        soundManager.play('click');
+      }
     });
 
     // Initial View on Load
@@ -100,6 +112,99 @@ export class NavigationController {
     if (initialHash !== "about-engine") {
       switchView(initialHash);
     }
+  }
+
+  _initSidebarCollapse() {
+    const shell = document.querySelector('.app-shell');
+    const toggle = document.getElementById('sidebarCollapseToggle');
+    if (!shell || !toggle) return;
+
+    const media = window.matchMedia('(max-width: 1200px)');
+    let savedPreference = null;
+    try {
+      const stored = window.localStorage.getItem(SIDEBAR_PREFERENCE_KEY);
+      if (stored === 'true' || stored === 'false') savedPreference = stored === 'true';
+    } catch (_) {}
+
+    const apply = (collapsed) => {
+      const isCollapsed = Boolean(collapsed);
+      shell.classList.toggle('sidebar-collapsed', isCollapsed);
+      toggle.setAttribute('aria-expanded', String(!isCollapsed));
+      toggle.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
+      toggle.setAttribute('title', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
+    };
+
+    apply(savedPreference ?? media.matches);
+    toggle.addEventListener('click', () => {
+      const collapsed = !shell.classList.contains('sidebar-collapsed');
+      apply(collapsed);
+      savedPreference = collapsed;
+      try { window.localStorage.setItem(SIDEBAR_PREFERENCE_KEY, String(collapsed)); } catch (_) {}
+    });
+
+    media.addEventListener?.('change', (event) => {
+      if (savedPreference === null) apply(event.matches);
+    });
+
+    document.querySelectorAll('.sidebar [data-view], .sidebar [data-action]').forEach(item => {
+      const label = item.querySelector('.nav-label')?.textContent.trim() || item.getAttribute('aria-label') || '';
+      if (label) {
+        item.setAttribute('aria-label', label);
+        item.setAttribute('title', label);
+      }
+    });
+  }
+
+  _initCommandPalette() {
+    const palette = document.getElementById('navigationPalette');
+    const openButton = document.getElementById('quickNavigationButton');
+    const closeButton = document.getElementById('closeNavigationPalette');
+    const search = document.getElementById('navigationPaletteSearch');
+    const groups = [...(palette?.querySelectorAll('[data-palette-group]') || [])];
+    const emptyState = document.getElementById('navigationPaletteEmpty');
+    if (!palette || !search || !openButton) return;
+
+    const filterDestinations = () => {
+      const query = search.value.trim().toLocaleLowerCase();
+      let visibleCount = 0;
+      groups.forEach(group => {
+        let groupCount = 0;
+        group.querySelectorAll('.navigation-palette-link').forEach(link => {
+          const searchable = `${link.textContent} ${link.dataset.search || ''}`.toLocaleLowerCase();
+          const visible = !query || searchable.includes(query);
+          link.hidden = !visible;
+          if (visible) groupCount += 1;
+        });
+        group.hidden = groupCount === 0;
+        visibleCount += groupCount;
+      });
+      if (emptyState) emptyState.hidden = visibleCount > 0;
+    };
+
+    const openPalette = () => {
+      if (!palette.open) palette.showModal();
+      search.value = '';
+      filterDestinations();
+      search.focus();
+    };
+
+    openButton.addEventListener('click', openPalette);
+    closeButton?.addEventListener('click', () => palette.close());
+    search.addEventListener('input', filterDestinations);
+    palette.querySelectorAll('.navigation-palette-link').forEach(link => {
+      link.addEventListener('click', () => palette.close());
+    });
+    palette.addEventListener('close', () => {
+      search.value = '';
+      filterDestinations();
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'k') return;
+      if (event.target?.matches?.('input, textarea, select, [contenteditable="true"]')) return;
+      event.preventDefault();
+      openPalette();
+    });
   }
 
   /**
@@ -122,7 +227,8 @@ export class NavigationController {
     const toggleSidebar = () => {
       const sidebar = document.querySelector(".sidebar, .app-sidebar");
       if (!sidebar) return;
-      this._setSidebarOpen(!sidebar.classList.contains("open-mobile"), { returnFocus: false });
+      const wasOpen = sidebar.classList.contains("open-mobile");
+      this._setSidebarOpen(!wasOpen, { returnFocus: wasOpen });
       soundManager.play('click');
     };
 
@@ -146,24 +252,79 @@ export class NavigationController {
         });
       }
     });
+
+    const sidebar = document.querySelector('.sidebar, .app-sidebar');
+    if (sidebar) {
+      const mobileQuery = window.matchMedia('(max-width: 768px)');
+      const syncInert = () => {
+        sidebar.inert = mobileQuery.matches && !sidebar.classList.contains('open-mobile');
+      };
+      syncInert();
+      mobileQuery.addEventListener?.('change', syncInert);
+      sidebar.addEventListener('keydown', (event) => {
+        if (event.key !== 'Tab' || !mobileQuery.matches || !sidebar.classList.contains('open-mobile')) return;
+        const focusable = [...sidebar.querySelectorAll('a[href], button:not(:disabled), [tabindex="0"]')]
+          .filter(element => !element.hidden && element.getClientRects().length > 0);
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && (document.activeElement === first || !sidebar.contains(document.activeElement))) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && (document.activeElement === last || !sidebar.contains(document.activeElement))) {
+          event.preventDefault();
+          first.focus();
+        }
+      });
+    }
   }
 
   _setSidebarOpen(isOpen, { returnFocus = false } = {}) {
     const sidebar = document.querySelector(".sidebar, .app-sidebar");
     const backdrop = document.getElementById("drawerBackdrop");
     const menuToggle = document.getElementById("menuToggle");
+    const mobileMenu = document.getElementById('mobTabMenu');
     if (!sidebar) return;
 
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    if (!isMobile) {
+      sidebar.classList.remove('open-mobile');
+      sidebar.inert = false;
+      document.body.classList.remove('sidebar-drawer-open');
+      if (backdrop) {
+        backdrop.classList.remove('active');
+        backdrop.style.display = 'none';
+      }
+      menuToggle?.setAttribute('aria-expanded', 'false');
+      mobileMenu?.setAttribute('aria-expanded', 'false');
+      return;
+    }
+
     const wasOpen = sidebar.classList.contains("open-mobile");
+    if (isOpen) this._sidebarReturnFocus = document.activeElement;
     sidebar.classList.toggle("open-mobile", isOpen);
+    sidebar.inert = !isOpen;
+    document.body.classList.toggle('sidebar-drawer-open', isOpen);
     if (backdrop) {
       backdrop.classList.toggle("active", isOpen);
       backdrop.style.display = isOpen ? "block" : "none";
     }
     menuToggle?.setAttribute("aria-expanded", String(isOpen));
+    mobileMenu?.setAttribute('aria-expanded', String(isOpen));
+    menuToggle?.setAttribute('aria-label', isOpen ? 'Tutup menu' : 'Buka menu');
+    mobileMenu?.setAttribute('aria-label', isOpen ? 'Close destinations menu' : 'Open all destinations');
 
     if (isOpen) document.getElementById("closeDrawer")?.focus();
-    else if (returnFocus && wasOpen) menuToggle?.focus();
+    else if (returnFocus && wasOpen) {
+      const preferred = this._sidebarReturnFocus;
+      const fallback = [menuToggle, mobileMenu].find(element => element && element.getClientRects().length > 0);
+      (preferred && preferred.getClientRects().length > 0 ? preferred : fallback)?.focus();
+      this._sidebarReturnFocus = null;
+    }
+  }
+
+  closeMobileSidebar() {
+    this._setSidebarOpen(false, { returnFocus: true });
   }
 
   /**

@@ -5,10 +5,11 @@ import { ROLES } from '../../server/config/constants.js';
 import { commandExecutor } from '../../server/services/commandExecutor.js';
 import { backendState } from '../../server/services/stateManager.js';
 import { dbManager } from '../../server/db/database.js';
+import { testDatabasePath } from '../helpers/testDatabasePath.js';
 
 // Setup environment variables before importing the server
 process.env.PORT = '0';
-const testDbPath = 'data/test_command_authority.sqlite';
+const testDbPath = testDatabasePath('command-authority.sqlite');
 process.env.DB_PATH = testDbPath;
 
 const { server } = await import('../../server.js');

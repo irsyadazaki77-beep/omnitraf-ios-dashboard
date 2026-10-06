@@ -7,19 +7,19 @@
 export class ViewLoader {
   constructor() {
     this.viewMap = {
-      'dashboard': { file: '/src/views/dashboardView.html', id: 'view-dashboard' },
-      'map': { file: '/src/views/mapView.html', id: 'view-map' },
-      'cctv': { file: '/src/views/cctvView.html', id: 'view-cctv' },
-      'signals': { file: '/src/views/signalsView.html', id: 'view-signals' },
-      'emergency': { file: '/src/views/emergenciesView.html', id: 'view-emergency' },
-      'emergencies': { file: '/src/views/emergenciesView.html', id: 'view-emergency' },
-      'analytics': { file: '/src/views/analyticsView.html', id: 'view-analytics' },
-      'prediction': { file: '/src/views/predictionView.html', id: 'view-prediction' },
-      'incidents': { file: '/src/views/incidentsView.html', id: 'view-incidents' },
-      'reports': { file: '/src/views/reportsView.html', id: 'view-reports' },
-      'devices': { file: '/src/views/devicesView.html', id: 'view-devices' },
-      'integration': { file: '/src/views/integrationView.html', id: 'view-integration' },
-      'settings': { file: '/src/views/settingsView.html', id: 'view-settings' }
+      'dashboard': { file: '/src/views/dashboardView.html', id: 'view-dashboard', title: 'Dashboard' },
+      'map': { file: '/src/views/mapView.html', id: 'view-map', title: 'City Map' },
+      'cctv': { file: '/src/views/cctvView.html', id: 'view-cctv', title: 'CCTV Monitoring' },
+      'signals': { file: '/src/views/signalsView.html', id: 'view-signals', title: 'Traffic Signals' },
+      'emergency': { file: '/src/views/emergenciesView.html', id: 'view-emergency', title: 'Emergency Priority' },
+      'emergencies': { file: '/src/views/emergenciesView.html', id: 'view-emergency', title: 'Emergency Priority' },
+      'analytics': { file: '/src/views/analyticsView.html', id: 'view-analytics', title: 'Analytics' },
+      'prediction': { file: '/src/views/predictionView.html', id: 'view-prediction', title: 'Prediction' },
+      'incidents': { file: '/src/views/incidentsView.html', id: 'view-incidents', title: 'Incidents' },
+      'reports': { file: '/src/views/reportsView.html', id: 'view-reports', title: 'Reports' },
+      'devices': { file: '/src/views/devicesView.html', id: 'view-devices', title: 'Device Management' },
+      'integration': { file: '/src/views/integrationView.html', id: 'view-integration', title: 'Integrations' },
+      'settings': { file: '/src/views/settingsView.html', id: 'view-settings', title: 'Settings' }
     };
 
     this.componentMap = {
@@ -181,10 +181,14 @@ export class ViewLoader {
       const v = link.dataset.view?.replace('view-', '');
       if (v === cleanKey || (cleanKey === 'emergencies' && v === 'emergency')) {
         link.classList.add('active');
+        link.setAttribute('aria-current', 'page');
       } else {
         link.classList.remove('active');
+        link.removeAttribute('aria-current');
       }
     });
+
+    document.title = `OmniTRAF — ${config.title || 'Dashboard'}`;
 
     return {
       success: true,

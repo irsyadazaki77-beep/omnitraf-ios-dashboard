@@ -6,8 +6,8 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 34px;
-  height: 34px;
+  min-height: 36px;
+  height: 36px;
   padding: 0 14px;
   border-radius: var(--radius-md);
   font-family: var(--font-sans);
@@ -36,6 +36,11 @@
   transform: none !important;
 }
 
+.btn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
 .btn-primary {
   background: var(--primary);
   color: #ffffff;
@@ -50,16 +55,16 @@
 
 .btn-ghost,
 .btn-secondary {
-  background: var(--panel-elevated);
-  color: var(--text);
-  border-color: var(--border);
+  background: var(--surface-interactive);
+  color: var(--text-primary);
+  border-color: var(--border-default);
 }
 
 .btn-ghost:hover,
 .btn-secondary:hover {
-  background: var(--panel-soft);
-  border-color: var(--border-emphasis);
-  color: var(--text);
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 
 .btn-danger {
@@ -73,6 +78,17 @@
   background: var(--danger-hover);
   box-shadow: 0 2px 8px rgba(239, 68, 68, 0.45);
 }
+
+.btn-success {
+  background: var(--status-success);
+  color: #fff;
+  border-color: var(--success-border);
+}
+
+.btn-success:hover { background: var(--success-hover); }
+
+.btn[aria-busy="true"],
+.btn.is-loading { cursor: progress; }
 
 .btn-warning {
   background: var(--warning);
@@ -104,6 +120,13 @@
   padding: 0 10px;
   font-size: 11px;
   border-radius: var(--radius-sm);
+}
+
+@media (max-width: 768px) {
+  .btn:not(.compact):not(.btn-xs):not(.btn-sm) {
+    min-height: 40px;
+    height: auto;
+  }
 }
 
 .btn-lg {

@@ -737,11 +737,10 @@ export class SocketClient {
     const perfDot = perfChip.querySelector(".perf-dot");
     const state = stateStore.getState();
 
-    const latency = this.isConnected() ? `${this.lastLatencyMs} ms` : "Offline";
     const status = state.connectionStatus;
 
     if (perfText) {
-      perfText.textContent = `Ping: ${latency} | Server demo: ${status.toUpperCase()}`;
+      perfText.textContent = `Connection: ${status.toUpperCase()}`;
     }
 
     if (perfDot) {

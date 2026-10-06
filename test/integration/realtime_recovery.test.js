@@ -2,10 +2,12 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
 import fs from 'fs';
 import { io as Client } from 'socket.io-client';
+import { testDatabasePath } from '../helpers/testDatabasePath.js';
+import { REALTIME_ROOMS } from '../../shared/realtimeRooms.js';
 
 // Setup port 0 for dynamic testing port
 process.env.PORT = '0';
-process.env.DB_PATH = 'data/test_realtime_omnitraf.sqlite';
+process.env.DB_PATH = testDatabasePath('realtime-recovery.sqlite');
 const { server } = await import('../../server.js');
 const { backendState } = await import('../../server/services/stateManager.js');
 const { generateToken } = await import('../../server/middlewares/auth.js');
@@ -46,8 +48,8 @@ describe('Phase 18: Realtime Reliability, Ordering & Recovery Hardening Test Sui
     });
   });
 
-  after(() => {
-    server.close();
+  after(async () => {
+    await new Promise((resolve) => server.close(resolve));
     try {
       if (fs.existsSync(process.env.DB_PATH)) {
         fs.unlinkSync(process.env.DB_PATH);
@@ -303,8 +305,9 @@ describe('Phase 18: Realtime Reliability, Ordering & Recovery Hardening Test Sui
     client.disconnect();
   });
 
-  test('7. CCTV Computer Vision frames: ordering metadata and stream validation', async () => {
+  test('7. CCTV Computer Vision frames: ordering metadata and stream validation', async (t) => {
     const client = createClient();
+    t.after(() => client.disconnect());
 
     const frames = [];
     const framePromise = new Promise((resolve, reject) => {
@@ -318,7 +321,15 @@ describe('Phase 18: Realtime Reliability, Ordering & Recovery Hardening Test Sui
       });
     });
 
-    client.connect();
+    await new Promise((resolve, reject) => {
+      client.once('connect', resolve);
+      client.once('connect_error', reject);
+      client.connect();
+    });
+    const subscription = await new Promise((resolve) => {
+      client.emit('channel:subscribe', { channels: [REALTIME_ROOMS.CCTV_ALL] }, resolve);
+    });
+    assert.deepStrictEqual(subscription.rejected, []);
     await framePromise;
     assert.strictEqual(frames.length, 2);
 
@@ -332,7 +343,6 @@ describe('Phase 18: Realtime Reliability, Ordering & Recovery Hardening Test Sui
     assert.ok(f2.seq >= f1.seq, `Subsequent frame seq (${f2.seq}) must be >= previous frame seq (${f1.seq})`);
     assert.ok(f1.cameras && typeof f1.cameras === 'object');
 
-    client.disconnect();
   });
 
   test('8. SSE Stream (/api/stream-traffic): diagnostic stream format, headers, and clean disconnect', async () => {

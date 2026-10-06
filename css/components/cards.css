@@ -23,8 +23,8 @@
 .device-config-drawer,
 .terminal-logs-card,
 .api-playground-card {
-  background: var(--panel);
-  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   position: relative;

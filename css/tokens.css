@@ -75,6 +75,64 @@
   --stale-soft: rgba(148, 163, 184, 0.12);
   --stale-border: rgba(148, 163, 184, 0.25);
 
+  /* Semantic surface, text, border, and status aliases */
+  --surface-base: var(--bg-base);
+  --surface-raised: var(--panel);
+  --surface-overlay: var(--panel-glass);
+  --surface-interactive: var(--panel-elevated);
+  --surface-hover: rgba(148, 163, 184, 0.1);
+  --surface-selected: var(--primary-soft);
+  --text-primary: var(--text);
+  --text-secondary: var(--text-muted);
+  --text-tertiary: var(--text-dim);
+  --text-disabled: rgba(148, 163, 184, 0.58);
+  --border-default: var(--border);
+  --border-strong: var(--border-emphasis);
+  --status-success: var(--success);
+  --status-warning: var(--warning);
+  --status-danger: var(--danger);
+  --status-info: var(--info);
+  --status-neutral: var(--stale);
+  --status-user-action: #c084fc;
+
+  /* Traffic and data provenance colors */
+  --traffic-free: #22c55e;
+  --traffic-moderate: #eab308;
+  --traffic-heavy: #f97316;
+  --traffic-critical: #ef4444;
+  --provenance-live: var(--status-success);
+  --provenance-derived: var(--status-info);
+  --provenance-simulated: var(--status-warning);
+  --provenance-stale: var(--status-neutral);
+  --provenance-offline: var(--status-danger);
+  --provenance-user-triggered: var(--status-user-action);
+  --chart-primary: #38bdf8;
+  --chart-prediction: #00e5ff;
+  --chart-savings: #10b981;
+  --chart-peak-fill: rgba(239, 68, 68, 0.25);
+
+  /* Compact operational spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Typography roles */
+  --font-size-display: 28px;
+  --font-size-title: 20px;
+  --font-size-section: 16px;
+  --font-size-card: 14px;
+  --font-size-body: 13px;
+  --font-size-small: 12px;
+  --font-size-caption: 11px;
+  --font-size-label: 10px;
+  --line-height-tight: 1.25;
+  --line-height-body: 1.5;
+
   --control-height-sm: 28px;
   --control-height-md: 34px;
   --control-height-lg: 40px;
@@ -166,4 +224,17 @@ body.theme-light,
   --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.09), 0 4px 8px -2px rgba(0, 0, 0, 0.05);
   --shadow-modal: 0 24px 48px -8px rgba(0, 0, 0, 0.15), 0 8px 16px -4px rgba(0, 0, 0, 0.08);
   --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.04);
+
+  --surface-base: var(--bg-base);
+  --surface-raised: var(--panel);
+  --surface-overlay: var(--panel-glass);
+  --surface-interactive: var(--panel-elevated);
+  --surface-hover: rgba(15, 23, 42, 0.06);
+  --surface-selected: var(--primary-soft);
+  --text-primary: var(--text);
+  --text-secondary: var(--text-muted);
+  --text-tertiary: var(--text-dim);
+  --text-disabled: rgba(71, 85, 105, 0.55);
+  --border-default: var(--border);
+  --border-strong: var(--border-emphasis);
 }

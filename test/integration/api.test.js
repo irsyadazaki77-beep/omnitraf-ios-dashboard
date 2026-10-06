@@ -2,10 +2,11 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
 import fs from 'fs';
 import { rateLimitStore } from '../../server/middlewares/rateLimiter.js';
+import { testDatabasePath } from '../helpers/testDatabasePath.js';
 
 // Setup environment variables before importing the server to listen on a random free port (0)
 process.env.PORT = '0';
-process.env.DB_PATH = 'data/test_api_omnitraf.sqlite';
+process.env.DB_PATH = testDatabasePath('api.sqlite');
 
 // Dynamically import server to ensure process.env.PORT is respected
 const { server } = await import('../../server.js');

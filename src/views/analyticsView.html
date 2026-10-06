@@ -1,25 +1,25 @@
 <div class="view-pane" id="view-analytics">
         <!-- Traffic Trends Chart Panel -->
         <article class="trend-panel glass-panel" id="card-analytics">
-          <div class="section-head" style="flex-wrap: wrap; gap: 12px;">
+          <div class="section-head analytics-section-head">
             <div>
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <div class="analytics-provenance-row">
                 <span class="provenance-badge derived">TELEMETRY + MODEL ESTIMATE</span>
-                <span style="font-size: 11px; color: var(--text-dim); font-family: var(--font-mono);">Unit: smp/jam & km/jam · Periode: 24 Jam Diurnal</span>
+                <span class="analytics-units-label">Unit: smp/jam & km/jam · Periode: 24 Jam Diurnal</span>
               </div>
               <h2>Traffic Trends & Time-Travel Simulator</h2>
               <p>Simulasi fluktuasi kepadatan 24 jam koridor arteri Surabaya berdasarkan histori pola puncak SITS (Pagi 07:00 & Sore 17:00).</p>
             </div>
-            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <div class="analytics-toolbar">
               <!-- Corridor Selection Dropdown -->
-              <select id="analyticsCorridorSelect" class="search-box select glass-soft" style="padding: 6px 12px; font-size: 12px; font-weight: 600; color: var(--text); border-radius: 8px; border: 1px solid var(--border); background: rgba(15, 23, 42, 0.85); cursor: pointer;" aria-label="Pilih Koridor Analitik">
+              <select id="analyticsCorridorSelect" class="search-box select glass-soft" aria-label="Pilih Koridor Analitik">
                 <option value="corridor-ayani">🛣️ Koridor A. Yani / Wonokromo</option>
                 <option value="corridor-darmo">🛣️ Koridor Raya Darmo</option>
                 <option value="corridor-jemursari">🛣️ Koridor A. Yani - Jemursari</option>
                 <option value="corridor-merr">🛣️ Koridor MERR Kertajaya</option>
               </select>
 
-              <span class="badge" id="analyticsHourBadge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; font-weight: 800; padding: 6px 12px; border-radius: 8px; font-size: 13px;">
+              <span class="badge analytics-hour-badge" id="analyticsHourBadge">
                 🕒 08:00 WIB
               </span>
               <div class="time-range-segmented glass-soft" id="analyticsTimeRangeSegmented" role="group" aria-label="Rentang Waktu Analitik">
@@ -31,20 +31,20 @@
           </div>
 
           <!-- 24-Hour Time-Travel Slider Controller -->
-          <div class="time-travel-control-box" style="background: rgba(15, 23, 42, 0.55); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px 18px; margin: 12px 0 16px 0;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-              <label for="timeTravelRange" style="font-size: 12.5px; font-weight: 700; color: #e2e8f0; display: flex; align-items: center; gap: 6px;">
+          <div class="time-travel-control-box">
+            <div class="time-travel-header">
+              <label for="timeTravelRange" class="time-travel-label">
                 <span>⏳ Time-Travel 24 Jam:</span>
-                <span id="timeTravelStatusText" style="color: #ef4444; font-weight: 800;">Jam Puncak Sibuk Pagi</span>
+                <span id="timeTravelStatusText">Jam Puncak Sibuk Pagi</span>
               </label>
-              <span id="timeTravelTimeVal" style="font-size: 16px; font-weight: 800; color: #38bdf8; font-family: 'Share Tech Mono', monospace;">08:00 WIB</span>
+              <span id="timeTravelTimeVal">08:00 WIB</span>
             </div>
-            <input type="range" id="timeTravelRange" min="0" max="23" value="8" step="1" style="width: 100%; accent-color: #00e5ff; cursor: pointer;" />
-            <div style="display: flex; justify-content: space-between; font-size: 10.5px; color: #64748b; margin-top: 4px; font-family: 'Share Tech Mono', monospace;">
+            <input type="range" id="timeTravelRange" min="0" max="23" value="8" step="1" />
+            <div class="time-travel-marks">
               <span>00:00 (Sepi)</span>
-              <span style="color: #ef4444; font-weight: 700;">07:00 Puncak Pagi</span>
+              <span class="peak-period">07:00 Puncak Pagi</span>
               <span>12:00 (Siang)</span>
-              <span style="color: #ef4444; font-weight: 700;">17:00 Puncak Sore</span>
+              <span class="peak-period">17:00 Puncak Sore</span>
               <span>23:00 (Malam)</span>
             </div>
           </div>
@@ -69,17 +69,17 @@
 
             <div class="chart-container">
               <!-- Chart Legend Header -->
-              <div style="display: flex; justify-content: flex-end; gap: 16px; margin-bottom: 8px; font-size: 11px; color: var(--text-muted);">
-                <span style="display: flex; align-items: center; gap: 6px;">
-                  <span style="display: inline-block; width: 16px; height: 3px; background: #38bdf8; border-radius: 2px;"></span>
+              <div class="analytics-chart-legend">
+                <span class="analytics-legend-item">
+                  <span class="legend-swatch legend-swatch-actual"></span>
                   <strong>Data Riil Telemetri (Solid)</strong>
                 </span>
-                <span style="display: flex; align-items: center; gap: 6px;">
-                  <span style="display: inline-block; width: 16px; height: 3px; border-top: 2px dashed #00e5ff;"></span>
+                <span class="analytics-legend-item">
+                  <span class="legend-swatch legend-swatch-forecast"></span>
                   <strong>Prediksi AI Diurnal (Dashed)</strong>
                 </span>
-                <span style="display: flex; align-items: center; gap: 6px;">
-                  <span style="display: inline-block; width: 12px; height: 12px; background: rgba(239, 68, 68, 0.25); border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 2px;"></span>
+                <span class="analytics-legend-item">
+                  <span class="legend-swatch legend-swatch-peak"></span>
                   <strong>Jam Puncak Sibuk</strong>
                 </span>
               </div>
@@ -109,12 +109,12 @@
                 <path class="chart-area" d="M0 206 C65 200 100 132 158 92 S285 112 352 152 S530 115 760 96 L760 260 L0 260 Z" />
                 
                 <!-- Solid Line: Data Riil Telemetri -->
-                <path class="chart-line primary" id="chartPathPrimary" d="M0 206 C65 200 100 132 158 92 S285 112 352 152 S530 115 760 96" style="stroke: #38bdf8; stroke-width: 2.5px;" />
+                <path class="chart-line primary" id="chartPathPrimary" d="M0 206 C65 200 100 132 158 92 S285 112 352 152 S530 115 760 96" />
                 
                 <!-- Dashed Line: Prediksi AI Diurnal -->
-                <path class="chart-line muted" id="chartPathMuted" d="M0 180 C80 185 155 166 252 120 S410 86 540 104 S650 85 760 72" style="stroke: #00e5ff; stroke-width: 2px; stroke-dasharray: 6 4;" />
+                <path class="chart-line muted" id="chartPathMuted" d="M0 180 C80 185 155 166 252 120 S410 86 540 104 S650 85 760 72" />
                 
-                <path class="chart-line cyan" id="chartPathCyan" d="M0 228 C88 218 142 158 224 84 S350 180 468 168 S624 142 760 176" style="stroke: #10b981; stroke-width: 1.5px;" />
+                <path class="chart-line cyan" id="chartPathCyan" d="M0 228 C88 218 142 158 224 84 S350 180 468 168 S624 142 760 176" />
                 
                 <!-- Interactive elements -->
                 <line id="chartHoverLine" x1="-10" y1="0" x2="-10" y2="260" class="chart-hover-line" />
@@ -141,8 +141,8 @@
                 <h2>Carbon Emission & Fuel Efficiency Impact</h2>
                 <p>Kalkulasi reduksi emisi karbon dioksida dan efisiensi konsumsi bahan bakar minyak (BBM) melalui manajemen lalu lintas berbasis kecerdasan buatan.</p>
               </div>
-              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                <button id="btnEsgMethodology" class="btn btn-ghost compact" type="button" style="padding: 6px 12px; font-size: 11.5px; border-color: rgba(16, 185, 129, 0.4); color: #34d399;">
+              <div class="esg-methodology-actions">
+                <button id="btnEsgMethodology" class="btn btn-ghost compact btn-esg-methodology" type="button">
                   ℹ️ Metodologi Perhitungan
                 </button>
                 <div class="esg-badge-leaf">🌱 Impact Score: A+</div>
@@ -206,56 +206,56 @@
           </article>
 
           <!-- Interactive ESG Signal Optimization Simulator -->
-          <article class="esg-calculator-card glass-panel esg-card-padded" style="margin-top: 16px; border-left: 4px solid #10b981; padding: 20px;">
+          <article class="esg-calculator-card glass-panel esg-card-padded esg-impact-calculator">
             <div class="section-head compact">
               <div>
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                <div class="analytics-provenance-row">
                   <span class="provenance-badge simulated">SIMULATED / MODEL</span>
                 </div>
                 <h2>🌱 Kalkulator Simulasi Dampak ESG & Penghematan BBM</h2>
                 <p>Simulasi model matematis dampak optimasi durasi sinyal adaptif SITS terhadap efisiensi energi kota dan emisi karbon.</p>
               </div>
-              <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; padding: 4px 10px; border-radius: 8px;">ESG Impact Model</span>
+              <span class="badge esg-model-badge">ESG Impact Model</span>
             </div>
             
-            <div style="margin: 16px 0;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <label for="esgSignalOptSlider" style="font-weight: 600; font-size: 13px; color: #e2e8f0;">
+            <div class="esg-slider-section">
+              <div class="esg-slider-header">
+                <label for="esgSignalOptSlider" class="esg-slider-label">
                   Optimasi Durasi Sinyal AI (%):
                 </label>
-                <span id="esgOptSliderVal" style="font-size: 18px; font-weight: 800; color: #10b981;">24%</span>
+                <span id="esgOptSliderVal">24%</span>
               </div>
-              <input type="range" id="esgSignalOptSlider" min="0" max="40" value="24" step="1" style="width: 100%; accent-color: #10b981; cursor: pointer;" />
-              <div style="display: flex; justify-content: space-between; font-size: 11px; color: #64748b; margin-top: 4px;">
+              <input type="range" id="esgSignalOptSlider" min="0" max="40" value="24" step="1" />
+              <div class="esg-slider-marks">
                 <span>0% (Statis / Standar)</span>
                 <span>20% (Optimasi SITS)</span>
                 <span>40% (Efisiensi Puncak AI)</span>
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 16px;">
-              <div style="background: rgba(15, 23, 42, 0.6); padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">
-                <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Jam Antrean Dipangkas</div>
-                <div id="esgQueueHoursSaved" style="font-size: 20px; font-weight: 800; color: #38bdf8; margin-top: 4px;">3.000 Jam</div>
-                <small style="color: #64748b; font-size: 10px;">Kumulatif armada Surabaya/hari</small>
+            <div class="esg-impact-grid">
+              <div class="esg-impact-metric">
+                <div class="esg-impact-label">Jam Antrean Dipangkas</div>
+                <div class="esg-impact-value esg-hours" id="esgQueueHoursSaved">3.000 Jam</div>
+                <small class="esg-impact-note">Kumulatif armada Surabaya/hari</small>
               </div>
 
-              <div style="background: rgba(15, 23, 42, 0.6); padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">
-                <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Estimasi BBM Dihemat</div>
-                <div id="esgCalcFuelSaved" style="font-size: 20px; font-weight: 800; color: #10b981; margin-top: 4px;">840,0 L</div>
-                <small style="color: #64748b; font-size: 10px;">Faktor 0.28 L/jam antrean</small>
+              <div class="esg-impact-metric">
+                <div class="esg-impact-label">Estimasi BBM Dihemat</div>
+                <div class="esg-impact-value esg-fuel" id="esgCalcFuelSaved">840,0 L</div>
+                <small class="esg-impact-note">Faktor 0.28 L/jam antrean</small>
               </div>
 
-              <div style="background: rgba(15, 23, 42, 0.6); padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">
-                <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Reduksi Emisi CO₂</div>
-                <div id="esgCalcCo2Saved" style="font-size: 20px; font-weight: 800; color: #34d399; margin-top: 4px;">1.940,4 Kg</div>
-                <small style="color: #64748b; font-size: 10px;">Faktor 2.31 kg CO₂/Liter BBM</small>
+              <div class="esg-impact-metric">
+                <div class="esg-impact-label">Reduksi Emisi CO₂</div>
+                <div class="esg-impact-value esg-co2" id="esgCalcCo2Saved">1.940,4 Kg</div>
+                <small class="esg-impact-note">Faktor 2.31 kg CO₂/Liter BBM</small>
               </div>
 
-              <div style="background: rgba(15, 23, 42, 0.6); padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">
-                <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Nilai Finansial Dihemat</div>
-                <div id="esgCalcMoneySaved" style="font-size: 20px; font-weight: 800; color: #f59e0b; margin-top: 4px;">Rp 12.180.000</div>
-                <small style="color: #64748b; font-size: 10px;">Ref: Rp 14.500/Liter subsidi</small>
+              <div class="esg-impact-metric">
+                <div class="esg-impact-label">Nilai Finansial Dihemat</div>
+                <div class="esg-impact-value esg-money" id="esgCalcMoneySaved">Rp 12.180.000</div>
+                <small class="esg-impact-note">Ref: Rp 14.500/Liter subsidi</small>
               </div>
             </div>
           </article>

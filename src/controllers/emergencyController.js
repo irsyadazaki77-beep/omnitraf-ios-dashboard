@@ -47,7 +47,7 @@ export class EmergencyController {
       chkGreenWave.checked = !!isGw;
     }
     if (hud) {
-      hud.style.display = isGw ? "block" : "none";
+      hud.classList.toggle("is-hidden", !isGw);
     }
   }
 
@@ -288,7 +288,7 @@ export class EmergencyController {
       }
 
       if (value) {
-        if (hud) hud.style.display = "block";
+        if (hud) hud.classList.remove("is-hidden");
         soundManager.play('siren');
         
         if (!this.greenWaveCountdownTimer) {
@@ -305,7 +305,7 @@ export class EmergencyController {
           }, 1000);
         }
       } else {
-        if (hud) hud.style.display = "none";
+        if (hud) hud.classList.add("is-hidden");
         if (this.greenWaveCountdownTimer) {
           clearInterval(this.greenWaveCountdownTimer);
           this.greenWaveCountdownTimer = null;

@@ -2,7 +2,7 @@
         <article class="prediction-panel glass-panel">
           <div class="section-head">
             <div>
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <div class="analytics-provenance-row">
                 <span class="provenance-badge simulated">SIMULATED / MODEL / ASSUMPTION</span>
               </div>
               <h2>AI Hour-by-Hour Congestion Forecasting</h2>
@@ -35,18 +35,18 @@
           </div>
 
           <!-- Live AI Prediction Metrics Row -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 16px 0;">
-            <div style="background: rgba(15, 23, 42, 0.6); padding: 12px 14px; border-radius: 10px; border-left: 3px solid var(--primary-2);">
-              <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Estimasi Kecepatan Arteri</div>
-              <div id="predictSpeedVal" style="font-size: 22px; font-weight: 800; color: #fff; margin-top: 4px;">14 km/jam</div>
+          <div class="prediction-metrics-grid">
+            <div class="prediction-metric-card speed">
+              <div class="prediction-metric-label">Estimasi Kecepatan Arteri</div>
+              <div id="predictSpeedVal" class="prediction-metric-value">14 km/jam</div>
             </div>
-            <div style="background: rgba(15, 23, 42, 0.6); padding: 12px 14px; border-radius: 10px; border-left: 3px solid var(--danger);">
-              <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Probabilitas Kemacetan</div>
-              <div id="predictProbVal" style="font-size: 22px; font-weight: 800; color: #ef4444; margin-top: 4px;">88%</div>
+            <div class="prediction-metric-card risk">
+              <div class="prediction-metric-label">Probabilitas Kemacetan</div>
+              <div id="predictProbVal" class="prediction-metric-value">88%</div>
             </div>
-            <div style="background: rgba(15, 23, 42, 0.6); padding: 12px 14px; border-radius: 10px; border-left: 3px solid #10b981; grid-column: span 2;">
-              <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Rekomendasi AI SITS</div>
-              <div id="predictRecText" style="font-size: 13px; font-weight: 600; color: #38bdf8; margin-top: 4px;">Aktifkan Koridor Hijau A. Yani - Wonokromo & Alihkan beban lalu lintas ke MERR.</div>
+            <div class="prediction-metric-card recommendation">
+              <div class="prediction-metric-label">Rekomendasi AI SITS</div>
+              <div id="predictRecText" class="prediction-metric-value">Aktifkan Koridor Hijau A. Yani - Wonokromo & Alihkan beban lalu lintas ke MERR.</div>
             </div>
           </div>
 

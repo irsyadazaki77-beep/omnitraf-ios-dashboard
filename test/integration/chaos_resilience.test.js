@@ -6,10 +6,11 @@ import { commandExecutor } from '../../server/services/commandExecutor.js';
 import { backendState } from '../../server/services/stateManager.js';
 import { dbManager } from '../../server/db/database.js';
 import { diagnosticEngine, HEALTH_STATUS, SUBSYSTEMS, DIAGNOSTIC_LEVELS } from '../../server/services/diagnosticEngine.js';
+import { testDatabasePath } from '../helpers/testDatabasePath.js';
 
 // Setup environment variables before importing the server
 process.env.PORT = '0';
-const testDbPath = 'data/test_chaos_resilience.sqlite';
+const testDbPath = testDatabasePath('chaos-resilience.sqlite');
 process.env.DB_PATH = testDbPath;
 process.env.ENABLE_CHAOS_MODE = 'true';
 

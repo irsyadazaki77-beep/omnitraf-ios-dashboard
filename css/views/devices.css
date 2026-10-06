@@ -1,0 +1,14 @@
+/* Static demo meter values mirror their adjacent labels until live simulation updates them. */
+.devices-table tr[data-device="NODE-EDGE-01"] .diag-bar-fill { width: 48%; }
+.devices-table tr[data-device="NODE-EDGE-01"] .diag-temp-fill { width: 42%; }
+.devices-table tr[data-device="NODE-EDGE-02"] .diag-bar-fill { width: 52%; }
+.devices-table tr[data-device="NODE-EDGE-02"] .diag-temp-fill { width: 45%; }
+.devices-table tr[data-device="NODE-EDGE-03"] .diag-bar-fill { width: 74%; }
+.devices-table tr[data-device="NODE-EDGE-03"] .diag-temp-fill { width: 68%; }
+.devices-table tr[data-device="NODE-EDGE-04"] .diag-bar-fill { width: 32%; }
+.devices-table tr[data-device="NODE-EDGE-04"] .diag-temp-fill { width: 38%; }
+
+.incident-empty-state {
+  padding: var(--space-6);
+  color: var(--text-tertiary);
+}

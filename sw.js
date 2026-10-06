@@ -2,9 +2,9 @@
  * Public app shell and static asset cache. API, Socket.io, auth and map tiles
  * stay network-only so an offline response can never look like live state.
  */
-const CACHE_NAME = 'omnitraf-sits-v9';
-const SHELL_CACHE_NAME = 'omnitraf-sits-v9-shell';
-const APP_SHELL = ['/index.html', '/style.css', '/css/main.css', '/manifest.webmanifest'];
+const CACHE_NAME = 'omnitraf-sits-v11';
+const SHELL_CACHE_NAME = 'omnitraf-sits-v11-shell';
+const APP_SHELL = ['/index.html', '/css/main.css', '/manifest.webmanifest'];
 const STATIC_PATH = /^\/(?:src|css|assets)\/.+\.(?:js|css|png|jpe?g|webp|svg|woff2?)$/i;
 const MAX_STATIC_ENTRIES = 120;
 

@@ -1,0 +1,5 @@
+.emergency-empty-state {
+  grid-column: 1 / -1;
+  padding: var(--space-6);
+  color: var(--text-tertiary);
+}

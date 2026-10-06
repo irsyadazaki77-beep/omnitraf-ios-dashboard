@@ -1,0 +1,15 @@
+.git
+.github
+.env
+.env.*
+!.env.example
+node_modules
+coverage
+.nyc_output
+data/*.sqlite
+data/**/*.sqlite
+data/*.sqlite-*
+data/**/*.sqlite-*
+data/*.tmp
+data/**/*.tmp
+bun.lock

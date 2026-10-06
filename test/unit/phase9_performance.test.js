@@ -9,14 +9,15 @@ import { diagnostics } from '../../src/core/diagnostics.js';
 const root = new URL('../../', import.meta.url);
 const [html, stylesheet, worker] = await Promise.all([
   readFile(new URL('index.html', root), 'utf8'),
-  readFile(new URL('style.css', root), 'utf8'),
+  readFile(new URL('css/main.css', root), 'utf8'),
   readFile(new URL('sw.js', root), 'utf8')
 ]);
 const cctvAdapter = await readFile(new URL('../../src/modules/cctv/cctvRealtimeAdapter.js', import.meta.url), 'utf8');
 
-test('Phase 9: CSS entrypoints load the main stylesheet once without an import loop', () => {
+test('Phase 2: the modular CSS entry point loads once without the legacy stylesheet', () => {
   const mainStylesheetLinks = html.match(/href=["'](?:\.\/)?css\/main\.css["']/g) || [];
   assert.equal(mainStylesheetLinks.length, 1);
+  assert.doesNotMatch(html, /href=["'](?:\.\/)?style\.css["']/);
   assert.doesNotMatch(stylesheet, /@import\s+["']\.\/css\/main\.css["']/);
 });
 

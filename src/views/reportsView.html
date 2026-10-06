@@ -108,106 +108,106 @@
         </section>
 
         <!-- Simulation report template (Rendered only on print / @media print) -->
-        <div id="executivePrintDoc" class="print-only-container" style="display: none;">
-          <div class="print-letterhead" style="display: flex; align-items: center; gap: 16px; border-bottom: 3px double #000; padding-bottom: 12px; margin-bottom: 16px;">
+        <div id="executivePrintDoc" class="print-only-container">
+          <div class="print-letterhead">
             <div class="print-logo-col">
-              <img src="/assets/omnitraf-logo-original.png" alt="Logo OmniTRAF" style="height: 65px; width: auto;" />
+              <img src="/assets/omnitraf-logo-original.png" alt="Logo OmniTRAF" />
             </div>
             <div class="print-title-col">
-              <h1 style="font-size: 15pt; font-weight: 800; margin: 0; text-transform: uppercase; color: #000; font-family: serif;">OMNITRAF</h1>
-              <h2 style="font-size: 13pt; font-weight: 700; margin: 2px 0; text-transform: uppercase; color: #000; font-family: serif;">PROTOTIPE SIMULASI MOBILITAS</h2>
-              <h3 style="font-size: 11pt; font-weight: 700; margin: 0; color: #1e3a8a; font-family: sans-serif;">DEMO NONRESMI • BUKAN SISTEM OPERASIONAL SITS</h3>
+              <h1>OMNITRAF</h1>
+              <h2>PROTOTIPE SIMULASI MOBILITAS</h2>
+              <h3>DEMO NONRESMI • BUKAN SISTEM OPERASIONAL SITS</h3>
             </div>
           </div>
 
-          <div style="text-align: center; margin-bottom: 20px;">
-            <h3 style="font-size: 13pt; font-weight: 800; margin: 0; text-decoration: underline; text-transform: uppercase; color: #000;">LAPORAN EKSEKUTIF MOBILITAS & KINERJA APILL ADAPTIF</h3>
-            <p style="font-size: 9.5pt; margin: 4px 0; color: #475569;">ID Demo: OMNITRAF-SIM &nbsp;|&nbsp; Waktu pembuatan: <span id="printDateStr">—</span></p>
-            <p style="font-size: 8pt; margin: 2px 0; color: #b91c1c; font-weight: 800;">DATA SIMULASI • BUKAN DOKUMEN RESMI ATAU HASIL PENGUKURAN KOTA</p>
+          <div class="print-report-heading">
+            <h3 class="print-report-title">LAPORAN EKSEKUTIF MOBILITAS & KINERJA APILL ADAPTIF</h3>
+            <p class="print-meta-line">ID Demo: OMNITRAF-SIM &nbsp;|&nbsp; Waktu pembuatan: <span id="printDateStr">—</span></p>
+            <p class="print-safety-note">DATA SIMULASI • BUKAN DOKUMEN RESMI ATAU HASIL PENGUKURAN KOTA</p>
           </div>
 
-          <h4 style="font-size: 10.5pt; margin-bottom: 6px; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 4px; color: #000;">I. RINGKASAN KPI SIMULASI</h4>
-          <table class="print-summary-table" style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9.5pt; color: #000;">
+          <h4 class="print-section-title">I. RINGKASAN KPI SIMULASI</h4>
+          <table class="print-summary-table">
             <thead>
-              <tr style="background: #e2e8f0; border: 1px solid #000;">
-                <th style="padding: 6px; text-align: left; border: 1px solid #000;">Indikator Performa Utama</th>
-                <th style="padding: 6px; text-align: center; border: 1px solid #000;">Capaian Hari Ini</th>
-                <th style="padding: 6px; text-align: center; border: 1px solid #000;">Pembanding model</th>
-                <th style="padding: 6px; text-align: center; border: 1px solid #000;">Status Evaluasi</th>
+              <tr>
+                <th>Indikator Performa Utama</th>
+                <th>Capaian Hari Ini</th>
+                <th>Pembanding model</th>
+                <th>Status Evaluasi</th>
               </tr>
             </thead>
             <tbody>
-              <tr style="border: 1px solid #000;">
-                <td style="padding: 6px; border: 1px solid #000;">Total Volume Kendaraan Terlayani</td>
-                <td style="padding: 6px; text-align: center; font-weight: bold; border: 1px solid #000;" id="printVolVal">128.540 kendaraan</td>
-                <td style="padding: 6px; text-align: center; border: 1px solid #000;">110.000 kendaraan</td>
-                <td style="padding: 6px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">✓ Optimal (+16.8%)</td>
+              <tr>
+                <td>Total Volume Kendaraan Terlayani</td>
+                <td id="printVolVal">128.540 kendaraan</td>
+                <td>110.000 kendaraan</td>
+                <td>✓ Optimal (+16.8%)</td>
               </tr>
-              <tr style="border: 1px solid #000;">
-                <td style="padding: 6px; border: 1px solid #000;">Rata-rata Waktu Tunggu Simpang (Wait Time)</td>
-                <td style="padding: 6px; text-align: center; font-weight: bold; border: 1px solid #000;" id="printWaitVal">28.4 detik/kend</td>
-                <td style="padding: 6px; text-align: center; border: 1px solid #000;">&lt; 45.0 detik</td>
-                <td style="padding: 6px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">✓ Memenuhi SPM</td>
+              <tr>
+                <td>Rata-rata Waktu Tunggu Simpang (Wait Time)</td>
+                <td id="printWaitVal">28.4 detik/kend</td>
+                <td>&lt; 45.0 detik</td>
+                <td>✓ Memenuhi SPM</td>
               </tr>
-              <tr style="border: 1px solid #000;">
-                <td style="padding: 6px; border: 1px solid #000;">Reduksi Emisi Karbon Dioksida (CO₂)</td>
-                <td style="padding: 6px; text-align: center; font-weight: bold; border: 1px solid #000;" id="printCo2Val">1.420 kg CO₂</td>
-                <td style="padding: 6px; text-align: center; border: 1px solid #000;">1.000 kg CO₂</td>
-                <td style="padding: 6px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">✓ Melampaui Target</td>
+              <tr>
+                <td>Reduksi Emisi Karbon Dioksida (CO₂)</td>
+                <td id="printCo2Val">1.420 kg CO₂</td>
+                <td>1.000 kg CO₂</td>
+                <td>✓ Melampaui Target</td>
               </tr>
-              <tr style="border: 1px solid #000;">
-                <td style="padding: 6px; border: 1px solid #000;">Jumlah contoh skenario insiden (bukan data SITS 112)</td>
-                <td style="padding: 6px; text-align: center; font-weight: bold; border: 1px solid #000;" id="printIncVal">12 Insiden Selesai</td>
-                <td style="padding: 6px; text-align: center; border: 1px solid #000;">100% Resolved</td>
-                <td style="padding: 6px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">✓ 100% Selesai</td>
+              <tr>
+                <td>Jumlah contoh skenario insiden (bukan data SITS 112)</td>
+                <td id="printIncVal">12 Insiden Selesai</td>
+                <td>100% Resolved</td>
+                <td>✓ 100% Selesai</td>
               </tr>
             </tbody>
           </table>
 
-          <h4 style="font-size: 10.5pt; margin-bottom: 6px; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 4px; color: #000;">II. STATUS OPERASIONAL KORIDOR UTAMA SURABAYA</h4>
-          <table class="print-corridor-table" style="width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 9pt; color: #000;">
+          <h4 class="print-section-title">II. STATUS OPERASIONAL KORIDOR UTAMA SURABAYA</h4>
+          <table class="print-corridor-table">
             <thead>
-              <tr style="background: #e2e8f0; border: 1px solid #000;">
-                <th style="padding: 5px; text-align: left; border: 1px solid #000;">Koridor Utama</th>
-                <th style="padding: 5px; text-align: center; border: 1px solid #000;">Volume Arus</th>
-                <th style="padding: 5px; text-align: center; border: 1px solid #000;">Kecepatan Rerata</th>
-                <th style="padding: 5px; text-align: center; border: 1px solid #000;">Metode Sinyal</th>
-                <th style="padding: 5px; text-align: center; border: 1px solid #000;">Status Terakhir</th>
+              <tr>
+                <th>Koridor Utama</th>
+                <th>Volume Arus</th>
+                <th>Kecepatan Rerata</th>
+                <th>Metode Sinyal</th>
+                <th>Status Terakhir</th>
               </tr>
             </thead>
             <tbody>
-              <tr style="border: 1px solid #000;">
-                <td style="padding: 5px; border: 1px solid #000;">Koridor A. Yani / Wonokromo</td>
-                <td style="padding: 5px; text-align: center; border: 1px solid #000;">3.120 smp/jam</td>
-                <td style="padding: 5px; text-align: center; border: 1px solid #000;">38 km/jam</td>
-                <td style="padding: 5px; text-align: center; border: 1px solid #000;">Contoh perhitungan Webster (48s; belum divalidasi)</td>
-                <td style="padding: 5px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">Lancar Terkendali</td>
+              <tr>
+                <td>Koridor A. Yani / Wonokromo</td>
+                <td>3.120 smp/jam</td>
+                <td>38 km/jam</td>
+                <td>Contoh perhitungan Webster (48s; belum divalidasi)</td>
+                <td>Lancar Terkendali</td>
               </tr>
-              <tr style="border: 1px solid #000;">
-                <td style="padding: 5px; border: 1px solid #000;">Koridor Raya Darmo</td>
-                <td style="padding: 5px; text-align: center; border: 1px solid #000;">2.640 smp/jam</td>
-                <td style="padding: 5px; text-align: center; border: 1px solid #000;">42 km/jam</td>
-                <td style="padding: 5px; text-align: center; border: 1px solid #000;">Green Wave Sync</td>
-                <td style="padding: 5px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">Bebas Hambatan</td>
+              <tr>
+                <td>Koridor Raya Darmo</td>
+                <td>2.640 smp/jam</td>
+                <td>42 km/jam</td>
+                <td>Green Wave Sync</td>
+                <td>Bebas Hambatan</td>
               </tr>
-              <tr style="border: 1px solid #000;">
-                <td style="padding: 5px; border: 1px solid #000;">Koridor A. Yani - Jemursari</td>
-                <td style="padding: 5px; text-align: center; border: 1px solid #000;">1.980 smp/jam</td>
-                <td style="padding: 5px; text-align: center; border: 1px solid #000;">35 km/jam</td>
-                <td style="padding: 5px; text-align: center; border: 1px solid #000;">SITS Adaptive</td>
-                <td style="padding: 5px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">Lancar Teratur</td>
+              <tr>
+                <td>Koridor A. Yani - Jemursari</td>
+                <td>1.980 smp/jam</td>
+                <td>35 km/jam</td>
+                <td>SITS Adaptive</td>
+                <td>Lancar Teratur</td>
               </tr>
-              <tr style="border: 1px solid #000;">
-                <td style="padding: 5px; border: 1px solid #000;">Koridor MERR Kertajaya</td>
-                <td style="padding: 5px; text-align: center; border: 1px solid #000;">2.850 smp/jam</td>
-                <td style="padding: 5px; text-align: center; border: 1px solid #000;">48 km/jam</td>
-                <td style="padding: 5px; text-align: center; border: 1px solid #000;">ATCS Standar</td>
-                <td style="padding: 5px; text-align: center; color: #15803d; font-weight: bold; border: 1px solid #000;">Optimal</td>
+              <tr>
+                <td>Koridor MERR Kertajaya</td>
+                <td>2.850 smp/jam</td>
+                <td>48 km/jam</td>
+                <td>ATCS Standar</td>
+                <td>Optimal</td>
               </tr>
             </tbody>
           </table>
 
-          <p style="margin-top: 32px; padding: 10px; border: 1px solid #b91c1c; color: #b91c1c; text-align: center; font-weight: 800;">
+          <p class="print-final-notice">
             SIMULASI • TIDAK DITANDATANGANI • BUKAN DOKUMEN PEMERINTAH
           </p>
         </div>

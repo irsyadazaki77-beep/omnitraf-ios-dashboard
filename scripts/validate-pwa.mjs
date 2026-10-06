@@ -6,7 +6,7 @@ import path from 'node:path';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (relativePath) => readFile(path.join(root, relativePath), 'utf8');
 const [html, css, manifest, worker] = await Promise.all([
-  read('index.html'), read('style.css'), read('manifest.webmanifest'), read('sw.js')
+  read('index.html'), read('css/main.css'), read('manifest.webmanifest'), read('sw.js')
 ]);
 const parsedManifest = JSON.parse(manifest);
 
@@ -23,13 +23,27 @@ async function listJavaScript(directory) {
 assert.ok(parsedManifest.name && parsedManifest.start_url, 'manifest must identify the app and start URL');
 assert.equal((html.match(/href=["'](?:\.\/)?css\/main\.css["']/g) || []).length, 1,
   'index.html must link css/main.css exactly once');
-assert.doesNotMatch(css, /@import\s+["']\.\/css\/main\.css["']/,
-  'style.css must not import the main stylesheet a second time');
+assert.doesNotMatch(html, /href=["'](?:\.\/)?style\.css["']/,
+  'index.html must not load the legacy stylesheet');
 assert.match(worker, /const CACHE_NAME = 'omnitraf-sits-v\d+'/,
   'service worker cache namespace must be versioned');
 
-for (const shellPath of ['/index.html', '/style.css', '/css/main.css', '/manifest.webmanifest']) {
+for (const shellPath of ['/index.html', '/css/main.css', '/manifest.webmanifest']) {
   await access(path.join(root, shellPath.slice(1)));
+}
+
+const pendingStylesheets = [{ file: 'css/main.css', source: css }];
+const checkedStylesheets = new Set();
+while (pendingStylesheets.length) {
+  const { file, source } = pendingStylesheets.pop();
+  if (checkedStylesheets.has(file)) continue;
+  checkedStylesheets.add(file);
+  const imports = [...source.matchAll(/@import\s+["']([^"']+\.css)["']/g)];
+  for (const [, importedPath] of imports) {
+    const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(file), importedPath));
+    await access(path.join(root, resolved));
+    pendingStylesheets.push({ file: resolved, source: await read(resolved) });
+  }
 }
 
 for (const sourcePath of await listJavaScript('src')) {
