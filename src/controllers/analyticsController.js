@@ -6,7 +6,6 @@
  */
 
 import { soundManager } from '../core/soundManager.js';
-import { mapManager } from '../modules/mapManager.js';
 import { stateStore, escapeHtml } from '../core/stateStore.js';
 import { generateForecastSnapshot, runForecastTestSuite, MODEL_VERSION } from '../modules/forecastEngine.js';
 import { Disposer } from '../core/disposer.js';
@@ -244,8 +243,8 @@ export class AnalyticsController {
     this._updateEsgMetricsFromSnapshot(snapshot);
 
     // 10. Geospatial Map Overlay Update
-    if (mapManager && typeof mapManager.updateCorridorLoadByHour === 'function') {
-      mapManager.updateCorridorLoadByHour(hour);
+    if (window.mapManager && typeof window.mapManager.updateCorridorLoadByHour === 'function') {
+      window.mapManager.updateCorridorLoadByHour(hour);
     }
   }
 

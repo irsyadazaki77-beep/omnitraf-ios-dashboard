@@ -8,7 +8,6 @@ import { stateStore, escapeHtml } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
 import { socketClient } from '../core/socketClient.js';
 import { TRAFFIC_LIMITS } from '../config/trafficConfig.js';
-import { mapManager } from '../modules/mapManager.js';
 import { SITS_INTERSECTIONS } from '../config/surabayaCoords.js';
 import { commandLayer } from '../core/commandLayer.js';
 import { Disposer } from '../core/disposer.js';
@@ -530,7 +529,7 @@ export class SignalsController {
           if (typeof window.showToast === "function") {
             window.showToast(`🛰️ Navigasi kamera ke: ${name}`);
           }
-          mapManager.flyToIntersection(name);
+          window.mapManager?.flyToIntersection(name);
         });
       });
     };
@@ -566,7 +565,7 @@ export class SignalsController {
         if (typeof window.showToast === "function") {
           window.showToast(`🛰️ Navigasi kamera ke: ${name}`);
         }
-        mapManager.flyToIntersection(name);
+          window.mapManager?.flyToIntersection(name);
       });
     });
   }
@@ -616,7 +615,7 @@ export class SignalsController {
       if (typeof window.showToast === "function") {
         window.showToast(`🛰️ Navigasi kamera ke: ${name}`);
       }
-      mapManager.flyToIntersection(id);
+      window.mapManager?.flyToIntersection(id);
       searchInput.blur();
     };
 
@@ -730,9 +729,9 @@ export class SignalsController {
           window.showToast(`Menyaring persimpangan: ${label}`);
         }
 
-        if (mapManager && typeof mapManager.maps === "object") {
-          mapManager.maps.forEach((map, containerId) => {
-            const groups = mapManager.layerGroupsMap.get(containerId);
+        if (window.mapManager && typeof window.mapManager.maps === "object") {
+          window.mapManager.maps.forEach((map, containerId) => {
+            const groups = window.mapManager.layerGroupsMap.get(containerId);
             const signalGroup = groups ? groups['signal-points'] : null;
             if (signalGroup) {
               signalGroup.eachLayer(layer => {

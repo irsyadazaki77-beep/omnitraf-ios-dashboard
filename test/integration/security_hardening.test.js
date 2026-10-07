@@ -311,7 +311,22 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
   });
 
   // 7. Sensitive Files Static Serving Protection Check
-  test('7. Sensitive File Exposure: .env, sqlite, package.json and server source code blocked with 403', async () => {
+  test('7. Production static allowlist serves dist with safe cache headers', async () => {
+    const appRes = await fetch(`${baseUrl}/`);
+    assert.strictEqual(appRes.status, 200);
+    assert.match(appRes.headers.get('cache-control') || '', /no-cache/);
+    const html = await appRes.text();
+    const entryPath = html.match(/src="(\/assets\/[^\"]+\.js)"/)?.[1];
+    assert.ok(entryPath, 'Production HTML must reference a hashed JavaScript asset');
+    const chunkRes = await fetch(`${baseUrl}${entryPath}`);
+    assert.strictEqual(chunkRes.status, 200);
+    assert.match(chunkRes.headers.get('cache-control') || '', /max-age=31536000, immutable/);
+    assert.strictEqual((await fetch(`${baseUrl}/views/dashboardView.html`)).status, 200);
+    assert.strictEqual((await fetch(`${baseUrl}/sw.js`)).status, 200);
+    assert.strictEqual((await fetch(`${baseUrl}/src/app.js`)).status, 404);
+  });
+
+  test('7b. Sensitive File Exposure: .env, sqlite, package.json and server source code blocked with 403', async () => {
     const envRes = await fetch(`${baseUrl}/.env`);
     assert.strictEqual(envRes.status, 403);
 

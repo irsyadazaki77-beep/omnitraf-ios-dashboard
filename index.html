@@ -25,31 +25,11 @@
   <meta name="twitter:description" content="Dashboard demonstrasi dengan data, CCTV, sensor, dan aksi operasional simulasi." />
   <meta name="twitter:image" content="/assets/omnitraf-logo.png" />
 
-  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="assets/omnitraf-icon.png" />
+  <link rel="apple-touch-icon" href="/assets/omnitraf-icon.png" />
 
-  <!-- DNS Prefetch & Preconnect for High Performance -->
-  <link rel="dns-prefetch" href="https://unpkg.com" />
-  <link rel="dns-prefetch" href="https://basemaps.cartocdn.com" />
-  <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
-  <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preconnect" href="https://unpkg.com" crossorigin />
-  <link rel="preconnect" href="https://basemaps.cartocdn.com" crossorigin />
-
-  <!-- Google Fonts for Premium Typography -->
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <!-- Leaflet.js Real Geospatial Mapping Library & MarkerCluster Plugin -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="css/main.css" />
-  <!-- Socket.io Client Library -->
-  <script src="/socket.io/socket.io.js"></script>
+  <link rel="stylesheet" href="/css/main.css" />
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Lewati ke konten utama</a>
@@ -71,10 +51,10 @@
       <button class="close-drawer" id="closeDrawer" aria-label="Tutup menu" type="button">&times;</button>
       <a class="brand" href="#dashboard" aria-label="OmniTRAF home">
         <span class="brand-mark">
-          <img src="assets/omnitraf-icon.png" width="38" height="38" alt="Ikon OmniTRAF SITS Surabaya" loading="eager" decoding="async" />
+          <img src="/assets/omnitraf-icon.png" width="38" height="38" alt="Ikon OmniTRAF SITS Surabaya" loading="eager" decoding="async" />
         </span>
         <span class="brand-copy">
-          <img src="assets/omnitraf-logo.png" width="148" height="34" alt="Logo OmniTRAF Adaptive Urban Mobility System" class="brand-logo" loading="eager" decoding="async" />
+          <img src="/assets/omnitraf-logo.png" width="148" height="34" alt="Logo OmniTRAF Adaptive Urban Mobility System" class="brand-logo" loading="eager" decoding="async" />
           <small>Surabaya Command Center</small>
         </span>
       </a>
@@ -461,6 +441,6 @@
   <div id="printExecutiveReport" class="print-executive-container" aria-hidden="true"></div>
 
   <!-- Modular SITS Surabaya Command Center Architecture Entry Point -->
-  <script type="module" src="src/app.js"></script>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>

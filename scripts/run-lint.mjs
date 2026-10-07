@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const excluded = new Set(['.git', 'node_modules', 'coverage']);
+const excluded = new Set(['.git', 'node_modules', 'coverage', 'dist']);
 
 async function listJavaScript(directory) {
   const entries = await readdir(directory, { withFileTypes: true });

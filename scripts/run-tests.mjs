@@ -29,7 +29,7 @@ async function runTestFiles(suite, directory, env) {
     const perTestPath = path.relative(testRoot, file).replace(/\.test\.js$/, '');
     const testDataDirectory = path.join(tempRoot, suite, perTestPath);
     console.log(`\n[${suite}] ${relativeFile}`);
-    const result = spawnSync(process.execPath, ['--test', file], {
+    const result = spawnSync(process.execPath, ['--test', '--test-force-exit', file], {
       cwd: root,
       env: {
         ...env,

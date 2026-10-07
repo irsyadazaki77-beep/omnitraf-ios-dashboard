@@ -52,15 +52,15 @@ export function securityHeadersMiddleware(req, res, next) {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
 
-  // Permit only the exact pinned Leaflet scripts/styles used by the page.
-  // Inline event handlers remain forbidden; inline styles are still required by legacy UI templates.
+  // Frontend libraries and styles are served from the hashed local build.
+  // Inline styles remain for legacy templates; inline scripts and handlers stay blocked.
   const cspDirectives = [
     "default-src 'self'",
-    "script-src 'self' https://unpkg.com/leaflet@1.9.4/dist/leaflet.js https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js",
+    "script-src 'self'",
     "script-src-attr 'none'",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com/leaflet@1.9.4/dist/leaflet.css https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css",
-    "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.cartocdn.com https://*.tile.openstreetmap.org https://unpkg.com/leaflet@1.9.4/dist/images/",
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self' data:",
+    "img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.cartocdn.com https://*.tile.openstreetmap.org",
     "connect-src 'self' ws: wss: https://*.basemaps.cartocdn.com https://*.cartocdn.com https://*.tile.openstreetmap.org",
     "frame-ancestors 'self'",
     "base-uri 'self'",

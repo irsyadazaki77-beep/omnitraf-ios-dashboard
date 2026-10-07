@@ -6,7 +6,6 @@
 
 import { stateStore } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
-import { mapManager } from '../modules/mapManager.js';
 import { viewLoader } from '../core/viewLoader.js';
 
 const SIDEBAR_PREFERENCE_KEY = 'omnitraf.sidebar.collapsed';

@@ -33,6 +33,7 @@ import { authManager } from './authManager.js';
 import { realtimeMetrics } from './realtimeMetrics.js';
 import { ResyncManager } from './resyncManager.js';
 import { RealtimeRouter } from './realtimeRouter.js';
+import { io } from 'socket.io-client';
 
 export { realtimeMetrics, ResyncManager, RealtimeRouter };
 
@@ -316,37 +317,11 @@ export class SocketClient {
     };
 
     try {
-      if (typeof window !== "undefined" && typeof window.io !== "undefined") {
-        this.socket = window.io(socketOptions);
-        this.resyncManager.setSocketClient(this);
-        this._bindStandardEvents();
-        this._flushPendingListeners();
-        this._startHealthWatchdog();
-      } else if (typeof document !== "undefined") {
-        // Dynamic load fallback
-        const script = document.createElement("script");
-        script.src = "/socket.io/socket.io.js";
-        script.onload = () => {
-          if (typeof window !== "undefined" && typeof window.io !== "undefined" && !this.socket) {
-            const currentToken = authManager.getToken();
-            this.socket = window.io({
-              ...socketOptions,
-              auth: { token: currentToken || null }
-            });
-            this.resyncManager.setSocketClient(this);
-            this._bindStandardEvents();
-            this._flushPendingListeners();
-            this._startHealthWatchdog();
-          }
-        };
-        script.onerror = () => {
-          console.warn("[SocketClient] Socket.io script unreachable. Entering Standalone Offline Mode.");
-          setConnectionLifecycle('fallback', { isStaleData: true });
-        };
-        document.head.appendChild(script);
-      } else {
-        setConnectionLifecycle('fallback', { isStaleData: true });
-      }
+      this.socket = io(socketOptions);
+      this.resyncManager.setSocketClient(this);
+      this._bindStandardEvents();
+      this._flushPendingListeners();
+      this._startHealthWatchdog();
     } catch (err) {
       console.warn("[SocketClient] Connection deferred:", err);
       setConnectionLifecycle('fallback', { isStaleData: true });

@@ -21,14 +21,4 @@
 @import "./components/modals.css";
 @import "./components/navigation.css";
 
-/* 5. View-Specific Styling Panels */
-@import "./views/dashboard.css";
-@import "./views/map.css";
-@import "./views/cctv.css";
-@import "./views/signals.css";
-@import "./views/analytics.css";
-@import "./views/reports.css";
-@import "./views/prediction.css";
-@import "./views/devices.css";
-@import "./views/incidents.css";
-@import "./views/emergencies.css";
+/* View-specific styles are imported with their lazy controller chunks. */

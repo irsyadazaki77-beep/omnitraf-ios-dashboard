@@ -8,7 +8,6 @@ import { stateStore, escapeHtml } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
 import { socketClient } from '../core/socketClient.js';
 import { trafficEngine } from '../modules/trafficEngine.js';
-import { mapManager } from '../modules/mapManager.js';
 import { commandLayer } from '../core/commandLayer.js';
 import { Disposer } from '../core/disposer.js';
 

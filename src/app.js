@@ -19,33 +19,31 @@ import { chatSystem } from './modules/chatSystem.js';
 import { uiMarquee } from './modules/uiMarquee.js';
 
 import { navigationController } from './controllers/navigationController.js';
-import { signalsController } from './controllers/signalsController.js';
-import { incidentController } from './controllers/incidentController.js';
-import { emergencyController } from './controllers/emergencyController.js';
 import { tourShortcutsController } from './controllers/tourShortcutsController.js';
-import { analyticsController } from './controllers/analyticsController.js';
-import { deviceController } from './controllers/deviceController.js';
-import { reportController } from './controllers/reportController.js';
 import { pwaController } from './controllers/pwaController.js';
+
+const isViteRuntime = Boolean(import.meta.env);
 
 const controllerLoaders = {
   mapManager: async () => {
-    await import('./../css/views/map.css');
-    await import('leaflet/dist/leaflet.css');
-    await import('leaflet.markercluster/dist/MarkerCluster.css');
-    await import('leaflet.markercluster/dist/MarkerCluster.Default.css');
-    const leaflet = await import('leaflet');
-    window.L = leaflet.default;
-    await import('leaflet.markercluster');
+    if (isViteRuntime) {
+      await import('./../css/views/map.css');
+      await import('leaflet/dist/leaflet.css');
+      await import('leaflet.markercluster/dist/MarkerCluster.css');
+      await import('leaflet.markercluster/dist/MarkerCluster.Default.css');
+      const leaflet = await import('leaflet');
+      if (typeof window !== 'undefined') window.L = leaflet.default;
+      await import('leaflet.markercluster');
+    }
     return import('./modules/mapManager.js');
   },
-  cctvController: async () => { await import('../css/views/cctv.css'); return import('./modules/cctvController.js'); },
-  signalsController: async () => { await import('../css/views/signals.css'); return import('./controllers/signalsController.js'); },
-  incidentController: async () => { await import('../css/views/incidents.css'); return import('./controllers/incidentController.js'); },
-  emergencyController: async () => { await import('../css/views/emergencies.css'); return import('./controllers/emergencyController.js'); },
-  analyticsController: async () => { await import('../css/views/analytics.css'); return import('./controllers/analyticsController.js'); },
-  deviceController: async () => { await import('../css/views/devices.css'); return import('./controllers/deviceController.js'); },
-  reportController: async () => { await import('../css/views/reports.css'); return import('./controllers/reportController.js'); }
+  cctvController: async () => { if (isViteRuntime) await import('../css/views/cctv.css'); return import('./modules/cctvController.js'); },
+  signalsController: async () => { if (isViteRuntime) await import('../css/views/signals.css'); return import('./controllers/signalsController.js'); },
+  incidentController: async () => { if (isViteRuntime) await import('../css/views/incidents.css'); return import('./controllers/incidentController.js'); },
+  emergencyController: async () => { if (isViteRuntime) await import('../css/views/emergencies.css'); return import('./controllers/emergencyController.js'); },
+  analyticsController: async () => { if (isViteRuntime) await import('../css/views/analytics.css'); return import('./controllers/analyticsController.js'); },
+  deviceController: async () => { if (isViteRuntime) await import('../css/views/devices.css'); return import('./controllers/deviceController.js'); },
+  reportController: async () => { if (isViteRuntime) await import('../css/views/reports.css'); return import('./controllers/reportController.js'); }
 };
 
 export class App {
@@ -56,6 +54,8 @@ export class App {
     this.navigationId = 0;
     this.controllerPromises = new Map();
     this.controllerModules = new Map();
+    this.initializedControllers = new Set();
+    this.mapObserver = null;
   }
 
   async init() {
@@ -111,6 +111,10 @@ export class App {
   async _handleViewTransition(newView, oldView) {
     const navigationId = ++this.navigationId;
     this.currentView = newView;
+    if (String(newView).replace('#', '').replace('view-', '') !== 'dashboard') {
+      this.mapObserver?.disconnect();
+      this.mapObserver = null;
+    }
 
     // Deactivate previous controllers if needed
     if (oldView && oldView !== newView) {
@@ -190,17 +194,60 @@ export class App {
     const cleanView = (view || '').replace('#', '').replace('view-', '');
 
     const viewControllers = {
-      dashboard: ['mapManager', 'cctvController', 'signalsController', 'incidentController', 'emergencyController'],
-      map: ['mapManager'], cctv: ['cctvController'], signals: ['signalsController'],
-      incidents: ['incidentController'], emergency: ['emergencyController'], emergencies: ['emergencyController'],
+      dashboard: ['cctvController', 'signalsController', 'incidentController', 'emergencyController'],
+      map: ['mapManager'], cctv: ['cctvController'], signals: ['mapManager', 'signalsController'],
+      incidents: ['mapManager', 'incidentController'], emergency: ['emergencyController'], emergencies: ['emergencyController'],
       analytics: ['analyticsController'], prediction: ['analyticsController'],
       devices: ['deviceController'], reports: ['reportController']
     };
     const navigationId = this.navigationId;
     const names = viewControllers[cleanView] || [];
+    if (cleanView === 'dashboard' && isViteRuntime) await import('../css/views/dashboard.css');
     await Promise.all(names.map((name) => this._loadController(name)));
     if (navigationId !== this.navigationId) return;
     for (const name of names) this._safeInitAndActivate(name, this.controllerModules.get(name));
+    if (cleanView === 'dashboard') {
+      this._scheduleDashboardMap(navigationId);
+      this._scheduleIncidentPrefetch(navigationId);
+    }
+  }
+
+  _scheduleIncidentPrefetch(navigationId) {
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (connection?.saveData || /(^|-)2g$/.test(connection?.effectiveType || '')) return;
+    const prefetch = () => {
+      if (navigationId !== this.navigationId || this.currentView !== 'dashboard') return;
+      this._loadController('incidentController').catch(() => {});
+    };
+    if ('requestIdleCallback' in window) window.requestIdleCallback(prefetch, { timeout: 4000 });
+    else setTimeout(prefetch, 1500);
+  }
+
+  _scheduleDashboardMap(navigationId) {
+    this.mapObserver?.disconnect();
+    const target = document.getElementById('dashboardMapBox');
+    if (!target || typeof IntersectionObserver === 'undefined') {
+      this._activateMapIfCurrent(navigationId);
+      return;
+    }
+    this.mapObserver = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      this.mapObserver?.disconnect();
+      this.mapObserver = null;
+      this._activateMapIfCurrent(navigationId);
+    }, { rootMargin: '120px' });
+    this.mapObserver.observe(target);
+  }
+
+  async _activateMapIfCurrent(navigationId) {
+    try {
+      const controller = await this._loadController('mapManager');
+      if (navigationId !== this.navigationId || this.currentView !== 'dashboard') return;
+      this._safeInitAndActivate('mapManager', controller);
+    } catch (error) {
+      if (navigationId === this.navigationId) this._showViewLoadError('dashboard map', () => this._activateMapIfCurrent(this.navigationId));
+      console.error('[App] Unable to load the dashboard map module:', error);
+    }
   }
 
   _loadController(name) {
@@ -233,9 +280,18 @@ export class App {
       status.className = 'view-load-status';
       status.setAttribute('role', 'status');
       status.setAttribute('aria-live', 'polite');
-      container.prepend(status);
+      if (typeof container.prepend === 'function') {
+        container.prepend(status);
+      } else if (typeof container.appendChild === 'function') {
+        container.appendChild(status);
+      }
     }
-    status.replaceChildren(document.createTextNode(`Loading ${String(view).replace('#', '')}…`));
+    const label = `Loading ${String(view).replace('#', '')}…`;
+    if (typeof status.replaceChildren === 'function' && typeof document.createTextNode === 'function') {
+      status.replaceChildren(document.createTextNode(label));
+    } else {
+      status.textContent = label;
+    }
     status.hidden = false;
     const errorPanel = document.getElementById('viewLoadError');
     if (errorPanel) errorPanel.hidden = true;
@@ -250,9 +306,17 @@ export class App {
       panel.id = 'viewLoadError';
       panel.className = 'view-load-error';
       panel.setAttribute('role', 'alert');
-      container.prepend(panel);
+      if (typeof container.prepend === 'function') {
+        container.prepend(panel);
+      } else if (typeof container.appendChild === 'function') {
+        container.appendChild(panel);
+      }
     }
-    panel.replaceChildren();
+    if (typeof panel.replaceChildren === 'function') {
+      panel.replaceChildren();
+    } else {
+      panel.textContent = '';
+    }
     const message = document.createElement('p');
     message.textContent = `Unable to load ${String(view).replace('#', '')}. Check the connection and retry.`;
     const retryButton = document.createElement('button');
@@ -263,7 +327,13 @@ export class App {
     reloadButton.type = 'button';
     reloadButton.textContent = 'Reload application';
     reloadButton.addEventListener('click', () => window.location.reload(), { once: true });
-    panel.append(message, retryButton, reloadButton);
+    if (typeof panel.append === 'function') {
+      panel.append(message, retryButton, reloadButton);
+    } else {
+      panel.appendChild?.(message);
+      panel.appendChild?.(retryButton);
+      panel.appendChild?.(reloadButton);
+    }
     panel.hidden = false;
   }
 
@@ -275,8 +345,8 @@ export class App {
       'dashboard': ['mapManager', 'cctvController', 'signalsController', 'incidentController', 'emergencyController'],
       'map': ['mapManager'],
       'cctv': ['cctvController'],
-      'signals': ['signalsController'],
-      'incidents': ['incidentController'],
+      'signals': ['mapManager', 'signalsController'],
+      'incidents': ['mapManager', 'incidentController'],
       'emergency': ['emergencyController'],
       'emergencies': ['emergencyController'],
       'analytics': ['analyticsController'],
@@ -301,9 +371,10 @@ export class App {
   _safeInitAndActivate(name, ctrl) {
     if (!ctrl) return;
     try {
-      if (typeof ctrl.init === 'function') {
+      if (!this.initializedControllers.has(name) && typeof ctrl.init === 'function') {
         ctrl.init();
       }
+      this.initializedControllers.add(name);
       if (typeof ctrl.activate === 'function') {
         ctrl.activate();
       }
@@ -316,7 +387,9 @@ export class App {
   _exposeGlobalBridges() {
     // Compatibility bridge for inline/legacy integrations; modules should import dependencies directly.
     window.stateStore = stateStore;
-    window.mapManager = null;
+    if (this.controllerModules.has('mapManager')) {
+      window.mapManager = this.controllerModules.get('mapManager');
+    }
     window.trafficEngine = trafficEngine;
     window.soundManager = soundManager;
     window.diagnostics = diagnostics;
@@ -559,11 +632,3 @@ export class App {
 }
 
 export const app = new App();
-
-if (typeof document !== "undefined") {
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => app.init());
-  } else {
-    app.init();
-  }
-}

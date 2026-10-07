@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "node server.js",
-    "build": "npm run lint && npm run validate",
+    "dev:server": "node server.js",
+    "dev:client": "vite",
+    "build": "vite build && node scripts/report-build-size.mjs",
+    "preview": "vite preview",
     "validate": "node scripts/validate-pwa.mjs",
     "lint": "node scripts/run-lint.mjs",
     "start": "node server.js",
@@ -22,10 +25,11 @@
     "leaflet.markercluster": "^1.5.3",
     "pdf-lib": "^1.17.1",
     "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.4",
     "sql.js": "^1.14.2"
   },
   "devDependencies": {
-    "socket.io-client": "^4.8.4",
+    "esbuild": "^0.28.2",
     "vite": "^8.3.3"
   }
 }

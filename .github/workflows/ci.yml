@@ -27,7 +27,10 @@ jobs:
       - name: Code Quality Lint Check
         run: npm run lint
 
-      - name: Validate PWA and Static Assets
+      - name: Build Production Frontend
+        run: npm run build
+
+      - name: Validate Production Build and PWA
         run: npm run validate
 
       - name: Execute Automated Testing Suite

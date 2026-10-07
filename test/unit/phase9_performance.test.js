@@ -10,12 +10,12 @@ const root = new URL('../../', import.meta.url);
 const [html, stylesheet, worker] = await Promise.all([
   readFile(new URL('index.html', root), 'utf8'),
   readFile(new URL('css/main.css', root), 'utf8'),
-  readFile(new URL('sw.js', root), 'utf8')
+  readFile(new URL('public/sw.js', root), 'utf8')
 ]);
 const cctvAdapter = await readFile(new URL('../../src/modules/cctv/cctvRealtimeAdapter.js', import.meta.url), 'utf8');
 
-test('Phase 2: the modular CSS entry point loads once without the legacy stylesheet', () => {
-  const mainStylesheetLinks = html.match(/href=["'](?:\.\/)?css\/main\.css["']/g) || [];
+test('Phase 4: the Vite HTML entry references the shared CSS entry once', () => {
+  const mainStylesheetLinks = html.match(/href=["']\/css\/main\.css["']/g) || [];
   assert.equal(mainStylesheetLinks.length, 1);
   assert.doesNotMatch(html, /href=["'](?:\.\/)?style\.css["']/);
   assert.doesNotMatch(stylesheet, /@import\s+["']\.\/css\/main\.css["']/);
@@ -26,19 +26,19 @@ test('Phase 9: service worker excludes API, socket and authenticated requests fr
   assert.match(worker, /url\.pathname\.startsWith\('\/socket\.io\/'\)/);
   assert.match(worker, /request\.headers\.has\('Authorization'\)/);
   assert.match(worker, /request\.method !== 'GET'/);
-  assert.match(worker, /url\.origin === self\.location\.origin/);
+  assert.match(worker, /url\.origin !== self\.location\.origin/);
 });
 
-test('Phase 9: cache namespace is versioned and old OmniTRAF versions are removed', () => {
-  assert.match(worker, /const CACHE_NAME = 'omnitraf-sits-v\d+'/);
-  assert.match(worker, /const SHELL_CACHE_NAME = 'omnitraf-sits-v\d+-shell'/);
-  assert.match(worker, /key\.startsWith\('omnitraf-sits-'\)/);
-  assert.match(worker, /key !== CACHE_NAME && key !== SHELL_CACHE_NAME/);
-  assert.match(worker, /MAX_STATIC_ENTRIES/);
+test('Phase 9: hashed build cache namespace is versioned and old versions are removed', () => {
+  assert.match(worker, /const CACHE_PREFIX = 'omnitraf-build-'/);
+  assert.match(worker, /const CACHE_NAME = `\$\{CACHE_PREFIX\}v\d+`/);
+  assert.match(worker, /key\.startsWith\(CACHE_PREFIX\)/);
+  assert.match(worker, /HASHED_ASSET\.test\(url\.pathname\)/);
+  assert.match(worker, /self\.skipWaiting\(\)/);
 });
 
-test('Phase 9: offline navigation falls back only to the app shell', () => {
-  assert.match(worker, /caches\.match\('\/index\.html', \{ cacheName: SHELL_CACHE_NAME \}\)/);
+test('Phase 9: network-first navigation falls back to the app shell', () => {
+  assert.match(worker, /caches\.match\('\/index\.html', \{ cacheName: CACHE_NAME \}\)/);
   assert.match(worker, /request\.mode === 'navigate'/);
   assert.match(html, /Data operasional live tidak tersedia/);
 });

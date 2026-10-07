@@ -33,6 +33,7 @@ import { cvEngine } from './server/services/visionEngine.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const distDirectory = path.join(__dirname, 'dist');
 
 // Ensure persistence layer & state hydration are completed on startup
 let startupLifecycle = 'STARTING';
@@ -266,11 +267,20 @@ app.use((req, res, next) => {
   next();
 });
 
-// 2. Static Assets Serving
-app.use(express.static(__dirname, {
+// 2. Only the explicit production build is a public static surface.
+app.use(express.static(distDirectory, {
   dotfiles: 'deny',
   index: ['index.html'],
+  fallthrough: true,
   setHeaders: (res, filePath) => {
+    const basename = path.basename(filePath);
+    if (/^[^/]+-[A-Za-z0-9_-]{8,}\.(?:js|css|png|jpe?g|webp|svg|woff2?)$/i.test(basename)) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else if (basename === 'index.html') {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    } else {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    }
     if (filePath.endsWith('.webmanifest')) {
       res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
     }

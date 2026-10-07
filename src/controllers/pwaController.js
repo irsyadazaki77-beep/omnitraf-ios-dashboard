@@ -28,12 +28,46 @@ export class PwaController {
         navigator.serviceWorker.register('/sw.js')
           .then((reg) => {
             console.info('📦 [PWA] Service Worker terdaftar dengan scope:', reg.scope);
+            this._watchForUpdates(reg);
           })
           .catch((err) => {
             console.warn('⚠️ [PWA] Gagal meregistrasi Service Worker:', err);
           });
       });
     }
+  }
+
+  _watchForUpdates(registration) {
+    const announce = () => {
+      if (registration.waiting && navigator.serviceWorker.controller) this._showUpdateNotice(registration.waiting);
+    };
+    registration.addEventListener('updatefound', () => {
+      const worker = registration.installing;
+      worker?.addEventListener('statechange', () => {
+        if (worker.state === 'installed') announce();
+      });
+    });
+    announce();
+  }
+
+  _showUpdateNotice(worker) {
+    if (document.getElementById('pwaUpdateNotice')) return;
+    const notice = document.createElement('div');
+    notice.id = 'pwaUpdateNotice';
+    notice.setAttribute('role', 'status');
+    notice.style.cssText = 'position:fixed;z-index:10000;right:16px;bottom:16px;display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface,#111827);color:var(--text,#fff);box-shadow:0 8px 24px rgba(0,0,0,.3);';
+    const message = document.createElement('span');
+    message.textContent = 'A new version is available.';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Update';
+    button.addEventListener('click', () => {
+      button.disabled = true;
+      navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload(), { once: true });
+      worker.postMessage({ type: 'SKIP_WAITING' });
+    }, { once: true });
+    notice.append(message, button);
+    document.body.append(notice);
   }
 
   _bindInstallPrompt() {

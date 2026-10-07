@@ -6,11 +6,12 @@ WORKDIR /usr/src/app
 # Copy canonical npm package descriptors
 COPY package.json package-lock.json ./
 
-# Install the exact production dependency tree from the lockfile
-RUN npm ci --omit=dev
+# Install the locked build and runtime dependencies.
+RUN npm ci
 
 # Copy application files
 COPY . .
+RUN npm run build && npm prune --omit=dev
 
 # Stage 2: Secure Production Release Stage
 FROM node:20-alpine

@@ -7,39 +7,39 @@
 export class ViewLoader {
   constructor() {
     this.viewMap = {
-      'dashboard': { file: '/src/views/dashboardView.html', id: 'view-dashboard', title: 'Dashboard' },
-      'map': { file: '/src/views/mapView.html', id: 'view-map', title: 'City Map' },
-      'cctv': { file: '/src/views/cctvView.html', id: 'view-cctv', title: 'CCTV Monitoring' },
-      'signals': { file: '/src/views/signalsView.html', id: 'view-signals', title: 'Traffic Signals' },
-      'emergency': { file: '/src/views/emergenciesView.html', id: 'view-emergency', title: 'Emergency Priority' },
-      'emergencies': { file: '/src/views/emergenciesView.html', id: 'view-emergency', title: 'Emergency Priority' },
-      'analytics': { file: '/src/views/analyticsView.html', id: 'view-analytics', title: 'Analytics' },
-      'prediction': { file: '/src/views/predictionView.html', id: 'view-prediction', title: 'Prediction' },
-      'incidents': { file: '/src/views/incidentsView.html', id: 'view-incidents', title: 'Incidents' },
-      'reports': { file: '/src/views/reportsView.html', id: 'view-reports', title: 'Reports' },
-      'devices': { file: '/src/views/devicesView.html', id: 'view-devices', title: 'Device Management' },
-      'integration': { file: '/src/views/integrationView.html', id: 'view-integration', title: 'Integrations' },
-      'settings': { file: '/src/views/settingsView.html', id: 'view-settings', title: 'Settings' }
+      'dashboard': { file: '/views/dashboardView.html', id: 'view-dashboard', title: 'Dashboard' },
+      'map': { file: '/views/mapView.html', id: 'view-map', title: 'City Map' },
+      'cctv': { file: '/views/cctvView.html', id: 'view-cctv', title: 'CCTV Monitoring' },
+      'signals': { file: '/views/signalsView.html', id: 'view-signals', title: 'Traffic Signals' },
+      'emergency': { file: '/views/emergenciesView.html', id: 'view-emergency', title: 'Emergency Priority' },
+      'emergencies': { file: '/views/emergenciesView.html', id: 'view-emergency', title: 'Emergency Priority' },
+      'analytics': { file: '/views/analyticsView.html', id: 'view-analytics', title: 'Analytics' },
+      'prediction': { file: '/views/predictionView.html', id: 'view-prediction', title: 'Prediction' },
+      'incidents': { file: '/views/incidentsView.html', id: 'view-incidents', title: 'Incidents' },
+      'reports': { file: '/views/reportsView.html', id: 'view-reports', title: 'Reports' },
+      'devices': { file: '/views/devicesView.html', id: 'view-devices', title: 'Device Management' },
+      'integration': { file: '/views/integrationView.html', id: 'view-integration', title: 'Integrations' },
+      'settings': { file: '/views/settingsView.html', id: 'view-settings', title: 'Settings' }
     };
 
     this.componentMap = {
-      'marquee': { file: '/src/components/marquee.html', targetId: 'marqueeContainer' },
-      'notifDrawer': { file: '/src/components/notifDrawer.html', targetId: 'drawersContainer' },
+      'marquee': { file: '/components/marquee.html', targetId: 'marqueeContainer' },
+      'notifDrawer': { file: '/components/notifDrawer.html', targetId: 'drawersContainer' },
       'modals': [
-        '/src/components/modals/reportModal.html',
-        '/src/components/modals/engineInfoModal.html',
-        '/src/components/modals/incidentDetailModal.html',
-        '/src/components/modals/keyboardShortcutsModal.html',
-        '/src/components/modals/staffChatPanel.html',
-        '/src/components/modals/mobileTabBar.html',
-        '/src/components/modals/mapContextMenu.html',
-        '/src/components/modals/cctvZoomModal.html',
-        '/src/components/modals/quickTourOverlay.html',
-        '/src/components/modals/signalIntelModal.html',
-        '/src/components/modals/aiRecommendationModal.html',
-        '/src/components/modals/manualOverrideModal.html',
-        '/src/components/modals/greenWaveConfirmModal.html',
-        '/src/components/modals/esgMethodologyModal.html'
+        '/components/modals/reportModal.html',
+        '/components/modals/engineInfoModal.html',
+        '/components/modals/incidentDetailModal.html',
+        '/components/modals/keyboardShortcutsModal.html',
+        '/components/modals/staffChatPanel.html',
+        '/components/modals/mobileTabBar.html',
+        '/components/modals/mapContextMenu.html',
+        '/components/modals/cctvZoomModal.html',
+        '/components/modals/quickTourOverlay.html',
+        '/components/modals/signalIntelModal.html',
+        '/components/modals/aiRecommendationModal.html',
+        '/components/modals/manualOverrideModal.html',
+        '/components/modals/greenWaveConfirmModal.html',
+        '/components/modals/esgMethodologyModal.html'
       ]
     };
 
@@ -58,12 +58,16 @@ export class ViewLoader {
       return this.templateCache.get(url);
     }
     try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status} when fetching ${url}`);
-      const html = await res.text();
+      const pending = fetch(url).then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status} when fetching ${url}`);
+        return res.text();
+      });
+      this.templateCache.set(url, pending);
+      const html = await pending;
       this.templateCache.set(url, html);
       return html;
     } catch (err) {
+      this.templateCache.delete(url);
       console.error(`[ViewLoader] Failed to fetch template from ${url}:`, err);
       throw err;
     }
@@ -131,7 +135,7 @@ export class ViewLoader {
    * @param {string} viewKey (misal: 'dashboard', 'map', 'cctv', dll.)
    * @returns {Promise<{ success: boolean, isFirstMount: boolean, element: HTMLElement }>}
    */
-  async mountView(viewKey) {
+  async mountView(viewKey, { shouldActivate = () => true } = {}) {
     const cleanKey = (viewKey || 'dashboard').replace('#', '').replace('view-', '');
     const config = this.viewMap[cleanKey] || this.viewMap['dashboard'];
     const targetId = config.id;
@@ -163,6 +167,8 @@ export class ViewLoader {
         return { success: false, isFirstMount: false, element: null };
       }
     }
+
+    if (!shouldActivate()) return { success: true, isFirstMount, element: viewElement };
 
     // Toggle active classes & visibility across view panes
     const allPanes = document.querySelectorAll('.view-pane');

@@ -1,55 +1,45 @@
 import assert from 'node:assert/strict';
-import { readFile, access, readdir } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
+import { access, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const read = (relativePath) => readFile(path.join(root, relativePath), 'utf8');
-const [html, css, manifest, worker] = await Promise.all([
-  read('index.html'), read('css/main.css'), read('manifest.webmanifest'), read('sw.js')
-]);
-const parsedManifest = JSON.parse(manifest);
+const root = path.resolve('dist');
+const read = (relative) => readFile(path.join(root, relative), 'utf8');
+const exists = async (relative) => access(path.join(root, relative));
+const html = await read('index.html');
+const worker = await read('sw.js');
+const manifest = JSON.parse(await read('.vite/manifest.json'));
+const webManifest = JSON.parse(await read('manifest.webmanifest'));
 
-async function listJavaScript(directory) {
-  const entries = await readdir(path.join(root, directory), { withFileTypes: true });
-  const nested = await Promise.all(entries.map((entry) => {
-    const relative = path.posix.join(directory, entry.name);
-    if (entry.isDirectory()) return listJavaScript(relative);
-    return entry.isFile() && entry.name.endsWith('.js') ? [relative] : [];
-  }));
-  return nested.flat();
+assert.ok(webManifest.name && webManifest.start_url, 'PWA manifest must identify the app and start URL');
+assert.match(html, /assets\/[^"']+-[A-Za-z0-9_-]{8,}\.js/, 'entry JavaScript must have a content hash');
+assert.match(html, /assets\/[^"']+-[A-Za-z0-9_-]{8,}\.css/, 'entry CSS must have a content hash');
+assert.doesNotMatch(html, /(?:unpkg\.com|fonts\.googleapis\.com|fonts\.gstatic\.com|\/src\/app\.js)/,
+  'production HTML must reference local bundled code and avoid development/CDN paths');
+assert.match(worker, /request\.mode === 'navigate'/, 'service worker must use network-first navigation');
+assert.match(worker, /HASHED_ASSET\.test\(url\.pathname\)/, 'service worker must cache only fingerprinted assets');
+assert.match(worker, /\/api\//, 'service worker must bypass API traffic');
+assert.match(worker, /\/socket\.io\//, 'service worker must bypass Socket.io traffic');
+assert.ok(manifest['index.html']?.isEntry, 'Vite manifest must contain the HTML app entry');
+const dynamicEntries = new Set(manifest['index.html'].dynamicImports || []);
+for (const feature of [
+  'src/modules/mapManager.js', 'src/modules/cctvController.js',
+  'src/controllers/analyticsController.js', 'src/controllers/deviceController.js',
+  'src/controllers/signalsController.js', 'src/controllers/incidentController.js'
+]) {
+  assert.ok(dynamicEntries.has(feature), `${feature} must stay outside the initial entry graph`);
 }
 
-assert.ok(parsedManifest.name && parsedManifest.start_url, 'manifest must identify the app and start URL');
-assert.equal((html.match(/href=["'](?:\.\/)?css\/main\.css["']/g) || []).length, 1,
-  'index.html must link css/main.css exactly once');
-assert.doesNotMatch(html, /href=["'](?:\.\/)?style\.css["']/,
-  'index.html must not load the legacy stylesheet');
-assert.match(worker, /const CACHE_NAME = 'omnitraf-sits-v\d+'/,
-  'service worker cache namespace must be versioned');
-
-for (const shellPath of ['/index.html', '/css/main.css', '/manifest.webmanifest']) {
-  await access(path.join(root, shellPath.slice(1)));
+for (const file of ['index.html', 'sw.js', 'manifest.webmanifest', 'views/dashboardView.html', 'components/marquee.html', 'assets/favicon.png']) {
+  await exists(file);
 }
 
-const pendingStylesheets = [{ file: 'css/main.css', source: css }];
-const checkedStylesheets = new Set();
-while (pendingStylesheets.length) {
-  const { file, source } = pendingStylesheets.pop();
-  if (checkedStylesheets.has(file)) continue;
-  checkedStylesheets.add(file);
-  const imports = [...source.matchAll(/@import\s+["']([^"']+\.css)["']/g)];
-  for (const [, importedPath] of imports) {
-    const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(file), importedPath));
-    await access(path.join(root, resolved));
-    pendingStylesheets.push({ file: resolved, source: await read(resolved) });
-  }
+const assetDirectory = path.join(root, 'assets');
+const assetNames = await readdir(assetDirectory);
+const lazyChunks = assetNames.filter((name) => name.endsWith('.js') && /analyticsController|mapManager|cctvController|deviceController|signalsController/.test(name));
+assert.ok(lazyChunks.length >= 3, 'production build must emit multiple feature-level JavaScript chunks');
+const allHtmlPaths = [...html.matchAll(/(?:src|href)="(\/[^"]+)"/g)].map((match) => match[1]);
+for (const urlPath of allHtmlPaths) {
+  if (urlPath.startsWith('/assets/')) await exists(urlPath.slice(1));
 }
 
-for (const sourcePath of await listJavaScript('src')) {
-  const source = await read(sourcePath);
-  assert.doesNotMatch(source, /from\s+["'][^"']*\/server\//,
-    `${sourcePath} must not import protected backend modules into the browser graph`);
-}
-
-console.log('Static PWA validation passed (no bundle or compilation is produced).');
+console.log(`Production frontend validation passed (${assetNames.length} hashed asset files, ${lazyChunks.length} feature chunks).`);

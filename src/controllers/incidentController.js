@@ -7,7 +7,6 @@
 import { stateStore, updateIncidentState, escapeHtml } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
 import { socketClient } from '../core/socketClient.js';
-import { mapManager } from '../modules/mapManager.js';
 import { commandLayer } from '../core/commandLayer.js';
 import { Disposer } from '../core/disposer.js';
 
@@ -48,7 +47,7 @@ export class IncidentController {
 
     window.resolveDynamicIncident = (id) => this.resolveIncident(id);
     window.dispatchIncident = (id) => this.dispatchIncident(id);
-    window.openIncidentOnMap = (loc, title) => mapManager.flyToIncident(loc, title);
+    window.openIncidentOnMap = (loc, title) => window.mapManager?.flyToIncident(loc, title);
     window.openIncidentDetail = (id, loc, time, desc) => this.openIncidentDetail(id, loc, time, desc);
   }
 
@@ -138,7 +137,7 @@ export class IncidentController {
         } else if (action === "lapor-insiden") {
           this.openIncidentDetail("NEW-112", target, "Baru saja", `Laporan insiden kepadatan/hambatan lajur dilaporkan pada ${target}.`);
         } else if (action === "zoom-simpang") {
-          mapManager.flyToIntersection(target);
+          window.mapManager?.flyToIntersection(target);
           window.showToast(`🔍 Memperbesar kamera ke ${target}.`);
           soundManager.play('click');
         }
@@ -394,7 +393,7 @@ export class IncidentController {
       `;
 
       notifContainer.appendChild(card);
-      card.querySelector('.btn-map-shortcut')?.addEventListener('click', () => mapManager.flyToIncident(inc.location || '', inc.title || ''));
+      card.querySelector('.btn-map-shortcut')?.addEventListener('click', () => window.mapManager?.flyToIncident(inc.location || '', inc.title || ''));
       card.querySelector('.incident-dispatch-btn')?.addEventListener('click', () => this.dispatchIncident(inc.id));
       card.querySelector('.incident-resolve-btn')?.addEventListener('click', () => this.resolveIncident(inc.id));
     });
@@ -494,7 +493,7 @@ export class IncidentController {
         </div>
       `;
       listContainer.appendChild(item);
-      item.querySelector('.btn-map-shortcut')?.addEventListener('click', () => mapManager.flyToIncident(inc.location || '', inc.title || ''));
+      item.querySelector('.btn-map-shortcut')?.addEventListener('click', () => window.mapManager?.flyToIncident(inc.location || '', inc.title || ''));
       item.querySelector('.dispatch-btn')?.addEventListener('click', () => this.dispatchIncident(inc.id));
       item.querySelector('.resolve-btn')?.addEventListener('click', () => this.resolveIncident(inc.id));
       item.querySelector('.incident-detail-btn')?.addEventListener('click', () => this.openIncidentDetail(inc.id, inc.location || '', inc.reportedAt || '', inc.notes || ''));
