@@ -1,7 +1,6 @@
 import { Server } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
-import Redis from 'ioredis';
-import { isOriginAllowed, ALLOW_TEST_QUERY_TOKEN_AUTH, NODE_ENV } from '../config/env.js';
+import { isOriginAllowed, ALLOW_TEST_QUERY_TOKEN_AUTH, NODE_ENV, OMNITRAF_RUNTIME_MODE } from '../config/env.js';
 import { verifyToken } from '../middlewares/auth.js';
 import { backendState } from '../services/stateManager.js';
 import { cvEngine } from '../services/visionEngine.js';
@@ -33,7 +32,7 @@ function isRoomAllowedForRole(room, role) {
   return !!allowedRoles?.includes(role);
 }
 
-export function initializeSocketServer(httpServer) {
+export function initializeSocketServer(httpServer, { redisManager = null, leadership = null } = {}) {
   const io = new Server(httpServer, {
     maxHttpBufferSize: 1e6, // 1 MB payload protection
     pingTimeout: 20000,
@@ -49,35 +48,12 @@ export function initializeSocketServer(httpServer) {
       credentials: true
     }
   });
+  io.data = {};
 
-  // Skalabilitas Horisontal: Integrasi Redis Adapter bila konfigurasi REDIS_URL tersedia
-  if (process.env.REDIS_URL) {
-    try {
-      const pubClient = new Redis(process.env.REDIS_URL, {
-        maxRetriesPerRequest: 3,
-        retryStrategy: (times) => Math.min(times * 100, 2000),
-        lazyConnect: true
-      });
-      const subClient = pubClient.duplicate();
-
-      pubClient.on('error', (err) => {
-        console.warn('⚠️ [Redis Adapter] Pub connection error:', err.message);
-      });
-      subClient.on('error', (err) => {
-        console.warn('⚠️ [Redis Adapter] Sub connection error:', err.message);
-      });
-
-      Promise.all([pubClient.connect(), subClient.connect()])
-        .then(() => {
-          io.adapter(createAdapter(pubClient, subClient));
-          console.log('🚀 [Socket.io] Redis Adapter aktif untuk klaster horisontal terdistribusi.');
-        })
-        .catch((err) => {
-          console.warn('⚠️ [Socket.io] Gagal menghubungkan ke Redis, fallback ke default in-memory adapter:', err.message);
-        });
-    } catch (err) {
-      console.warn('⚠️ [Socket.io] Gagal menginisialisasi Redis Adapter, fallback ke default in-memory adapter:', err.message);
-    }
+  io.data = { leadership, redisClients: redisManager?.socketClients() || null };
+  if (io.data.redisClients) {
+    io.adapter(createAdapter(...io.data.redisClients));
+    console.log('🚀 [Socket.io] Redis Adapter aktif melalui RedisManager.');
   } else {
     console.log('ℹ️ [Socket.io] Berjalan dengan in-memory adapter lokal.');
   }
@@ -87,6 +63,7 @@ export function initializeSocketServer(httpServer) {
 
   // Handshake Authentication Middleware
   io.use((socket, next) => {
+    if (OMNITRAF_RUNTIME_MODE === 'cluster' && !leadership?.synchronized) return next(new Error('STATE_SYNC_PENDING: instance belum menerima baseline authoritative.'));
     const header = socket.handshake.headers?.authorization;
     const cookieHeader = socket.handshake.headers?.cookie;
     let cookieToken = null;
@@ -137,7 +114,7 @@ export function initializeSocketServer(httpServer) {
       provenance: 'SIMULATED',
       safetyBoundary: SAFETY_BOUNDARY
     });
-    if (isRoomAllowedForRole(REALTIME_ROOMS.CCTV_ALL, socket.user.role)) {
+    if (isRoomAllowedForRole(REALTIME_ROOMS.CCTV_ALL, socket.user.role) && (OMNITRAF_RUNTIME_MODE === 'single' || leadership?.isLeader())) {
       socket.emit('cctv:vision-update', cvEngine.generateFramePayload(backendState.state.isChaosMode));
     }
 
@@ -228,27 +205,44 @@ export function initializeSocketServer(httpServer) {
     });
   });
 
-  // 1. Core Telemetry & APILL Ticker Loop (1000ms with elapsed delta tracking)
+  let intervalTimers = [];
   let lastTrafficTickMonotonic = backendState.clock.monotonic();
-  setInterval(() => {
-    const nowMono = backendState.clock.monotonic();
-    const elapsedMs = Math.max(100, Math.round(nowMono - lastTrafficTickMonotonic));
-    lastTrafficTickMonotonic = nowMono;
-
-    if (io.engine.clientsCount === 0) return;
-    const updatedState = backendState.tick(elapsedMs);
-    // Broadcast via RealtimeEventDispatcher + direct io.emit fallback for legacy/test clients
-    realtimeDispatcher.dispatchTrafficUpdate(updatedState);
-  }, 1000).unref();
-
-  // 2. High-Efficiency Computer Vision Detection Stream (300ms)
-  setInterval(() => {
-    if (io.engine.clientsCount === 0) return;
-    const isChaos = backendState.state.isChaosMode;
-    const visionPayload = cvEngine.generateFramePayload(isChaos);
-    // Dispatched via RealtimeEventDispatcher with per-camera stream separation & aggregate
-    realtimeDispatcher.dispatchCctvVision(visionPayload);
-  }, 300).unref();
+  const stopSimulationLoops = () => {
+    intervalTimers.forEach(clearInterval);
+    intervalTimers = [];
+    io.data.intervalTimers = intervalTimers;
+  };
+  const startSimulationLoops = () => {
+    if (intervalTimers.length || (leadership && !leadership.isLeader())) return;
+    lastTrafficTickMonotonic = backendState.clock.monotonic();
+    const trafficTicker = setInterval(() => {
+      const nowMono = backendState.clock.monotonic();
+      const elapsedMs = Math.max(100, Math.round(nowMono - lastTrafficTickMonotonic));
+      lastTrafficTickMonotonic = nowMono;
+      if (OMNITRAF_RUNTIME_MODE === 'single' && io.engine.clientsCount === 0) return;
+      const updatedState = backendState.tick(elapsedMs);
+      realtimeDispatcher.dispatchTrafficUpdate(updatedState);
+      leadership?.publishSnapshot().catch(() => {});
+    }, 1000);
+    const visionTicker = setInterval(() => {
+      if (OMNITRAF_RUNTIME_MODE === 'single' && io.engine.clientsCount === 0) return;
+      const visionPayload = cvEngine.generateFramePayload(backendState.state.isChaosMode);
+      realtimeDispatcher.dispatchCctvVision(visionPayload);
+      if (OMNITRAF_RUNTIME_MODE === 'cluster') {
+        leadership?.eventBus?.publish('omnitraf:events:cctv', 'cctv:state', visionPayload.seq, cvEngine.getSnapshot()).catch(() => {});
+      }
+    }, 300);
+    intervalTimers = [trafficTicker, visionTicker];
+    intervalTimers.forEach((timer) => timer.unref?.());
+    io.data.intervalTimers = intervalTimers;
+  };
+  io.data.startSimulationLoops = startSimulationLoops;
+  io.data.stopSimulationLoops = stopSimulationLoops;
+  io.data.unsubscribeLeadership = leadership?.addRoleListener(({ role }) => {
+    if (role === 'LEADER') startSimulationLoops();
+    else stopSimulationLoops();
+  }) || null;
+  if (!leadership || leadership.isLeader()) startSimulationLoops();
 
   return io;
 }

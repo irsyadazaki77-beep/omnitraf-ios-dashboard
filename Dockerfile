@@ -28,7 +28,9 @@ COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app ./
 
 # Enforce secure container directory permissions
-RUN chown -R node:node /usr/src/app
+RUN mkdir -p /usr/src/app/data && chown -R node:node /usr/src/app
+
+ENV DB_PATH=/usr/src/app/data/omnitraf.sqlite
 
 # Apply non-root container security instruction
 USER node

@@ -24,7 +24,7 @@ describe('Phase 17: Persistence, Recovery & Data Integrity Hardening Test Suite'
     } catch (_) {}
   });
 
-  test('1. Fresh database startup: creates schema, metadata, and version 17', async () => {
+  test('1. Fresh database startup: creates schema, metadata, and version 18', async () => {
     const db = new DatabaseManager();
     db.dbPath = testDbPath;
     await db.init();
@@ -33,7 +33,7 @@ describe('Phase 17: Persistence, Recovery & Data Integrity Hardening Test Suite'
     assert.ok(fs.existsSync(testDbPath), 'Database file must be written to disk on startup');
 
     const schemaVer = db.getMetadata('schema_version');
-    assert.strictEqual(schemaVer, '17', 'Schema version metadata must match version 17');
+    assert.strictEqual(schemaVer, '18', 'Schema version metadata must match version 18');
 
     const incidentsRes = db.getAllIncidents();
     assert.strictEqual(incidentsRes.status, 'OK');
@@ -56,6 +56,7 @@ describe('Phase 17: Persistence, Recovery & Data Integrity Hardening Test Suite'
       notes: 'Antrean kendaraan dari arah selatan.'
     };
     db.upsertIncident(sampleIncident, true);
+    await db.flush();
 
     // Reopen database from disk in a fresh instance
     const dbReopened = new DatabaseManager();
@@ -90,7 +91,7 @@ describe('Phase 17: Persistence, Recovery & Data Integrity Hardening Test Suite'
     }
 
     await Promise.all(writePromises);
-    db.flushSync();
+    await db.flushSync();
 
     const check = db.getAllIncidents();
     assert.strictEqual(check.status, 'OK');
@@ -110,6 +111,7 @@ describe('Phase 17: Persistence, Recovery & Data Integrity Hardening Test Suite'
       status: 'ACTIVE',
       notes: 'Lajur kiri terhalang.'
     }, true);
+    await db.flush();
 
     // Mutate to RESOLVED
     const nowIso = new Date().toISOString();
@@ -120,6 +122,7 @@ describe('Phase 17: Persistence, Recovery & Data Integrity Hardening Test Suite'
       resolvedAt: nowIso,
       notes: 'Truk telah diderek.'
     }, true);
+    await db.flush();
 
     // Simulate immediate server crash and restart
     const dbCrashedReboot = new DatabaseManager();
@@ -143,6 +146,7 @@ describe('Phase 17: Persistence, Recovery & Data Integrity Hardening Test Suite'
       cycleTime: 110,
       mode: 'MANUAL_OVERRIDE'
     }, true);
+    await db.flush();
 
     const dbReboot = new DatabaseManager();
     dbReboot.dbPath = testDbPath;
@@ -168,6 +172,7 @@ describe('Phase 17: Persistence, Recovery & Data Integrity Hardening Test Suite'
       resolution: '4k',
       greenWaveSync: true
     }, true);
+    await db.flush();
 
     const dbReboot = new DatabaseManager();
     dbReboot.dbPath = testDbPath;
@@ -199,7 +204,7 @@ describe('Phase 17: Persistence, Recovery & Data Integrity Hardening Test Suite'
         details: 'Override green light'
       });
     }
-    db.flushSync();
+    await db.flushSync();
 
     const logsRes = db.getAllAuditLogs(50);
     assert.strictEqual(logsRes.status, 'OK');
@@ -238,7 +243,7 @@ describe('Phase 17: Persistence, Recovery & Data Integrity Hardening Test Suite'
       '{"bad_json_not_terminated...' // Malformed JSON payload
     ]);
     stmt.free();
-    db.flushSync();
+    await db.flushSync();
 
     const res = db.getAllIncidents();
     assert.strictEqual(res.status, 'OK');
@@ -280,5 +285,81 @@ describe('Phase 17: Persistence, Recovery & Data Integrity Hardening Test Suite'
     assert.strictEqual(snapshot.source, 'server');
     assert.ok(Array.isArray(snapshot.state.incidents));
     assert.ok(snapshot.state.intersections.length > 0);
+  });
+
+  test('12. Burst mutations coalesce into bounded atomic flushes', async () => {
+    const db = new DatabaseManager();
+    db.dbPath = path.join(testDir, 'coalescing.sqlite');
+    await db.init();
+    const before = db.getHealth().flushCount;
+    for (let i = 0; i < 80; i++) {
+      db.upsertIncident({ id: `INC-COALESCE-${i}`, title: `Incident ${i}`, status: 'ACTIVE' });
+    }
+    await db.flush();
+    assert.ok(db.getHealth().flushCount - before <= 2, 'a mutation burst must be persisted in one bounded flush');
+    await db.shutdown();
+  });
+
+  test('13. A mutation during asynchronous file replacement is persisted by the same drain', async () => {
+    const db = new DatabaseManager();
+    db.dbPath = path.join(testDir, 'concurrent-flush.sqlite');
+    await db.init();
+    db.upsertIncident({ id: 'INC-BEFORE-FLUSH', status: 'ACTIVE' });
+    const draining = db.flush();
+    db.upsertIncident({ id: 'INC-DURING-FLUSH', status: 'ACTIVE' });
+    await draining;
+    const reopened = new DatabaseManager();
+    reopened.dbPath = db.dbPath;
+    await reopened.init();
+    const ids = reopened.getAllIncidents().data.map((incident) => incident.id);
+    assert.ok(ids.includes('INC-BEFORE-FLUSH'));
+    assert.ok(ids.includes('INC-DURING-FLUSH'));
+    await db.shutdown();
+    await reopened.shutdown();
+  });
+
+  test('14. Shutdown drains pending mutations before closing database', async () => {
+    const db = new DatabaseManager();
+    db.dbPath = path.join(testDir, 'shutdown-drain.sqlite');
+    await db.init();
+    db.upsertIncident({ id: 'INC-SHUTDOWN-FLUSH', status: 'ACTIVE' });
+    await db.shutdown();
+    const reopened = new DatabaseManager();
+    reopened.dbPath = db.dbPath;
+    await reopened.init();
+    assert.ok(reopened.getAllIncidents().data.some((incident) => incident.id === 'INC-SHUTDOWN-FLUSH'));
+    await reopened.shutdown();
+  });
+
+  test('15. Failed atomic replacement reports degraded persistence diagnostics', async () => {
+    const db = new DatabaseManager();
+    db.dbPath = path.join(testDir, 'failed-write.sqlite');
+    await db.init();
+    await fs.promises.unlink(db.dbPath);
+    await fs.promises.mkdir(db.dbPath);
+    db.upsertIncident({ id: 'INC-FAILED-FLUSH', status: 'ACTIVE' });
+    assert.strictEqual(await db.flush(), false);
+    const health = db.getHealth();
+    assert.strictEqual(health.status, 'DEGRADED');
+    assert.strictEqual(health.dirty, true);
+    assert.ok(health.failedFlushCount >= 1);
+    assert.ok(health.lastError);
+    await fs.promises.rm(db.dbPath, { recursive: true, force: true });
+    await db.shutdown();
+  });
+
+  test('16. Relative DB_PATH resolves from repository root regardless of process working directory', () => {
+    const previousCwd = process.cwd();
+    const previousDbPath = process.env.DB_PATH;
+    try {
+      process.env.DB_PATH = path.join('data', 'cwd-independent.sqlite');
+      process.chdir(testDir);
+      const configuredDb = new DatabaseManager();
+      assert.strictEqual(configuredDb.dbPath, path.join(previousCwd, 'data', 'cwd-independent.sqlite'));
+    } finally {
+      process.chdir(previousCwd);
+      if (previousDbPath === undefined) delete process.env.DB_PATH;
+      else process.env.DB_PATH = previousDbPath;
+    }
   });
 });

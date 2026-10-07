@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 /**
  * Standardized API Response & Error Contract Helpers & Sanitizers (Phase 16)
  */
@@ -8,7 +10,7 @@ export function createApiErrorResponse(statusCode, code, message, details = {}, 
     success: false,
     type,
     timestamp: Date.now(),
-    requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+    requestId: `req_${randomUUID()}`,
     code,
     message,
     retryable: statusCode >= 500 || statusCode === 429,

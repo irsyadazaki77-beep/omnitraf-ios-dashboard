@@ -1,5 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import { backendState } from '../services/stateManager.js';
-import { dbManager } from '../db/database.js';
+import { incidentRepository } from '../repositories/incidentRepository.js';
+import { deviceRepository } from '../repositories/deviceRepository.js';
+import { auditRepository } from '../repositories/auditRepository.js';
 import { isActionAuthorized, getRequiredRoles } from '../config/capabilities.js';
 import { ROLES } from '../config/constants.js';
 import { diagnosticEngine } from './diagnosticEngine.js';
@@ -7,6 +10,7 @@ import { parseCommandInput, normalizeCommand, validateCommand, ContractValidatio
 import { REALTIME_ROOMS } from '../sockets/eventRegistry.js';
 import { SAFETY_BOUNDARY, assertSimulationOnlyAction } from '../config/safetyBoundary.js';
 import { assertCommandRateLimit } from './commandRateLimit.js';
+import { clusterRuntime } from '../infrastructure/redis/clusterRuntimeSingleton.js';
 import {
   INCIDENT_STATES,
   EMERGENCY_STATES,
@@ -79,7 +83,39 @@ export class CommandExecutor {
     idempotencyKey = null,
     correlationId = null,
     authenticatedUser = null,
-    sourceChannel = 'socket'
+    sourceChannel = 'socket',
+    sourceInstanceId = null
+  } = {}) {
+    const stableCommandId = commandId || `CMD-${randomUUID()}`;
+    const stableCorrelationId = correlationId || `CORR-${randomUUID()}`;
+    const stableIdempotencyKey = idempotencyKey || stableCommandId;
+    const parameters = { action, targetId, payload, commandId: stableCommandId, idempotencyKey: stableIdempotencyKey, correlationId: stableCorrelationId, authenticatedUser, sourceChannel, sourceInstanceId };
+    const preflight = validateCommand(normalizeCommand(parseCommandInput({ action, targetId, payload, commandId: stableCommandId, idempotencyKey: stableIdempotencyKey, correlationId: stableCorrelationId })));
+    assertSimulationOnlyAction(preflight.action);
+    if (clusterRuntime.mode === 'cluster') {
+      if (!clusterRuntime.redis?.isConnected() || !clusterRuntime.leadership?.synchronized) {
+        const unavailable = new Error('Cluster coordination is unavailable.'); unavailable.code = 'CLUSTER_UNAVAILABLE'; unavailable.statusCode = 503; throw unavailable;
+      }
+      if (!clusterRuntime.leadership.isLeader()) return clusterRuntime.forwardCommand(parameters);
+      const principal = authenticatedUser;
+      if (principal?.id && principal?.name && Object.values(ROLES).includes(principal.role) && isActionAuthorized(principal.role, preflight.action)) {
+        const fingerprint = JSON.stringify({ action: preflight.action, targetId: preflight.targetId, payload: preflight.payload, actorId: principal.id, actorRole: principal.role });
+        return clusterRuntime.executeIdempotently(stableIdempotencyKey, fingerprint, () => this._executeCommandLocally(parameters), { actorId: principal.id });
+      }
+    }
+    return this._executeCommandLocally(parameters);
+  }
+
+  async _executeCommandLocally({
+    action,
+    targetId = null,
+    payload = {},
+    commandId = null,
+    idempotencyKey = null,
+    correlationId = null,
+    authenticatedUser = null,
+    sourceChannel = 'socket',
+    sourceInstanceId = null
   }) {
     // Canonical parse/normalize/validate happens before authorization, idempotency,
     // domain lookup, persistence, or any event/audit side effect.
@@ -96,8 +132,8 @@ export class CommandExecutor {
     const actorId = authenticatedUser?.id;
 
     // 1. Establish stable identifiers
-    const finalCommandId = commandId || `CMD-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
-    const finalCorrelationId = correlationId || `CORR-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+    const finalCommandId = commandId || `CMD-${randomUUID()}`;
+    const finalCorrelationId = correlationId || `CORR-${randomUUID()}`;
     const finalIdempotencyKey = idempotencyKey || finalCommandId || `IDEMP-${action}-${targetId || 'global'}-${JSON.stringify(payload || {})}`;
 
     // Resolve explicit entity targets before authorization so malformed and unknown
@@ -134,7 +170,7 @@ export class CommandExecutor {
 
     // Apply after identity/RBAC checks so REST and Socket.IO share one per-user
     // budget and unauthenticated traffic cannot allocate actor-window entries.
-    assertCommandRateLimit(actorId);
+    await assertCommandRateLimit(actorId);
 
     // 3. Idempotency Check & In-Flight Protection
     if (backendState.processedCommands && backendState.processedCommands.has(finalIdempotencyKey)) {
@@ -152,7 +188,7 @@ export class CommandExecutor {
       }
 
       console.info(`🔄 [Idempotency Backend] Returning cached authoritative result for key: ${finalIdempotencyKey}`);
-      return {
+      const commandResult = {
         ...SAFETY_BOUNDARY,
         success: true,
         commandId: cached.commandId || finalCommandId,
@@ -170,6 +206,8 @@ export class CommandExecutor {
         isIdempotentReplay: true,
         error: null
       };
+      if (clusterRuntime.mode === 'cluster') await clusterRuntime.leadership.publishSnapshot();
+      return commandResult;
     }
 
     if (this.inFlightKeys.has(finalIdempotencyKey)) {
@@ -217,6 +255,9 @@ export class CommandExecutor {
         timestamp: Date.now()
       };
 
+      backendState.stateVersion++;
+      backendState.state.stateVersion = backendState.stateVersion;
+
       backendState.processedCommands.set(finalIdempotencyKey, record);
       backendState.processedCommands.set(finalCommandId, record);
       backendState.processedCommands.set(finalCorrelationId, record);
@@ -228,11 +269,18 @@ export class CommandExecutor {
       const auditLog = {
         actorId,
         operator: actorName,
+        actorRole,
         action: action.toUpperCase().replace(/[-:]/g, '_'),
         entity: entityId || targetId || 'SITS Core',
         result: `SUCCESS (CorrelationID: ${finalCorrelationId})`,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        commandId: finalCommandId,
+        correlationId: finalCorrelationId,
+        idempotencyKey: finalIdempotencyKey,
+        sourceInstanceId: sourceInstanceId || clusterRuntime.leadership?.instanceId || null,
+        leaderInstanceId: clusterRuntime.leadership?.leaderId || clusterRuntime.leadership?.instanceId || null
       };
+      auditRepository.insert({ ...auditLog, details: customAudit?.details || `Perintah [${action}] berhasil diterapkan.` });
       backendState.auditLogs.unshift(auditLog);
       if (backendState.auditLogs.length > 250) backendState.auditLogs.pop();
 
@@ -266,7 +314,7 @@ export class CommandExecutor {
         });
       }
 
-      return {
+      const commandResult = {
         ...SAFETY_BOUNDARY,
         success: true,
         commandId: finalCommandId,
@@ -284,6 +332,8 @@ export class CommandExecutor {
         sequence: domainSequence || backendState.sequence,
         error: null
       };
+      if (clusterRuntime.mode === 'cluster') await clusterRuntime.leadership.publishSnapshot();
+      return commandResult;
 
     } catch (err) {
       console.error(`❌ [CommandExecutor Error] [${action}]:`, err.message);
@@ -380,7 +430,7 @@ export class CommandExecutor {
 
         // Atomic Persistence
         try {
-          dbManager.upsertDeviceTelemetry(dev, true);
+          deviceRepository.upsert(dev, true);
         } catch (persistErr) {
           // Rollback on persistence failure
           dev.fps = previousState.fps;
@@ -903,7 +953,7 @@ export class CommandExecutor {
         backendState.state.seq = backendState.sequence;
         backendState.state.timestampMs = Date.now();
         try {
-          dbManager.upsertIncident(incident, true);
+          incidentRepository.upsert(incident, true);
         } catch (err) {
           backendState.state.incidents.splice(backendState.state.incidents.indexOf(incident), 1);
           backendState.incidentSequence--;

@@ -90,6 +90,12 @@ export class EventBus {
   clearListeners() {
     this._listeners.clear();
   }
+
+  getListenerCount() {
+    let count = 0;
+    for (const listeners of this._listeners.values()) count += listeners.size;
+    return count;
+  }
 }
 
 export const eventBus = new EventBus();

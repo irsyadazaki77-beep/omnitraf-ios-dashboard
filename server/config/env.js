@@ -30,6 +30,10 @@ export const DEV_AUTO_LOGIN = !IS_PRODUCTION && (process.env.DEV_AUTO_LOGIN === 
 // Query-string JWTs are disabled by default, including normal test runs.
 export const ALLOW_TEST_QUERY_TOKEN_AUTH = NODE_ENV === 'test' && process.env.ALLOW_TEST_QUERY_TOKEN_AUTH === 'true';
 export const REDIS_URL = process.env.REDIS_URL || null;
+export const OMNITRAF_RUNTIME_MODE = process.env.OMNITRAF_RUNTIME_MODE || 'single';
+if (!['single', 'cluster'].includes(OMNITRAF_RUNTIME_MODE)) {
+  throw new Error('OMNITRAF_RUNTIME_MODE must be either "single" or "cluster".');
+}
 export const TRUST_PROXY = process.env.TRUST_PROXY === 'true' || process.env.TRUST_PROXY === '1' || process.env.NODE_ENV === 'test' || IS_TEST;
 // Exact peer IPs only; never trust a forwarded client IP merely because a
 // boolean says a proxy exists. Configure the direct reverse-proxy addresses.

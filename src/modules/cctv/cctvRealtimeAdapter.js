@@ -9,6 +9,7 @@
 
 import { socketClient } from '../../core/socketClient.js';
 import { stateStore } from '../../core/stateStore.js';
+import { diagnostics } from '../../core/diagnostics.js';
 import { REALTIME_ROOMS } from '../../../shared/realtimeRooms.js';
 import { SeededRandom } from '../../../shared/seededRandom.js';
 
@@ -16,12 +17,16 @@ export class CctvRealtimeAdapter {
   constructor(options = {}) {
     this.localFallbackRandom = options.randomStream || new SeededRandom('omnitraf-cctv-local-fallback');
     this.onFrameCallback = options.onFrame || (() => {});
+    this.coalesceVisualUpdates = options.coalesceVisualUpdates === true;
     this.lastProcessedSeq = 0;
     this.latestPayload = null;
     this.lastReceivedTime = Date.now();
     this._socketUnsubscribe = null;
     this._localFallbackTimer = null;
     this._subscribedRooms = new Set();
+    this._visualFrameHandle = null;
+    this._pendingVisualFrame = null;
+    this.coalescedVisualUpdates = 0;
   }
 
   /**
@@ -112,8 +117,30 @@ export class CctvRealtimeAdapter {
     this.latestPayload = framePayload;
     this.lastReceivedTime = Date.now();
 
-    this.onFrameCallback(framePayload, source);
+    this._queueVisualFrame(framePayload, source);
     return true;
+  }
+
+  _queueVisualFrame(framePayload, source) {
+    if (!this.coalesceVisualUpdates) {
+      this.onFrameCallback(framePayload, source);
+      return;
+    }
+    if (this._pendingVisualFrame) {
+      this.coalescedVisualUpdates++;
+      diagnostics.recordDroppedFrame();
+      diagnostics.recordCoalescedDomUpdate();
+    }
+    this._pendingVisualFrame = { framePayload, source };
+    if (this._visualFrameHandle !== null) return;
+    const flush = () => {
+      this._visualFrameHandle = null;
+      const latest = this._pendingVisualFrame;
+      this._pendingVisualFrame = null;
+      if (latest) this.onFrameCallback(latest.framePayload, latest.source);
+    };
+    if (typeof requestAnimationFrame === 'function') this._visualFrameHandle = requestAnimationFrame(flush);
+    else flush();
   }
 
   _startLocalFallback(disposer, camerasRegistry) {
@@ -213,6 +240,9 @@ export class CctvRealtimeAdapter {
       this._socketUnsubscribe();
       this._socketUnsubscribe = null;
     }
+    if (this._visualFrameHandle !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this._visualFrameHandle);
+    this._visualFrameHandle = null;
+    this._pendingVisualFrame = null;
     this._subscribedRooms.clear();
   }
 }

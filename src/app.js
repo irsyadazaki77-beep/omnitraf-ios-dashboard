@@ -27,14 +27,35 @@ import { analyticsController } from './controllers/analyticsController.js';
 import { deviceController } from './controllers/deviceController.js';
 import { reportController } from './controllers/reportController.js';
 import { pwaController } from './controllers/pwaController.js';
-import { mapManager } from './modules/mapManager.js';
-import { cctvController } from './modules/cctvController.js';
+
+const controllerLoaders = {
+  mapManager: async () => {
+    await import('./../css/views/map.css');
+    await import('leaflet/dist/leaflet.css');
+    await import('leaflet.markercluster/dist/MarkerCluster.css');
+    await import('leaflet.markercluster/dist/MarkerCluster.Default.css');
+    const leaflet = await import('leaflet');
+    window.L = leaflet.default;
+    await import('leaflet.markercluster');
+    return import('./modules/mapManager.js');
+  },
+  cctvController: async () => { await import('../css/views/cctv.css'); return import('./modules/cctvController.js'); },
+  signalsController: async () => { await import('../css/views/signals.css'); return import('./controllers/signalsController.js'); },
+  incidentController: async () => { await import('../css/views/incidents.css'); return import('./controllers/incidentController.js'); },
+  emergencyController: async () => { await import('../css/views/emergencies.css'); return import('./controllers/emergencyController.js'); },
+  analyticsController: async () => { await import('../css/views/analytics.css'); return import('./controllers/analyticsController.js'); },
+  deviceController: async () => { await import('../css/views/devices.css'); return import('./controllers/deviceController.js'); },
+  reportController: async () => { await import('../css/views/reports.css'); return import('./controllers/reportController.js'); }
+};
 
 export class App {
   constructor() {
     this.isInitialized = false;
     this.activeControllers = new Set();
     this.currentView = 'dashboard';
+    this.navigationId = 0;
+    this.controllerPromises = new Map();
+    this.controllerModules = new Map();
   }
 
   async init() {
@@ -88,6 +109,7 @@ export class App {
    * Orchestrate Lazy Init & View Lifecycle
    */
   async _handleViewTransition(newView, oldView) {
+    const navigationId = ++this.navigationId;
     this.currentView = newView;
 
     // Deactivate previous controllers if needed
@@ -98,20 +120,35 @@ export class App {
     }
 
     // Lazy load & mount HTML partial into DOM
-    const { isFirstMount } = await viewLoader.mountView(newView);
+    this._showViewLoading(newView);
+    const { isFirstMount, success } = await viewLoader.mountView(newView, {
+      shouldActivate: () => navigationId === this.navigationId
+    });
+    if (navigationId !== this.navigationId) return;
+    if (!success) {
+      this._showViewLoadError(newView, () => this._handleViewTransition(newView, oldView));
+      return;
+    }
 
     // Dynamic Socket Channel Subscription Management (Langkah 4 & 13)
     this._manageSocketChannelSubscriptions(newView, oldView);
 
     // Lazy load & activate target view modules
-    this._activateViewModules(newView, isFirstMount);
+    try {
+      await this._activateViewModules(newView, isFirstMount);
+    } catch (error) {
+      if (navigationId === this.navigationId) this._showViewLoadError(newView, () => this._handleViewTransition(newView, oldView));
+      console.error(`[App] Unable to load view modules for ${newView}:`, error);
+      return;
+    }
+    if (navigationId !== this.navigationId) return;
+    const loadingStatus = document.getElementById('viewLoadStatus');
+    if (loadingStatus) loadingStatus.hidden = true;
 
     // If switching to Map view or Dashboard, trigger Leaflet size invalidation
     const cleanId = (newView || '').replace('#', '').replace('view-', '');
     if (cleanId === 'map' || cleanId === 'dashboard') {
-      if (mapManager && typeof mapManager.debouncedInvalidateSize === 'function') {
-        mapManager.debouncedInvalidateSize(120);
-      }
+      this.controllerModules.get('mapManager')?.debouncedInvalidateSize?.(120);
     }
   }
 
@@ -122,9 +159,9 @@ export class App {
     const cleanOld = (oldView || '').replace('#', '').replace('view-', '');
 
     const VIEW_CHANNELS = {
-      'dashboard': ['room:dashboard', 'room:traffic', 'room:signals', 'room:incidents', 'room:emergency', 'room:cctv:all'],
+      'dashboard': ['room:dashboard', 'room:traffic', 'room:signals', 'room:incidents', 'room:emergency', 'room:cctv:dashCameraCanvas'],
       'map': ['room:traffic', 'room:incidents', 'room:emergency'],
-      'cctv': ['room:cctv:all', 'room:cctv:dashCameraCanvas', 'room:cctv:cctvCanvas1', 'room:cctv:cctvCanvas2', 'room:cctv:cctvCanvas3', 'room:cctv:cctvCanvas4'],
+      'cctv': ['room:cctv:dashCameraCanvas', 'room:cctv:cctvCanvas1', 'room:cctv:cctvCanvas2', 'room:cctv:cctvCanvas3', 'room:cctv:cctvCanvas4'],
       'signals': ['room:signals', 'room:traffic'],
       'incidents': ['room:incidents'],
       'emergency': ['room:emergency', 'room:traffic'],
@@ -148,56 +185,86 @@ export class App {
     socketClient.subscribeChannels(neededChannels);
   }
 
-  _activateViewModules(view, isFirstMount = false) {
+  async _activateViewModules(view, isFirstMount = false) {
     diagnostics.recordInit('view:' + view);
     const cleanView = (view || '').replace('#', '').replace('view-', '');
 
-    switch (cleanView) {
-      case 'dashboard':
-        this._safeInitAndActivate('mapManager', mapManager);
-        this._safeInitAndActivate('cctvController', cctvController);
-        this._safeInitAndActivate('signalsController', signalsController);
-        this._safeInitAndActivate('incidentController', incidentController);
-        this._safeInitAndActivate('emergencyController', emergencyController);
-        break;
+    const viewControllers = {
+      dashboard: ['mapManager', 'cctvController', 'signalsController', 'incidentController', 'emergencyController'],
+      map: ['mapManager'], cctv: ['cctvController'], signals: ['signalsController'],
+      incidents: ['incidentController'], emergency: ['emergencyController'], emergencies: ['emergencyController'],
+      analytics: ['analyticsController'], prediction: ['analyticsController'],
+      devices: ['deviceController'], reports: ['reportController']
+    };
+    const navigationId = this.navigationId;
+    const names = viewControllers[cleanView] || [];
+    await Promise.all(names.map((name) => this._loadController(name)));
+    if (navigationId !== this.navigationId) return;
+    for (const name of names) this._safeInitAndActivate(name, this.controllerModules.get(name));
+  }
 
-      case 'map':
-        this._safeInitAndActivate('mapManager', mapManager);
-        break;
-
-      case 'cctv':
-        this._safeInitAndActivate('cctvController', cctvController);
-        break;
-
-      case 'signals':
-        this._safeInitAndActivate('signalsController', signalsController);
-        break;
-
-      case 'incidents':
-        this._safeInitAndActivate('incidentController', incidentController);
-        break;
-
-      case 'emergency':
-      case 'emergencies':
-        this._safeInitAndActivate('emergencyController', emergencyController);
-        break;
-
-      case 'analytics':
-      case 'prediction':
-        this._safeInitAndActivate('analyticsController', analyticsController);
-        break;
-
-      case 'devices':
-        this._safeInitAndActivate('deviceController', deviceController);
-        break;
-
-      case 'reports':
-        this._safeInitAndActivate('reportController', reportController);
-        break;
-
-      default:
-        break;
+  _loadController(name) {
+    if (this.controllerModules.has(name)) return Promise.resolve(this.controllerModules.get(name));
+    if (!this.controllerPromises.has(name)) {
+      const loader = controllerLoaders[name];
+      if (!loader) return Promise.reject(new Error(`Unknown controller: ${name}`));
+      const pending = loader().then((module) => {
+        const controller = module[name] || module.default;
+        if (!controller) throw new Error(`Controller export missing: ${name}`);
+        this.controllerModules.set(name, controller);
+        if (name === 'mapManager') window.mapManager = controller;
+        return controller;
+      }).catch((error) => {
+        this.controllerPromises.delete(name);
+        throw error;
+      });
+      this.controllerPromises.set(name, pending);
     }
+    return this.controllerPromises.get(name);
+  }
+
+  _showViewLoading(view) {
+    const container = document.getElementById('viewContainer');
+    if (!container) return;
+    let status = document.getElementById('viewLoadStatus');
+    if (!status) {
+      status = document.createElement('div');
+      status.id = 'viewLoadStatus';
+      status.className = 'view-load-status';
+      status.setAttribute('role', 'status');
+      status.setAttribute('aria-live', 'polite');
+      container.prepend(status);
+    }
+    status.replaceChildren(document.createTextNode(`Loading ${String(view).replace('#', '')}…`));
+    status.hidden = false;
+    const errorPanel = document.getElementById('viewLoadError');
+    if (errorPanel) errorPanel.hidden = true;
+  }
+
+  _showViewLoadError(view, retry) {
+    const container = document.getElementById('viewContainer');
+    if (!container) return;
+    let panel = document.getElementById('viewLoadError');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'viewLoadError';
+      panel.className = 'view-load-error';
+      panel.setAttribute('role', 'alert');
+      container.prepend(panel);
+    }
+    panel.replaceChildren();
+    const message = document.createElement('p');
+    message.textContent = `Unable to load ${String(view).replace('#', '')}. Check the connection and retry.`;
+    const retryButton = document.createElement('button');
+    retryButton.type = 'button';
+    retryButton.textContent = 'Retry';
+    retryButton.addEventListener('click', retry, { once: true });
+    const reloadButton = document.createElement('button');
+    reloadButton.type = 'button';
+    reloadButton.textContent = 'Reload application';
+    reloadButton.addEventListener('click', () => window.location.reload(), { once: true });
+    panel.append(message, retryButton, reloadButton);
+    panel.hidden = false;
   }
 
   _deactivateViewModules(oldView, newView) {
@@ -221,20 +288,9 @@ export class App {
     const oldCtrls = VIEW_CONTROLLERS[cleanOld] || [];
     const newCtrls = VIEW_CONTROLLERS[cleanNew] || [];
 
-    const controllers = {
-      mapManager,
-      cctvController,
-      signalsController,
-      incidentController,
-      emergencyController,
-      analyticsController,
-      deviceController,
-      reportController
-    };
-
     oldCtrls.forEach(ctrlName => {
       if (!newCtrls.includes(ctrlName)) {
-        const ctrl = controllers[ctrlName];
+        const ctrl = this.controllerModules.get(ctrlName);
         if (ctrl && typeof ctrl.deactivate === 'function') {
           ctrl.deactivate();
         }
@@ -258,28 +314,23 @@ export class App {
   }
 
   _exposeGlobalBridges() {
+    // Compatibility bridge for inline/legacy integrations; modules should import dependencies directly.
     window.stateStore = stateStore;
-    window.mapManager = mapManager;
+    window.mapManager = null;
     window.trafficEngine = trafficEngine;
     window.soundManager = soundManager;
     window.diagnostics = diagnostics;
 
     window.resolveDynamicIncident = (id) => {
-      if (incidentController && typeof incidentController.resolveIncident === 'function') {
-        incidentController.resolveIncident(id);
-      }
+      this._loadController('incidentController').then((controller) => controller.resolveIncident?.(id)).catch(() => {});
     };
 
     window.acknowledgeIncident = (id) => {
-      if (incidentController && typeof incidentController.updateIncidentStatus === 'function') {
-        incidentController.updateIncidentStatus(id, "ACKNOWLEDGED");
-      }
+      this._loadController('incidentController').then((controller) => controller.updateIncidentStatus?.(id, "ACKNOWLEDGED")).catch(() => {});
     };
 
     window.openIncidentDetail = (id, loc, time, desc) => {
-      if (incidentController && typeof incidentController.openIncidentDetail === 'function') {
-        incidentController.openIncidentDetail(id, loc, time, desc);
-      }
+      this._loadController('incidentController').then((controller) => controller.openIncidentDetail?.(id, loc, time, desc)).catch(() => {});
     };
 
     window.dismissAiRecommendation = () => {

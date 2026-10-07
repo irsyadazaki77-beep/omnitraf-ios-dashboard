@@ -356,6 +356,7 @@ export function normalizeCanonicalEmergency(raw = {}) {
 export function createNormalizedCollection(items = [], keySelector = (item) => item.id) {
   const byId = {};
   const allIds = [];
+  const seenIds = new Set();
 
   for (const item of items) {
     if (!item) continue;
@@ -363,8 +364,9 @@ export function createNormalizedCollection(items = [], keySelector = (item) => i
     if (key !== undefined && key !== null) {
       const strKey = String(key);
       byId[strKey] = item;
-      if (!allIds.includes(strKey)) {
+      if (!seenIds.has(strKey)) {
         allIds.push(strKey);
+        seenIds.add(strKey);
       }
     }
   }

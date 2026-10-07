@@ -14,6 +14,7 @@
 
 import { TRAFFIC_LIMITS } from '../config/trafficConfig.js';
 import { diagnostics } from './diagnostics.js';
+import { shallowEqual } from './state/comparators.js';
 import { eventBus, createEventEnvelope } from './eventBus.js';
 import { smartUpdateDOM, flushPendingDomWrites, clearPendingDomWrites } from './domScheduler.js';
 import {
@@ -39,6 +40,7 @@ export {
 // Re-export eventBus and domScheduler utilities for backward compatibility
 export { eventBus, createEventEnvelope };
 export { smartUpdateDOM, flushPendingDomWrites, clearPendingDomWrites };
+export { shallowEqual };
 
 /**
  * HTML Escaper Utility for Safe DOM Rendering (Phase 9 Security)
@@ -322,12 +324,129 @@ export const INITIAL_STATE = {
   }
 };
 
+const STATE_DOMAINS = {
+  ui: ['currentView', 'theme', 'isSirenMuted', 'activeIncidentFilter', 'cctvPaused', 'cctvBoxesVisible', 'activeCamId'],
+  connection: ['sseConnected', 'connectionStatus', 'lastConnectedAt', 'lastDisconnectedAt', 'connectionAttemptCount', 'isStaleData'],
+  traffic: ['telemetry', 'isChaosMode', 'chaosLevel', 'greenWaveActive', 'greenSplitWonokromo', 'isRainMode', 'roadCondition'],
+  intersections: ['intersections'], incidents: ['incidents'], emergencies: ['activeEmergencies', 'emergency112Active'],
+  devices: ['devices'], signals: ['lastReceivedSignalSequence'], cctv: ['cctvVisionData', 'lastReceivedCctvSequence'],
+  analytics: [], simulation: [], diagnostics: []
+};
+function domainForKey(key) {
+  for (const [domain, keys] of Object.entries(STATE_DOMAINS)) if (keys.includes(key)) return domain;
+  return null;
+}
+function setPathImmutable(node, keys, value) {
+  if (!keys.length) return value;
+  const [key, ...rest] = keys;
+  const current = node?.[key];
+  const child = setPathImmutable(current && typeof current === 'object' ? current : {}, rest, value);
+  if (Object.is(current, child)) return node;
+  return Array.isArray(node) ? node.map((entry, index) => String(index) === key ? child : entry) : { ...(node || {}), [key]: child };
+}
+function evaluateTrackedSelector(selector, state) {
+  const dependencies = new Set();
+  const proxies = new WeakMap();
+  const proxySources = new WeakMap();
+  const trackedProxy = (source, path = '') => {
+    if (!source || typeof source !== 'object') return source;
+    if (proxies.has(source)) return proxies.get(source);
+    const proxy = new Proxy({}, {
+      get(_target, key) {
+        if (typeof key === 'string') dependencies.add(path ? `${path}.${key}` : key);
+        const value = source[key];
+        return value && typeof value === 'object' ? trackedProxy(value, path ? `${path}.${String(key)}` : String(key)) : value;
+      },
+      ownKeys() { return Reflect.ownKeys(source); },
+      getOwnPropertyDescriptor(_target, key) {
+        const descriptor = Object.getOwnPropertyDescriptor(source, key);
+        return descriptor ? { ...descriptor, configurable: true } : undefined;
+      }
+    });
+    proxies.set(source, proxy);
+    proxySources.set(proxy, source);
+    return proxy;
+  };
+  const selected = selector(trackedProxy(state));
+  const value = proxySources.get(selected) || selected;
+  for (const dependency of [...dependencies]) {
+    if ([...dependencies].some(candidate => candidate !== dependency && candidate.startsWith(`${dependency}.`))) dependencies.delete(dependency);
+  }
+  return { value, dependencies };
+}
+const DEVELOPMENT_ASSERTIONS = typeof process !== 'undefined' && process?.env?.NODE_ENV !== 'production';
+function upsertNormalizedCollection(collection, item, id, keySelector = value => value.id) {
+  const key = String(id);
+  const current = collection || { byId: {}, allIds: [] };
+  const previous = current.byId?.[key];
+  const nextItem = previous ? { ...previous, ...item } : item;
+  if (previous && Object.keys(item).every(field => Object.is(previous[field], item[field]))) return current;
+  return {
+    byId: { ...current.byId, [key]: nextItem },
+    allIds: previous ? current.allIds : [...current.allIds, key]
+  };
+}
+function shallowValueEqual(a, b) {
+  if (Object.is(a, b)) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
+  }
+  return shallowEqual(a, b);
+}
+function reuseEntityArray(previous = [], incoming = [], idField = 'id') {
+  if (!Array.isArray(incoming)) return incoming;
+  const previousById = new Map(previous.map(item => [String(item?.[idField]), item]));
+  const next = incoming.map(item => {
+    const old = previousById.get(String(item?.[idField]));
+    if (!old) return item;
+    const keys = Object.keys(item || {});
+    return keys.length === Object.keys(old || {}).length && keys.every(key => shallowValueEqual(old[key], item[key])) ? old : item;
+  });
+  if (next.length === previous.length && next.every((item, index) => item === previous[index])) return previous;
+  return next;
+}
+function snapshotValueEqual(a, b) {
+  if (Object.is(a, b)) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object' || Array.isArray(a) !== Array.isArray(b)) return false;
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  return keysA.length === keysB.length && keysA.every(key => Object.prototype.hasOwnProperty.call(b, key) && snapshotValueEqual(a[key], b[key]));
+}
+function reuseNormalizedCollection(previous, incoming) {
+  const old = previous || { byId: {}, allIds: [] };
+  const byId = {};
+  const allIds = [];
+  for (const id of incoming.allIds) {
+    const item = incoming.byId[id];
+    const oldItem = old.byId?.[id];
+    byId[id] = oldItem && snapshotValueEqual(oldItem, item) ? oldItem : item;
+    allIds.push(id);
+  }
+  if (allIds.length === old.allIds.length && allIds.every((id, index) => id === old.allIds[index] && byId[id] === old.byId[id])) return old;
+  return { byId, allIds };
+}
+function reconcileCanonicalCollection(previousCanonical, previousLegacy, incomingLegacy, normalizer, idSelector) {
+  const previousItems = new Map((previousLegacy || []).map(item => [String(idSelector(item)), item]));
+  const normalized = incomingLegacy.map(item => {
+    const id = String(idSelector(item));
+    const previousEntity = previousCanonical?.byId?.[id];
+    if (previousEntity && previousItems.get(id) === item) return previousEntity;
+    return normalizer(item);
+  });
+  return reuseNormalizedCollection(previousCanonical, createNormalizedCollection(normalized));
+}
+
 export class StateStore {
   constructor() {
     this._state = deepClone(INITIAL_STATE);
-    /** @type {Map<string, Set<Function>>} */
-    this._listeners = new Map();
+    if (DEVELOPMENT_ASSERTIONS) deepFreeze(this._state);
+    this._selectorListeners = new Set();
     this._version = 1;
+    this._batchDepth = 0;
+    this._batch = null;
+    this._domainVersions = Object.create(null);
+    this._performance = { updates: [], selectorCallbacks: [], mutationDurations: [], maxMutationDurationMs: 0 };
   }
 
   /**
@@ -335,7 +454,9 @@ export class StateStore {
    * @returns {Readonly<typeof INITIAL_STATE>}
    */
   getState() {
-    return deepFreeze(deepClone(this._state));
+    // State is immutable by convention: mutations must go through Store APIs.
+    // Returning the stable root reference avoids a full-tree clone on read paths.
+    return this._state;
   }
 
   /**
@@ -353,82 +474,106 @@ export class StateStore {
    * @param {string} [options.source='local']
    */
   setState(updateArg, options = {}) {
+    const mutationStarted = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const { emitGeneric = true, source = 'local' } = typeof options === 'boolean' ? { emitGeneric: options } : options;
-    const prevState = deepClone(this._state);
-
-    const partialState = typeof updateArg === 'function' ? updateArg(deepClone(this._state)) : updateArg;
+    const prevState = this._state;
+    const partialState = typeof updateArg === 'function' ? updateArg(prevState) : updateArg;
     if (!partialState || typeof partialState !== 'object') return;
 
-    // Langkah 16: Granular equality check to prevent repeated identical state updates
-    let hasActualChange = false;
+    let nextState = prevState;
     const changedKeys = [];
 
     for (const [key, val] of Object.entries(partialState)) {
       if (key === 'telemetry' && typeof val === 'object' && val !== null) {
-        let telChanged = false;
-        const curTel = this._state.telemetry || {};
-        for (const [tk, tv] of Object.entries(val)) {
-          if (curTel[tk] !== tv) {
-            telChanged = true;
-            break;
-          }
-        }
-        if (telChanged) {
-          this._state.telemetry = {
-            ...this._state.telemetry,
-            ...deepClone(val)
-          };
-          hasActualChange = true;
+        const current = prevState.telemetry || {};
+        const entries = Object.entries(val).filter(([field, value]) => !Object.is(current[field], value));
+        if (entries.length) {
+          if (nextState === prevState) nextState = { ...prevState };
+          nextState.telemetry = { ...current, ...Object.fromEntries(entries) };
           changedKeys.push(key);
         }
       } else {
-        const curVal = this._state[key];
-        // Fast primitive equality check or reference check
-        if (typeof val !== 'object' || val === null) {
-          if (curVal !== val) {
-            this._state[key] = val;
-            hasActualChange = true;
-            changedKeys.push(key);
-          }
-        } else {
-          // Object/array update
-          this._state[key] = deepClone(val);
-          hasActualChange = true;
+        if (!Object.is(prevState[key], val)) {
+          if (nextState === prevState) nextState = { ...prevState };
+          nextState[key] = val;
           changedKeys.push(key);
         }
       }
     }
 
-    if (!hasActualChange) return;
+    if (!changedKeys.length) return;
 
     this._version++;
     const nowIso = new Date().toISOString();
-    this._state.stateVersion = this._version;
-    this._state.lastUpdated = nowIso;
+    nextState.stateVersion = this._version;
+    nextState.lastUpdated = nowIso;
+    const domains = new Set(changedKeys.map(domainForKey).filter(Boolean));
+    const versions = { ...(nextState.versions || {}) };
+    for (const domain of domains) {
+      this._domainVersions[domain] = (this._domainVersions[domain] || 0) + 1;
+      versions[domain] = this._domainVersions[domain];
+    }
+    if (domains.size) nextState.versions = versions;
+    if (DEVELOPMENT_ASSERTIONS) deepFreeze(nextState);
+    this._state = nextState;
     diagnostics.recordStateUpdate();
+    this._recordPerformance('updates');
+    const duration = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - mutationStarted;
+    this._performance.mutationDurations.push({ at: Date.now(), value: duration });
+    this._performance.maxMutationDurationMs = Math.max(this._performance.maxMutationDurationMs, duration);
+    this._prunePerformance();
 
-    const snapshot = this.getState();
+    if (this._batchDepth) {
+      this._batch.changedKeys = new Set([...this._batch.changedKeys, ...changedKeys]);
+      this._batch.emitGeneric ||= emitGeneric;
+      this._batch.sources.add(source);
+      return;
+    }
+    this._emitCommit(prevState, changedKeys, emitGeneric, source);
+  }
 
-    // Standard Envelope Event
-    if (emitGeneric) {
-      this.publish("state:changed", createEventEnvelope("state:changed", {
-        prev: prevState,
-        current: snapshot,
-        changedKeys
-      }, source, this._version));
+  _emitCommit(prevState, changedKeys, emitGeneric, source) {
+    const snapshot = this._state;
+    if (emitGeneric) this.publish('state:changed', createEventEnvelope('state:changed', {
+      prev: prevState, current: snapshot, changedKeys
+    }, source, this._version));
+
+    const changedSet = new Set(changedKeys);
+    for (const key of changedKeys) {
+      const previous = prevState[key];
+      const current = snapshot[key];
+      if (!previous || !current || typeof previous !== 'object' || typeof current !== 'object') continue;
+      const nestedKeys = new Set([...Object.keys(previous), ...Object.keys(current)]);
+      for (const nestedKey of nestedKeys) if (!Object.is(previous[nestedKey], current[nestedKey])) changedSet.add(`${key}.${nestedKey}`);
+    }
+    const dependencyChanged = key => key.includes('.')
+      ? changedSet.has(key) || [...changedSet].some(changed => changed.startsWith(`${key}.`))
+      : changedSet.has(key) || [...changedSet].some(changed => changed.startsWith(`${key}.`));
+    for (const listener of [...this._selectorListeners]) {
+      if (![...listener.dependencies].some(dependencyChanged)) continue;
+      try {
+        const evaluated = evaluateTrackedSelector(listener.selector, snapshot);
+        const nextSelected = evaluated.value;
+        listener.dependencies = evaluated.dependencies;
+        if (!listener.equalityFn(listener.current, nextSelected)) {
+          const previous = listener.current;
+          listener.current = nextSelected;
+          this._recordPerformance('selectorCallbacks');
+          listener.callback(nextSelected, previous);
+        }
+      } catch (err) {
+        console.error('[StateStore] Selector error:', err);
+      }
     }
 
     // Key-specific subscriptions for backwards compatibility
     for (const key of changedKeys) {
-      this.publish(`state:${key}`, {
-        value: this._state[key],
-        prev: prevState[key]
-      });
+      this.publish(`state:${key}`, { value: snapshot[key], prev: prevState[key] });
     }
 
     // Trigger standardized domain events if related keys changed
     if (changedKeys.includes('telemetry') || changedKeys.includes('intersections') || changedKeys.includes('isChaosMode') || changedKeys.includes('greenWaveActive')) {
-      const trafficEnvelope = createEventEnvelope("traffic:update", {
+      const trafficEnvelope = createEventEnvelope('traffic:update', {
         telemetry: snapshot.telemetry,
         intersections: snapshot.intersections,
         isChaosMode: snapshot.isChaosMode,
@@ -437,10 +582,80 @@ export class StateStore {
         greenSplitWonokromo: snapshot.greenSplitWonokromo,
         activeEmergencies: snapshot.activeEmergencies
       }, source, this._version);
-      this.publish("traffic:update", trafficEnvelope);
-      this.publish("telemetry:update", snapshot.telemetry);
+      this.publish('traffic:update', trafficEnvelope);
+      this.publish('telemetry:update', snapshot.telemetry);
     }
   }
+
+  /** Coalesce synchronous domain changes and notify subscribers once at commit. */
+  batch(mutator) {
+    if (typeof mutator !== 'function') return;
+    const outermost = this._batchDepth === 0;
+    if (outermost) this._batch = { prevState: this._state, changedKeys: new Set(), emitGeneric: false, sources: new Set() };
+    this._batchDepth++;
+    try {
+      return mutator();
+    } finally {
+      this._batchDepth--;
+      if (outermost) {
+        const batch = this._batch;
+        this._batch = null;
+        if (batch.changedKeys.size) this._emitCommit(batch.prevState, [...batch.changedKeys], batch.emitGeneric, batch.sources.size === 1 ? [...batch.sources][0] : 'batch');
+      }
+    }
+  }
+
+  _recordPerformance(metric) {
+    this._performance[metric].push(Date.now());
+    this._prunePerformance();
+  }
+
+  _prunePerformance() {
+    const cutoff = Date.now() - 1000;
+    for (const metric of ['updates', 'selectorCallbacks']) {
+      while (this._performance[metric].length && this._performance[metric][0] < cutoff) this._performance[metric].shift();
+    }
+    while (this._performance.mutationDurations.length && this._performance.mutationDurations[0].at < cutoff) this._performance.mutationDurations.shift();
+    this._performance.maxMutationDurationMs = Math.max(0, ...this._performance.mutationDurations.map(item => item.value));
+  }
+
+  getDiagnostics() {
+    this._prunePerformance();
+    const durations = this._performance.mutationDurations.map(item => item.value);
+    return {
+      stateUpdatesPerSecond: this._performance.updates.length,
+      selectorCallbacksPerSecond: this._performance.selectorCallbacks.length,
+      averageMutationDurationMs: durations.length ? durations.reduce((sum, value) => sum + value, 0) / durations.length : 0,
+      maxMutationDurationMs: this._performance.maxMutationDurationMs,
+      activeSelectorSubscriptions: this._selectorListeners.size,
+      activeEventSubscriptions: eventBus.getListenerCount(),
+      domainVersions: { ...this._domainVersions }
+    };
+  }
+
+  updateDomain(domain, partial, options = {}) {
+    const domainKeys = {
+      traffic: ['telemetry', 'intersections', 'activeEmergencies', 'isChaosMode', 'chaosLevel', 'greenWaveActive', 'greenSplitWonokromo', 'lastTelemetryAt', 'lastTelemetryTime', 'lastTelemetrySource', 'lastReceivedSequence', 'isStaleData', 'canonical'],
+      intersections: ['intersections', 'canonical'], incidents: ['incidents', 'canonical', 'lastReceivedIncidentSequence'],
+      emergencies: ['activeEmergencies', 'emergency112Active', 'greenWaveActive', 'canonical', 'lastReceivedEmergencySequence'],
+      devices: ['devices', 'canonical', 'lastReceivedDeviceSequence'], signals: ['intersections', 'canonical', 'lastReceivedSignalSequence'],
+      cctv: ['cctvVisionData', 'cctvCamerasMetrics', 'lastReceivedCctvSequence'],
+      connection: ['connectionStatus', 'sseConnected', 'lastConnectedAt', 'lastDisconnectedAt', 'lastTelemetryAt', 'lastTelemetryTime', 'connectionAttemptCount', 'isStaleData', 'lastReceivedSequence'],
+      ui: ['currentView', 'theme', 'isSirenMuted', 'activeIncidentFilter', 'cctvPaused', 'cctvBoxesVisible', 'activeCamId'],
+    }[domain];
+    if (!domainKeys) throw new Error(`Unknown state domain: ${domain}`);
+    for (const key of Object.keys(partial || {})) if (!domainKeys.includes(key)) throw new Error(`State key '${key}' does not belong to domain '${domain}'`);
+    return this.setState(partial, options);
+  }
+
+  updateTraffic(partial, options) { return this.updateDomain('traffic', partial, options); }
+  updateIntersection(partial, options) { return this.updateDomain('intersections', partial, options); }
+  updateIncident(partial, options) { return this.updateDomain('incidents', partial, options); }
+  updateEmergency(partial, options) { return this.updateDomain('emergencies', partial, options); }
+  updateSignal(partial, options) { return this.updateDomain('signals', partial, options); }
+  updateDevice(partial, options) { return this.updateDomain('devices', partial, options); }
+  updateCctv(partial, options) { return this.updateDomain('cctv', partial, options); }
+  updateConnection(partial, options) { return this.updateDomain('connection', partial, options); }
 
   /**
    * Memperbarui data bersarang dengan aman
@@ -450,19 +665,9 @@ export class StateStore {
    */
   setNestedState(path, value, source = 'local') {
     const keys = path.split('.');
-    const nextState = deepClone(this._state);
-    let cur = nextState;
-
-    for (let i = 0; i < keys.length - 1; i++) {
-      const k = keys[i];
-      if (!(k in cur) || typeof cur[k] !== 'object' || cur[k] === null) {
-        cur[k] = {};
-      }
-      cur = cur[k];
-    }
-
-    cur[keys[keys.length - 1]] = deepClone(value);
-    this.setState(nextState, { source });
+    const next = setPathImmutable(this._state, keys, value);
+    const rootKey = keys[0];
+    if (next !== this._state) this.setState({ [rootKey]: next[rootKey] }, { source });
   }
 
   /**
@@ -472,24 +677,14 @@ export class StateStore {
    * @param {(selectedVal: any, prevVal: any) => void} callback
    * @returns {() => void} Fungsi unsubscribe
    */
-  subscribeSelector(selector, callback) {
+  subscribeSelector(selector, callback, equalityFn = Object.is) {
     if (typeof selector !== 'function' || typeof callback !== 'function') {
       return () => {};
     }
-    let currentSelected = selector(this._state);
-
-    return this.subscribe("state:changed", () => {
-      try {
-        const nextSelected = selector(this._state);
-        if (JSON.stringify(currentSelected) !== JSON.stringify(nextSelected)) {
-          const prev = currentSelected;
-          currentSelected = nextSelected;
-          callback(nextSelected, prev);
-        }
-      } catch (err) {
-        console.error('[StateStore] Selector error:', err);
-      }
-    });
+    const evaluated = evaluateTrackedSelector(selector, this._state);
+    const listener = { selector, callback, equalityFn: typeof equalityFn === 'function' ? equalityFn : Object.is, current: evaluated.value, dependencies: evaluated.dependencies };
+    this._selectorListeners.add(listener);
+    return () => this._selectorListeners.delete(listener);
   }
 
   /**
@@ -520,6 +715,7 @@ export class StateStore {
    */
   clearListeners() {
     eventBus.clearListeners();
+    this._selectorListeners.clear();
   }
 
   /**
@@ -666,16 +862,16 @@ export function applyServerSnapshot(serverState, source = 'server') {
   diagnostics.recordAcceptedEvent('device', updates.lastReceivedDeviceSequence, timestampMs);
 
   if (Array.isArray(rawState.intersections)) {
-    updates.intersections = deepClone(rawState.intersections);
+    updates.intersections = reuseEntityArray(currentStore.intersections, rawState.intersections.map(item => ({ ...item })), 'id');
   }
   if (Array.isArray(rawState.activeEmergencies)) {
-    updates.activeEmergencies = deepClone(rawState.activeEmergencies);
+    updates.activeEmergencies = reuseEntityArray(currentStore.activeEmergencies, rawState.activeEmergencies.map(item => ({ ...item })), 'id');
   }
   if (Array.isArray(rawState.incidents)) {
-    updates.incidents = deepClone(rawState.incidents);
+    updates.incidents = reuseEntityArray(currentStore.incidents, rawState.incidents.map(item => ({ ...item })), 'id');
   }
   if (Array.isArray(rawState.devices)) {
-    updates.devices = deepClone(rawState.devices);
+    updates.devices = reuseEntityArray(currentStore.devices, rawState.devices.map(item => ({ ...item })), 'deviceId');
   }
 
   const telemetryKeys = ['networkLoad', 'avgWaitTime', 'congestionIndex', 'co2SavedKg', 'fuelSavedLiters', 'vehiclesToday', 'sitsUptime', 'cctvOnline', 'iotOnline', 'sitsSignal', 'aiScore', 'aiConfidence', 'timestamp'];
@@ -696,25 +892,28 @@ export function applyServerSnapshot(serverState, source = 'server') {
   const incomingEmergencies = updates.activeEmergencies || currentStore.activeEmergencies || [];
   const incomingTelemetry = updates.telemetry || currentStore.telemetry || {};
 
-  const canonicalIntersections = incomingIntersections.map(normalizeCanonicalIntersection);
-  const canonicalDevices = incomingDevices.map(normalizeCanonicalDevice);
-  const canonicalIncidents = incomingIncidents.map(normalizeCanonicalIncident);
-  const canonicalEmergencies = incomingEmergencies.map(normalizeCanonicalEmergency);
-  const canonicalTelemetry = normalizeCanonicalTelemetry({
+  const canonicalIntersections = reconcileCanonicalCollection(currentStore.canonical?.intersections, currentStore.intersections, incomingIntersections, normalizeCanonicalIntersection, item => item.id);
+  const canonicalDevices = reconcileCanonicalCollection(currentStore.canonical?.devices, currentStore.devices, incomingDevices, normalizeCanonicalDevice, item => item.deviceId || item.id);
+  const canonicalIncidents = reconcileCanonicalCollection(currentStore.canonical?.incidents, currentStore.incidents, incomingIncidents, normalizeCanonicalIncident, item => item.id);
+  const canonicalEmergencies = reconcileCanonicalCollection(currentStore.canonical?.emergencies, currentStore.activeEmergencies, incomingEmergencies, normalizeCanonicalEmergency, item => item.id);
+  const normalizedTelemetry = normalizeCanonicalTelemetry({
     ...incomingTelemetry,
     source: 'server',
     provenance: 'SIMULATED',
     updatedAt: new Date(timestampMs).toISOString()
   });
+  const previousCanonical = currentStore.canonical || {};
+  const canonicalTelemetry = snapshotValueEqual(previousCanonical.telemetry, normalizedTelemetry) ? previousCanonical.telemetry : normalizedTelemetry;
 
   updates.provenance = 'SIMULATED';
-  updates.canonical = {
+  const canonical = {
     telemetry: canonicalTelemetry,
-    intersections: createNormalizedCollection(canonicalIntersections),
-    devices: createNormalizedCollection(canonicalDevices),
-    incidents: createNormalizedCollection(canonicalIncidents),
-    emergencies: createNormalizedCollection(canonicalEmergencies)
+    intersections: canonicalIntersections,
+    devices: canonicalDevices,
+    incidents: canonicalIncidents,
+    emergencies: canonicalEmergencies
   };
+  updates.canonical = Object.keys(canonical).every(key => canonical[key] === previousCanonical[key]) ? previousCanonical : canonical;
 
   stateStore.setState(updates, { source });
   stateStore.publish("state:resynced", createEventEnvelope("state:resynced", updates, source, seq));
@@ -830,8 +1029,8 @@ export function updateTrafficState(payload, source = 'server') {
   if ('chaosLevel' in payload) updates.chaosLevel = payload.chaosLevel;
   if ('greenWaveActive' in payload) updates.greenWaveActive = payload.greenWaveActive;
   if ('greenSplitWonokromo' in payload) updates.greenSplitWonokromo = payload.greenSplitWonokromo;
-  if ('intersections' in payload && Array.isArray(payload.intersections)) updates.intersections = payload.intersections;
-  if ('activeEmergencies' in payload && Array.isArray(payload.activeEmergencies)) updates.activeEmergencies = payload.activeEmergencies;
+  if ('intersections' in payload && Array.isArray(payload.intersections)) updates.intersections = reuseEntityArray(currentState.intersections, payload.intersections.map(item => ({ ...item })), 'id');
+  if ('activeEmergencies' in payload && Array.isArray(payload.activeEmergencies)) updates.activeEmergencies = reuseEntityArray(currentState.activeEmergencies, payload.activeEmergencies.map(item => ({ ...item })), 'id');
 
   // Extract telemetry metrics
   const telemetryKeys = ['networkLoad', 'avgWaitTime', 'congestionIndex', 'co2SavedKg', 'fuelSavedLiters', 'vehiclesToday', 'sitsUptime', 'cctvOnline', 'iotOnline', 'sitsSignal', 'aiScore', 'aiConfidence', 'timestamp'];
@@ -862,28 +1061,33 @@ export function updateTrafficState(payload, source = 'server') {
   }
 
   const curState = stateStore.getState();
-  const curCanonical = deepClone(curState.canonical || {});
+  const curCanonical = curState.canonical || {};
+  let nextCanonical = curCanonical;
+  const setCanonical = (key, value) => {
+    if (nextCanonical === curCanonical) nextCanonical = { ...curCanonical };
+    nextCanonical[key] = value;
+  };
 
   if (updates.telemetry) {
-    curCanonical.telemetry = normalizeCanonicalTelemetry({
+    setCanonical('telemetry', normalizeCanonicalTelemetry({
       ...curState.telemetry,
       ...updates.telemetry,
       source,
       provenance: 'SIMULATED',
       updatedAt: new Date(now).toISOString()
-    });
+    }));
   }
 
   if (updates.intersections && Array.isArray(updates.intersections)) {
-    curCanonical.intersections = createNormalizedCollection(updates.intersections.map(normalizeCanonicalIntersection));
+    setCanonical('intersections', createNormalizedCollection(updates.intersections.map(normalizeCanonicalIntersection)));
   }
 
   if (updates.activeEmergencies && Array.isArray(updates.activeEmergencies)) {
-    curCanonical.emergencies = createNormalizedCollection(updates.activeEmergencies.map(normalizeCanonicalEmergency));
+    setCanonical('emergencies', createNormalizedCollection(updates.activeEmergencies.map(normalizeCanonicalEmergency)));
   }
 
-  updates.canonical = curCanonical;
-  stateStore.setState(updates, { source });
+  if (nextCanonical !== curCanonical) updates.canonical = nextCanonical;
+  stateStore.updateTraffic(updates, { source });
 }
 
 /**
@@ -894,29 +1098,24 @@ export function updateSignalState(nodeId, signalData, source = 'controller') {
     return;
   }
   const incomingSeq = signalData.seq || signalData.sequence || 0;
-  const currentIntersections = deepClone(stateStore.getState().intersections || []);
-  let found = false;
-
-  const updated = currentIntersections.map(node => {
-    if (node.id === nodeId) {
-      found = true;
-      return { ...node, ...signalData };
-    }
-    return node;
+  const state = stateStore.getState();
+  const current = state.intersections || [];
+  let nextItem;
+  const updated = current.map(node => {
+    if (String(node.id) !== String(nodeId)) return node;
+    nextItem = { ...node, ...signalData };
+    return nextItem;
   });
-
-  if (found) {
-    const curCanonical = deepClone(stateStore.getState().canonical || {});
-    const canonicalList = updated.map(normalizeCanonicalIntersection);
-    curCanonical.intersections = createNormalizedCollection(canonicalList);
-
-    stateStore.setState({ 
-      intersections: updated,
-      canonical: curCanonical,
-      lastReceivedSignalSequence: source === 'server' && incomingSeq > 0 ? incomingSeq : stateStore.getState().lastReceivedSignalSequence
-    }, { source });
-    stateStore.publish("signal:update", createEventEnvelope("signal:update", { nodeId, signalData, intersections: updated }, source));
-  }
+  if (!nextItem) return;
+  const canonical = state.canonical || {};
+  const normalized = normalizeCanonicalIntersection(nextItem);
+  const canonicalIntersections = upsertNormalizedCollection(canonical.intersections, normalized, nodeId);
+  stateStore.updateDomain('signals', {
+    intersections: updated,
+    canonical: { ...canonical, intersections: canonicalIntersections },
+    lastReceivedSignalSequence: source === 'server' && incomingSeq > 0 ? incomingSeq : state.lastReceivedSignalSequence
+  }, { source });
+  stateStore.publish('signal:update', createEventEnvelope('signal:update', { nodeId, signalData, intersections: updated }, source));
 }
 
 /**
@@ -937,26 +1136,28 @@ export function updateEmergencyState(emergencyPayload, source = 'controller') {
   const payloadData = emergencyPayload.payload || emergencyPayload;
 
   if (Array.isArray(payloadData.activeEmergencies)) {
-    updates.activeEmergencies = deepClone(payloadData.activeEmergencies);
+    updates.activeEmergencies = payloadData.activeEmergencies;
   } else if (payloadData.item || payloadData.emergencyItem) {
     const item = payloadData.item || payloadData.emergencyItem;
-    const list = deepClone(stateStore.getState().activeEmergencies || []);
+    const list = stateStore.getState().activeEmergencies || [];
     const existingIdx = list.findIndex(e => e.id === item.id || e.vehicleId === item.vehicleId);
-    if (existingIdx >= 0) {
-      list[existingIdx] = { ...list[existingIdx], ...item };
-    } else {
-      list.unshift(item);
-    }
-    if (list.length > 5) list.pop();
-    updates.activeEmergencies = list;
+    const nextItem = existingIdx >= 0 ? { ...list[existingIdx], ...item } : item;
+    const updated = existingIdx >= 0 ? list.map((entry, index) => index === existingIdx ? nextItem : entry) : [nextItem, ...list];
+    const bounded = updated.length > 5 ? updated.slice(0, 5) : updated;
+    updates.activeEmergencies = bounded;
   }
 
-  const finalEmergencies = updates.activeEmergencies || stateStore.getState().activeEmergencies || [];
-  const curCanonical = deepClone(stateStore.getState().canonical || {});
-  curCanonical.emergencies = createNormalizedCollection(finalEmergencies.map(normalizeCanonicalEmergency));
-  updates.canonical = curCanonical;
+  const currentState = stateStore.getState();
+  const finalEmergencies = updates.activeEmergencies || currentState.activeEmergencies || [];
+  const canonical = currentState.canonical || {};
+  if (updates.activeEmergencies) {
+    const emergencies = Array.isArray(payloadData.activeEmergencies)
+      ? createNormalizedCollection(updates.activeEmergencies.map(normalizeCanonicalEmergency))
+      : upsertNormalizedCollection(canonical.emergencies, normalizeCanonicalEmergency(updates.activeEmergencies[0]), updates.activeEmergencies[0].id);
+    updates.canonical = { ...canonical, emergencies };
+  }
 
-  stateStore.setState(updates, { source });
+  stateStore.updateEmergency(updates, { source });
   stateStore.publish("emergency:update", createEventEnvelope("emergency:update", emergencyPayload, source));
 }
 
@@ -968,27 +1169,26 @@ export function updateIncidentState(incidentId, updateData, source = 'controller
     return;
   }
   const incomingSeq = updateData.seq || updateData.sequence || 0;
-  const currentIncidents = deepClone(stateStore.getState().incidents || []);
-  let found = false;
+  const state = stateStore.getState();
+  const currentIncidents = state.incidents || [];
+  let nextItem;
   const updated = currentIncidents.map(inc => {
     if (String(inc.id) === String(incidentId)) {
-      found = true;
-      return { ...inc, ...updateData };
+      nextItem = { ...inc, ...updateData };
+      return nextItem;
     }
     return inc;
   });
 
-  if (!found) {
-    updated.unshift({ id: incidentId, ...updateData });
-  }
+  if (!nextItem) { nextItem = { id: incidentId, ...updateData }; updated.unshift(nextItem); }
 
-  const curCanonical = deepClone(stateStore.getState().canonical || {});
-  curCanonical.incidents = createNormalizedCollection(updated.map(normalizeCanonicalIncident));
+  const canonical = state.canonical || {};
+  const collection = upsertNormalizedCollection(canonical.incidents, normalizeCanonicalIncident(nextItem), incidentId);
 
-  stateStore.setState({ 
+  stateStore.updateIncident({
     incidents: updated,
-    canonical: curCanonical,
-    lastReceivedIncidentSequence: source === 'server' && incomingSeq > 0 ? incomingSeq : stateStore.getState().lastReceivedIncidentSequence
+    canonical: { ...canonical, incidents: collection },
+    lastReceivedIncidentSequence: source === 'server' && incomingSeq > 0 ? incomingSeq : state.lastReceivedIncidentSequence
   }, { source });
   stateStore.publish("incident:update", createEventEnvelope("incident:update", { incidentId, updateData, incidents: updated }, source));
 }
@@ -1001,21 +1201,22 @@ export function updateDeviceState(deviceId, deviceData, source = 'controller') {
     return;
   }
   const incomingSeq = deviceData.seq || deviceData.sequence || 0;
-  const currentDevices = deepClone(stateStore.getState().devices || []);
+  const state = stateStore.getState();
+  const currentDevices = state.devices || [];
+  let nextDevice;
   const updated = currentDevices.map(dev => {
-    if (dev.deviceId === deviceId) {
-      return { ...dev, ...deviceData };
-    }
-    return dev;
+    if (String(dev.deviceId) !== String(deviceId)) return dev;
+    nextDevice = { ...dev, ...deviceData };
+    return nextDevice;
   });
+  if (!nextDevice) { nextDevice = { deviceId, ...deviceData }; updated.push(nextDevice); }
+  const canonical = state.canonical || {};
+  const collection = upsertNormalizedCollection(canonical.devices, normalizeCanonicalDevice(nextDevice), deviceId, value => value.deviceId);
 
-  const curCanonical = deepClone(stateStore.getState().canonical || {});
-  curCanonical.devices = createNormalizedCollection(updated.map(normalizeCanonicalDevice));
-
-  stateStore.setState({ 
+  stateStore.updateDevice({
     devices: updated,
-    canonical: curCanonical,
-    lastReceivedDeviceSequence: source === 'server' && incomingSeq > 0 ? incomingSeq : stateStore.getState().lastReceivedDeviceSequence
+    canonical: { ...canonical, devices: collection },
+    lastReceivedDeviceSequence: source === 'server' && incomingSeq > 0 ? incomingSeq : state.lastReceivedDeviceSequence
   }, { source });
   stateStore.publish("device:update", createEventEnvelope("device:update", { deviceId, deviceData, devices: updated }, source));
 }
@@ -1025,21 +1226,23 @@ export function updateDeviceState(deviceId, deviceData, source = 'controller') {
  */
 export function updateTelemetryState(telemetryData, source = 'server') {
   const now = Date.now();
-  const curCanonical = deepClone(stateStore.getState().canonical || {});
-  curCanonical.telemetry = normalizeCanonicalTelemetry({
+  const current = stateStore.getState();
+  const canonical = current.canonical || {};
+  const telemetry = normalizeCanonicalTelemetry({
+    ...current.telemetry,
     ...telemetryData,
     source,
     provenance: 'SIMULATED',
     updatedAt: new Date(now).toISOString()
   });
 
-  stateStore.setState({
+  stateStore.updateTraffic({
     telemetry: telemetryData,
-    canonical: curCanonical,
+    canonical: { ...canonical, telemetry },
     lastTelemetryTime: now,
     lastTelemetryAt: now,
     lastTelemetrySource: source,
-    isStaleData: source === 'server' ? false : stateStore.getState().isStaleData
+    isStaleData: source === 'server' ? false : current.isStaleData
   }, { source });
 }
 
@@ -1051,7 +1254,7 @@ export function updateCctvVisionState(framePayload, source = 'server') {
     return;
   }
   const incomingSeq = framePayload.seq || framePayload.sequence || 0;
-  stateStore.setState({ 
+  stateStore.updateCctv({
     cctvVisionData: framePayload,
     lastReceivedCctvSequence: source === 'server' && incomingSeq > 0 ? incomingSeq : stateStore.getState().lastReceivedCctvSequence
   }, { source, emitGeneric: false });

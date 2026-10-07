@@ -615,5 +615,6 @@ class CommandLayer {
 
 export const commandLayer = new CommandLayer();
 if (typeof window !== 'undefined') {
+  // Compatibility bridge consumed by SocketClient during reconnect reconciliation.
   window.commandLayer = commandLayer;
 }

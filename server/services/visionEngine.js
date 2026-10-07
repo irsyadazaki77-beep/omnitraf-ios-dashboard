@@ -132,6 +132,21 @@ export class ComputerVisionEngine {
       this.vehiclesPerCam.set(camId, this._generateInitialVehicles(camId));
     });
   }
+
+  getSnapshot() {
+    return { frameSequence: this.frameSequence, randomState: this.prng.getSnapshot(), vehicles: Array.from(this.vehiclesPerCam.entries()) };
+  }
+
+  restoreSnapshot(snapshot) {
+    if (!snapshot || !Number.isSafeInteger(snapshot.frameSequence) || snapshot.frameSequence < 0 || !Array.isArray(snapshot.vehicles)) {
+      throw new TypeError('invalid computer vision snapshot');
+    }
+    const vehicles = new Map(snapshot.vehicles);
+    if (this.cameras.some((cameraId) => !Array.isArray(vehicles.get(cameraId)))) throw new TypeError('computer vision snapshot is missing camera state');
+    this.prng.restoreSnapshot(snapshot.randomState);
+    this.frameSequence = snapshot.frameSequence;
+    this.vehiclesPerCam = vehicles;
+  }
 }
 
 export const cvEngine = new ComputerVisionEngine();

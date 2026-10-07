@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { backendState } from '../services/stateManager.js';
 import { createApiResponse, createApiErrorResponse, sanitizeString } from '../middlewares/errorHandler.js';
 import { diagnosticEngine } from '../services/diagnosticEngine.js';
@@ -9,7 +10,7 @@ export function executeTerminalCommand(req, res) {
   const cmd = typeof command === 'string' ? sanitizeString(command, 40).trim() : '';
   const lower = cmd.toLowerCase();
   const time = backendState._getWibTimeString();
-  const executionId = `EXEC-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+  const executionId = `EXEC-${randomUUID()}`;
   // Security: authenticated user strictly from verified principal (req.user), never client body
   const act = req.user.name;
 

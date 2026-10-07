@@ -13,17 +13,20 @@ import { createApiResponse, createApiErrorResponse, createCommandErrorResponse, 
 import { ROLES } from '../config/constants.js';
 import { commandExecutor } from '../services/commandExecutor.js';
 import { SAFETY_BOUNDARY } from '../config/safetyBoundary.js';
+import { clusterRuntime } from '../infrastructure/redis/clusterRuntimeSingleton.js';
+import { runtimeInstanceId } from '../infrastructure/redis/simulationLeadership.js';
+import { OMNITRAF_RUNTIME_MODE } from '../config/env.js';
 import { validateDiagnosticEventsQuery } from '../config/contracts.js';
 
 export function getDiagnosticHealth(req, res) {
-  const dbReady = dbManager.isInitialized && dbManager.db !== null;
+  const dbReady = dbManager.isInitialized && dbManager.ping();
   let dbStatus = HEALTH_STATUS.UNAVAILABLE;
   let dbLatencyMs = 0;
 
   if (dbReady) {
     const t0 = Date.now();
     try {
-      dbManager.db.exec('SELECT 1;');
+      if (!dbManager.ping()) throw new Error('DATABASE_PING_FAILED');
       dbLatencyMs = Date.now() - t0;
       dbStatus = HEALTH_STATUS.HEALTHY;
     } catch (err) {
@@ -34,6 +37,8 @@ export function getDiagnosticHealth(req, res) {
   const clientsCount = backendState.io?.engine?.clientsCount || 0;
   const socketStatus = backendState.io ? HEALTH_STATUS.HEALTHY : HEALTH_STATUS.DEGRADED;
   const stateStatus = backendState.isHydrated ? HEALTH_STATUS.HEALTHY : HEALTH_STATUS.STARTING;
+  const leadership = clusterRuntime.leadership?.getDiagnostics() || { mode: OMNITRAF_RUNTIME_MODE, instanceId: runtimeInstanceId, role: 'UNAVAILABLE', redisStatus: OMNITRAF_RUNTIME_MODE === 'single' ? 'NOT_REQUIRED' : 'UNAVAILABLE', leaderId: null, leaseExpiresInMs: 0, synchronized: false };
+  const clusterReady = OMNITRAF_RUNTIME_MODE === 'single' || (clusterRuntime.redis?.isConnected() && leadership.synchronized && ['LEADER', 'FOLLOWER'].includes(leadership.role));
 
   // Check if simulated fault on database or socket is active
   if (diagnosticEngine.isFaultActive(SUBSYSTEMS.DATABASE)) {
@@ -47,7 +52,7 @@ export function getDiagnosticHealth(req, res) {
   diagnosticEngine.setSubsystemHealth(SUBSYSTEMS.STATE_MANAGER, stateStatus, `Hydrated: ${backendState.isHydrated}`);
   diagnosticEngine.setSubsystemHealth(SUBSYSTEMS.SOCKET, socketStatus, `Clients: ${clientsCount}`);
 
-  const isHealthy = dbStatus === HEALTH_STATUS.HEALTHY && stateStatus === HEALTH_STATUS.HEALTHY;
+  const isHealthy = dbStatus === HEALTH_STATUS.HEALTHY && stateStatus === HEALTH_STATUS.HEALTHY && clusterReady;
   const overallStatus = isHealthy ? (diagnosticEngine.activeFaults.size > 0 ? HEALTH_STATUS.DEGRADED : HEALTH_STATUS.HEALTHY) : HEALTH_STATUS.UNAVAILABLE;
 
   res.status(isHealthy ? 200 : 503).json(createApiResponse({
@@ -59,11 +64,15 @@ export function getDiagnosticHealth(req, res) {
       uptimeSec: Math.round(process.uptime()),
       pid: process.pid,
       subsystems: {
+        cluster: {
+          ...leadership,
+          ...clusterRuntime.getDiagnostics()
+        },
         database: {
           status: dbStatus,
           readiness: dbReady,
           latencyMs: dbLatencyMs,
-          path: '[LOCAL_EMBEDDED_SQLITE]'
+          persistence: dbManager.getHealth()
         },
         stateManager: {
           status: stateStatus,

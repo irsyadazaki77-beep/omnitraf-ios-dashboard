@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { ROUTES_DB } from '../config/constants.js';
 
 const isTest = typeof global.it === 'function' || 
@@ -12,6 +13,11 @@ if (isTest) {
 }
 
 import { dbManager } from '../db/database.js';
+import { incidentRepository } from '../repositories/incidentRepository.js';
+import { auditRepository } from '../repositories/auditRepository.js';
+import { deviceRepository } from '../repositories/deviceRepository.js';
+import { metadataRepository } from '../repositories/metadataRepository.js';
+import { signalConfigRepository } from '../repositories/signalConfigRepository.js';
 import {
   INCIDENT_STATES,
   EMERGENCY_STATES,
@@ -69,6 +75,7 @@ export class BackendStateManager {
     this.simEngine.registerDomain('state-finalize', 50, () => this._finishSimulationTick());
 
     this.sequence = 1;
+    this.stateVersion = 1;
     this.cctvSequence = 1;
     this.incidentSequence = 1;
     this.emergencySequence = 1;
@@ -323,6 +330,16 @@ export class BackendStateManager {
     this.io = io;
   }
 
+  stopRuntime() {
+    if (this.resolutionInterval) clearInterval(this.resolutionInterval);
+    this.resolutionInterval = null;
+    this.simEngine?.stop?.();
+  }
+
+  startRuntime() {
+    if (this.state?.isChaosMode) this._startChaosResolutionTimer();
+  }
+
   async init() {
     if (this.isHydrated) return this;
     if (this._initPromise) return this._initPromise;
@@ -332,7 +349,7 @@ export class BackendStateManager {
         await dbManager.init();
 
         // 0. Restore & Protect Sequence Monotonicity Across Restarts
-        const savedSeq = dbManager.getMetadata('last_persisted_sequence');
+        const savedSeq = metadataRepository.findByKey('last_persisted_sequence');
         if (savedSeq) {
           const parsed = parseInt(savedSeq, 10);
           if (!isNaN(parsed) && parsed >= this.sequence) {
@@ -347,7 +364,7 @@ export class BackendStateManager {
         }
 
         // 1. Deterministic Hydration: Incidents (Database is authoritative)
-        const incRes = dbManager.getAllIncidents();
+        const incRes = incidentRepository.findAll();
         const dbIncidents = Array.isArray(incRes) ? incRes : (incRes?.data || []);
         if (dbIncidents && dbIncidents.length > 0) {
           const incidentMap = new Map();
@@ -357,7 +374,7 @@ export class BackendStateManager {
           (this.state.incidents || []).forEach(seed => {
             if (!incidentMap.has(String(seed.id))) {
               try {
-                dbManager.upsertIncident(seed);
+                incidentRepository.upsert(seed);
                 incidentMap.set(String(seed.id), seed);
               } catch (_) {}
             }
@@ -367,12 +384,12 @@ export class BackendStateManager {
         } else {
           // Fresh database: persist initial seed incidents
           this.state.incidents.forEach(inc => {
-            try { dbManager.upsertIncident(inc); } catch (_) {}
+            try { incidentRepository.upsert(inc); } catch (_) {}
           });
         }
 
         // 2. Deterministic Hydration: Audit Logs (Deduplicated with Stable Identifiers)
-        const logRes = dbManager.getAllAuditLogs(100);
+        const logRes = auditRepository.findAll(100);
         const dbLogs = Array.isArray(logRes) ? logRes : (logRes?.data || []);
         if (dbLogs && dbLogs.length > 0) {
           const knownCorrs = new Set();
@@ -387,12 +404,12 @@ export class BackendStateManager {
           this.auditLogs = mergedLogs;
         } else {
           this.auditLogs.forEach(log => {
-            try { dbManager.insertAuditLog(log); } catch (_) {}
+            try { auditRepository.insert(log); } catch (_) {}
           });
         }
 
         // 3. Hydrate Signal Configs
-        const sigRes = dbManager.getAllSignalConfigs();
+        const sigRes = signalConfigRepository.findAll();
         const dbSignals = Array.isArray(sigRes) ? sigRes : (sigRes?.data || []);
         if (dbSignals && dbSignals.length > 0) {
           dbSignals.forEach(cfg => {
@@ -407,7 +424,7 @@ export class BackendStateManager {
         } else {
           this.state.intersections.forEach(node => {
             try {
-              dbManager.upsertSignalConfig(node.id, {
+              signalConfigRepository.upsert(node.id, {
                 greenSplit: node.greenSplit || 35,
                 cycleTime: 90,
                 mode: 'ADAPTIVE_AI'
@@ -417,7 +434,7 @@ export class BackendStateManager {
         }
 
         // 4. Hydrate Device Configs & Recover with Safe Defaults
-        const devRes = dbManager.getAllDeviceTelemetry();
+        const devRes = deviceRepository.findAll();
         const dbDevices = Array.isArray(devRes) ? devRes : (devRes?.data || []);
         if (dbDevices && dbDevices.length > 0) {
           dbDevices.forEach(dbDev => {
@@ -434,7 +451,7 @@ export class BackendStateManager {
           });
         } else {
           this.devicesRegistry.forEach(dev => {
-            try { dbManager.upsertDeviceTelemetry(dev); } catch (_) {}
+            try { deviceRepository.upsert(dev); } catch (_) {}
           });
         }
 
@@ -480,7 +497,7 @@ export class BackendStateManager {
     if (!logEntry) return;
 
     const nowIso = new Date().toISOString();
-    const stableCorrId = logEntry.correlationId || logEntry.commandId || `AUD-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    const stableCorrId = logEntry.correlationId || logEntry.commandId || `AUD-${randomUUID()}`;
     const normalizedLog = {
       ...logEntry,
       correlationId: stableCorrId,
@@ -497,7 +514,7 @@ export class BackendStateManager {
     }
 
     try {
-      dbManager.insertAuditLog(normalizedLog);
+      auditRepository.insert(normalizedLog);
     } catch (e) {
       console.error("❌ [Audit Log] Gagal menyimpan log audit:", e.message);
     }
@@ -766,6 +783,7 @@ export class BackendStateManager {
 
     return {
       seq: this.sequence,
+      stateVersion: this.stateVersion,
       cctvSeq: this.cctvSequence,
       incidentSeq: this.incidentSequence,
       emergencySeq: this.emergencySequence,
@@ -790,9 +808,35 @@ export class BackendStateManager {
 
   tick(deltaMs = 1000, options = {}) {
     this.pendingSimulationEvents = [];
+    this.stateVersion++;
     const result = this.simEngine.step(deltaMs, options);
     this._dispatchSimulationEvents();
     return result.domainResults?.['state-finalize'] || this.state;
+  }
+
+  getClusterSnapshot() {
+    return { stateVersion: this.stateVersion, simulationCheckpoint: this.simEngine.createCheckpoint(), auditLogs: this.auditLogs.slice(0, 250) };
+  }
+
+  applyClusterSnapshot(snapshot) {
+    if (!snapshot || !Number.isSafeInteger(snapshot.stateVersion) || !snapshot.simulationCheckpoint || !Array.isArray(snapshot.auditLogs)) return false;
+    if (snapshot.stateVersion < this.stateVersion) return false;
+    this.simEngine.restoreCheckpoint(snapshot.simulationCheckpoint);
+    this.auditLogs = cloneSimulationValue(snapshot.auditLogs).slice(0, 250);
+    this.stateVersion = snapshot.stateVersion;
+    this.isHydrated = true;
+    this._simulationBaseline = this._snapshotSimulationState();
+    return true;
+  }
+
+  persistClusterSnapshot() {
+    this.state.incidents.forEach((incident) => dbManager.upsertIncident(incident));
+    this.devicesRegistry.forEach((device) => dbManager.upsertDeviceTelemetry(device));
+    this.state.intersections.forEach((node) => dbManager.upsertSignalConfig(node.id, {
+      greenSplit: node.greenSplit || 35, cycleTime: 90, mode: node.mode || 'ADAPTIVE_AI'
+    }));
+    this.auditLogs.filter((entry) => entry.correlationId || entry.commandId).forEach((entry) => auditRepository.insert(entry));
+    return dbManager.flush();
   }
 
   _queueSimulationEvent(name, payload) {
@@ -823,6 +867,7 @@ export class BackendStateManager {
       activeFaults: this.activeFaults,
       deviceAuditTrail: this.deviceAuditTrail,
       sequence: this.sequence,
+      stateVersion: this.stateVersion,
       cctvSequence: this.cctvSequence,
       incidentSequence: this.incidentSequence,
       emergencySequence: this.emergencySequence,
@@ -839,7 +884,7 @@ export class BackendStateManager {
     if (!snapshot || !snapshot.state || !Array.isArray(snapshot.devicesRegistry)) {
       throw new TypeError('invalid state-manager simulation snapshot');
     }
-    for (const key of ['sequence', 'cctvSequence', 'incidentSequence', 'emergencySequence', 'signalSequence', 'deviceSequence', 'lastUpdated', 'vehiclesCountToday', 'co2SavedKg', 'fuelSavedLiters']) {
+    for (const key of ['sequence', 'stateVersion', 'cctvSequence', 'incidentSequence', 'emergencySequence', 'signalSequence', 'deviceSequence', 'lastUpdated', 'vehiclesCountToday', 'co2SavedKg', 'fuelSavedLiters']) {
       if (!Number.isFinite(snapshot[key])) throw new TypeError(`invalid state-manager snapshot field '${key}'`);
     }
     const restored = cloneSimulationValue(snapshot);
@@ -848,7 +893,7 @@ export class BackendStateManager {
     this.state.devices = this.devicesRegistry;
     this.activeFaults = restored.activeFaults || {};
     this.deviceAuditTrail = restored.deviceAuditTrail || [];
-    for (const key of ['sequence', 'cctvSequence', 'incidentSequence', 'emergencySequence', 'signalSequence', 'deviceSequence', 'lastUpdated', 'vehiclesCountToday', 'co2SavedKg', 'fuelSavedLiters']) {
+    for (const key of ['sequence', 'stateVersion', 'cctvSequence', 'incidentSequence', 'emergencySequence', 'signalSequence', 'deviceSequence', 'lastUpdated', 'vehiclesCountToday', 'co2SavedKg', 'fuelSavedLiters']) {
       this[key] = restored[key];
     }
     return this.state;
@@ -1211,7 +1256,7 @@ export class BackendStateManager {
         }
         node.pendingGreenSplit = null;
         node.totalCycleTime = node.greenSplit + yellowDur + redDur;
-        dbManager.upsertSignalConfig(node.id, {
+        signalConfigRepository.upsert(node.id, {
           greenSplit: node.greenSplit,
           cycleTime: node.totalCycleTime,
           mode: 'AI_OPTIMIZED'
@@ -1248,6 +1293,7 @@ export class BackendStateManager {
       paused: this.clock.paused,
       tickResolution: this.simConfig.tickResolution
     };
+    this.state.stateVersion = this.stateVersion;
 
     return this.state;
   }
@@ -1258,27 +1304,12 @@ export class BackendStateManager {
     this.lastUpdated = Date.now();
     this.state.seq = this.sequence;
     this.state.timestampMs = this.lastUpdated;
+    this.state.stateVersion = this.stateVersion;
     this.state.isChaosMode = !!active;
     this.state.chaosLevel = active ? 4 : 0;
 
     if (active) {
-      if (this.resolutionInterval) clearInterval(this.resolutionInterval);
-      this.resolutionInterval = setInterval(() => {
-        if (this.state.chaosLevel <= 1) {
-          this.toggleChaos(false);
-          if (this.io) {
-            this.io.emit('system:toast', { message: 'State simulator kembali dari skenario gangguan.', type: 'info' });
-            this.io.emit('traffic:update', this.state);
-          }
-        } else {
-          this.sequence++;
-          this.lastUpdated = Date.now();
-          this.state.seq = this.sequence;
-          this.state.timestampMs = this.lastUpdated;
-          this.state.chaosLevel--;
-          if (this.io) this.io.emit('traffic:update', this.state);
-        }
-      }, 5000);
+      this._startChaosResolutionTimer();
     } else {
       if (this.resolutionInterval) {
         clearInterval(this.resolutionInterval);
@@ -1286,6 +1317,32 @@ export class BackendStateManager {
       }
     }
     return this.state;
+  }
+
+  _startChaosResolutionTimer() {
+    if (this.resolutionInterval || !this.state?.isChaosMode) return;
+    this.resolutionInterval = setInterval(() => {
+      if (this.state.chaosLevel <= 1) {
+        this.stateVersion++;
+        this.state.stateVersion = this.stateVersion;
+        this.toggleChaos(false);
+        if (this.io) {
+          this.io.emit('system:toast', { message: 'State simulator kembali dari skenario gangguan.', type: 'info' });
+          this.io.emit('traffic:update', this.state);
+        }
+      } else {
+        this.sequence++;
+        this.stateVersion++;
+        this.state.stateVersion = this.stateVersion;
+        this.lastUpdated = Date.now();
+        this.state.seq = this.sequence;
+        this.state.timestampMs = this.lastUpdated;
+        this.state.chaosLevel--;
+        if (this.io) this.io.emit('traffic:update', this.state);
+      }
+      Promise.resolve(this.publishClusterSnapshot?.()).catch(() => {});
+    }, 5000);
+    this.resolutionInterval.unref?.();
   }
 
   setGreenSplit(value, intersectionId) {
@@ -1374,7 +1431,7 @@ export class BackendStateManager {
     node.status = `Manual Override (${durSec}s)`;
 
     try {
-      dbManager.upsertSignalConfig(node.id, {
+      signalConfigRepository.upsert(node.id, {
         greenSplit: durSec,
         cycleTime: durSec,
         mode: 'MANUAL_OVERRIDE'
@@ -1453,7 +1510,7 @@ export class BackendStateManager {
 
     // Persist ke Database SQLite with immediate atomic save and rollback guard
     try {
-      dbManager.upsertIncident(inc, true);
+      incidentRepository.upsert(inc, true);
     } catch (err) {
       // Rollback in-memory mutation
       Object.assign(inc, previousSnapshot);
@@ -1536,7 +1593,7 @@ export class BackendStateManager {
           linkedIncident.status = INCIDENT_STATES.DISPATCHED;
           linkedIncident.assignedUnit = `${code} (${(code && (code.toLowerCase().includes("damkar") || code.toLowerCase().includes("pmk"))) ? "PMK" : "Ambulance"})`;
           linkedIncident.updatedAt = new Date().toISOString();
-          try { dbManager.upsertIncident(linkedIncident, true); } catch (_) {}
+          try { incidentRepository.upsert(linkedIncident, true); } catch (_) {}
         }
       }
     }

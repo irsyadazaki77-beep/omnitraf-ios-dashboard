@@ -125,6 +125,16 @@ npm start
 Buka peramban (browser) di alamat:
 **`http://localhost:3000`**
 
+### Database dan deployment Docker
+
+Persistence menggunakan SQLite-compatible database melalui `sql.js`. `DB_PATH` memilih file database; path relatif diselesaikan dari root repository, sedangkan production sebaiknya memakai path absolut. Nilai container adalah `/usr/src/app/data/omnitraf.sqlite`, disimpan pada named volume `omnitraf-data` oleh Docker Compose. Volume tetap ada ketika container dibuat ulang; hapus volume secara eksplisit hanya ketika memang ingin membuang datanya.
+
+Perubahan domain ditandai dirty dan digabungkan ke satu asynchronous flush pada satu waktu. File sementara diganti secara atomik, dan shutdown `SIGINT`/`SIGTERM` menunggu final flush dengan batas waktu. `/healthz` mengukur liveness; `/ready` melaporkan readiness, lifecycle, dan metrik persistence tanpa membocorkan path database. Test menggunakan path tersendiri melalui `test/helpers/testDatabasePath.js`.
+
+Repository domain berada di `server/repositories`; `server/db/database.js` menjadi adapter implementasi saat ini. Socket.io Redis adapter hanya membagi koneksi/event realtime. File database tetap lokal ke satu process/volume dan belum aman dipakai sebagai persistence bersama beberapa replica.
+
+Untuk multi-instance, set `OMNITRAF_RUNTIME_MODE=cluster` dan `REDIS_URL`. Setiap instance memakai lease Redis `omnitraf:simulation:leader` (TTL 10 detik, renew tiap 3 detik); hanya leader menjalankan simulation/CCTV loop dan command follower diteruskan ke leader. Followers memuat baseline checkpoint dan snapshot/CCTV terbaru dari Redis sebelum readiness dan Socket.io diaktifkan. Redis outage membuat cluster degraded dan menghentikan loop authoritative. Rate limits dan idempotency command memakai counter/registry Redis; Socket.io adapter tetap menjadi satu jalur broadcast ke client agar custom snapshot pub/sub tidak menggandakan packet realtime.
+
 ### Development checks
 ```bash
 npm ci

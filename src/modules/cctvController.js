@@ -61,6 +61,7 @@ export class CctvController {
 
     // Realtime adapter
     this.realtimeAdapter = new CctvRealtimeAdapter({
+      coalesceVisualUpdates: true,
       onFrame: (payload, source) => this._ingestFramePipeline(payload, source)
     });
 

@@ -1,6 +1,9 @@
 import { createApiErrorResponse } from './errorHandler.js';
 import { isIP } from 'node:net';
 import { IS_TEST, TRUSTED_PROXY_IPS } from '../config/env.js';
+import { OMNITRAF_RUNTIME_MODE } from '../config/env.js';
+import { createHash } from 'node:crypto';
+import { redisManager } from '../infrastructure/redis/redisManager.js';
 
 // In-Memory Bounded Rate Limiter
 export const rateLimitStore = new Map();
@@ -53,6 +56,24 @@ export function rateLimiter(options = {}) {
   const windowMs = options.windowMs || 15000;
   const maxRequests = options.max || 100;
   const keyPrefix = options.keyPrefix || 'global';
+
+  if (OMNITRAF_RUNTIME_MODE === 'cluster') {
+    return async (req, res, next) => {
+      const ip = getClientIp(req);
+      const digest = createHash('sha256').update(`${keyPrefix}:${ip}`).digest('hex');
+      try {
+        const [count, ttl] = await redisManager.incrementWindow(`omnitraf:ratelimit:http:${digest}`, windowMs);
+        if (Number(count) > maxRequests) {
+          const cooldownMs = Math.max(0, Number(ttl));
+          res.setHeader('Retry-After', Math.ceil(cooldownMs / 1000));
+          return res.status(429).json(createApiErrorResponse(429, 'TOO_MANY_REQUESTS', 'Batas frekuensi permintaan terlampaui. Silakan tunggu beberapa detik.', { cooldownMs }, 'rate_limit_exceeded'));
+        }
+        return next();
+      } catch (_) {
+        return res.status(503).json(createApiErrorResponse(503, 'CLUSTER_UNAVAILABLE', 'Shared rate limiter sementara tidak tersedia.', null, 'cluster_unavailable'));
+      }
+    };
+  }
 
   return (req, res, next) => {
     const ip = getClientIp(req);

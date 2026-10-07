@@ -18,11 +18,14 @@
     "express": "^4.21.2",
     "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
+    "leaflet": "^1.9.4",
+    "leaflet.markercluster": "^1.5.3",
     "pdf-lib": "^1.17.1",
     "socket.io": "^4.8.3",
     "sql.js": "^1.14.2"
   },
   "devDependencies": {
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.4",
+    "vite": "^8.3.3"
   }
 }

@@ -1,4 +1,5 @@
 import initSqlJs from 'sql.js';
+import { randomUUID } from 'node:crypto';
 
 const isTest = typeof global.it === 'function' || 
                typeof global.test === 'function' || 
@@ -11,14 +12,40 @@ if (isTest) {
   console.warn = () => {};
 }
 
-import fs from 'fs';
+import fsPromises from 'node:fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { normalizeCanonicalIncident, normalizeCanonicalDevice, CompatibilityAdapters } from '../config/domainModels.js';
+import { runMigrations } from './migrations.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DEFAULT_DB_PATH = path.resolve(__dirname, '../../data/omnitraf.sqlite');
+const APP_ROOT = path.resolve(__dirname, '../..');
+const DEFAULT_DB_PATH = path.join(APP_ROOT, 'data', 'omnitraf.sqlite');
+
+async function atomicReplace(tmpPath, targetPath) {
+  try {
+    await fsPromises.rename(tmpPath, targetPath);
+  } catch (error) {
+    if (process.platform !== 'win32' || !['EPERM', 'EEXIST', 'ENOTEMPTY'].includes(error.code)) throw error;
+    let targetStat;
+    try { targetStat = await fsPromises.stat(targetPath); }
+    catch (statError) { if (statError.code === 'ENOENT') throw error; throw statError; }
+    if (!targetStat.isFile()) throw error;
+
+    const backupPath = `${targetPath}.replace.${process.pid}.${Date.now()}`;
+    await fsPromises.rename(targetPath, backupPath);
+    try {
+      await fsPromises.rename(tmpPath, targetPath);
+      await fsPromises.rm(backupPath, { force: true });
+    } catch (replaceError) {
+      try { await fsPromises.rename(backupPath, targetPath); } catch (restoreError) {
+        throw new AggregateError([replaceError, restoreError], 'DATABASE_REPLACE_AND_RESTORE_FAILED');
+      }
+      throw replaceError;
+    }
+  }
+}
 
 /**
  * OmniTRAF SITS Surabaya - Embedded SQLite Persistence & Recovery Layer (Phase 17 Hardened)
@@ -27,17 +54,25 @@ const DEFAULT_DB_PATH = path.resolve(__dirname, '../../data/omnitraf.sqlite');
  * - Distinct operational states (EMPTY vs UNAVAILABLE vs ERROR)
  * - Defensive recovery rules for corrupted rows, missing fields & shutdown synchronization
  */
-export class DatabaseManager {
-  static _globalShutdownRegistered = false;
-
+export class SqlJsAdapter {
   constructor() {
     this.db = null;
     this.SQL = null;
-    this.dbPath = process.env.DB_PATH ? path.resolve(process.env.DB_PATH) : DEFAULT_DB_PATH;
+    this.dbPath = process.env.DB_PATH
+      ? (path.isAbsolute(process.env.DB_PATH) ? path.normalize(process.env.DB_PATH) : path.resolve(APP_ROOT, process.env.DB_PATH))
+      : DEFAULT_DB_PATH;
     this.isInitialized = false;
     this._saveTimer = null;
+    this.dirty = false;
+    this.flushScheduled = false;
+    this.flushInProgress = false;
+    this.flushRequestedDuringWrite = false;
+    this._flushPromise = null;
+    this._flushWaiters = [];
+    this._closed = false;
+    this._metrics = { flushCount: 0, failedFlushCount: 0, totalFlushDurationMs: 0, lastFlushDurationMs: null, lastFlushAt: null, lastError: null };
     this._initPromise = null;
-    this.schemaVersion = 17;
+    this.schemaVersion = 18;
   }
 
   /**
@@ -55,29 +90,29 @@ export class DatabaseManager {
     this._initPromise = (async () => {
       try {
         const dir = path.dirname(this.dbPath);
-        if (!fs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true });
-        }
+        await fsPromises.mkdir(dir, { recursive: true });
 
         this.SQL = await initSqlJs();
 
-        if (fs.existsSync(this.dbPath)) {
-          try {
-            const fileBuffer = fs.readFileSync(this.dbPath);
-            if (fileBuffer.length > 0) {
+        try {
+          await fsPromises.access(this.dbPath);
+          const fileBuffer = await fsPromises.readFile(this.dbPath);
+          if (fileBuffer.length > 0) {
+            try {
               this.db = new this.SQL.Database(fileBuffer);
-              console.log(`🗄️ [Database] Memuat database tersemat SQLite dari: ${this.dbPath} (${fileBuffer.length} bytes)`);
-            } else {
-              console.warn(`⚠️ [Database] File database berukuran 0 byte, membuat database SQLite baru.`);
+            } catch (parseErr) {
+              const backupPath = `${this.dbPath}.corrupt.${Date.now()}`;
+              await fsPromises.rename(this.dbPath, backupPath);
+              console.error(`❌ [Database] Database SQLite korup (${parseErr.message}); berkas dipindah ke backup ${path.basename(backupPath)}.`);
               this.db = new this.SQL.Database();
             }
-          } catch (readErr) {
-            console.error(`❌ [Database] Berkas SQLite korup/tidak terbaca (${readErr.message}), menginisialisasi fresh database dengan backup.`);
-            const backupPath = `${this.dbPath}.corrupt.${Date.now()}`;
-            try { fs.renameSync(this.dbPath, backupPath); } catch (_) {}
+            console.log(`🗄️ [Database] Memuat database tersemat SQLite dari ${fileBuffer.length} bytes.`);
+          } else {
+            console.warn('⚠️ [Database] File database berukuran 0 byte, membuat database SQLite baru.');
             this.db = new this.SQL.Database();
           }
-        } else {
+        } catch (accessErr) {
+          if (accessErr.code !== 'ENOENT') throw accessErr;
           this.db = new this.SQL.Database();
           console.log(`🗄️ [Database] Menginisialisasi database SQLite baru di: ${this.dbPath}`);
         }
@@ -85,12 +120,16 @@ export class DatabaseManager {
         this._createTables();
         this._runMigrations();
         this.isInitialized = true;
-        this.saveToDisk(true); // Initial atomic flush
-        this._registerShutdownHooks();
+        this.markDirty();
+        if (!await this.flush()) throw new Error(`DATABASE_INITIAL_FLUSH_FAILED: ${this._metrics.lastError || 'unknown error'}`);
 
         return this;
       } catch (err) {
         console.error('❌ [Database] Gagal menginisialisasi SQLite database:', err);
+        if (this._saveTimer) clearTimeout(this._saveTimer);
+        this._saveTimer = null;
+        this.flushScheduled = false;
+        try { this.db?.close(); } catch (_) {}
         this.isInitialized = false;
         this.db = null;
         throw err;
@@ -102,32 +141,105 @@ export class DatabaseManager {
     return this._initPromise;
   }
 
-  _registerShutdownHooks() {
-    const isTest = typeof global.it === 'function' || 
-                   typeof global.test === 'function' || 
-                   process.env.NODE_ENV === 'test' || 
-                   (process.env.DB_PATH && process.env.DB_PATH.includes('test'));
-    if (isTest) return; // Do not register process exit handlers in a testing context to avoid test runner IPC deserialization issues
+  getHealth() {
+    return { status: this.isInitialized && this.db ? (this._metrics.lastError ? 'DEGRADED' : 'CONNECTED') : 'DISCONNECTED', dirty: this.dirty, flushInProgress: this.flushInProgress, pendingFlush: this.flushScheduled || this.flushInProgress || this.dirty, lastFlushAt: this._metrics.lastFlushAt, lastFlushDurationMs: this._metrics.lastFlushDurationMs, lastError: this._metrics.lastError, flushCount: this._metrics.flushCount, failedFlushCount: this._metrics.failedFlushCount, averageFlushDurationMs: this._metrics.flushCount ? this._metrics.totalFlushDurationMs / this._metrics.flushCount : 0 };
+  }
 
-    if (DatabaseManager._globalShutdownRegistered) return;
-    DatabaseManager._globalShutdownRegistered = true;
+  ping() {
+    if (!this.db || !this.isInitialized) return false;
+    try {
+      this.db.exec('SELECT 1;');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
-    const onShutdown = (signal) => {
+  markDirty() {
+    if (!this.db || this._closed) return false;
+    this.dirty = true;
+    this.scheduleFlush();
+    return true;
+  }
+
+  scheduleFlush(delayMs = 150) {
+    if (!this.db || this._closed) return;
+    if (this.flushInProgress) { this.flushRequestedDuringWrite = true; return; }
+    if (this._saveTimer) clearTimeout(this._saveTimer);
+    this.flushScheduled = true;
+    this._saveTimer = setTimeout(() => { this._saveTimer = null; this.flush().catch(() => {}); }, delayMs);
+    this._saveTimer.unref?.();
+  }
+
+  async flush() {
+    if (!this.db || this._closed) return false;
+    if (this._saveTimer) { clearTimeout(this._saveTimer); this._saveTimer = null; }
+    this.flushScheduled = false;
+    if (this.flushInProgress) {
+      return this._flushPromise;
+    }
+    if (!this.dirty) return true;
+    this.flushInProgress = true;
+    this._flushPromise = (async () => {
+      let outcome = true;
       try {
-        if (this.isInitialized && this.db) {
-          console.log(`\n🛑 [Database] Menerima sinyal ${signal}: Menjalankan atomic sync ke disk...`);
-          this.setMetadata('last_shutdown_at', new Date().toISOString());
-          this.setMetadata('shutdown_signal', signal);
-          this.flushSync();
-        }
-      } catch (e) {
-        console.error('❌ [Database] Kesalahan saat shutdown flush:', e.message);
+        do {
+          this.flushRequestedDuringWrite = false;
+          this.dirty = false;
+          const started = Date.now();
+          const buffer = Buffer.from(this.db.export());
+          const tmpPath = `${this.dbPath}.tmp.${process.pid}.${randomUUID()}`;
+          try {
+            await fsPromises.writeFile(tmpPath, buffer, { flag: 'wx' });
+            await atomicReplace(tmpPath, this.dbPath);
+          } catch (err) {
+            try { await fsPromises.rm(tmpPath, { force: true }); } catch (_) {}
+            throw err;
+          }
+          this._metrics.flushCount++;
+          this._metrics.lastFlushDurationMs = Date.now() - started;
+          this._metrics.totalFlushDurationMs += this._metrics.lastFlushDurationMs;
+          this._metrics.lastFlushAt = new Date().toISOString();
+          this._metrics.lastError = null;
+          if (this.flushRequestedDuringWrite) this.dirty = true;
+        } while (this.dirty);
+      } catch (err) {
+        outcome = false;
+        this.dirty = true;
+        this._metrics.failedFlushCount++;
+        this._metrics.lastError = err.code
+          ? `${err.code}${err.syscall ? ` during ${err.syscall}` : ''}`
+          : 'PERSISTENCE_ERROR';
+        console.error('❌ [Database] Gagal menyimpan biner database secara atomik ke disk:', err);
+      } finally {
+        this.flushInProgress = false;
+        this._flushPromise = null;
+        if (this.dirty && !this._closed) this.scheduleFlush(1000);
       }
-    };
+      return outcome;
+    })();
+    return this._flushPromise;
+  }
 
-    process.once('SIGINT', () => { onShutdown('SIGINT'); process.exit(0); });
-    process.once('SIGTERM', () => { onShutdown('SIGTERM'); process.exit(0); });
-    process.once('beforeExit', () => { onShutdown('beforeExit'); });
+  async shutdown() {
+    if (this._saveTimer) { clearTimeout(this._saveTimer); this._saveTimer = null; }
+    let flushError = null;
+    if (this.db && this.isInitialized) {
+      this.setMetadata('last_shutdown_at', new Date().toISOString());
+      this.markDirty();
+      const flushed = await this.flush();
+      if (!flushed) flushError = new Error(`DATABASE_FLUSH_FAILED: ${this._metrics.lastError || 'unknown error'}`);
+    }
+    await this.close();
+    if (flushError) throw flushError;
+  }
+
+  async close() {
+    if (this._flushPromise) await this._flushPromise;
+    this._closed = true;
+    if (this.db) this.db.close();
+    this.db = null;
+    this.isInitialized = false;
   }
 
   _createTables() {
@@ -171,6 +283,11 @@ export class DatabaseManager {
         result TEXT,
         correlation_id TEXT,
         details TEXT,
+        command_id TEXT,
+        idempotency_key TEXT,
+        actor_role TEXT,
+        source_instance_id TEXT,
+        leader_instance_id TEXT,
         timestamp TEXT
       );
     `);
@@ -204,58 +321,9 @@ export class DatabaseManager {
   }
 
   _runMigrations() {
-    try {
-      // 1. Check existing columns in audit_logs
-      const auditCols = this._getTableColumns('audit_logs');
-      if (!auditCols.includes('correlation_id')) {
-        this.db.run(`ALTER TABLE audit_logs ADD COLUMN correlation_id TEXT;`);
-      }
-      if (!auditCols.includes('details')) {
-        this.db.run(`ALTER TABLE audit_logs ADD COLUMN details TEXT;`);
-      }
-
-      // 2. Check existing columns in incidents
-      const incCols = this._getTableColumns('incidents');
-      if (!incCols.includes('severity')) {
-        this.db.run(`ALTER TABLE incidents ADD COLUMN severity TEXT;`);
-      }
-      if (!incCols.includes('priority')) {
-        this.db.run(`ALTER TABLE incidents ADD COLUMN priority TEXT;`);
-      }
-      if (!incCols.includes('acknowledged_at')) {
-        this.db.run(`ALTER TABLE incidents ADD COLUMN acknowledged_at TEXT;`);
-      }
-      if (!incCols.includes('notes')) {
-        this.db.run(`ALTER TABLE incidents ADD COLUMN notes TEXT;`);
-      }
-      if (!incCols.includes('source')) {
-        this.db.run(`ALTER TABLE incidents ADD COLUMN source TEXT;`);
-      }
-
-      // 3. Check existing columns in device_telemetry
-      const devCols = this._getTableColumns('device_telemetry');
-      if (!devCols.includes('fps')) {
-        this.db.run(`ALTER TABLE device_telemetry ADD COLUMN fps INTEGER;`);
-      }
-      if (!devCols.includes('resolution')) {
-        this.db.run(`ALTER TABLE device_telemetry ADD COLUMN resolution TEXT;`);
-      }
-      if (!devCols.includes('green_wave_sync')) {
-        this.db.run(`ALTER TABLE device_telemetry ADD COLUMN green_wave_sync INTEGER;`);
-      }
-
-      // 4. Ensure high performance indexes after migrations ensure columns exist
-      this.db.run(`CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_logs(timestamp);`);
-      this.db.run(`CREATE INDEX IF NOT EXISTS idx_audit_corr ON audit_logs(correlation_id);`);
-      this.db.run(`CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status);`);
-      this.db.run(`CREATE INDEX IF NOT EXISTS idx_incidents_time ON incidents(time);`);
-
-      // 5. Update Schema Version in Metadata
-      this.setMetadata('schema_version', String(this.schemaVersion));
-      this.setMetadata('last_migrated_at', new Date().toISOString());
-    } catch (migErr) {
-      console.warn('⚠️ [Database] Non-critical migration notice:', migErr.message);
-    }
+    runMigrations(this.db, (tableName) => this._getTableColumns(tableName), (key, value) => {
+      if (!this.setMetadata(key, value)) throw new Error(`DATABASE_METADATA_MIGRATION_FAILED: ${key}`);
+    }, this.schemaVersion);
   }
 
   _getTableColumns(tableName) {
@@ -264,8 +332,8 @@ export class DatabaseManager {
       if (!res.length || !res[0].values) return [];
       // Col name is index 1
       return res[0].values.map(row => row[1]);
-    } catch (e) {
-      return [];
+    } catch (error) {
+      throw new Error(`DATABASE_SCHEMA_INSPECTION_FAILED: ${error.message}`, { cause: error });
     }
   }
 
@@ -273,43 +341,10 @@ export class DatabaseManager {
    * Atomic file write via temporary file + atomic rename
    * Prevents half-written corrupted SQLite files when process crashes during write
    */
-  saveToDisk(forceSync = false) {
-    if (!this.db || (!this.isInitialized && !forceSync)) return false;
+  saveToDisk() { return this.markDirty(); }
+  flushSync() { return this.flush(); }
 
-    try {
-      const data = this.db.export();
-      const buffer = Buffer.from(data);
-      const dir = path.dirname(this.dbPath);
-
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-
-      const tmpPath = `${this.dbPath}.tmp.${Date.now()}.${Math.random().toString(36).substr(2, 6)}`;
-      fs.writeFileSync(tmpPath, buffer);
-      fs.renameSync(tmpPath, this.dbPath);
-      return true;
-    } catch (err) {
-      console.error('❌ [Database] Gagal menyimpan biner database secara atomik ke disk:', err);
-      return false;
-    }
-  }
-
-  flushSync() {
-    if (this._saveTimer) {
-      clearTimeout(this._saveTimer);
-      this._saveTimer = null;
-    }
-    return this.saveToDisk(true);
-  }
-
-  debounceSave() {
-    if (this._saveTimer) clearTimeout(this._saveTimer);
-    this._saveTimer = setTimeout(() => {
-      this.saveToDisk();
-      this._saveTimer = null;
-    }, 150);
-  }
+  debounceSave() { this.markDirty(); }
 
   // ==========================================
   // METADATA & SEQUENCE OPERATIONS
@@ -521,6 +556,11 @@ export class DatabaseManager {
           entity: row.entity,
           result: row.result,
           correlationId: row.correlation_id,
+          commandId: row.command_id,
+          idempotencyKey: row.idempotency_key,
+          actorRole: row.actor_role,
+          sourceInstanceId: row.source_instance_id,
+          leaderInstanceId: row.leader_instance_id,
           details: row.details,
           timestamp: row.timestamp
         });
@@ -533,7 +573,7 @@ export class DatabaseManager {
     }
   }
 
-  insertAuditLog({ operator, action, entity, result, timestamp, correlationId, commandId, details }, flushImmediate = false) {
+  insertAuditLog({ operator, action, entity, result, timestamp, correlationId, commandId, idempotencyKey, actorRole, sourceInstanceId, leaderInstanceId, details }, flushImmediate = false) {
     if (!this.db || !this.isInitialized) {
       console.warn("⚠️ [Database] insertAuditLog skipped: DB belum siap.");
       return false;
@@ -555,8 +595,8 @@ export class DatabaseManager {
 
       const ts = timestamp || new Date().toISOString();
       const stmt = this.db.prepare(`
-        INSERT INTO audit_logs (operator, action, entity, result, correlation_id, details, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?);
+        INSERT INTO audit_logs (operator, action, entity, result, correlation_id, details, command_id, idempotency_key, actor_role, source_instance_id, leader_instance_id, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       `);
 
       stmt.run([
@@ -566,6 +606,11 @@ export class DatabaseManager {
         String(result || 'OK'),
         corrId,
         String(details || ''),
+        commandId || corrId,
+        idempotencyKey || null,
+        actorRole || null,
+        sourceInstanceId || null,
+        leaderInstanceId || null,
         ts
       ]);
       stmt.free();
@@ -750,5 +795,7 @@ export class DatabaseManager {
     }
   }
 }
+
+export class DatabaseManager extends SqlJsAdapter {}
 
 export const dbManager = new DatabaseManager();

@@ -12,6 +12,9 @@ services:
       - .env
     environment:
       - PORT=3000
+      - DB_PATH=/usr/src/app/data/omnitraf.sqlite
+    volumes:
+      - omnitraf-data:/usr/src/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/healthz || exit 1"]
@@ -19,3 +22,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+volumes:
+  omnitraf-data:

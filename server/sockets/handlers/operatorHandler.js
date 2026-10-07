@@ -2,6 +2,7 @@ import { ROLES } from '../../config/constants.js';
 import { backendState } from '../../services/stateManager.js';
 import { commandExecutor } from '../../services/commandExecutor.js';
 import { isActionAuthorized, getRequiredRoles } from '../../config/capabilities.js';
+import { clusterRuntime } from '../../infrastructure/redis/clusterRuntimeSingleton.js';
 
 export function checkSocketRole(socket, allowedRoles, eventName, callback) {
   const userRole = socket.user?.role || null;
@@ -25,7 +26,7 @@ export function checkSocketRole(socket, allowedRoles, eventName, callback) {
 
 export function registerOperatorHandlers(io, socket) {
   // Check the authoritative status of a command (reconnection / resync helper)
-  socket.on('command:status', (data, callback) => {
+  socket.on('command:status', async (data, callback) => {
     if (!isActionAuthorized(socket.user?.role, 'command:status')) {
       if (typeof callback === 'function') callback({ success: false, status: 'REJECTED', result: 'FORBIDDEN', code: 'FORBIDDEN' });
       return;
@@ -38,23 +39,39 @@ export function registerOperatorHandlers(io, socket) {
       (correlationId && cmds.get(correlationId))
     );
 
-    if (cached) {
-      if (cached.actorId !== socket.user.id && socket.user.role !== ROLES.ADMIN) {
+    let distributed = null;
+    if (!cached && clusterRuntime.mode === 'cluster') {
+      try { distributed = await clusterRuntime.getIdempotentCommandResult(idempotencyKey || commandId); }
+      catch (_) {
+        if (typeof callback === 'function') callback({ success: false, status: 'UNAVAILABLE', code: 'CLUSTER_UNAVAILABLE' });
+        return;
+      }
+    }
+    const authoritative = cached || (distributed && distributed.status !== 'PROCESSING' ? {
+      actorId: distributed.actorId,
+      status: distributed.status === 'SUCCEEDED' ? distributed.result?.status || 'SERVER_APPLIED' : 'REJECTED',
+      resultingState: distributed.result?.resultingState,
+      action: distributed.result?.action,
+      timestamp: distributed.result?.timestamp
+    } : null);
+
+    if (authoritative) {
+      if (authoritative.actorId !== socket.user.id && socket.user.role !== ROLES.ADMIN) {
         if (typeof callback === 'function') callback({ success: false, status: 'REJECTED', result: 'FORBIDDEN', code: 'FORBIDDEN' });
         return;
       }
       if (typeof callback === 'function') {
         callback({
           success: true,
-          status: cached.status || 'SERVER_APPLIED',
-          resultingState: cached.resultingState,
-          action: cached.action,
-          timestamp: cached.timestamp
+          status: authoritative.status || 'SERVER_APPLIED',
+          resultingState: authoritative.resultingState,
+          action: authoritative.action,
+          timestamp: authoritative.timestamp
         });
       }
     } else {
       // Check if command is currently in-flight
-      const isExecuting = commandExecutor.inFlightKeys.has(idempotencyKey || commandId || '');
+      const isExecuting = distributed?.status === 'PROCESSING' || commandExecutor.inFlightKeys.has(idempotencyKey || commandId || '');
       if (typeof callback === 'function') {
         callback({
           success: true,

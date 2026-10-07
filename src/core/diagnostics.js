@@ -64,6 +64,10 @@ class DiagnosticsManager {
     this.activeAnimationFrames = new Set();
     this.activeSocketListenersCount = 0;
     this.domUpdateCount = 0;
+    this.domBatchCount = 0;
+    this.coalescedDomUpdates = 0;
+    this._domBatchTimestamps = [];
+    this._coalescedDomTimestamps = [];
     this.cctvDroppedFrames = 0;
     this.apiRequestCount = 0;
     this.apiErrorCount = 0;
@@ -291,6 +295,23 @@ class DiagnosticsManager {
     this.domUpdateCount++;
   }
 
+  recordDomBatch() {
+    this.domBatchCount++;
+    this._domBatchTimestamps.push(Date.now());
+    this._pruneDomMetrics();
+  }
+  recordCoalescedDomUpdate(count = 1) {
+    const amount = Math.max(0, count);
+    this.coalescedDomUpdates += amount;
+    for (let index = 0; index < amount; index++) this._coalescedDomTimestamps.push(Date.now());
+    this._pruneDomMetrics();
+  }
+  _pruneDomMetrics() {
+    const cutoff = Date.now() - 1000;
+    while (this._domBatchTimestamps.length && this._domBatchTimestamps[0] < cutoff) this._domBatchTimestamps.shift();
+    while (this._coalescedDomTimestamps.length && this._coalescedDomTimestamps[0] < cutoff) this._coalescedDomTimestamps.shift();
+  }
+
   recordDroppedFrame() {
     this.cctvDroppedFrames++;
   }
@@ -380,6 +401,7 @@ class DiagnosticsManager {
   }
 
   getMetricsReport() {
+    this._pruneDomMetrics();
     const uptimeSec = Math.round((Date.now() - this.startTime) / 1000);
     return {
       initCount: this.initCount,
@@ -387,6 +409,10 @@ class DiagnosticsManager {
       activeAnimationFrames: this.activeAnimationFrames.size,
       activeSocketListeners: this.activeSocketListenersCount,
       domUpdateCount: this.domUpdateCount,
+      domBatchCount: this.domBatchCount,
+      coalescedDomUpdates: this.coalescedDomUpdates,
+      domBatchesPerSecond: this._domBatchTimestamps.length,
+      coalescedVisualUpdatesPerSecond: this._coalescedDomTimestamps.length,
       stateUpdateCount: this.stateUpdateCount,
       cctvDroppedFrames: this.cctvDroppedFrames,
       apiRequestCount: this.apiRequestCount,
@@ -450,6 +476,10 @@ class DiagnosticsManager {
     this.initCount = 0;
     this.activeSocketListenersCount = 0;
     this.domUpdateCount = 0;
+    this.domBatchCount = 0;
+    this.coalescedDomUpdates = 0;
+    this._domBatchTimestamps = [];
+    this._coalescedDomTimestamps = [];
     this.stateUpdateCount = 0;
     this.cctvDroppedFrames = 0;
     this.apiRequestCount = 0;

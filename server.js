@@ -15,7 +15,7 @@ import express from 'express';
 import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { HOST, PORT, isOriginAllowed } from './server/config/env.js';
+import { HOST, PORT, isOriginAllowed, OMNITRAF_RUNTIME_MODE, REDIS_URL } from './server/config/env.js';
 import { dbManager } from './server/db/database.js';
 import { backendState } from './server/services/stateManager.js';
 import { corsMiddleware, securityHeadersMiddleware } from './server/middlewares/security.js';
@@ -24,16 +24,73 @@ import { initializeSocketServer } from './server/sockets/socketServer.js';
 import apiRoutes from './server/routes/apiRoutes.js';
 import { diagnosticEngine } from './server/services/diagnosticEngine.js';
 import { requireCapability } from './server/middlewares/auth.js';
+import { redisManager } from './server/infrastructure/redis/redisManager.js';
+import { ClusterEventBus, CLUSTER_CHANNELS } from './server/infrastructure/redis/clusterEventBus.js';
+import { SimulationLeadership, runtimeInstanceId } from './server/infrastructure/redis/simulationLeadership.js';
+import { clusterRuntime } from './server/infrastructure/redis/clusterRuntimeSingleton.js';
+import { commandExecutor } from './server/services/commandExecutor.js';
+import { cvEngine } from './server/services/visionEngine.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Ensure persistence layer & state hydration are completed on startup
+let startupLifecycle = 'STARTING';
+let leadershipManager = null;
+let clusterEventBus = null;
 try {
+  startupLifecycle = 'DATABASE_INITIALIZING';
   await dbManager.init();
+  startupLifecycle = 'STATE_HYDRATING';
   await backendState.init();
+  startupLifecycle = 'REDIS_COORDINATION';
+  if (OMNITRAF_RUNTIME_MODE === 'cluster' || REDIS_URL) {
+    try { await redisManager.connect(); }
+    catch (error) {
+      if (OMNITRAF_RUNTIME_MODE === 'cluster') throw error;
+      console.warn('[Redis] Optional Redis connection unavailable; single mode continues locally:', error.message);
+    }
+  }
+  clusterRuntime.redis = redisManager;
+  if (OMNITRAF_RUNTIME_MODE === 'cluster') {
+    if (!redisManager.isConnected()) throw new Error('OMNITRAF_RUNTIME_MODE=cluster requires an available Redis service.');
+    clusterEventBus = new ClusterEventBus(redisManager, runtimeInstanceId);
+  }
+  leadershipManager = new SimulationLeadership({
+    redisManager,
+    eventBus: clusterEventBus,
+    mode: OMNITRAF_RUNTIME_MODE,
+    instanceId: runtimeInstanceId,
+    onSnapshot: () => ({ ...backendState.getClusterSnapshot(), cctvSnapshot: cvEngine.getSnapshot() }),
+    applySnapshot: (snapshot) => {
+      if (!backendState.applyClusterSnapshot(snapshot)) return false;
+      if (snapshot.cctvSnapshot) cvEngine.restoreSnapshot(snapshot.cctvSnapshot);
+      return true;
+    },
+    onLeaderReady: () => OMNITRAF_RUNTIME_MODE === 'cluster' ? backendState.persistClusterSnapshot() : undefined,
+    onRoleChange: ({ previousRole, role }) => {
+      if (role === 'LEADER') backendState.startRuntime();
+      else backendState.stopRuntime();
+      console.info(`[Leadership] ${previousRole} -> ${role} (${runtimeInstanceId}).`);
+    }
+  });
+  backendState.publishClusterSnapshot = () => leadershipManager?.publishSnapshot();
+  clusterRuntime.leadership = leadershipManager;
+  clusterRuntime.eventBus = clusterEventBus;
+  if (clusterEventBus) {
+    await clusterEventBus.subscribe(CLUSTER_CHANNELS.snapshot, (envelope) => leadershipManager.onSnapshotEvent(envelope).catch(() => {}));
+    await clusterEventBus.subscribe(CLUSTER_CHANNELS.cctv, (envelope) => {
+      if (leadershipManager.isLeader() || !envelope.payload || envelope.sequence < cvEngine.frameSequence) return;
+      try { cvEngine.restoreSnapshot(envelope.payload); } catch (_) {}
+    });
+    await clusterRuntime.startCommandBroker();
+  }
+  clusterRuntime.configureCommandHandler((params) => commandExecutor.executeCommand(params));
+  await leadershipManager.start();
+  startupLifecycle = 'READY';
 } catch (startupErr) {
-  console.error('❌ [Server Startup] Gagal inisialisasi persistensi database:', startupErr.message);
+  startupLifecycle = 'UNAVAILABLE';
+  console.error('❌ [Server Startup] Startup persistence/state gagal; operational traffic dinonaktifkan:', startupErr.message);
 }
 
 const app = express();
@@ -79,23 +136,22 @@ app.get('/healthz', requireCapability('health:liveness'), (req, res) => {
 
 app.get('/ready', requireCapability('diagnostics:read'), (req, res) => {
   const hasActiveDbFault = diagnosticEngine.isFaultActive('database');
-  const dbReady = dbManager.isInitialized && dbManager.db !== null && !hasActiveDbFault;
-  let dbStatus = 'DISCONNECTED';
+  const dbHealth = dbManager.getHealth();
+  const clusterHealth = leadershipManager?.getDiagnostics() || { mode: OMNITRAF_RUNTIME_MODE, instanceId: runtimeInstanceId, role: 'UNAVAILABLE', redisStatus: OMNITRAF_RUNTIME_MODE === 'single' ? 'NOT_REQUIRED' : redisManager.getHealth().status, synchronized: false };
+  const clusterReady = OMNITRAF_RUNTIME_MODE === 'single' || (redisManager.isConnected() && clusterHealth.synchronized && ['LEADER', 'FOLLOWER'].includes(clusterHealth.role));
+  const dbReady = dbManager.isInitialized && dbManager.ping() && !hasActiveDbFault && startupLifecycle === 'READY' && dbHealth.status === 'CONNECTED';
+  let dbStatus = dbHealth.status === 'DEGRADED' ? 'DEGRADED' : 'DISCONNECTED';
   if (hasActiveDbFault) {
     dbStatus = 'FAULT_INJECTED_UNAVAILABLE';
   } else if (dbReady) {
-    try {
-      dbManager.db.exec('SELECT 1;');
-      dbStatus = 'CONNECTED';
-    } catch (err) {
-      dbStatus = 'DEGRADED';
-    }
+    dbStatus = dbManager.ping() ? 'CONNECTED' : 'DEGRADED';
   }
 
   const clientsCount = backendState.io?.engine?.clientsCount || 0;
   const socketStatus = backendState.io ? 'CONNECTED' : 'DISCONNECTED';
+  const realtimeStatus = backendState.io && (OMNITRAF_RUNTIME_MODE === 'single' || clusterReady) ? 'READY' : 'UNAVAILABLE';
 
-  const isReady = dbStatus === 'CONNECTED' && backendState.isHydrated && !hasActiveDbFault;
+  const isReady = dbStatus === 'CONNECTED' && backendState.isHydrated && !hasActiveDbFault && clusterReady && realtimeStatus === 'READY';
   const status = isReady ? 'READY' : (hasActiveDbFault ? 'DEGRADED' : 'OUT_OF_SERVICE');
   const statusCode = isReady ? 200 : 503;
 
@@ -108,8 +164,14 @@ app.get('/ready', requireCapability('diagnostics:read'), (req, res) => {
     timestamp: new Date().toISOString(),
     components: {
       database: dbStatus,
+      databaseHealth: dbHealth,
+      cluster: { ...clusterHealth, ...clusterRuntime.getDiagnostics() },
+      leadership: clusterHealth.role,
+      redis: clusterHealth.redisStatus,
+      lifecycle: startupLifecycle,
       stateHydration: backendState.isHydrated ? 'COMPLETED' : 'PENDING',
       socketServer: socketStatus,
+      realtime: realtimeStatus,
       activeClients: clientsCount,
       process: 'RUNNING'
     },
@@ -117,8 +179,14 @@ app.get('/ready', requireCapability('diagnostics:read'), (req, res) => {
       status,
       components: {
         database: dbStatus,
+        databaseHealth: dbHealth,
+        cluster: { ...clusterHealth, ...clusterRuntime.getDiagnostics() },
+        leadership: clusterHealth.role,
+        redis: clusterHealth.redisStatus,
+        lifecycle: startupLifecycle,
         stateHydration: backendState.isHydrated ? 'COMPLETED' : 'PENDING',
         socketServer: socketStatus,
+        realtime: realtimeStatus,
         activeClients: clientsCount,
         process: 'RUNNING'
       }
@@ -211,6 +279,13 @@ app.use(express.static(__dirname, {
 
 
 // 3. Mount Modular REST API Routes
+app.use('/api', (req, res, next) => {
+  const clusterUnavailable = OMNITRAF_RUNTIME_MODE === 'cluster' && (!redisManager.isConnected() || !leadershipManager?.synchronized);
+  if (startupLifecycle !== 'READY' || clusterUnavailable) {
+    return res.status(503).json({ success: false, code: 'SERVICE_UNAVAILABLE', message: 'Backend belum siap menerima perintah operasional.', lifecycle: startupLifecycle });
+  }
+  next();
+});
 app.use('/api', apiRoutes);
 app.use('/api', (req, res) => res.status(404).json({
   success: false,
@@ -246,7 +321,7 @@ app.use((error, req, res, next) => {
 });
 
 // 4. Initialize Real-Time WebSockets Engine
-initializeSocketServer(server);
+const io = startupLifecycle === 'READY' ? initializeSocketServer(server, { redisManager, leadership: leadershipManager }) : null;
 
 // 5. Start HTTP & WebSocket Server Listen
 const activePort = process.env.PORT !== undefined ? parseInt(process.env.PORT, 10) : PORT;
@@ -260,3 +335,47 @@ server.listen(activePort, HOST, () => {
 });
 
 export { app, server };
+
+let shutdownPromise = null;
+export function shutdown(signal = 'manual', timeoutMs = 10000) {
+  if (shutdownPromise) return shutdownPromise;
+  startupLifecycle = 'SHUTTING_DOWN';
+  shutdownPromise = (async () => {
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('SHUTDOWN_TIMEOUT')), timeoutMs).unref());
+    const work = (async () => {
+      const httpClosed = new Promise((resolve) => {
+        if (!server.listening) return resolve();
+        server.close(() => resolve());
+      });
+      backendState.stopRuntime?.();
+      backendState.simEngine?.stop?.();
+      io?.data?.stopSimulationLoops?.();
+      io?.data?.unsubscribeLeadership?.();
+      io?.data?.intervalTimers?.forEach((timer) => clearInterval(timer));
+      if (io) await new Promise((resolve) => io.close(() => resolve()));
+      try {
+        if (dbManager.isInitialized) {
+          dbManager.setMetadata('shutdown_signal', signal);
+          dbManager.setMetadata('last_shutdown_at', new Date().toISOString());
+          dbManager.markDirty();
+          const persisted = await dbManager.flush();
+          if (!persisted) throw new Error(`DATABASE_FLUSH_FAILED: ${dbManager.getHealth().lastError || 'unknown error'}`);
+        }
+      } finally {
+        await leadershipManager?.stop({ release: true });
+        await Promise.allSettled(io?.data?.redisClients?.map((client) => client.quit()) || []);
+        if (redisManager.clients.length) await redisManager.disconnect();
+        await dbManager.close();
+      }
+      await httpClosed;
+    })();
+    try { await Promise.race([work, timeout]); startupLifecycle = 'STOPPED'; }
+    catch (err) { console.error('[Server Shutdown] Shutdown tidak selesai dengan bersih:', err.message); startupLifecycle = 'UNAVAILABLE'; }
+  })();
+  return shutdownPromise;
+}
+
+if (process.env.NODE_ENV !== 'test' && !process.env.DB_PATH?.includes('test') && process.env.PORT !== '0') {
+  process.once('SIGINT', () => { shutdown('SIGINT').finally(() => { process.exitCode = startupLifecycle === 'STOPPED' ? 0 : 1; }); });
+  process.once('SIGTERM', () => { shutdown('SIGTERM').finally(() => { process.exitCode = startupLifecycle === 'STOPPED' ? 0 : 1; }); });
+}

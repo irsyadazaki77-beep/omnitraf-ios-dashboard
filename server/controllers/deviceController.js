@@ -1,5 +1,4 @@
 import { backendState } from '../services/stateManager.js';
-import { dbManager } from '../db/database.js';
 import { commandExecutor } from '../services/commandExecutor.js';
 import { createApiResponse, createApiErrorResponse, createCommandErrorResponse, getCommandErrorStatus, sanitizeString } from '../middlewares/errorHandler.js';
 import { DEVICE_FAULTS, DEVICE_RESOLUTIONS } from '../config/contracts.js';
