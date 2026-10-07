@@ -1,16 +1,22 @@
 import { defineConfig } from 'vite';
 
 const backend = process.env.OMNITRAF_BACKEND_ORIGIN || 'http://localhost:3000';
+const backendProxy = {
+  '/api': { target: backend, changeOrigin: true },
+  '/socket.io': { target: backend, ws: true, changeOrigin: true }
+};
 
 export default defineConfig({
   publicDir: 'public',
   server: {
     host: '0.0.0.0',
     port: 5173,
-    proxy: {
-      '/api': { target: backend, changeOrigin: true },
-      '/socket.io': { target: backend, ws: true, changeOrigin: true }
-    }
+    proxy: backendProxy
+  },
+  preview: {
+    host: '0.0.0.0',
+    port: 4173,
+    proxy: backendProxy
   },
   build: {
     outDir: 'dist',

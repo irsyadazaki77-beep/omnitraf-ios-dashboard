@@ -107,23 +107,40 @@ Jaminan deterministik yang diuji mencakup output handler untuk seed dan jadwal y
 
 ---
 
-## 🚀 Panduan Menjalankan Project (1-Command Run)
+## 🚀 Menjalankan Project
 
 ### Prasyarat
 - Node.js versi 20.
 - `npm` adalah package manager canonical project ini.
 
-### Langkah Menjalankan
+### Development
 ```bash
-# 1. Pasang dependensi secara reproducible
 npm ci
+```
 
-# 2. Jalankan server (Otomatis mendeteksi port 3000 atau port bebas berikutnya)
+Jalankan backend dan frontend Vite di dua terminal:
+
+```bash
+# Terminal 1
+npm run dev:server
+```
+
+```bash
+# Terminal 2
+npm run dev:client
+```
+
+Buka `http://localhost:5173`. Vite meneruskan `/api` dan `/socket.io` ke backend lokal di port 3000. `OMNITRAF_BACKEND_ORIGIN` dapat dipakai untuk memilih alamat backend lain.
+
+### Production
+
+```bash
+npm ci
+npm run build
 npm start
 ```
 
-Buka peramban (browser) di alamat:
-**`http://localhost:3000`**
+Server Express menyajikan frontend dari `dist/` pada `http://localhost:3000`. Docker membangun `dist/` di build stage sebelum menjalankan server.
 
 ### Database dan deployment Docker
 
@@ -139,11 +156,12 @@ Untuk multi-instance, set `OMNITRAF_RUNTIME_MODE=cluster` dan `REDIS_URL`. Setia
 ```bash
 npm ci
 npm run lint
+npm run build
 npm run validate
 npm test
 ```
 
-`npm run lint` memeriksa sintaks JavaScript, sedangkan `npm run validate` memvalidasi PWA dan static assets. `npm test` menemukan dan menjalankan seluruh unit serta integration test. `npm run build` menjalankan lint dan validasi statis; project ini tidak memiliki bundler atau langkah kompilasi. Rincian baseline dan batas pengukuran Phase 9 ada di [PHASE9_PERFORMANCE.md](PHASE9_PERFORMANCE.md).
+`npm run lint` memeriksa sintaks JavaScript. `npm run build` menghasilkan bundle Vite ber-hash dan mencetak ukuran entry serta chunk fitur. `npm run validate` memeriksa artefak production/PWA, lalu `npm test` menjalankan seluruh unit dan integration test. `npm run preview` menyajikan build Vite pada port 4173 dan meneruskan API/Socket.io ke backend lokal. Rincian baseline dan batas pengukuran Phase 9 ada di [PHASE9_PERFORMANCE.md](PHASE9_PERFORMANCE.md).
 
 ---
 

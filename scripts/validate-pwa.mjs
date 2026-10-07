@@ -29,12 +29,13 @@ for (const feature of [
   assert.ok(dynamicEntries.has(feature), `${feature} must stay outside the initial entry graph`);
 }
 
-for (const file of ['index.html', 'sw.js', 'manifest.webmanifest', 'views/dashboardView.html', 'components/marquee.html', 'assets/favicon.png']) {
+for (const file of ['index.html', 'sw.js', 'manifest.webmanifest', 'views/dashboardView.html', 'components/marquee.html']) {
   await exists(file);
 }
 
 const assetDirectory = path.join(root, 'assets');
 const assetNames = await readdir(assetDirectory);
+assert.ok(assetNames.some((name) => /^favicon-[A-Za-z0-9_-]{8,}\.png$/i.test(name)), 'public images must be content hashed');
 const lazyChunks = assetNames.filter((name) => name.endsWith('.js') && /analyticsController|mapManager|cctvController|deviceController|signalsController/.test(name));
 assert.ok(lazyChunks.length >= 3, 'production build must emit multiple feature-level JavaScript chunks');
 const allHtmlPaths = [...html.matchAll(/(?:src|href)="(\/[^"]+)"/g)].map((match) => match[1]);

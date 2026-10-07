@@ -7,7 +7,7 @@
     "dev": "node server.js",
     "dev:server": "node server.js",
     "dev:client": "vite",
-    "build": "vite build && node scripts/report-build-size.mjs",
+    "build": "vite build && node scripts/hash-public-assets.mjs && node scripts/report-build-size.mjs",
     "preview": "vite preview",
     "validate": "node scripts/validate-pwa.mjs",
     "lint": "node scripts/run-lint.mjs",

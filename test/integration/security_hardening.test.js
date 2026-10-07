@@ -321,6 +321,11 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
     const chunkRes = await fetch(`${baseUrl}${entryPath}`);
     assert.strictEqual(chunkRes.status, 200);
     assert.match(chunkRes.headers.get('cache-control') || '', /max-age=31536000, immutable/);
+    const iconPath = html.match(/href="(\/assets\/favicon-[^\"]+\.png)"/)?.[1];
+    assert.ok(iconPath, 'Production HTML must reference a content-hashed public icon');
+    const iconRes = await fetch(`${baseUrl}${iconPath}`);
+    assert.strictEqual(iconRes.status, 200);
+    assert.match(iconRes.headers.get('cache-control') || '', /max-age=31536000, immutable/);
     assert.strictEqual((await fetch(`${baseUrl}/views/dashboardView.html`)).status, 200);
     assert.strictEqual((await fetch(`${baseUrl}/sw.js`)).status, 200);
     assert.strictEqual((await fetch(`${baseUrl}/src/app.js`)).status, 404);
