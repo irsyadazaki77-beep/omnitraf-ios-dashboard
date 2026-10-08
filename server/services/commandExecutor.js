@@ -280,7 +280,7 @@ export class CommandExecutor {
         sourceInstanceId: sourceInstanceId || clusterRuntime.leadership?.instanceId || null,
         leaderInstanceId: clusterRuntime.leadership?.leaderId || clusterRuntime.leadership?.instanceId || null
       };
-      auditRepository.insert({ ...auditLog, details: customAudit?.details || `Perintah [${action}] berhasil diterapkan.` });
+      await auditRepository.insert({ ...auditLog, details: customAudit?.details || `Perintah [${action}] berhasil diterapkan.` }, true);
       backendState.auditLogs.unshift(auditLog);
       if (backendState.auditLogs.length > 250) backendState.auditLogs.pop();
 
@@ -430,7 +430,7 @@ export class CommandExecutor {
 
         // Atomic Persistence
         try {
-          deviceRepository.upsert(dev, true);
+          await deviceRepository.upsert(dev, true);
         } catch (persistErr) {
           // Rollback on persistence failure
           dev.fps = previousState.fps;
@@ -648,7 +648,7 @@ export class CommandExecutor {
           isOverrideActive: !!node.isOverrideActive
         };
 
-        const res = backendState.signalOverride(intersectionId, duration);
+        const res = await backendState.signalOverride(intersectionId, duration);
         backendState.signalSequence++;
 
         if (backendState.io) {
@@ -687,7 +687,7 @@ export class CommandExecutor {
           pendingGreenSplit: node.pendingGreenSplit
         };
 
-        const resultingState = backendState.setGreenSplit(value, intersectionId);
+        const resultingState = await backendState.setGreenSplit(value, intersectionId);
         backendState.signalSequence++;
 
         if (backendState.io) {
@@ -848,7 +848,7 @@ export class CommandExecutor {
         const code = payload.code;
         const route = payload.route;
 
-        const res = backendState.activateEmergencyPriority(code, route, {
+        const res = await backendState.activateEmergencyPriority(code, route, {
           commandId: finalCommandId,
           correlationId: finalCorrelationId,
           actor: actorName,
@@ -896,7 +896,7 @@ export class CommandExecutor {
         const existingEmg = (backendState.state.activeEmergencies || []).find(e => String(e.id) === String(id) || String(e.vehicleId) === String(id));
         const previousState = existingEmg ? { ...existingEmg } : null;
 
-        const resultingState = backendState.cancelEmergency(id, {
+        const resultingState = await backendState.cancelEmergency(id, {
           commandId: finalCommandId,
           correlationId: finalCorrelationId,
           actor: actorName,
@@ -919,7 +919,7 @@ export class CommandExecutor {
         const existingInc = (backendState.state.incidents || []).find(i => String(i.id) === String(id));
         const previousState = existingInc ? { ...existingInc } : null;
 
-        const inc = backendState.updateIncidentStatus(id, INCIDENT_STATES.ACKNOWLEDGED, payload?.assignedUnit, payload?.notes, {
+        const inc = await backendState.updateIncidentStatus(id, INCIDENT_STATES.ACKNOWLEDGED, payload?.assignedUnit, payload?.notes, {
           commandId: finalCommandId,
           correlationId: finalCorrelationId,
           actor: actorName, commandManaged: true
@@ -953,7 +953,7 @@ export class CommandExecutor {
         backendState.state.seq = backendState.sequence;
         backendState.state.timestampMs = Date.now();
         try {
-          incidentRepository.upsert(incident, true);
+          await incidentRepository.upsert(incident, true);
         } catch (err) {
           backendState.state.incidents.splice(backendState.state.incidents.indexOf(incident), 1);
           backendState.incidentSequence--;
@@ -980,7 +980,7 @@ export class CommandExecutor {
         const existing = (backendState.state.incidents || []).find(item => String(item.id) === String(id));
         const previousState = existing ? { ...existing } : null;
         const status = payload.status;
-        const inc = backendState.updateIncidentStatus(id, status, payload.assignedUnit, payload.notes, {
+        const inc = await backendState.updateIncidentStatus(id, status, payload.assignedUnit, payload.notes, {
           commandId: finalCommandId, correlationId: finalCorrelationId, actor: actorName, commandManaged: true
         });
         return {
@@ -999,7 +999,7 @@ export class CommandExecutor {
         const targetStatus = payload.status;
         const assignedUnit = payload?.assignedUnit || 'Unit Demo';
         const notes = payload?.notes || 'Status penugasan contoh diubah pada simulator; tidak ada petugas yang dihubungi.';
-        const inc = backendState.updateIncidentStatus(id, targetStatus, assignedUnit, notes, {
+        const inc = await backendState.updateIncidentStatus(id, targetStatus, assignedUnit, notes, {
           commandId: finalCommandId,
           correlationId: finalCorrelationId,
           actor: actorName, commandManaged: true
@@ -1021,7 +1021,7 @@ export class CommandExecutor {
         const existingInc = (backendState.state.incidents || []).find(i => String(i.id) === String(id));
         const previousState = existingInc ? { ...existingInc } : null;
 
-        const inc = backendState.updateIncidentStatus(id, INCIDENT_STATES.RESOLVED, payload?.assignedUnit, payload?.notes || `Diselesaikan oleh ${actorName}`, {
+        const inc = await backendState.updateIncidentStatus(id, INCIDENT_STATES.RESOLVED, payload?.assignedUnit, payload?.notes || `Diselesaikan oleh ${actorName}`, {
           commandId: finalCommandId,
           correlationId: finalCorrelationId,
           actor: actorName, commandManaged: true

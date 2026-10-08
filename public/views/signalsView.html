@@ -42,11 +42,11 @@
         <!-- Primary Intersection Cards Console Grid -->
         <section class="signals-console-grid">
           <!-- Card 1: Simpang Wonokromo -->
-          <article class="widget glass-panel signals-intersection-card">
+          <article class="widget glass-panel signals-intersection-card" data-intersection-id="node-wonokromo">
             <div class="section-head signals-card-header">
               <div>
                 <h2>Simpang Wonokromo</h2>
-                <p class="signals-card-meta">DEV-CTRL-01 · Koridor A. Yani – Diponegoro · Rata-rata tunggu: 42s</p>
+                <p class="signals-card-meta"><span data-signal-phase>Fase: —</span> · <span data-signal-wait>Waktu tunggu: —</span> · <span data-signal-updated>Update: —</span></p>
               </div>
               <span class="pill pill-ai signals-badge-adaptive"><span class="signals-status-dot dot-live"></span> MODEL SIMULASI</span>
             </div>
@@ -61,7 +61,7 @@
                 </div>
                 <div class="cycle-progress-ring">
                   <span class="cycle-number" id="cycleVal1">38</span>
-                  <span class="cycle-label">Detik Hijau</span>
+                  <span class="cycle-label">Fase tersisa</span>
                 </div>
               </div>
 
@@ -90,15 +90,15 @@
             </div>
 
             <!-- High-Impact Semantic Action -->
-            <button class="btn btn-primary compact force-override-btn" type="button">Terapkan Manual Override</button>
+            <button class="btn btn-primary compact force-override-btn" type="button" data-capability="signal:control">Terapkan Override Simulasi</button>
           </article>
 
           <!-- Card 2: Simpang Tunjungan -->
-          <article class="widget glass-panel signals-intersection-card">
+          <article class="widget glass-panel signals-intersection-card" data-intersection-id="node-tunjungan">
             <div class="section-head signals-card-header">
               <div>
                 <h2>Simpang Tunjungan (Siola)</h2>
-                <p class="signals-card-meta">DEV-CTRL-02 · Koridor Tunjungan – Praban · Rata-rata tunggu: 38s</p>
+                <p class="signals-card-meta"><span data-signal-phase>Fase: —</span> · <span data-signal-wait>Waktu tunggu: —</span> · <span data-signal-updated>Update: —</span></p>
               </div>
               <span class="pill pill-ai signals-badge-adaptive"><span class="signals-status-dot dot-live"></span> MODEL SIMULASI</span>
             </div>
@@ -113,7 +113,7 @@
                 </div>
                 <div class="cycle-progress-ring">
                   <span class="cycle-number" id="cycleVal2">28</span>
-                  <span class="cycle-label">Detik Hijau</span>
+                  <span class="cycle-label">Fase tersisa</span>
                 </div>
               </div>
 
@@ -142,7 +142,7 @@
             </div>
 
             <!-- High-Impact Semantic Action -->
-            <button class="btn btn-primary compact force-override-btn" type="button">Terapkan Manual Override</button>
+            <button class="btn btn-primary compact force-override-btn" type="button" data-capability="signal:control">Terapkan Override Simulasi</button>
           </article>
         </section>
 
@@ -167,7 +167,7 @@
                   <th>Status</th>
                   <th>Kepadatan</th>
                   <th>Waktu Tunggu</th>
-                  <th>Trend</th>
+                  <th>Pembaruan</th>
                 </tr>
               </thead>
               <tbody id="intersectionTable">

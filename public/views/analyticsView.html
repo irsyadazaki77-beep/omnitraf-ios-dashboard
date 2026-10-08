@@ -4,11 +4,11 @@
           <div class="section-head analytics-section-head">
             <div>
               <div class="analytics-provenance-row">
-                <span class="provenance-badge derived">TELEMETRY + MODEL ESTIMATE</span>
-                <span class="analytics-units-label">Unit: smp/jam & km/jam · Periode: 24 Jam Diurnal</span>
+                <span class="provenance-badge simulated">MODEL SIMULASI</span>
+                <span class="analytics-units-label">Skenario diurnal 24 jam · bukan data telemetri lapangan</span>
               </div>
-              <h2>Traffic Trends & Time-Travel Simulator</h2>
-              <p>Simulasi fluktuasi kepadatan 24 jam koridor arteri Surabaya berdasarkan histori pola puncak SITS (Pagi 07:00 & Sore 17:00).</p>
+              <h2>Tren dan Perbandingan Skenario</h2>
+              <p>Jelajahi pola lalu lintas sintetis untuk koridor demo. Semua grafik dan nilai di halaman ini berasal dari model simulasi.</p>
             </div>
             <div class="analytics-toolbar">
               <!-- Corridor Selection Dropdown -->
@@ -54,7 +54,7 @@
               <article class="summary-card glass-soft">
                 <strong id="analyticsTotalVehicles" data-counter="128540">128.540</strong>
                 <span>Total kendaraan</span>
-                <small class="metric-up" id="analyticsVolumeTrend">+14,8%</small>
+                <small class="metric-up" id="analyticsVolumeTrend" hidden></small>
               </article>
               <article class="summary-card glass-soft">
                 <strong id="analyticsPeakHourText">08:00–09:00</strong>
@@ -63,7 +63,7 @@
               <article class="summary-card glass-soft">
                 <strong id="analyticsAvgSpeed" data-counter="34">34 km/jam</strong>
                 <span>Rata-rata kecepatan</span>
-                <small class="metric-down" id="analyticsSpeedTrend">-8%</small>
+                <small class="metric-down" id="analyticsSpeedTrend" hidden></small>
               </article>
             </div>
 
@@ -72,11 +72,11 @@
               <div class="analytics-chart-legend">
                 <span class="analytics-legend-item">
                   <span class="legend-swatch legend-swatch-actual"></span>
-                  <strong>Data Riil Telemetri (Solid)</strong>
+                  <strong>Baseline model</strong>
                 </span>
                 <span class="analytics-legend-item">
                   <span class="legend-swatch legend-swatch-forecast"></span>
-                  <strong>Prediksi AI Diurnal (Dashed)</strong>
+                  <strong>Proyeksi model</strong>
                 </span>
                 <span class="analytics-legend-item">
                   <span class="legend-swatch legend-swatch-peak"></span>
@@ -108,10 +108,10 @@
 
                 <path class="chart-area" d="M0 206 C65 200 100 132 158 92 S285 112 352 152 S530 115 760 96 L760 260 L0 260 Z" />
                 
-                <!-- Solid Line: Data Riil Telemetri -->
+                <!-- Solid Line: Baseline simulated model -->
                 <path class="chart-line primary" id="chartPathPrimary" d="M0 206 C65 200 100 132 158 92 S285 112 352 152 S530 115 760 96" />
                 
-                <!-- Dashed Line: Prediksi AI Diurnal -->
+                <!-- Dashed Line: Simulated model projection -->
                 <path class="chart-line muted" id="chartPathMuted" d="M0 180 C80 185 155 166 252 120 S410 86 540 104 S650 85 760 72" />
                 
                 <path class="chart-line cyan" id="chartPathCyan" d="M0 228 C88 218 142 158 224 84 S350 180 468 168 S624 142 760 176" />
@@ -124,9 +124,9 @@
               </svg>
               <div id="chartTooltip" class="chart-tooltip glass-soft">
                 <div class="tooltip-time" id="tooltipTime">--:--</div>
-                <div class="tooltip-data"><span class="tooltip-dot primary"></span> <span id="tooltipVal1">Data Riil: --</span></div>
-                <div class="tooltip-data"><span class="tooltip-dot muted"></span> <span id="tooltipVal2">Prediksi AI: --</span></div>
-                <div class="tooltip-data"><span class="tooltip-dot cyan"></span> <span id="tooltipVal3">Kapasitas: --</span></div>
+                <div class="tooltip-data"><span class="tooltip-dot primary"></span> <span id="tooltipVal1">Baseline model: --</span></div>
+                <div class="tooltip-data"><span class="tooltip-dot muted"></span> <span id="tooltipVal2">Proyeksi model: --</span></div>
+                <div class="tooltip-data"><span class="tooltip-dot cyan"></span> <span id="tooltipVal3">Batas model: --</span></div>
               </div>
             </div>
           </div>
@@ -145,7 +145,7 @@
                 <button id="btnEsgMethodology" class="btn btn-ghost compact btn-esg-methodology" type="button">
                   ℹ️ Metodologi Perhitungan
                 </button>
-                <div class="esg-badge-leaf">🌱 Impact Score: A+</div>
+                <div class="esg-badge-leaf">OUTPUT MODEL SIMULASI</div>
               </div>
             </div>
 
@@ -153,25 +153,17 @@
               <div class="esg-metric-box">
                 <div class="esg-icon-large">🍃</div>
                 <div>
-                  <strong id="co2Saved">1.420 kg</strong>
+                  <strong id="co2Saved">—</strong>
                   <span>Estimasi CO₂ Tereduksi</span>
-                  <small>Deviasi terhadap siklus statis</small>
+                  <small>Model simulasi terhadap siklus statis</small>
                 </div>
               </div>
               <div class="esg-metric-box">
                 <div class="esg-icon-large">⛽</div>
                 <div>
-                  <strong id="fuelSaved">580 Liter</strong>
+                  <strong id="fuelSaved">—</strong>
                   <span>BBM Diselamatkan</span>
-                  <small>Reduksi siklus deselerasi</small>
-                </div>
-              </div>
-              <div class="esg-metric-box">
-                <div class="esg-icon-large">🌳</div>
-                <div>
-                  <strong id="treesPlanted">71 Pohon</strong>
-                  <span>Ekivalen Penyerapan Pohon</span>
-                  <small>Proyeksi serapan karbon harian</small>
+                  <small>Estimasi model simulasi</small>
                 </div>
               </div>
             </div>
@@ -195,8 +187,8 @@
               </form>
               <div class="esg-progress-panel esg-progress-col">
                 <div class="esg-progress-label-row">
-                  <span>Progres Pencapaian Target:</span>
-                  <span id="esgProgressText">71%</span>
+                  <span>Progres target simulasi:</span>
+                  <span id="esgProgressText">Belum dihitung</span>
                 </div>
                 <div class="stat-progress-bar esg-progress-track">
                   <div id="esgProgressFill" class="progress-fill green-bar esg-progress-fill-bar"></div>

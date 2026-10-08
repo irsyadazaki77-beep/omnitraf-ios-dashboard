@@ -56,6 +56,7 @@ try {
   const env = {
     ...process.env,
     NODE_ENV: 'test',
+    ALLOW_SQLJS_CLUSTER: 'true',
     DB_PATH: path.join(tempRoot, 'default.sqlite'),
     TEST_DATA_DIR: tempRoot
   };

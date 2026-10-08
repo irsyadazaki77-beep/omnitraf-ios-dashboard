@@ -658,3 +658,16 @@ body.theme-light #operatorConfirmModal #confirmModalTitle,
   .apill-timer-hero {
     font-size: 32px;
   }
+
+.signals-console-grid { gap: var(--space-3); }
+.signals-intersection-card { padding: var(--space-4); border: 1px solid var(--border-subtle); box-shadow: none; }
+.signals-intersection-card .section-head { padding-bottom: var(--space-3); border-bottom: 1px solid var(--border-subtle); }
+.signals-card-meta { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.force-override-btn { min-height: var(--control-height-md); }
+#intersectionTable th { position: sticky; top: 0; z-index: 2; background: var(--surface-raised); }
+#intersectionTable td, #intersectionTable th { font-variant-numeric: tabular-nums; }
+#intersectionTable tbody tr[role="button"] { cursor: pointer; }
+#intersectionTable tbody tr[role="button"]:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+@media (min-width: 1200px) {
+  .signals-console-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

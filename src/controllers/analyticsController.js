@@ -222,8 +222,8 @@ export class AnalyticsController {
     if (totalVehicles) totalVehicles.textContent = Number(snapshot.expectedVolume * 90).toLocaleString('id-ID');
     if (peakHourText) peakHourText.textContent = snapshot.factors?.[0] || "Arus Reguler SITS";
     if (avgSpeed) avgSpeed.textContent = `${snapshot.expectedSpeedKmh} km/jam`;
-    if (volumeTrend) volumeTrend.textContent = snapshot.probabilityValue >= 75 ? "+22,4%" : snapshot.probabilityValue >= 48 ? "+8,1%" : "-15,2%";
-    if (speedTrend) speedTrend.textContent = snapshot.expectedSpeedKmh <= 20 ? "-24%" : "+12%";
+    if (volumeTrend) volumeTrend.hidden = true;
+    if (speedTrend) speedTrend.hidden = true;
     if (predictSpeedVal) predictSpeedVal.textContent = `${snapshot.expectedSpeedKmh} km/jam`;
     if (predictProbVal) predictProbVal.textContent = `${snapshot.probabilityValue}%`;
 
@@ -250,8 +250,7 @@ export class AnalyticsController {
 
   _updateDataQualityBadges(snapshot) {
     const dq = snapshot.dataQuality || {};
-    const provenance = snapshot.source || dq.provenance || "REALTIME-DERIVED";
-    const confidence = snapshot.confidence ?? dq.confidence ?? 94;
+    const provenance = snapshot.source || dq.provenance || "SIMULATED";
 
     // Update or inject quality badges in prediction header
     let qualityBadge = document.getElementById("analyticsDataQualityBadge");
@@ -267,16 +266,13 @@ export class AnalyticsController {
     }
 
     if (qualityBadge) {
-      const provColor = provenance === 'REALTIME-DERIVED' ? '#10b981' : provenance === 'DEGRADED' ? '#f59e0b' : '#38bdf8';
+      const provColor = provenance === 'DEGRADED' ? 'var(--warning)' : 'var(--status-warning)';
       qualityBadge.innerHTML = `
-        <span class="badge" style="background: rgba(15, 23, 42, 0.8); border: 1px solid ${provColor}; color: ${provColor}; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 20px;">
-          🏷️ SOURCE: ${escapeHtml(provenance)}
+        <span class="badge provenance-badge simulated" style="border-color: ${provColor};">
+          SOURCE: ${escapeHtml(provenance)}
         </span>
-        <span class="badge" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(0, 229, 255, 0.4); color: #00e5ff; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 20px;">
-          🎯 CONFIDENCE: ${escapeHtml(confidence)}%
-        </span>
-        <span class="badge" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); color: #94a3b8; font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 20px;">
-          ⚙️ MODEL: ${escapeHtml(snapshot.modelVersion || MODEL_VERSION)}
+        <span class="badge provenance-badge simulated">
+          MODEL: ${escapeHtml(snapshot.modelVersion || MODEL_VERSION)}
         </span>
       `;
     }
@@ -444,19 +440,25 @@ export class AnalyticsController {
     const esg = snapshot.esgImpact;
     if (!esg) return;
 
+    const formatMetric = (value) => {
+      if (value === null || value === undefined || value === '') return '—';
+      const numericValue = Number(value);
+      return Number.isFinite(numericValue) ? numericValue.toLocaleString('id-ID') : '—';
+    };
+
     const co2SavedEl = document.getElementById("co2Saved");
     const fuelSavedEl = document.getElementById("fuelSaved");
 
     if (co2SavedEl) {
       co2SavedEl.innerHTML = `
-        <span>${escapeHtml(Number(esg.observedSavings.co2SavedKg || 0).toLocaleString('id-ID'))} kg</span>
-        <small style="font-size: 10px; color: #10b981; display: block;">(Observed Realtime) • Simulasi Scenario: ${escapeHtml(esg.simulatedScenarioSavings.co2SavedKg)} kg</small>
+        <span>${escapeHtml(formatMetric(esg.observedSavings?.co2SavedKg))} kg</span>
+        <small class="esg-source-note">Teramati di simulator • skenario model: ${escapeHtml(formatMetric(esg.simulatedScenarioSavings?.co2SavedKg))} kg</small>
       `;
     }
     if (fuelSavedEl) {
       fuelSavedEl.innerHTML = `
-        <span>${escapeHtml(Number(esg.observedSavings.fuelSavedLiters || 0).toLocaleString('id-ID'))} Liter</span>
-        <small style="font-size: 10px; color: #10b981; display: block;">(Observed Realtime) • Simulasi Scenario: ${escapeHtml(esg.simulatedScenarioSavings.fuelSavedLiters)} L</small>
+        <span>${escapeHtml(formatMetric(esg.observedSavings?.fuelSavedLiters))} Liter</span>
+        <small class="esg-source-note">Teramati di simulator • skenario model: ${escapeHtml(formatMetric(esg.simulatedScenarioSavings?.fuelSavedLiters))} L</small>
       `;
     }
   }
@@ -545,7 +547,11 @@ export class AnalyticsController {
     this.disposer.addEventListener(form, "submit", (e) => {
       e.preventDefault();
       const targetVal = Math.max(500, parseInt(input?.value, 10) || 2000);
-      const currentSavedCo2 = stateStore.getState().telemetry?.co2SavedKg || 1420;
+      const currentSavedCo2 = Number(stateStore.getState().telemetry?.co2SavedKg);
+      if (!Number.isFinite(currentSavedCo2)) {
+        if (typeof window.showToast === 'function') window.showToast('Data estimasi CO₂ simulator belum tersedia.', 'warning');
+        return;
+      }
       const percentage = Math.min(100, Math.round((currentSavedCo2 / targetVal) * 100));
 
       if (progressFill) progressFill.style.width = `${percentage}%`;

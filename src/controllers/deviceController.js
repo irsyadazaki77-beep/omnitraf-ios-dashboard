@@ -40,6 +40,7 @@ export class DeviceController {
     this._setupSocketListeners();
     this._bindTableEvents();
     this._bindDrawerEvents();
+    this.disposer.add(authManager.onAuthChange(() => this.render()));
     
     this.render();
   }
@@ -77,6 +78,12 @@ export class DeviceController {
 
     // 2. Render Tabel Device secara dinamis
     this._renderDeviceTable(devices);
+    const pingAllButton = document.getElementById('btnPingAll');
+    const canPing = authManager.hasRole(['OPERATOR', 'ADMIN']);
+    if (pingAllButton) pingAllButton.hidden = !canPing;
+    document.querySelectorAll('#view-devices .ping-device-btn').forEach((button) => { button.hidden = !canPing; });
+    const saveConfiguration = document.querySelector('#deviceConfigForm button[type="submit"]');
+    if (saveConfiguration) saveConfiguration.hidden = !authManager.hasRole('ADMIN');
 
     // 3. Jika drawer sedang terbuka, update datanya secara real-time
     this._updateDrawerDetailsLive(devices);
@@ -84,7 +91,7 @@ export class DeviceController {
 
   _renderSummaryCards(devices) {
     const totalCount = devices.length;
-    const onlineCount = devices.filter(d => d.healthLevel === "HEALTHY" || d.healthLevel === "DEGRADED").length;
+    const exceptionCount = devices.filter(d => ["OFFLINE", "DEGRADED", "STALE", "FAULT", "RECOVERING", "MAINTENANCE"].includes(String(d.status === 'MAINTENANCE' ? d.status : d.healthLevel || '').toUpperCase())).length;
     
     // Hitung rata-rata CPU Load & Suhu untuk perangkat aktif
     let cpuSum = 0;
@@ -92,9 +99,11 @@ export class DeviceController {
     let activeDevicesCount = 0;
 
     devices.forEach(d => {
-      if (d.healthLevel !== "OFFLINE") {
-        cpuSum += d.cpuPercent || 0;
-        tempSum += d.temperatureC || 0;
+      if (!['OFFLINE', 'SIMULATED'].includes(String(d.healthLevel || '').toUpperCase())
+        && Number.isFinite(Number(d.cpuPercent)) && d.cpuPercent !== null
+        && Number.isFinite(Number(d.temperatureC)) && d.temperatureC !== null) {
+        cpuSum += Number(d.cpuPercent);
+        tempSum += Number(d.temperatureC);
         activeDevicesCount++;
       }
     });
@@ -102,16 +111,13 @@ export class DeviceController {
     const avgCpu = activeDevicesCount > 0 ? Math.round(cpuSum / activeDevicesCount) : 0;
     const avgTemp = activeDevicesCount > 0 ? Math.round(tempSum / activeDevicesCount) : 0;
 
-    const summaryGrid = document.querySelector(".devices-summary-grid");
-    if (summaryGrid) {
-      const valElements = summaryGrid.querySelectorAll("strong");
-      if (valElements.length >= 4) {
-        valElements[0].textContent = `${totalCount} Perangkat`;
-        valElements[1].innerHTML = `<span style="color:#22c55e;">${onlineCount} Online</span>`;
-        valElements[2].textContent = `${avgCpu}% Load`;
-        valElements[3].textContent = `${avgTemp}°C`;
-      }
-    }
+    const values = [
+      [document.querySelector('#view-devices .workspace-header-summary-strip .workspace-summary-item:first-child strong'), `${totalCount} Perangkat`],
+      [document.getElementById('nodeStatusSummary'), `${exceptionCount} exception`],
+      [document.getElementById('nodeGpuSummary'), activeDevicesCount ? `${avgCpu}% Load` : '—'],
+      [document.getElementById('nodeTempSummary'), activeDevicesCount ? `${avgTemp}°C` : '—']
+    ];
+    values.forEach(([element, value]) => { if (element) element.textContent = value; });
   }
 
   _renderDeviceTable(devices) {
@@ -122,12 +128,19 @@ export class DeviceController {
     const scrollTop = tbody.parentElement ? tbody.parentElement.scrollTop : 0;
 
     let html = "";
-    devices.forEach(dev => {
+    const sortedDevices = [...devices].sort((a, b) => {
+      const priority = (device) => ['OFFLINE', 'FAULT', 'DEGRADED', 'STALE', 'RECOVERING', 'MAINTENANCE'].indexOf(String(device.status === 'MAINTENANCE' ? device.status : device.healthLevel || '').toUpperCase());
+      const aPriority = priority(a) < 0 ? 99 : priority(a);
+      const bPriority = priority(b) < 0 ? 99 : priority(b);
+      return aPriority - bPriority;
+    });
+    sortedDevices.forEach(dev => {
       const safeDeviceId = escapeHtml(dev.deviceId);
       const safeDeviceName = escapeHtml(dev.deviceName);
       const safeLocation = escapeHtml(dev.location);
       const safeType = escapeHtml(dev.type);
-      const safeHealthLevel = ['HEALTHY', 'DEGRADED', 'STALE', 'FAULT', 'RECOVERING', 'OFFLINE'].includes(dev.healthLevel) ? dev.healthLevel : 'OFFLINE';
+      const resolvedHealth = dev.status === 'MAINTENANCE' ? 'MAINTENANCE' : String(dev.healthLevel || '').toUpperCase();
+      const safeHealthLevel = ['HEALTHY', 'DEGRADED', 'STALE', 'FAULT', 'RECOVERING', 'OFFLINE', 'SIMULATED', 'MAINTENANCE'].includes(resolvedHealth) ? resolvedHealth : 'OFFLINE';
       const numericValue = value => Number.isFinite(Number(value)) ? Number(value) : 0;
       const cpuPercent = Math.max(0, Math.min(100, numericValue(dev.cpuPercent)));
       const temperatureC = Math.max(0, Math.min(150, numericValue(dev.temperatureC)));
@@ -145,6 +158,10 @@ export class DeviceController {
         badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#ef4444;"></span><span class="pulse-ring-inner" style="background:#ef4444;"></span></span><span style="color:#ef4444; font-weight:700;">FAULT DEMO</span>`;
       } else if (safeHealthLevel === "RECOVERING") {
         badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#38bdf8;"></span><span class="pulse-ring-inner" style="background:#38bdf8;"></span></span><span style="color:#38bdf8; font-weight:700;">DEMO · RECOVERING</span>`;
+      } else if (safeHealthLevel === "MAINTENANCE") {
+        badgeHtml = `<span class="status-badge gray">MAINTENANCE · DEMO</span>`;
+      } else if (safeHealthLevel === "SIMULATED") {
+        badgeHtml = `<span class="status-badge gray">MODEL ONLY</span>`;
       } else { // OFFLINE
         badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#64748b;"></span><span class="pulse-ring-inner" style="background:#64748b;"></span></span><span style="color:#64748b; font-weight:700;">OFFLINE DEMO</span>`;
       }
@@ -197,7 +214,7 @@ export class DeviceController {
 
       // Row layout HTML murni
       html += `
-        <tr class="clickable-device-row ${this.selectedDeviceId === dev.deviceId ? 'active-row-highlight' : ''}" data-device="${safeDeviceId}" style="border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.2s;">
+        <tr class="clickable-device-row ${this.selectedDeviceId === dev.deviceId ? 'active-row-highlight' : ''}" data-device="${safeDeviceId}" data-health="${safeHealthLevel.toLowerCase()}" style="border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.2s;">
           <td><strong style="font-family:'Share Tech Mono'; color:#00e5ff;">${safeDeviceId}</strong></td>
           <td>
             <div style="font-weight:600;">${safeDeviceName}</div>
@@ -210,12 +227,13 @@ export class DeviceController {
           <td class="device-ping" style="font-family:'Share Tech Mono';">${safeHealthLevel === 'OFFLINE' ? '--' : latencyMs + ' ms demo'}</td>
           <td class="device-ping-spark">${sparklineHtml}</td>
           <td style="font-size:11px; font-family:'Share Tech Mono';">${inferenceRateText}</td>
-          <td><button class="btn btn-ghost compact btn-ping-device-row" data-device="${safeDeviceId}" style="font-size:10px; padding:3px 8px;">Ping demo</button></td>
+          <td>${authManager.hasRole(['OPERATOR', 'ADMIN']) && !['SIMULATED', 'MAINTENANCE'].includes(safeHealthLevel) ? `<button aria-label="Ping simulation for ${safeDeviceId}" class="btn btn-ghost compact btn-ping-device-row" data-device="${safeDeviceId}" style="font-size:10px; padding:3px 8px;">Ping demo</button>` : ''}</td>
         </tr>
       `;
     });
 
     tbody.innerHTML = html;
+    this._applyDeviceFilters();
 
     // Kembalikan scroll position
     if (tbody.parentElement) {
@@ -226,6 +244,11 @@ export class DeviceController {
   _bindTableEvents() {
     const tbody = document.getElementById("deviceTableBody");
     if (!tbody) return;
+
+    const search = document.getElementById('deviceSearch');
+    const statusFilter = document.getElementById('deviceStatusFilter');
+    if (search) this.disposer.addEventListener(search, 'input', () => this._applyDeviceFilters());
+    if (statusFilter) this.disposer.addEventListener(statusFilter, 'change', () => this._applyDeviceFilters());
 
     // centralized click delegator
     this.disposer.addEventListener(tbody, "click", (e) => {
@@ -283,6 +306,32 @@ export class DeviceController {
     }
   }
 
+  _applyDeviceFilters() {
+    const tbody = document.getElementById('deviceTableBody');
+    if (!tbody) return;
+    const query = (document.getElementById('deviceSearch')?.value || '').trim().toLowerCase();
+    const status = document.getElementById('deviceStatusFilter')?.value || 'all';
+    let visible = 0;
+    const rows = [...tbody.querySelectorAll('.clickable-device-row')];
+    rows.forEach((row) => {
+      const health = row.dataset.health || 'offline';
+      const matchesQuery = !query || row.textContent.toLowerCase().includes(query);
+      const isException = ['offline', 'degraded', 'stale', 'fault', 'recovering', 'maintenance'].includes(health);
+      const matchesStatus = status === 'all'
+        || (status === 'exceptions' && isException)
+        || (status === 'offline' && health === 'offline')
+        || (status === 'degraded' && ['degraded', 'stale', 'fault', 'recovering'].includes(health))
+        || (status === 'maintenance' && health === 'maintenance')
+        || (status === 'healthy' && health === 'healthy');
+      row.hidden = !(matchesQuery && matchesStatus);
+      if (!row.hidden) visible += 1;
+    });
+    const count = document.getElementById('deviceFilterCount');
+    if (count) count.textContent = `${visible} / ${rows.length} devices`;
+    const emptyState = document.getElementById('deviceFilterEmpty');
+    if (emptyState) emptyState.hidden = visible > 0;
+  }
+
   async pingDevice(deviceId, btnElement = null) {
     if (btnElement) {
       btnElement.disabled = true;
@@ -296,8 +345,10 @@ export class DeviceController {
       );
 
       if (payload && payload.success) {
-        const latency = payload.data?.latencyMs || payload.latencyMs || 8;
-        window.showToast(`Ping demo ${deviceId}: ${latency} ms waktu simulasi; tidak menguji perangkat fisik.`);
+        const latency = payload.data?.latencyMs ?? payload.latencyMs;
+        window.showToast(latency === undefined || latency === null
+          ? `Ping demo ${deviceId} berhasil; latensi simulasi tidak tersedia.`
+          : `Ping demo ${deviceId}: ${latency} ms waktu simulasi; tidak menguji perangkat fisik.`);
         soundManager.play('success');
       } else {
         throw new Error(payload?.error?.message || "Ping gagal diproses.");

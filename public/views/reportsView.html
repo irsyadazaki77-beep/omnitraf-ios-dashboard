@@ -51,7 +51,7 @@
               <h2 class="report-card-title">Daily Mobility Snapshot</h2>
               <p class="report-card-desc">Contoh ringkasan dari model lalu lintas OmniTRAF; tidak ditujukan untuk keputusan atau evaluasi operasional.</p>
             </div>
-            <button class="btn btn-primary compact report-action-btn" type="button" data-action="download-report">Generate Report</button>
+            <button class="btn btn-primary compact report-action-btn" type="button" data-action="download-report" data-report-type="Daily Mobility">Generate daily snapshot</button>
           </article>
 
           <!-- Weekly & Synthesis Snapshots List -->
@@ -63,13 +63,6 @@
               </div>
             </div>
             <div class="report-snapshots-list">
-              <div class="report-snapshot-item">
-                <div class="snap-info">
-                  <strong>Contoh snapshot harian — data sintetis</strong>
-                  <p>Angka simpang, indeks kemacetan, dan log prioritas kendaraan berasal dari skenario demo.</p>
-                </div>
-                <button class="btn btn-primary compact" data-action="download-report" data-report-type="Daily Mobility">Generate & Download</button>
-              </div>
               <div class="report-snapshot-item">
                 <div class="snap-info">
                   <strong>Contoh sintesis mingguan — data sintetis</strong>
@@ -103,6 +96,17 @@
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                 <span>Salin Data Telemetri (JSON API)</span>
               </button>
+            </div>
+          </article>
+          <article class="reports-history glass-panel">
+            <div class="section-head">
+              <div>
+                <h2>Riwayat ekspor sesi ini</h2>
+                <p>Daftar hanya disimpan selama sesi browser saat ini.</p>
+              </div>
+            </div>
+            <div class="export-history-list export-history-scroll" id="exportHistoryList" aria-live="polite">
+              <p class="empty-history-text empty-history-notice">Belum ada laporan yang diekspor.</p>
             </div>
           </article>
         </section>
@@ -139,27 +143,27 @@
             <tbody>
               <tr>
                 <td>Total Volume Kendaraan Terlayani</td>
-                <td id="printVolVal">128.540 kendaraan</td>
-                <td>110.000 kendaraan</td>
-                <td>✓ Optimal (+16.8%)</td>
+                <td id="printVolVal">—</td>
+                <td>Tidak tersedia</td>
+                <td>Belum dinilai</td>
               </tr>
               <tr>
                 <td>Rata-rata Waktu Tunggu Simpang (Wait Time)</td>
-                <td id="printWaitVal">28.4 detik/kend</td>
-                <td>&lt; 45.0 detik</td>
-                <td>✓ Memenuhi SPM</td>
+                <td id="printWaitVal">—</td>
+                <td>Tidak tersedia</td>
+                <td>Belum dinilai</td>
               </tr>
               <tr>
                 <td>Reduksi Emisi Karbon Dioksida (CO₂)</td>
-                <td id="printCo2Val">1.420 kg CO₂</td>
-                <td>1.000 kg CO₂</td>
-                <td>✓ Melampaui Target</td>
+                <td id="printCo2Val">—</td>
+                <td>Tidak tersedia</td>
+                <td>Belum dinilai</td>
               </tr>
               <tr>
                 <td>Jumlah contoh skenario insiden (bukan data SITS 112)</td>
-                <td id="printIncVal">12 Insiden Selesai</td>
-                <td>100% Resolved</td>
-                <td>✓ 100% Selesai</td>
+                <td id="printIncVal">—</td>
+                <td>Tidak tersedia</td>
+                <td>Belum dinilai</td>
               </tr>
             </tbody>
           </table>
@@ -177,32 +181,7 @@
             </thead>
             <tbody>
               <tr>
-                <td>Koridor A. Yani / Wonokromo</td>
-                <td>3.120 smp/jam</td>
-                <td>38 km/jam</td>
-                <td>Contoh perhitungan Webster (48s; belum divalidasi)</td>
-                <td>Lancar Terkendali</td>
-              </tr>
-              <tr>
-                <td>Koridor Raya Darmo</td>
-                <td>2.640 smp/jam</td>
-                <td>42 km/jam</td>
-                <td>Green Wave Sync</td>
-                <td>Bebas Hambatan</td>
-              </tr>
-              <tr>
-                <td>Koridor A. Yani - Jemursari</td>
-                <td>1.980 smp/jam</td>
-                <td>35 km/jam</td>
-                <td>SITS Adaptive</td>
-                <td>Lancar Teratur</td>
-              </tr>
-              <tr>
-                <td>Koridor MERR Kertajaya</td>
-                <td>2.850 smp/jam</td>
-                <td>48 km/jam</td>
-                <td>ATCS Standar</td>
-                <td>Optimal</td>
+                <td colspan="5" id="printCorridorRows">Data koridor belum tersedia pada snapshot ini.</td>
               </tr>
             </tbody>
           </table>

@@ -187,10 +187,10 @@ describe('PHASE 14C — Command Authority, Idempotency, Authorization & Audit In
     const originalResolution = dev.resolution;
     const originalSeq = backendState.deviceSequence;
 
-    // Temporarily mock dbManager.upsertDeviceTelemetry to simulate disk write failure
-    const originalUpsert = dbManager.upsertDeviceTelemetry;
-    dbManager.upsertDeviceTelemetry = () => {
-      throw new Error('DISK_FULL: Simulated SQLite write failure');
+    const originalExecute = dbManager.execute;
+    dbManager.execute = (sql, ...args) => {
+      if (sql.includes('INSERT INTO device_telemetry')) throw new Error('DISK_FULL: Simulated SQLite write failure');
+      return originalExecute.call(dbManager, sql, ...args);
     };
 
     try {
@@ -215,7 +215,7 @@ describe('PHASE 14C — Command Authority, Idempotency, Authorization & Audit In
       assert.strictEqual(backendState.deviceSequence, originalSeq, 'Sequence must rollback without increment');
     } finally {
       // Restore original DB method
-      dbManager.upsertDeviceTelemetry = originalUpsert;
+      dbManager.execute = originalExecute;
     }
   });
 

@@ -12,3 +12,28 @@
   padding: var(--space-6);
   color: var(--text-tertiary);
 }
+
+.device-filter-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.device-filter-toolbar label { color: var(--text-muted); font-size: var(--font-size-small); }
+.device-filter-toolbar input, .device-filter-toolbar select {
+  min-height: var(--control-height-md);
+  padding: 5px 9px;
+  color: var(--text);
+  background: var(--panel-inset);
+  border: 1px solid var(--border-emphasis);
+  border-radius: var(--radius-sm);
+}
+.device-filter-toolbar input { min-width: min(280px, 100%); flex: 1; }
+.device-filter-count { margin-left: auto; color: var(--text-dim); font: 11px var(--font-mono); }
+.devices-table thead th { position: sticky; top: 0; z-index: 1; background: var(--panel-elevated); }
+.devices-table { min-width: 1120px; }
+.devices-table-region { max-width: 100%; overscroll-behavior-inline: contain; }
+.devices-table-region:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }

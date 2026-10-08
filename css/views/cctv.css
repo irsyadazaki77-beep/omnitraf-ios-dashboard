@@ -168,7 +168,21 @@
 }
 
 .cctv-feed-grid.grid-focus {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1.8fr) minmax(240px, 0.8fr);
+  align-items: start;
+}
+
+.cctv-feed-grid.grid-focus .camera-card-spotlight {
+  grid-row: span 3;
+}
+
+.cctv-feed-grid.grid-focus .camera-card:not(.camera-card-spotlight) .cv-box-container {
+  max-height: 190px;
+}
+
+@media (max-width: 900px) {
+  .cctv-feed-grid.grid-focus { grid-template-columns: 1fr; }
+  .cctv-feed-grid.grid-focus .camera-card-spotlight { grid-row: auto; }
 }
 
 /* Camera Card Surface */
@@ -387,6 +401,7 @@
 .cctv-glitch-overlay.show {
   display: flex;
 }
+.camera-card { box-shadow: none; border-color: var(--border-subtle); }
 
 /* CCTV Responsive */
 @media (max-width: 900px) {
@@ -399,4 +414,3 @@
     border-radius: var(--radius-lg);
   }
 }
-

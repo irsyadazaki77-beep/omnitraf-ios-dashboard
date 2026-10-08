@@ -3,7 +3,7 @@
         <header class="workspace-header">
           <div class="workspace-header-title-group">
             <span class="workspace-header-kicker">OMNITRAF · MODEL PERANGKAT SIMULASI</span>
-            <h1 class="workspace-header-title">Node Perangkat Demo</h1>
+            <h1 class="workspace-header-title">Perangkat</h1>
             <p class="workspace-header-desc">Nilai kesehatan, latensi, suhu, dan konfigurasi perangkat adalah telemetri sintetis, bukan koneksi hardware Surabaya.</p>
           </div>
           <div class="workspace-header-summary-strip" aria-label="Ringkasan Status Perangkat">
@@ -16,24 +16,24 @@
               </div>
             </div>
             <div class="workspace-summary-item">
-              <span class="workspace-summary-label">Status model node</span>
+              <span class="workspace-summary-label">Node exception</span>
               <div class="workspace-summary-val-row">
-                <strong class="text-success" id="nodeStatusSummary">4 Demo</strong>
-                <span class="workspace-summary-sub">Nilai sintetis</span>
+                <strong class="text-warning" id="nodeStatusSummary">—</strong>
+                <span class="workspace-summary-sub">Offline atau degraded</span>
               </div>
             </div>
             <div class="workspace-summary-item hide-mobile">
-              <span class="workspace-summary-label">Beban Rata-rata GPU</span>
+              <span class="workspace-summary-label">Rata-rata CPU model</span>
               <div class="workspace-summary-val-row">
                 <strong class="tabular font-mono text-primary-2" id="nodeGpuSummary">38% Load</strong>
-                <span class="workspace-summary-sub">Stabil</span>
+                <span class="workspace-summary-sub">Nilai simulasi</span>
               </div>
             </div>
             <div class="workspace-summary-item hide-mobile">
               <span class="workspace-summary-label">Temperatur Rata-rata</span>
               <div class="workspace-summary-val-row">
                 <strong class="tabular font-mono text-warning" id="nodeTempSummary">58°C</strong>
-                <span class="workspace-summary-sub">Optimal</span>
+                <span class="workspace-summary-sub">Nilai simulasi</span>
               </div>
             </div>
           </div>
@@ -43,13 +43,29 @@
           <article class="devices-list-panel glass-panel">
             <div class="section-head">
               <div>
-                <h2>Daftar Node Contoh</h2>
+                <h2>Daftar Perangkat</h2>
                 <p>Perangkat representatif untuk demonstrasi. Status tidak berasal dari Nvidia Jetson atau node SITS yang terhubung.</p>
               </div>
               <button class="btn btn-ghost compact" id="btnPingAll" type="button">Simulasikan Ping Semua Node</button>
             </div>
             
-            <div class="table-wrap">
+            <div class="device-filter-toolbar" role="search">
+              <label for="deviceSearch">Find device</label>
+              <input id="deviceSearch" type="search" placeholder="Search ID, name or location" autocomplete="off" />
+              <label for="deviceStatusFilter">Status</label>
+              <select id="deviceStatusFilter">
+                <option value="all">All devices</option>
+                <option value="exceptions">Exceptions</option>
+                <option value="offline">Offline</option>
+                <option value="degraded">Degraded / stale / fault</option>
+                <option value="maintenance">Maintenance</option>
+                <option value="healthy">Healthy</option>
+              </select>
+              <span id="deviceFilterCount" class="device-filter-count" aria-live="polite"></span>
+            </div>
+            <p id="deviceFilterEmpty" class="empty-history-notice" role="status" hidden>No devices match these filters.</p>
+
+            <div class="table-wrap devices-table-region" role="region" aria-label="Daftar perangkat, gulir horizontal untuk kolom lanjutan" tabindex="0">
               <table class="devices-table">
                 <thead>
                   <tr>

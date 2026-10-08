@@ -346,7 +346,7 @@ export class CctvController {
         if (this.autoCreateConfig[anomaly.type]) {
           this._triggerAutomaticIncident(anomalyEvent);
         } else {
-          if (typeof window !== 'undefined' && typeof window.showToast === 'function' && anomaly.type === 'EMERGENCY_VEHICLE_DETECTED') {
+          if (anomalyEvent.provenance === 'LIVE' && typeof window !== 'undefined' && typeof window.showToast === 'function' && anomaly.type === 'EMERGENCY_VEHICLE_DETECTED') {
             window.showToast(`🚨 ${anomaly.message}`, 'warning');
             soundManager.play('alert');
           }
@@ -359,9 +359,8 @@ export class CctvController {
     // Generated camera frames are a browser demo. Never persist them as incidents
     // or send them to the incidents API as if they came from a live camera.
     if (anomalyEvent?.provenance === 'SIMULATED' || anomalyEvent?.simulated === true) {
-      if (typeof window !== 'undefined' && typeof window.showToast === 'function') {
-        window.showToast(`Skenario deteksi simulasi: ${anomalyEvent.message}`, 'warning');
-      }
+      // Simulated detections stay visible in the CCTV detection surface and do not
+      // enter the operational toast channel or appear as real incident alerts.
       return;
     }
 
@@ -555,6 +554,7 @@ export class CctvController {
         e.preventDefault();
         matrixBtns.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
+        matrixBtns.forEach((button) => button.setAttribute('aria-pressed', String(button === btn)));
         const gridType = btn.dataset.grid;
         if (feedGrid) {
           feedGrid.className = `cctv-feed-grid ${gridType}`;
@@ -610,10 +610,10 @@ export class CctvController {
         this.switchActiveCamera(newCamId, previousCamId);
 
         const card = document.querySelector(`[data-cam-id="${newCamId}"]`);
+        document.querySelectorAll('.camera-card-spotlight').forEach((activeCard) => activeCard.classList.remove('camera-card-spotlight'));
         if (card) {
           card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
           card.classList.add('camera-card-spotlight');
-          setTimeout(() => card.classList.remove('camera-card-spotlight'), 1500);
         }
 
         soundManager.play('click');

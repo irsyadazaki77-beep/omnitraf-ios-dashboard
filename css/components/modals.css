@@ -182,7 +182,14 @@
 }
 
 .staff-chat-panel.collapsed {
-  height: 44px;
+  display: none;
+}
+
+/* Keep the prototype coordination chat out of the workspace until requested. */
+
+.staff-chat-panel:not(.collapsed) {
+  width: min(360px, calc(100vw - 32px));
+  max-height: min(560px, calc(100vh - 40px));
 }
 
 .chat-header {
@@ -193,6 +200,15 @@
   background: var(--panel-elevated);
   border-bottom: 1px solid var(--border);
   cursor: pointer;
+}
+
+.chat-header:focus-visible,
+.chat-toggle-btn:focus-visible,
+.chat-sound-toggle-btn:focus-visible,
+.chat-send-btn:focus-visible,
+.chat-footer input:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
 }
 
 .chat-header-title {

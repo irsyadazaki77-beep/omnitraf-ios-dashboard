@@ -249,11 +249,11 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
       device: JSON.stringify(backendState.devicesRegistry.find(item => item.deviceId === 'NODE-EDGE-01'))
     };
     const originalExecute = commandExecutor.executeCommand;
-    const originalPersist = dbManager.upsertSignalConfig;
+    const originalDbExecute = dbManager.execute;
     let commandCalls = 0;
     let persistenceCalls = 0;
     commandExecutor.executeCommand = async (...args) => { commandCalls++; return originalExecute.apply(commandExecutor, args); };
-    dbManager.upsertSignalConfig = (...args) => { persistenceCalls++; return originalPersist.apply(dbManager, args); };
+    dbManager.execute = (sql, ...args) => { if (sql.includes('INSERT INTO signal_configs')) persistenceCalls++; return originalDbExecute.call(dbManager, sql, ...args); };
     try {
       const anonymousPing = await fetch(`${baseUrl}/api/devices/ping?deviceId=NODE-EDGE-01`);
       const anonymousAudit = await fetch(`${baseUrl}/api/audit-logs`);
@@ -279,7 +279,7 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
       assert.equal(signalEvents, 0);
     } finally {
       commandExecutor.executeCommand = originalExecute;
-      dbManager.upsertSignalConfig = originalPersist;
+      dbManager.execute = originalDbExecute;
       socket.disconnect();
     }
   });
@@ -466,12 +466,12 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
     });
     await new Promise((resolve) => socket.on('connect', resolve));
 
-    const originalPersist = dbManager.upsertSignalConfig;
+    const originalExecute = dbManager.execute;
     try {
       const beforeSequence = backendState.sequence;
       const beforeAudit = backendState.auditLogs.length;
       let persistCalls = 0;
-      dbManager.upsertSignalConfig = (...args) => { persistCalls++; return originalPersist.apply(dbManager, args); };
+      dbManager.execute = (sql, ...args) => { if (sql.includes('INSERT INTO signal_configs')) persistCalls++; return originalExecute.call(dbManager, sql, ...args); };
       let ackEvents = 0;
       let auditEvents = 0;
       socket.on('command:ack', () => ackEvents++);
@@ -493,9 +493,9 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
       await new Promise(resolve => setTimeout(resolve, 50));
       assert.equal(ackEvents, 0);
       assert.equal(auditEvents, 0);
-      dbManager.upsertSignalConfig = originalPersist;
+      dbManager.execute = originalExecute;
     } finally {
-      if (dbManager.upsertSignalConfig !== originalPersist) dbManager.upsertSignalConfig = originalPersist;
+      if (dbManager.execute !== originalExecute) dbManager.execute = originalExecute;
       socket.disconnect();
     }
   });

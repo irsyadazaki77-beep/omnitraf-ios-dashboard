@@ -1,4 +1,4 @@
-export const CURRENT_SCHEMA_VERSION = 18;
+export const CURRENT_SCHEMA_VERSION = 19;
 
 export function runMigrations(db, getTableColumns, setMetadata, schemaVersion = CURRENT_SCHEMA_VERSION) {
   const auditCols = getTableColumns('audit_logs');

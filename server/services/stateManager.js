@@ -349,7 +349,7 @@ export class BackendStateManager {
         await dbManager.init();
 
         // 0. Restore & Protect Sequence Monotonicity Across Restarts
-        const savedSeq = metadataRepository.findByKey('last_persisted_sequence');
+        const savedSeq = await metadataRepository.findByKey('last_persisted_sequence');
         if (savedSeq) {
           const parsed = parseInt(savedSeq, 10);
           if (!isNaN(parsed) && parsed >= this.sequence) {
@@ -364,32 +364,30 @@ export class BackendStateManager {
         }
 
         // 1. Deterministic Hydration: Incidents (Database is authoritative)
-        const incRes = incidentRepository.findAll();
+        const incRes = await incidentRepository.findAll();
         const dbIncidents = Array.isArray(incRes) ? incRes : (incRes?.data || []);
         if (dbIncidents && dbIncidents.length > 0) {
           const incidentMap = new Map();
           dbIncidents.forEach(inc => incidentMap.set(String(inc.id), inc));
 
           // Merge any pre-configured seed not yet present in SQLite
-          (this.state.incidents || []).forEach(seed => {
+          for (const seed of (this.state.incidents || [])) {
             if (!incidentMap.has(String(seed.id))) {
               try {
-                incidentRepository.upsert(seed);
+                await incidentRepository.upsert(seed);
                 incidentMap.set(String(seed.id), seed);
               } catch (_) {}
             }
-          });
+          }
           this.state.incidents = Array.from(incidentMap.values());
           console.log(`🗄️ [State Manager] Memuat & memulihkan ${this.state.incidents.length} insiden dari SQLite.`);
         } else {
           // Fresh database: persist initial seed incidents
-          this.state.incidents.forEach(inc => {
-            try { incidentRepository.upsert(inc); } catch (_) {}
-          });
+          for (const inc of this.state.incidents) { try { await incidentRepository.upsert(inc); } catch (_) {} }
         }
 
         // 2. Deterministic Hydration: Audit Logs (Deduplicated with Stable Identifiers)
-        const logRes = auditRepository.findAll(100);
+        const logRes = await auditRepository.findAll(100);
         const dbLogs = Array.isArray(logRes) ? logRes : (logRes?.data || []);
         if (dbLogs && dbLogs.length > 0) {
           const knownCorrs = new Set();
@@ -403,13 +401,11 @@ export class BackendStateManager {
           });
           this.auditLogs = mergedLogs;
         } else {
-          this.auditLogs.forEach(log => {
-            try { auditRepository.insert(log); } catch (_) {}
-          });
+          for (const log of this.auditLogs) { try { await auditRepository.insert(log); } catch (_) {} }
         }
 
         // 3. Hydrate Signal Configs
-        const sigRes = signalConfigRepository.findAll();
+        const sigRes = await signalConfigRepository.findAll();
         const dbSignals = Array.isArray(sigRes) ? sigRes : (sigRes?.data || []);
         if (dbSignals && dbSignals.length > 0) {
           dbSignals.forEach(cfg => {
@@ -422,19 +418,19 @@ export class BackendStateManager {
             }
           });
         } else {
-          this.state.intersections.forEach(node => {
+          for (const node of this.state.intersections) {
             try {
-              signalConfigRepository.upsert(node.id, {
+              await signalConfigRepository.upsert(node.id, {
                 greenSplit: node.greenSplit || 35,
                 cycleTime: 90,
                 mode: 'ADAPTIVE_AI'
               });
             } catch (_) {}
-          });
+          }
         }
 
         // 4. Hydrate Device Configs & Recover with Safe Defaults
-        const devRes = deviceRepository.findAll();
+        const devRes = await deviceRepository.findAll();
         const dbDevices = Array.isArray(devRes) ? devRes : (devRes?.data || []);
         if (dbDevices && dbDevices.length > 0) {
           dbDevices.forEach(dbDev => {
@@ -450,9 +446,7 @@ export class BackendStateManager {
             }
           });
         } else {
-          this.devicesRegistry.forEach(dev => {
-            try { deviceRepository.upsert(dev); } catch (_) {}
-          });
+          for (const dev of this.devicesRegistry) { try { await deviceRepository.upsert(dev); } catch (_) {} }
         }
 
         // 5. Emergency Recovery Guard: Do not leave orphaned active dispatches after crash
@@ -514,7 +508,7 @@ export class BackendStateManager {
     }
 
     try {
-      auditRepository.insert(normalizedLog);
+      Promise.resolve(auditRepository.insert(normalizedLog)).catch((e) => console.error("❌ [Audit Log] Gagal menyimpan log audit:", e.message));
     } catch (e) {
       console.error("❌ [Audit Log] Gagal menyimpan log audit:", e.message);
     }
@@ -829,13 +823,13 @@ export class BackendStateManager {
     return true;
   }
 
-  persistClusterSnapshot() {
-    this.state.incidents.forEach((incident) => dbManager.upsertIncident(incident));
-    this.devicesRegistry.forEach((device) => dbManager.upsertDeviceTelemetry(device));
-    this.state.intersections.forEach((node) => dbManager.upsertSignalConfig(node.id, {
-      greenSplit: node.greenSplit || 35, cycleTime: 90, mode: node.mode || 'ADAPTIVE_AI'
-    }));
-    this.auditLogs.filter((entry) => entry.correlationId || entry.commandId).forEach((entry) => auditRepository.insert(entry));
+  async persistClusterSnapshot() {
+    await dbManager.transaction(async (tx) => {
+      for (const incident of this.state.incidents) await incidentRepository.upsert(incident, false, tx);
+      for (const device of this.devicesRegistry) await deviceRepository.upsert(device, false, tx);
+      for (const node of this.state.intersections) await signalConfigRepository.upsert(node.id, { greenSplit: node.greenSplit || 35, cycleTime: 90, mode: node.mode || 'ADAPTIVE_AI' }, false, tx);
+      for (const entry of this.auditLogs.filter((item) => item.correlationId || item.commandId)) await auditRepository.insert(entry, false, tx);
+    });
     return dbManager.flush();
   }
 
@@ -1345,7 +1339,7 @@ export class BackendStateManager {
     this.resolutionInterval.unref?.();
   }
 
-  setGreenSplit(value, intersectionId) {
+  async setGreenSplit(value, intersectionId) {
     const input = validateDomainCommand('green-split:update', intersectionId, { value });
     const node = this.state.intersections.find(n => n.id === intersectionId);
     if (!node) throw new ContractValidationError('NOT_FOUND', `Intersection '${intersectionId}' was not found.`, { field: 'targetId', expected: 'known intersection', actual: intersectionId, statusCode: 404 });
@@ -1406,7 +1400,7 @@ export class BackendStateManager {
     return { state: this.state, optimizedSplit, nodeName: node.name, smoothTransitionScheduled: true };
   }
 
-  signalOverride(intersectionId, duration) {
+  async signalOverride(intersectionId, duration) {
     const input = validateDomainCommand('signal:override', intersectionId, { duration });
     const node = this.state.intersections.find(n => n.id === intersectionId);
     if (!node) throw new ContractValidationError('NOT_FOUND', `Intersection '${intersectionId}' was not found.`, { field: 'targetId', expected: 'known intersection', actual: intersectionId, statusCode: 404 });
@@ -1431,7 +1425,7 @@ export class BackendStateManager {
     node.status = `Manual Override (${durSec}s)`;
 
     try {
-      signalConfigRepository.upsert(node.id, {
+      await signalConfigRepository.upsert(node.id, {
         greenSplit: durSec,
         cycleTime: durSec,
         mode: 'MANUAL_OVERRIDE'
@@ -1448,7 +1442,7 @@ export class BackendStateManager {
     return { state: this.state, nodeName: node.name, duration: durSec };
   }
 
-  updateIncidentStatus(id, newStatus, assignedUnit = null, notes = null, options = {}) {
+  async updateIncidentStatus(id, newStatus, assignedUnit = null, notes = null, options = {}) {
     const canonical = validateDomainCommand('incident:update-status', id, { status: newStatus, assignedUnit, notes });
     const cleanStatus = canonical.status;
 
@@ -1510,7 +1504,7 @@ export class BackendStateManager {
 
     // Persist ke Database SQLite with immediate atomic save and rollback guard
     try {
-      incidentRepository.upsert(inc, true);
+      await incidentRepository.upsert(inc, true);
     } catch (err) {
       // Rollback in-memory mutation
       Object.assign(inc, previousSnapshot);
@@ -1567,7 +1561,7 @@ export class BackendStateManager {
     return inc;
   }
 
-  activateEmergencyPriority(code, routeId, options = {}) {
+  async activateEmergencyPriority(code, routeId, options = {}) {
     const canonical = validateDomainCommand('emergency:activate', code, { code, route: routeId, incidentId: options.incidentId || options.associatedIncidentId });
     code = canonical.code;
     routeId = canonical.route;
@@ -1588,12 +1582,17 @@ export class BackendStateManager {
       linkedIncident = this.state.incidents.find(i => String(i.id) === String(associatedIncidentId));
       if (!linkedIncident) throw new ContractValidationError('NOT_FOUND', `Incident '${associatedIncidentId}' was not found.`, { field: 'incidentId', expected: 'known incident', actual: associatedIncidentId, statusCode: 404 });
       if (linkedIncident) {
+        const previousIncident = { ...linkedIncident };
         linkedIncident.associatedEmergencyId = id;
         if (linkedIncident.status === INCIDENT_STATES.ACTIVE || linkedIncident.status === INCIDENT_STATES.ACKNOWLEDGED) {
           linkedIncident.status = INCIDENT_STATES.DISPATCHED;
           linkedIncident.assignedUnit = `${code} (${(code && (code.toLowerCase().includes("damkar") || code.toLowerCase().includes("pmk"))) ? "PMK" : "Ambulance"})`;
           linkedIncident.updatedAt = new Date().toISOString();
-          try { incidentRepository.upsert(linkedIncident, true); } catch (_) {}
+        }
+        try { await incidentRepository.upsert(linkedIncident, true); }
+        catch (error) {
+          Object.assign(linkedIncident, previousIncident);
+          throw new Error(`PERSISTENCE_FAILED: Gagal mengaitkan insiden dengan dispatch (${error.message})`);
         }
       }
     }
@@ -1677,7 +1676,7 @@ export class BackendStateManager {
     return { state: this.state, emergencyItem, domainEvent };
   }
 
-  cancelEmergency(id, options = {}) {
+  async cancelEmergency(id, options = {}) {
     validateDomainCommand('emergency:cancel', id, { id });
     const emg = this.state.activeEmergencies.find(e => e.id === id || e.vehicleId === id);
     if (!emg) {

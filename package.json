@@ -12,7 +12,9 @@
     "validate": "node scripts/validate-pwa.mjs",
     "lint": "node scripts/run-lint.mjs",
     "start": "node server.js",
-    "test": "node scripts/run-tests.mjs"
+    "test": "node scripts/run-tests.mjs",
+    "test:postgres": "node --test test/postgres/*.test.js",
+    "db:migrate:sqljs-to-postgres": "node scripts/migrate-sqljs-to-postgres.mjs"
   },
   "dependencies": {
     "@socket.io/redis-adapter": "^8.3.0",
@@ -24,6 +26,7 @@
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
     "pdf-lib": "^1.17.1",
+    "pg": "^8.23.1",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.4",
     "sql.js": "^1.14.2"

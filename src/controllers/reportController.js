@@ -192,12 +192,7 @@ export class ReportController {
       await this._delay(200);
       if (signal.aborted) return;
 
-      // Stage 2: Render Canvas Preview (50% -> 85%)
-      this._updateLoaderProgress(80, "Merender grafik visualisasi snapshot & tren mobilitas...");
-      await this._renderReportPreviewCanvas(telemetryData);
-      if (signal.aborted) return;
-
-      // Stage 3: Complete
+      // Stage 2: Complete the report preview without adding an illustrative, non-data chart.
       this._updateLoaderProgress(100, "Selesai!");
       await this._delay(150);
       if (signal.aborted) return;
@@ -234,150 +229,12 @@ export class ReportController {
     const state = stateStore.getState() || {};
     const telemetry = state.telemetry || {};
     return {
-      volume: telemetry.vehiclesToday || 128540,
-      waitTime: telemetry.avgWaitTime || 42,
-      co2Saved: telemetry.co2SavedKg || 1420,
-      incidents: (state.incidents || []).filter(i => i.status === 'RESOLVED').length || 12,
+      volume: telemetry.vehiclesToday ?? telemetry.totalVehicles ?? null,
+      waitTime: telemetry.avgWaitTime ?? null,
+      co2Saved: telemetry.co2SavedKg ?? null,
+      incidents: Array.isArray(state.incidents) ? state.incidents.filter(i => i.status === 'RESOLVED').length : null,
       docId: `SITS-EKS-${new Date().getFullYear()}/${(new Date().getMonth() + 1).toString().padStart(2, '0')}/REC-${Math.floor(1000 + Math.random() * 9000)}`
     };
-  }
-
-  async _renderReportPreviewCanvas(data) {
-    return new Promise((resolve) => {
-      try {
-        const canvas = document.getElementById("reportPreviewCanvas");
-        if (!canvas) {
-          resolve();
-          return;
-        }
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          resolve();
-          return;
-        }
-
-        const width = 600;
-        const height = 200;
-        canvas.width = width;
-        canvas.height = height;
-
-        // Clean dark gradient background
-        const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-        bgGrad.addColorStop(0, "#0f172a");
-        bgGrad.addColorStop(1, "#1e293b");
-        ctx.fillStyle = bgGrad;
-        ctx.fillRect(0, 0, width, height);
-
-        // Subtle grid lines
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.07)";
-        ctx.lineWidth = 1;
-        for (let x = 40; x < width; x += 65) {
-          ctx.beginPath();
-          ctx.moveTo(x, 20);
-          ctx.lineTo(x, height - 30);
-          ctx.stroke();
-        }
-        for (let y = 30; y < height - 30; y += 35) {
-          ctx.beginPath();
-          ctx.moveTo(40, y);
-          ctx.lineTo(width - 20, y);
-          ctx.stroke();
-        }
-
-        // Data points curve
-        const points = [
-          { x: 50, y: height - 40 },
-          { x: 120, y: height - 60 },
-          { x: 190, y: height - 130 }, // Morning peak
-          { x: 260, y: height - 85 },
-          { x: 330, y: height - 75 },
-          { x: 400, y: height - 145 }, // Evening peak
-          { x: 470, y: height - 90 },
-          { x: 540, y: height - 50 }
-        ];
-
-        // Gradient area under curve
-        const areaGrad = ctx.createLinearGradient(0, 20, 0, height - 30);
-        areaGrad.addColorStop(0, "rgba(56, 189, 248, 0.35)");
-        areaGrad.addColorStop(1, "rgba(56, 189, 248, 0.0)");
-
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, height - 30);
-        points.forEach(p => ctx.lineTo(p.x, p.y));
-        ctx.lineTo(points[points.length - 1].x, height - 30);
-        ctx.closePath();
-        ctx.fillStyle = areaGrad;
-        ctx.fill();
-
-        // Stroke curve
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) {
-          const xc = (points[i].x + points[i - 1].x) / 2;
-          const yc = (points[i].y + points[i - 1].y) / 2;
-          ctx.quadraticCurveTo(points[i - 1].x, points[i - 1].y, xc, yc);
-        }
-        ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
-        ctx.strokeStyle = "#38bdf8";
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
-
-        // Glow dots
-        points.forEach(p => {
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-          ctx.fillStyle = "#38bdf8";
-          ctx.fill();
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-        });
-
-        // Time labels
-        ctx.fillStyle = "#94a3b8";
-        ctx.font = "10px 'Share Tech Mono', sans-serif";
-        ctx.textAlign = "center";
-        const times = ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "23:00"];
-        times.forEach((t, idx) => {
-          const x = 50 + idx * 80;
-          if (x <= width - 20) {
-            ctx.fillText(t, x, height - 10);
-          }
-        });
-
-        // Header watermark tag
-        ctx.fillStyle = "rgba(0, 229, 255, 0.85)";
-        ctx.font = "bold 10px sans-serif";
-        ctx.textAlign = "right";
-        ctx.fillText("OMNITRAF SIMULATION SNAPSHOT", width - 20, 22);
-
-        resolve();
-      } catch (e) {
-        console.warn("[ReportController] Canvas rendering notice:", e);
-        resolve();
-      }
-    });
-  }
-
-  _updateLoaderProgress(percent, statusText) {
-    const circle = document.getElementById("modalLoaderCircle");
-    const percentEl = document.getElementById("loaderPercentage");
-    const statusEl = document.getElementById("loaderStatus");
-
-    if (circle) {
-      const maxOffset = 264;
-      const offset = maxOffset - (maxOffset * percent / 100);
-      circle.style.strokeDashoffset = offset;
-    }
-
-    if (percentEl) {
-      percentEl.textContent = `${Math.round(percent)}%`;
-    }
-
-    if (statusEl && statusText) {
-      statusEl.textContent = statusText;
-    }
   }
 
   _showDocPreviewState(data) {
@@ -399,10 +256,13 @@ export class ReportController {
     const incidentsEl = document.getElementById("repPreviewIncidents");
     const docIdEl = document.getElementById("repPreviewDocId");
 
-    if (volumeEl) volumeEl.textContent = Number(data.volume).toLocaleString('id-ID');
-    if (waitEl) waitEl.textContent = `${data.waitTime} detik`;
-    if (co2El) co2El.textContent = `${data.co2Saved} kg`;
-    if (incidentsEl) incidentsEl.textContent = `${data.incidents} insiden`;
+    const formatValue = (value, unit = '') => value === null || value === undefined || value === ''
+      ? 'Tidak tersedia'
+      : `${Number.isFinite(Number(value)) ? Number(value).toLocaleString('id-ID') : String(value)}${unit}`;
+    if (volumeEl) volumeEl.textContent = formatValue(data.volume, ' kendaraan');
+    if (waitEl) waitEl.textContent = formatValue(data.waitTime, ' detik');
+    if (co2El) co2El.textContent = formatValue(data.co2Saved, ' kg');
+    if (incidentsEl) incidentsEl.textContent = formatValue(data.incidents, ' insiden');
     if (docIdEl) docIdEl.textContent = `ID DEMO: ${data.docId} • DATA SIMULASI, TIDAK TERVERIFIKASI UNTUK OPERASI`;
   }
 
@@ -459,14 +319,65 @@ export class ReportController {
   _bindPrintExecutive() {
     const printBtns = [
       document.getElementById("btnPrintExecutive"),
-      document.getElementById("printExecutiveReport")
+      document.getElementById("btnPrintReportDoc")
     ].filter(Boolean);
 
     printBtns.forEach(btn => {
       this.disposer.addEventListener(btn, "click", () => {
         soundManager.play('click');
+        this._refreshExecutivePrintDocument();
         window.print();
       });
+    });
+  }
+
+  _refreshExecutivePrintDocument() {
+    const root = document.getElementById('executivePrintDoc');
+    if (!root) return;
+    const state = stateStore.getState() || {};
+    const telemetry = state.telemetry || {};
+    const formatValue = (value, unit = '') => value === null || value === undefined || value === ''
+      ? 'Tidak tersedia'
+      : `${Number.isFinite(Number(value)) ? Number(value).toLocaleString('id-ID') : String(value)}${unit}`;
+    const setText = (id, value) => { const element = document.getElementById(id); if (element) element.textContent = value; };
+
+    setText('printDateStr', new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB');
+    setText('printVolVal', formatValue(telemetry.vehiclesToday ?? telemetry.totalVehicles, ' kendaraan'));
+    setText('printWaitVal', formatValue(telemetry.avgWaitTime, ' detik'));
+    setText('printCo2Val', formatValue(telemetry.co2SavedKg, ' kg CO₂'));
+    setText('printIncVal', Array.isArray(state.incidents)
+      ? `${state.incidents.filter((incident) => String(incident.status).toUpperCase() === 'RESOLVED').length} insiden selesai`
+      : 'Tidak tersedia');
+
+    const rows = root.querySelector('#printCorridorRows');
+    if (!rows) return;
+    rows.replaceChildren();
+    const intersections = Array.isArray(state.intersections) ? state.intersections.slice(0, 8) : [];
+    if (intersections.length === 0) {
+      const row = document.createElement('tr');
+      const cell = document.createElement('td');
+      cell.colSpan = 5;
+      cell.textContent = 'Data koridor belum tersedia pada snapshot ini.';
+      row.appendChild(cell);
+      rows.appendChild(row);
+      return;
+    }
+    intersections.forEach((intersection) => {
+      const row = document.createElement('tr');
+      const values = [
+        intersection.name || intersection.id || 'Simpang tanpa nama',
+        intersection.traffic?.volume ?? intersection.traffic?.vehicleCount,
+        intersection.traffic?.speed,
+        intersection.signal?.controlMode,
+        intersection.status
+      ];
+      values.forEach((value, index) => {
+        const cell = document.createElement('td');
+        const unit = index === 1 && value !== null && value !== undefined ? ' kendaraan' : index === 2 && value !== null && value !== undefined ? ' km/jam' : '';
+        cell.textContent = index === 0 ? String(value) : formatValue(value, unit);
+        row.appendChild(cell);
+      });
+      rows.appendChild(row);
     });
   }
 

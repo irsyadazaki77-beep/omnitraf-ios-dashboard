@@ -144,11 +144,44 @@ Server Express menyajikan frontend dari `dist/` pada `http://localhost:3000`. Do
 
 ### Database dan deployment Docker
 
-Persistence menggunakan SQLite-compatible database melalui `sql.js`. `DB_PATH` memilih file database; path relatif diselesaikan dari root repository, sedangkan production sebaiknya memakai path absolut. Nilai container adalah `/usr/src/app/data/omnitraf.sqlite`, disimpan pada named volume `omnitraf-data` oleh Docker Compose. Volume tetap ada ketika container dibuat ulang; hapus volume secara eksplisit hanya ketika memang ingin membuang datanya.
+Lapisan database memakai interface `query`, `execute`, `transaction`, `ping`, `close`, dan `getHealth`. `DB_DRIVER=sqljs` tetap menjadi default development/test dan single-instance fallback; `DB_PATH` memilih file lokal dan Docker menyimpannya pada named volume `omnitraf-data`. Adapter PostgreSQL menggunakan `pg` pool dan menjadi durable shared source of truth saat `DB_DRIVER=postgres`. Tidak ada fallback diam-diam ke sql.js bila PostgreSQL gagal.
 
-Perubahan domain ditandai dirty dan digabungkan ke satu asynchronous flush pada satu waktu. File sementara diganti secara atomik, dan shutdown `SIGINT`/`SIGTERM` menunggu final flush dengan batas waktu. `/healthz` mengukur liveness; `/ready` melaporkan readiness, lifecycle, dan metrik persistence tanpa membocorkan path database. Test menggunakan path tersendiri melalui `test/helpers/testDatabasePath.js`.
+Development sederhana:
 
-Repository domain berada di `server/repositories`; `server/db/database.js` menjadi adapter implementasi saat ini. Socket.io Redis adapter hanya membagi koneksi/event realtime. File database tetap lokal ke satu process/volume dan belum aman dipakai sebagai persistence bersama beberapa replica.
+```env
+DB_DRIVER=sqljs
+OMNITRAF_RUNTIME_MODE=single
+```
+
+Production cluster memerlukan database PostgreSQL dan Redis:
+
+```env
+DB_DRIVER=postgres
+DATABASE_URL=postgresql://user:password@host:5432/omnitraf
+OMNITRAF_RUNTIME_MODE=cluster
+REDIS_URL=redis://host:6379
+```
+
+Jangan gunakan kredensial development Compose untuk deployment. `DB_POOL_MAX`, `DB_IDLE_TIMEOUT_MS`, `DB_CONNECTION_TIMEOUT_MS`, dan `DB_SSL=true` mengatur pool/TLS; TLS memvalidasi sertifikat secara default. Migrasi schema berversi dijalankan saat startup di bawah PostgreSQL advisory lock. `/healthz` mengukur liveness, sedangkan `/ready` mem-ping database aktif dan mengembalikan 503 bila database atau lifecycle belum siap. Shutdown menutup penerimaan traffic, menghentikan runtime, menguras persistence, lalu menutup pool.
+
+Compose tetap sederhana dengan app + sql.js. PostgreSQL development opsional tersedia lewat profile:
+
+```bash
+docker compose --profile postgres up -d postgres
+```
+
+Gunakan `DATABASE_URL=postgresql://omnitraf:omnitraf-local-dev-only@postgres:5432/omnitraf` dan `DB_DRIVER=postgres` di konfigurasi app Compose untuk menjalankan app pada database tersebut. Service PostgreSQL memiliki volume dan healthcheck; aplikasi tetap melakukan koneksi/retry per query dan readiness ping sendiri. Test biasa memakai database terisolasi per test file melalui `test/helpers/testDatabasePath.js`; PostgreSQL integration test terpisah berjalan dengan `npm run test:postgres` ketika `DATABASE_URL` test disediakan.
+
+Pemindahan database lokal dilakukan secara manual, bukan pada startup normal. Pastikan database target sudah siap, lalu periksa jumlah baris sebelum menulis:
+
+```bash
+DATABASE_URL=postgresql://user:password@host:5432/omnitraf npm run db:migrate:sqljs-to-postgres -- --source=./data/omnitraf.sqlite --dry-run
+DATABASE_URL=postgresql://user:password@host:5432/omnitraf npm run db:migrate:sqljs-to-postgres -- --source=./data/omnitraf.sqlite
+```
+
+Skrip memvalidasi lima tabel durable, mempertahankan primary key/timestamp, dan memakai upsert agar aman dijalankan ulang.
+
+Repository domain berada di `server/repositories`; adapter driver disimpan di `server/db/adapters`. Redis tetap menangani koordinasi ephemeral (leadership, pub/sub, idempotency dan rate limits), bukan persistence permanen. `DB_DRIVER=sqljs` ditolak pada runtime cluster kecuali override eksplisit development/test `ALLOW_SQLJS_CLUSTER=true`.
 
 Untuk multi-instance, set `OMNITRAF_RUNTIME_MODE=cluster` dan `REDIS_URL`. Setiap instance memakai lease Redis `omnitraf:simulation:leader` (TTL 10 detik, renew tiap 3 detik); hanya leader menjalankan simulation/CCTV loop dan command follower diteruskan ke leader. Followers memuat baseline checkpoint dan snapshot/CCTV terbaru dari Redis sebelum readiness dan Socket.io diaktifkan. Redis outage membuat cluster degraded dan menghentikan loop authoritative. Rate limits dan idempotency command memakai counter/registry Redis; Socket.io adapter tetap menjadi satu jalur broadcast ke client agar custom snapshot pub/sub tidak menggandakan packet realtime.
 

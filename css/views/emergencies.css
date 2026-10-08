@@ -3,3 +3,43 @@
   padding: var(--space-6);
   color: var(--text-tertiary);
 }
+.emergency-simulator-hero { box-shadow: none; }
+.emergency-dashboard { align-items: start; }
+.emergency-active-feed { min-width: 0; }
+.emergency-list-grid { align-content: start; }
+.emergency-progress { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
+.emergency-progress-step { padding-top: 8px; border-top: 2px solid var(--border); color: var(--text-tertiary); font-size: 10px; line-height: 1.35; }
+.emergency-progress-step.is-complete { border-color: var(--status-success); color: var(--text-secondary); }
+.emergency-progress-step.is-current { border-color: var(--status-warning); color: var(--text-primary); font-weight: 700; }
+.emergency-progress-step.is-cancelled { border-color: var(--status-neutral); color: var(--text-secondary); }
+.emergency-card-item { box-shadow: none; }
+.emergency-list-grid { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+.emergency-card-item {
+  padding: 14px 16px;
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--status-warning);
+  border-radius: var(--radius-md);
+  background: var(--surface-base);
+}
+.emergency-card-item.is-finished { border-left-color: var(--status-neutral); }
+.em-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.badge-em { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: var(--radius-full); font-size: 11px; font-weight: 700; }
+.badge-em.red { color: var(--status-danger); background: var(--danger-soft); border: 1px solid var(--danger-border); }
+.badge-em.amber, .badge-em.orange { color: var(--status-warning); background: var(--warning-soft); border: 1px solid var(--warning-border); }
+.em-status { color: var(--text-secondary); font: 700 11px/1.2 var(--font-mono); letter-spacing: .03em; }
+.em-status.is-active { color: var(--status-warning); }
+.em-status.is-finished { color: var(--status-success); }
+.emergency-card-item > p { margin: 0 0 10px; color: var(--text-secondary); font-size: 12px; }
+.em-meta-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.em-meta-row > div { display: grid; gap: 3px; min-width: 0; }
+.em-meta-row small { color: var(--text-tertiary); font-size: 10px; }
+.em-meta-row strong { color: var(--text-primary); font-size: 12px; font-variant-numeric: tabular-nums; }
+.emergency-simulator-hero [hidden], #emergencyActuatorForm[hidden] { display: none !important; }
+@media (min-width: 1200px) {
+  .emergency-dashboard { grid-template-columns: minmax(300px, .8fr) minmax(0, 1.4fr); gap: var(--space-4); }
+}
+@media (max-width: 640px) {
+  .emergency-progress { grid-template-columns: 1fr; }
+  .emergency-progress-step { padding: 5px 8px; border-top: 0; border-left: 2px solid var(--border); }
+  .em-meta-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

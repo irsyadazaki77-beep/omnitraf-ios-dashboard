@@ -135,17 +135,18 @@ app.get('/healthz', requireCapability('health:liveness'), (req, res) => {
   });
 });
 
-app.get('/ready', requireCapability('diagnostics:read'), (req, res) => {
+app.get('/ready', requireCapability('diagnostics:read'), async (req, res) => {
   const hasActiveDbFault = diagnosticEngine.isFaultActive('database');
   const dbHealth = dbManager.getHealth();
   const clusterHealth = leadershipManager?.getDiagnostics() || { mode: OMNITRAF_RUNTIME_MODE, instanceId: runtimeInstanceId, role: 'UNAVAILABLE', redisStatus: OMNITRAF_RUNTIME_MODE === 'single' ? 'NOT_REQUIRED' : redisManager.getHealth().status, synchronized: false };
   const clusterReady = OMNITRAF_RUNTIME_MODE === 'single' || (redisManager.isConnected() && clusterHealth.synchronized && ['LEADER', 'FOLLOWER'].includes(clusterHealth.role));
-  const dbReady = dbManager.isInitialized && dbManager.ping() && !hasActiveDbFault && startupLifecycle === 'READY' && dbHealth.status === 'CONNECTED';
+  const databaseConnected = dbManager.isInitialized && await dbManager.ping();
+  const dbReady = databaseConnected && !hasActiveDbFault && startupLifecycle === 'READY' && dbManager.getHealth().status === 'CONNECTED';
   let dbStatus = dbHealth.status === 'DEGRADED' ? 'DEGRADED' : 'DISCONNECTED';
   if (hasActiveDbFault) {
     dbStatus = 'FAULT_INJECTED_UNAVAILABLE';
   } else if (dbReady) {
-    dbStatus = dbManager.ping() ? 'CONNECTED' : 'DEGRADED';
+    dbStatus = databaseConnected ? 'CONNECTED' : 'DEGRADED';
   }
 
   const clientsCount = backendState.io?.engine?.clientsCount || 0;
@@ -365,8 +366,8 @@ export function shutdown(signal = 'manual', timeoutMs = 10000) {
       if (io) await new Promise((resolve) => io.close(() => resolve()));
       try {
         if (dbManager.isInitialized) {
-          dbManager.setMetadata('shutdown_signal', signal);
-          dbManager.setMetadata('last_shutdown_at', new Date().toISOString());
+          await dbManager.setMetadata('shutdown_signal', signal);
+          await dbManager.setMetadata('last_shutdown_at', new Date().toISOString());
           dbManager.markDirty();
           const persisted = await dbManager.flush();
           if (!persisted) throw new Error(`DATABASE_FLUSH_FAILED: ${dbManager.getHealth().lastError || 'unknown error'}`);

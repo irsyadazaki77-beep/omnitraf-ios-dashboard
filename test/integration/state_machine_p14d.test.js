@@ -167,7 +167,7 @@ describe('PHASE 14D — Formal Incident & Emergency State Machine + Cross-Module
     };
     backendState.state.incidents.unshift(testInc);
 
-    const updated = backendState.updateIncidentStatus(incId, INCIDENT_STATES.ACKNOWLEDGED, 'Petugas Pos 1', 'Diterima operator', {
+    const updated = await backendState.updateIncidentStatus(incId, INCIDENT_STATES.ACKNOWLEDGED, 'Petugas Pos 1', 'Diterima operator', {
       commandId: 'CMD-EVT-01',
       correlationId: 'CORR-EVT-01',
       actor: 'Operator 112 Surabaya'
@@ -256,14 +256,14 @@ describe('PHASE 14D — Formal Incident & Emergency State Machine + Cross-Module
     // Attempt to resolve incident directly via commandExecutor or backendState
     await assert.rejects(
       async () => {
-        backendState.updateIncidentStatus(incId, INCIDENT_STATES.RESOLVED);
+        await backendState.updateIncidentStatus(incId, INCIDENT_STATES.RESOLVED);
       },
       /STATE_CONFLICT.*armada tanggap darurat.*masih berstatus aktif/
     );
 
     // Mark emergency as ARRIVED -> Now resolution succeeds
     emgItem.status = EMERGENCY_STATES.ARRIVED;
-    const resolved = backendState.updateIncidentStatus(incId, INCIDENT_STATES.RESOLVED);
+    const resolved = await backendState.updateIncidentStatus(incId, INCIDENT_STATES.RESOLVED);
     assert.strictEqual(resolved.status, INCIDENT_STATES.RESOLVED);
 
     // Clean up
@@ -346,7 +346,7 @@ describe('PHASE 14D — Formal Incident & Emergency State Machine + Cross-Module
     assert.strictEqual(backendState.state.activeEmergencies.length, emgCountAfterFirst, 'No duplicate emergency added');
 
     // Clean up
-    backendState.cancelEmergency(firstRes.resultingState.activeEmergencies[0].id);
+    await backendState.cancelEmergency(firstRes.resultingState.activeEmergencies[0].id);
   });
 
   // 11. REST API Invalid State Transition returns HTTP 409 STATE_CONFLICT

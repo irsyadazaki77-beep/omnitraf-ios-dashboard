@@ -3,20 +3,18 @@
         <header class="dash-hero-header">
           <div class="dash-hero-title-group">
             <span class="eyebrow">OMNITRAF • PROTOTIPE SIMULASI</span>
-            <h1 class="dash-hero-title">Simulasi Command Center Surabaya</h1>
+            <h1 class="dash-hero-title">Traffic Command Center</h1>
+            <p class="dash-hero-subtitle">Surabaya · operational overview</p>
           </div>
           <div class="dash-hero-status-strip">
             <div class="dash-status-item">
               <span class="provenance-badge simulated" id="dashHeaderProv">SIMULASI • STREAM SERVER</span>
             </div>
-            <div class="dash-status-item hide-mobile">
-              <span class="dash-status-label">Uptime:</span>
-              <strong class="tabular text-success" id="dashHeaderUptime">99.7%</strong>
+            <div class="dash-status-item" aria-live="polite">
+              <span class="dash-status-label">System health</span>
+              <strong class="system-state-text" id="dashSystemState" title="Kesehatan koneksi simulator dan beban jaringan">NORMAL</strong>
             </div>
-            <div class="dash-status-item hide-mobile">
-              <span class="dash-status-label">Latency:</span>
-              <strong class="tabular text-primary-2" id="dashHeaderLatency">24ms</strong>
-            </div>
+            <span class="data-freshness-pill" id="dashDataFreshness" role="status">OFFLINE · SIM</span>
           </div>
         </header>
 
@@ -25,34 +23,39 @@
           <div class="briefing-header">
             <div class="briefing-title-group">
               <span class="briefing-pulse-dot" id="briefingStatusDot"></span>
-              <h2 class="briefing-title">Briefing Operasional Lalu Lintas Kota</h2>
+              <h2 class="briefing-title">Network status</h2>
               <span class="provenance-badge simulated" id="briefingProvenance">SIMULASI SERVER</span>
             </div>
-            <div class="briefing-timestamp" id="briefingTimestamp">Waktu Lokal: <span id="dashLocalTime">--:-- WIB</span></div>
+            <div class="briefing-timestamp" id="briefingTimestamp">Simulation snapshot</div>
           </div>
           <div class="briefing-grid">
             <div class="briefing-item briefing-severity-moderate" id="briefingCongestionState">
               <small class="briefing-label">Status Beban Kota</small>
-              <strong class="briefing-value" id="briefingCongestionVal">68% — contoh model</strong>
-              <span class="briefing-sub" id="briefingCongestionSub">Nilai contoh model simulasi</span>
+              <strong class="briefing-value" id="briefingCongestionVal">--</strong>
+              <span class="briefing-sub" id="briefingCongestionSub">Simulation telemetry</span>
             </div>
             <div class="briefing-item" id="briefingAffectedCorridors">
               <small class="briefing-label">Koridor Terdampak Utama</small>
-              <strong class="briefing-value text-amber" id="briefingCorridorsVal">Koridor Demo A (83%) & B (61%)</strong>
-              <span class="briefing-sub" id="briefingCorridorsSub">Angka contoh; bukan pengukuran lapangan</span>
+              <strong class="briefing-value text-amber" id="briefingCorridorsVal">--</strong>
+              <span class="briefing-sub" id="briefingCorridorsSub">Active intersection model</span>
             </div>
             <div class="briefing-item" id="briefingSignalCondition">
               <small class="briefing-label">Sistem Kontrol APILL</small>
-              <strong class="briefing-value text-cyan" id="briefingSignalVal">Model fase sinyal demo</strong>
-              <span class="briefing-sub" id="briefingSignalSub">Tidak terhubung ke APILL</span>
+              <strong class="briefing-value text-cyan" id="briefingSignalVal">Simulation control</strong>
+              <span class="briefing-sub" id="briefingSignalSub">Not connected to physical signals</span>
             </div>
             <div class="briefing-item" id="briefingActiveAlert">
               <small class="briefing-label">Intervensi / Peringatan Aktif</small>
-              <strong class="briefing-value text-emerald" id="briefingAlertVal">Contoh skenario kendaraan darurat</strong>
-              <span class="briefing-sub" id="briefingAlertSub">Tidak ada armada nyata atau ETA terukur</span>
+              <strong class="briefing-value text-emerald" id="briefingAlertVal">No active priority</strong>
+              <span class="briefing-sub" id="briefingAlertSub">Simulation state</span>
             </div>
           </div>
         </article>
+
+        <section id="criticalIncidentStrip" class="critical-incident-strip" aria-label="Priority incidents" role="status" aria-live="polite" hidden>
+          <div class="critical-strip-heading"><span class="critical-mark" aria-hidden="true"></span><strong>PRIORITY INCIDENTS</strong><span id="criticalIncidentCount" class="critical-count"></span></div>
+          <div id="criticalIncidentList" class="critical-incident-list" role="list"></div>
+        </section>
 
         <section class="control-strip glass-panel" aria-label="Quick controls">
           <div class="control-group-left">
@@ -74,17 +77,20 @@
           </div>
 
           <div class="control-group-right quick-actions">
-            <!-- Simulation Speed Range Control -->
-            <div class="sim-speed-box glass-soft">
-              <label for="simulationSpeedRange" class="sim-speed-label">Speed: <span id="simSpeedVal">1x</span></label>
-              <input id="simulationSpeedRange" type="range" min="0" max="4" value="1" step="1" class="sim-speed-input" />
-            </div>
-            
-            <button class="btn btn-ghost" type="button" data-action="simulate">Simulasi AI</button>
+            <button class="btn btn-ghost" type="button" data-capability="simulation:control" data-action="simulate">Simulasi AI</button>
             <button class="btn btn-ghost" type="button" data-action="export">Export Report</button>
             <button class="btn btn-primary compact" type="button" data-action="refresh">Refresh Data</button>
-            <button class="btn btn-chaos" type="button" id="btnToggleChaos">⚠️ MODE KEOS</button>
           </div>
+          <details class="dashboard-simulation-tools" id="dashboardSimulationTools" data-capability="simulation:control">
+            <summary>Simulation controls</summary>
+            <div class="dashboard-simulation-tools-body">
+              <div class="sim-speed-box glass-soft">
+                <label for="simulationSpeedRange" class="sim-speed-label">Simulation speed: <span id="simSpeedVal">1x</span></label>
+                <input id="simulationSpeedRange" type="range" min="0" max="4" value="1" step="1" class="sim-speed-input" />
+              </div>
+              <button class="btn btn-chaos" type="button" id="btnToggleChaos" aria-label="Admin: chaos simulation mode" hidden>Admin · Chaos simulation</button>
+            </div>
+          </details>
         </section>
 
         <!-- Bento Grid Executive Telemetry (Operator-Focused Hierarchy) -->
@@ -98,9 +104,9 @@
               <span class="bento-pill-tag">Model Koridor</span>
                 </div>
                 <div class="bento-meta-body">
-              <p>Indeks Kemacetan (simulasi)</p>
-                  <h2><span class="counter-val" data-counter="68">68</span><span class="denom-val">/100</span></h2>
-                  <span class="metric-warn pill-trend"><span class="trend-arrow">▲</span> Padat • Wonokromo</span>
+              <p>Network congestion</p>
+                  <h2><span class="counter-val" id="dashCongestionValue">--</span><span class="denom-val">/100</span></h2>
+                  <span class="metric-warn pill-trend">Simulation telemetry</span>
                 </div>
               </div>
               <div class="bento-gauge-wrapper">
@@ -109,8 +115,8 @@
                   <circle class="gauge-fill-ring amber-glow-ring" cx="50" cy="50" r="38" fill="none" stroke-width="6" stroke-dasharray="238.76" stroke-dashoffset="76.4" stroke-linecap="round" />
                 </svg>
                 <div class="gauge-center-text">
-                  <span class="gauge-center-val">68%</span>
-                  <span class="gauge-center-sub">Beban</span>
+                  <span class="gauge-center-val" id="dashCongestionGauge">--</span>
+                  <span class="gauge-center-sub">Load</span>
                 </div>
               </div>
             </div>
@@ -153,8 +159,8 @@
             </div>
             <div>
               <p>Simpang dalam model</p>
-              <h2 data-counter="5">5</h2>
-              <span class="metric-up pill-trend">Contoh simpang simulasi</span>
+              <h2 id="dashIntersectionCount">--</h2>
+              <span class="metric-up pill-trend">Active intersections · model</span>
             </div>
             <div class="stat-progress-bar"><div class="progress-fill blue-bar w-84p"></div></div>
           </article>
@@ -166,9 +172,9 @@
               <span class="pill pill-ai">Estimasi model</span>
             </div>
             <div>
-              <p>Waktu Tunggu Estimasi</p>
-              <h2><span class="counter-val" data-counter="42">42</span><span class="denom-val"> dtk</span></h2>
-              <span class="metric-up pill-trend">Antrean Terkendali</span>
+                  <p>Rata-rata Waktu Tunggu</p>
+                  <h2><span class="counter-val" id="dashWaitValue">--</span><span class="denom-val"> sec</span></h2>
+                  <span class="metric-up pill-trend">Current interval · model</span>
             </div>
             <div class="stat-progress-bar"><div class="progress-fill green-bar w-42p"></div></div>
           </article>
@@ -181,8 +187,8 @@
             </div>
             <div>
               <p>Skenario Darurat</p>
-              <h2 data-counter="1">1</h2>
-              <span class="metric-down pill-trend">Contoh data simulasi</span>
+              <h2 id="dashEmergencyCount">--</h2>
+              <span class="metric-down pill-trend">Active requests · model</span>
             </div>
             <div class="stat-progress-bar"><div class="progress-fill red-bar w-30p"></div></div>
           </article>
@@ -235,7 +241,7 @@
           <article class="map-panel glass-panel">
             <div class="section-head">
               <div>
-                <h2>Situational Map Preview</h2>
+                <h2>Live operations map</h2>
                 <p>Peta demo koridor Surabaya; posisi dan kepadatan bukan data geospasial real-time.</p>
               </div>
               <div class="map-head-actions" style="display: flex; align-items: center; gap: 8px;">
@@ -286,9 +292,9 @@
               <div class="map-box" id="dashboardMapBox" data-density="all"></div>
 
               <div class="map-overview glass-soft">
-                <h3>Network Load</h3>
-                <strong id="networkLoad">72%</strong>
-                <p>Kemacetan parah terdeteksi di Koridor A. Yani.</p>
+                <h3>Network load · simulated</h3>
+                <strong id="networkLoad">--</strong>
+                <p id="mapNetworkContext">Select a map asset to inspect.</p>
               </div>
 
               <div class="legend glass-soft">
@@ -304,11 +310,11 @@
                 <h3>Lapisan Peta</h3>
                 <div class="layer-option-list">
                   <label class="layer-item">
-                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="district-zones" checked />
+                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="district-zones" />
                     <span class="layer-label">Wilayah Kota</span>
                   </label>
                   <label class="layer-item">
-                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="map-river" checked />
+                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="map-river" />
                     <span class="layer-label">Aliran Sungai</span>
                   </label>
                   <label class="layer-item">
@@ -316,7 +322,7 @@
                     <span class="layer-label">Efek Arus</span>
                   </label>
                   <label class="layer-item">
-                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="minor-roads" checked />
+                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="minor-roads" />
                     <span class="layer-label">Jalan Sekunder</span>
                   </label>
                   <label class="layer-item">
@@ -324,11 +330,11 @@
                     <span class="layer-label">Titik Insiden</span>
                   </label>
                   <label class="layer-item">
-                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="landmark-group" checked />
+                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="landmark-group" />
                     <span class="layer-label">Tempat Penting</span>
                   </label>
                   <label class="layer-item">
-                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="compass-rose" checked />
+                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="compass-rose" />
                     <span class="layer-label">Kompas</span>
                   </label>
                   <label class="layer-item">
@@ -345,8 +351,8 @@
             <article class="widget glass-panel reveal-card" id="widgetLiveCamera">
               <div class="section-head compact">
                 <div>
-                  <h2 class="widget-title-sm">CCTV Intelligence Summary</h2>
-                  <p class="widget-subtitle-sm">Animasi visi komputer sintetis untuk demonstrasi.</p>
+                  <h2 class="widget-title-sm">Selected CCTV</h2>
+                  <p class="widget-subtitle-sm">Synthetic computer vision feed.</p>
                 </div>
                 <div class="camera-head-actions">
                   <!-- iOS Segmented Pill Bar Camera Switcher -->
@@ -391,9 +397,9 @@
               <div class="ai-rec-card-body">
                 <div class="ai-rec-badge-row">
                   <span class="ai-rec-tag">
-                    <span class="pulse-dot-ai"></span> Skenario simulasi
+                    <span class="pulse-dot-ai"></span> AI simulation recommendation
                   </span>
-                  <span class="ai-confidence-badge">Nilai contoh: 94%</span>
+                  <span class="ai-confidence-badge">Confidence unavailable</span>
                 </div>
                 <p class="ai-rec-text" id="aiRecText">
                   Skenario antrean <strong>180m (contoh)</strong> di <strong>Koridor Demo</strong>. Model menghitung tambahan fase <strong>+15 detik (contoh)</strong>; tidak dikirim ke pengendali sinyal.
@@ -407,7 +413,7 @@
 
               <div class="ai-rec-actions">
                 <button class="btn btn-ghost compact" type="button" id="btnDismissAiRec">Abaikan</button>
-                <button class="btn btn-primary compact" type="button" id="btnApplyAiRec" data-action="apply-ai">Coba di Simulasi</button>
+                <button class="btn btn-primary compact" type="button" id="btnApplyAiRec" data-capability="simulation:control" data-action="apply-ai">Coba di Simulasi</button>
               </div>
             </article>
           </aside>
@@ -430,7 +436,7 @@
                 <strong id="greenValue">42 dtk</strong>
               </div>
               <div class="range-container">
-                <input id="greenRange" class="slider-glow" type="range" min="15" max="90" value="42" />
+                <input id="greenRange" data-capability="simulation:control" class="slider-glow" type="range" min="15" max="90" value="42" />
                 <span class="slider-tooltip" id="sliderTooltip">42s</span>
               </div>
               <!-- Linear Phase Timeline -->
@@ -502,19 +508,6 @@
             </div>
           </article>
 
-          <!-- Export History Logs (Fitur 13) -->
-          <article class="ops-card glass-panel reveal-card" id="widgetExportHistory">
-            <div class="section-head compact">
-              <div>
-                <h2>Riwayat Ekspor Data</h2>
-                <p>Riwayat berkas yang diunduh pada sesi demo ini.</p>
-              </div>
-              <span class="pill">Riwayat</span>
-            </div>
-            <div class="export-history-list export-history-scroll" id="exportHistoryList">
-              <p class="empty-history-text empty-history-notice">Belum ada riwayat unduhan.</p>
-            </div>
-          </article>
           <article class="ops-card glass-panel reveal-card" id="card-incidents">
             <div class="section-head compact">
               <div>

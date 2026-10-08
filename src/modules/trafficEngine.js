@@ -16,6 +16,7 @@ import { stateStore, updateTrafficState, updateSignalState } from '../core/state
 import { soundManager } from '../core/soundManager.js';
 import { socketClient } from '../core/socketClient.js';
 import { commandLayer } from '../core/commandLayer.js';
+import { authManager } from '../core/authManager.js';
 import { SeededRandom } from '../../shared/seededRandom.js';
 
 export class TrafficEngine {
@@ -26,6 +27,7 @@ export class TrafficEngine {
     this._localSimulationRunning = false;
     this._isInitialized = false;
     this._unsubscribeCallbacks = [];
+    this._priorityIncidentSignature = null;
 
     this.yellowDuration = 3;
     this.redDurationBase = 25;
@@ -64,6 +66,8 @@ export class TrafficEngine {
 
     this._setupStoreSubscriptions();
     this._bindControls();
+    this._syncDashboardCapabilities();
+    authManager.onAuthChange(() => this._syncDashboardCapabilities());
 
     // Render snapshot awal dari StateStore
     this._renderFromState(stateStore.getState());
@@ -75,6 +79,18 @@ export class TrafficEngine {
         this.startLocalSimulation();
       }
     }, 3500);
+  }
+
+  _syncDashboardCapabilities() {
+    const admin = authManager.hasRole('ADMIN');
+    const operator = authManager.hasRole(['OPERATOR', 'ADMIN']);
+    const chaosButton = document.getElementById('btnToggleChaos');
+    const simulationTools = document.getElementById('dashboardSimulationTools');
+    if (chaosButton) chaosButton.hidden = !admin;
+    if (simulationTools) simulationTools.hidden = !operator;
+    document.querySelectorAll('#view-dashboard [data-capability="simulation:control"]').forEach((element) => {
+      element.hidden = !operator;
+    });
   }
 
   _setupStoreSubscriptions() {
@@ -152,6 +168,21 @@ export class TrafficEngine {
   _renderHeaderAndBriefing(state, telemetry, emergencies) {
     const isConnected = state.connectionStatus === 'connected';
     const isResync = state.connectionStatus === 'resyncing';
+    const activeIncidents = (Array.isArray(state.incidents) ? state.incidents : [])
+      .filter((incident) => !['RESOLVED', 'ARCHIVED'].includes(String(incident.status || '').toUpperCase()));
+    const priorityIncidents = activeIncidents.filter((incident) =>
+      ['critical', 'danger', 'high'].includes(String(incident.severity || '').toLowerCase())
+    );
+    const rawLoad = telemetry.congestionIndex ?? telemetry.networkLoad;
+    const hasLoad = rawLoad !== undefined && rawLoad !== null && Number.isFinite(Number(rawLoad));
+    const load = hasLoad ? Number(rawLoad) : 0;
+    // System health reports connectivity and network load only. Incident severity is
+    // surfaced separately in the priority strip so an incident cannot mask a degraded stream.
+    const systemStatus = ['offline', 'fallback', 'degraded', 'auth_failed'].includes(state.connectionStatus) ? 'DEGRADED'
+      : (!hasLoad || state.isStaleData || ['connecting', 'reconnecting', 'resyncing'].includes(state.connectionStatus)) ? 'WARNING'
+        : load >= 75 ? 'ADVISORY' : 'NORMAL';
+    this._smartUpdateDOM('dashSystemState', systemStatus, `system-state-text status-${systemStatus.toLowerCase()}`);
+    this._renderPriorityIncidents(priorityIncidents);
     
     // A live socket only confirms a connection to this prototype's simulator,
     // not to the real SITS infrastructure.
@@ -160,24 +191,83 @@ export class TrafficEngine {
     
     this._smartUpdateDOM('dashHeaderProv', provText, provClass);
     this._smartUpdateDOM('briefingProvenance', isConnected ? 'SIMULASI SERVER' : 'SIMULASI LOKAL', provClass);
+    const freshness = document.getElementById('dashDataFreshness');
+    if (freshness) {
+      const freshnessLabel = state.isStaleData ? 'STALE · SIM' : isConnected ? 'LIVE · SIM' : 'OFFLINE · SIM';
+      freshness.textContent = freshnessLabel;
+      freshness.className = `data-freshness-pill ${state.isStaleData ? 'is-stale' : isConnected ? 'is-live' : 'is-offline'}`;
+      freshness.setAttribute('aria-label', state.isStaleData ? 'Data simulasi tertahan' : isConnected ? 'Stream simulasi diperbarui' : 'Stream simulasi offline');
+      const lastUpdate = state.lastTelemetryTime;
+      if (lastUpdate) {
+        const parsed = new Date(lastUpdate);
+        if (!Number.isNaN(parsed.getTime())) {
+          freshness.title = `Pembaruan terakhir ${parsed.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit' })} WIB`;
+        }
+      }
+    }
     
     // Local Time Clock
-    const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
+    const nowStr = new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
     this._smartUpdateDOM('dashLocalTime', nowStr);
 
     // Briefing Grid Metrics
-    const congestion = telemetry.congestionIndex ?? telemetry.networkLoad ?? 68;
-    const congestionText = `${congestion}% — ${congestion >= 75 ? 'Macet Total' : congestion >= 60 ? 'Beban Sedang-Tinggi' : 'Lancar'}`;
+    const congestionRaw = telemetry.congestionIndex ?? telemetry.networkLoad;
+    const congestion = congestionRaw !== undefined && congestionRaw !== null && Number.isFinite(Number(congestionRaw)) ? Number(congestionRaw) : null;
+    const congestionText = congestion === null ? 'Data belum tersedia' : `${congestion}% — ${congestion >= 75 ? 'Beban tinggi' : congestion >= 60 ? 'Beban sedang' : 'Beban rendah'}`;
     this._smartUpdateDOM('briefingCongestionVal', congestionText);
+    this._smartUpdateDOM('dashCongestionValue', congestion === null ? '—' : String(congestion));
+    this._smartUpdateDOM('dashCongestionGauge', congestion === null ? '—' : `${congestion}%`);
+    const gaugeRing = document.querySelector('#bentoCardCongestion .gauge-fill-ring');
+    if (gaugeRing && congestion !== null) gaugeRing.style.strokeDashoffset = String(238.76 * (1 - Math.max(0, Math.min(100, congestion)) / 100));
+    this._smartUpdateDOM('networkLoad', telemetry.networkLoad ?? (congestion === null ? '—' : `${congestion}%`));
+    this._smartUpdateDOM('dashWaitValue', String(telemetry.avgWaitTime ?? '--'));
+    this._smartUpdateDOM('dashIntersectionCount', String((state.intersections || []).length));
+    this._smartUpdateDOM('dashEmergencyCount', String(emergencies?.length || 0));
+    this._smartUpdateDOM('briefingCorridorsVal', `${(state.intersections || []).length} intersections in model`);
+    this._smartUpdateDOM('briefingCorridorsSub', `${activeIncidents.length} active incident${activeIncidents.length === 1 ? '' : 's'}`);
 
     if (Array.isArray(emergencies) && emergencies.length > 0) {
       const firstEmg = emergencies[0];
-      this._smartUpdateDOM('briefingAlertVal', `Prioritas ${firstEmg.vehicleId || 'Ambulans'} Aktif`);
-      this._smartUpdateDOM('briefingAlertSub', `ETA ${firstEmg.ETA || '1m 45s'} • Rute Prioritas Hijau`);
+      this._smartUpdateDOM('briefingAlertVal', `Priority ${firstEmg.vehicleId || firstEmg.vehicle || 'vehicle'} active`);
+      this._smartUpdateDOM('briefingAlertSub', firstEmg.ETA ? `Model ETA ${firstEmg.ETA}` : 'Route status shown in emergency workflow');
     } else {
       this._smartUpdateDOM('briefingAlertVal', 'Kondisi Koridor Normal');
       this._smartUpdateDOM('briefingAlertSub', 'Sistem Siaga Dispatch 112');
     }
+  }
+
+  _renderPriorityIncidents(incidents) {
+    const strip = document.getElementById('criticalIncidentStrip');
+    const list = document.getElementById('criticalIncidentList');
+    const count = document.getElementById('criticalIncidentCount');
+    if (!strip || !list) return;
+    strip.hidden = incidents.length === 0;
+    const signature = JSON.stringify(incidents.map(({ id, title, location, severity, status }) => ({ id, title, location, severity, status })));
+    if (signature === this._priorityIncidentSignature) return;
+    this._priorityIncidentSignature = signature;
+    if (count) count.textContent = String(incidents.length);
+    list.replaceChildren();
+    incidents.slice(0, 3).forEach((incident) => {
+      const item = document.createElement('article');
+      item.className = 'critical-incident-item';
+      item.setAttribute('role', 'listitem');
+      const details = document.createElement('div');
+      details.className = 'critical-incident-copy';
+      const title = document.createElement('strong');
+      title.textContent = incident.title || 'Traffic incident';
+      const location = document.createElement('span');
+      location.textContent = incident.location || 'Location unavailable';
+      const severity = document.createElement('small');
+      severity.textContent = `${String(incident.severity || 'critical').toUpperCase()} · ${String(incident.status || 'ACTIVE').replaceAll('_', ' ')}`;
+      details.append(title, location, severity);
+      const inspect = document.createElement('a');
+      inspect.href = '#incidents';
+      inspect.className = 'btn btn-ghost compact';
+      inspect.textContent = 'Inspect';
+      inspect.setAttribute('aria-label', `Inspect incident ${incident.title || incident.id || ''}`);
+      item.append(details, inspect);
+      list.appendChild(item);
+    });
   }
 
   /**
@@ -301,7 +391,7 @@ export class TrafficEngine {
     const avgWaitCard = this._findKpiCard("Rata-rata Waktu Tunggu");
     if (avgWaitCard) {
       const counter = avgWaitCard.querySelector(".counter-val") || avgWaitCard.querySelector("h2");
-      if (counter) this._smartUpdateDOM(counter, `${avgWaitTime}s`);
+      if (counter) this._smartUpdateDOM(counter, String(avgWaitTime));
     }
 
     const netLoadCard = this._findKpiCard("Beban Jaringan");
@@ -633,7 +723,7 @@ export class TrafficEngine {
             targetType: 'system',
             targetId: 'global-network',
             payload: { active: target }
-          }, false); // low-risk simulation toggle
+          }, true); // high-impact simulation control requires confirmation
         } catch (err) {
           console.warn("[TrafficEngine] Chaos toggle failed:", err);
           if (typeof window.showToast === "function") {

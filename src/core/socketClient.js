@@ -641,6 +641,16 @@ export class SocketClient {
     const sseText = document.getElementById("sseStatusText");
     const sitsStatusText = document.getElementById("sitsStatusText");
     const offlineBanner = document.getElementById("offlineNotificationBanner");
+    const updateBanner = (kind, title, detail, visible) => {
+      if (!offlineBanner) return;
+      offlineBanner.dataset.status = kind;
+      offlineBanner.classList.toggle('is-hidden', !visible);
+      const message = document.getElementById('offlineBannerMessage');
+      if (!message) return;
+      const heading = document.createElement('strong');
+      heading.textContent = title;
+      message.replaceChildren(heading, document.createTextNode(` — ${detail}`));
+    };
 
     if (!sseText || !sseDot) return;
 
@@ -654,14 +664,14 @@ export class SocketClient {
         sseDot.style.background = "var(--success)";
         sseDot.style.boxShadow = "0 0 6px var(--success)";
       }
-      if (offlineBanner) offlineBanner.classList.add("is-hidden");
+      updateBanner(isStale ? 'stale' : 'normal', isStale ? 'Data simulasi tertahan' : '', isStale ? 'Pembaruan terakhir tidak diterima; nilai yang tampil mungkin sudah lama.' : '', isStale);
       if (sitsStatusText) sitsStatusText.textContent = "DEMO";
 
     } else if (status === 'resyncing') {
       sseText.textContent = "Sinkronisasi State...";
       sseDot.style.background = "var(--cyan)";
       sseDot.style.boxShadow = "0 0 6px var(--cyan)";
-      if (offlineBanner) offlineBanner.classList.add("is-hidden");
+      updateBanner('resyncing', 'Sinkronisasi ulang', 'State simulator sedang diselaraskan.', false);
       if (sitsStatusText) sitsStatusText.textContent = "DEMO";
 
     } else if (status === 'reconnecting') {
@@ -669,34 +679,35 @@ export class SocketClient {
       sseText.textContent = `Menghubungkan (#${attempt})...`;
       sseDot.style.background = "var(--warning)";
       sseDot.style.boxShadow = "0 0 6px var(--warning)";
-      if (offlineBanner) offlineBanner.classList.remove("is-hidden");
+      updateBanner('reconnecting', 'Menghubungkan ulang', 'Data stream simulasi sementara tidak diperbarui.', true);
       if (sitsStatusText) sitsStatusText.textContent = "DEMO";
 
     } else if (status === 'connecting') {
       sseText.textContent = "Menghubungkan ke server demo...";
       sseDot.style.background = "var(--warning)";
       sseDot.style.boxShadow = "0 0 6px var(--warning)";
+      updateBanner('connecting', 'Menghubungkan', 'Menunggu stream simulator.', false);
       if (sitsStatusText) sitsStatusText.textContent = "DEMO";
 
     } else if (status === 'degraded') {
       sseText.textContent = "Server simulasi lambat";
       sseDot.style.background = "var(--warning)";
       sseDot.style.boxShadow = "0 0 6px var(--warning)";
-      if (offlineBanner) offlineBanner.classList.add("is-hidden");
+      updateBanner('degraded', 'Stream simulator melambat', 'Data mungkin terlambat diperbarui.', true);
       if (sitsStatusText) sitsStatusText.textContent = "DEMO";
 
     } else if (status === 'auth_failed') {
       sseText.textContent = "Sesi Berakhir (Auth Failed)";
       sseDot.style.background = "var(--danger)";
       sseDot.style.boxShadow = "0 0 6px var(--danger)";
-      if (offlineBanner) offlineBanner.classList.remove("is-hidden");
+      updateBanner('offline', 'Sesi simulator berakhir', 'Autentikasi diperlukan sebelum stream dapat dipulihkan.', true);
       if (sitsStatusText) sitsStatusText.textContent = "DEMO";
 
     } else { // 'offline' | 'fallback'
       sseText.textContent = "Offline • simulator lokal";
       sseDot.style.background = "var(--danger)";
       sseDot.style.boxShadow = "0 0 6px var(--danger)";
-      if (offlineBanner) offlineBanner.classList.remove("is-hidden");
+      updateBanner('offline', 'Stream simulator offline', 'Data terakhir mungkin sudah tidak baru; tunggu koneksi tersambung kembali.', true);
       if (sitsStatusText) sitsStatusText.textContent = "DEMO";
     }
 

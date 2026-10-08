@@ -4,3 +4,8 @@
 }
 
 .incident-empty-state { padding: var(--space-6); color: var(--text-tertiary); }
+.incident-log-item { border-color: var(--border-subtle); box-shadow: none; }
+.incident-log-item:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+.incident-log-item .incident-detail-btn { min-height: var(--control-height-sm); }
+.incident-resolved-state { color: var(--status-success); font-size: var(--font-size-small); }
+.incident-empty-state strong { color: var(--status-success); }

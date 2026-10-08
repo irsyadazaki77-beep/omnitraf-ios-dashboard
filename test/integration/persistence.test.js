@@ -24,7 +24,7 @@ describe('Phase 17: Persistence, Recovery & Data Integrity Hardening Test Suite'
     } catch (_) {}
   });
 
-  test('1. Fresh database startup: creates schema, metadata, and version 18', async () => {
+  test('1. Fresh database startup: creates schema, metadata, and version 19', async () => {
     const db = new DatabaseManager();
     db.dbPath = testDbPath;
     await db.init();
@@ -33,7 +33,7 @@ describe('Phase 17: Persistence, Recovery & Data Integrity Hardening Test Suite'
     assert.ok(fs.existsSync(testDbPath), 'Database file must be written to disk on startup');
 
     const schemaVer = db.getMetadata('schema_version');
-    assert.strictEqual(schemaVer, '18', 'Schema version metadata must match version 18');
+    assert.strictEqual(schemaVer, '19', 'Schema version metadata must match version 19');
 
     const incidentsRes = db.getAllIncidents();
     assert.strictEqual(incidentsRes.status, 'OK');

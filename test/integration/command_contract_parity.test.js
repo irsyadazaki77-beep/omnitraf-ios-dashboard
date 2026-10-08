@@ -50,9 +50,9 @@ test('REST and Socket use the same canonical device command and expose matching 
 
 test('invalid REST and Socket commands return the same contract error and cause no side effects', async () => {
   const before = { sequence: backendState.deviceSequence, audit: backendState.auditLogs.length };
-  const originalPersist = dbManager.upsertDeviceTelemetry;
+  const originalExecute = dbManager.execute;
   let persistCalls = 0;
-  dbManager.upsertDeviceTelemetry = (...args) => { persistCalls++; return originalPersist.apply(dbManager, args); };
+  dbManager.execute = (sql, ...args) => { if (sql.includes('INSERT INTO device_telemetry')) persistCalls++; return originalExecute.call(dbManager, sql, ...args); };
   try {
     const restResponse = await fetch(`${baseUrl}/api/devices/config`, {
       method: 'POST',
@@ -73,7 +73,7 @@ test('invalid REST and Socket commands return the same contract error and cause 
     assert.equal(backendState.deviceSequence, before.sequence);
     assert.equal(backendState.auditLogs.length, before.audit);
   } finally {
-    dbManager.upsertDeviceTelemetry = originalPersist;
+    dbManager.execute = originalExecute;
   }
 });
 

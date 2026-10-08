@@ -12,6 +12,7 @@ import { SITS_INTERSECTIONS } from '../config/surabayaCoords.js';
 import { commandLayer } from '../core/commandLayer.js';
 import { Disposer } from '../core/disposer.js';
 import { signalsView } from '../ui/adapters/signalsView.js';
+import { authManager } from '../core/authManager.js';
 
 export class SignalsController {
   constructor() {
@@ -41,6 +42,8 @@ export class SignalsController {
     this._bindIntersectionSearchAutocomplete();
     this._bindDashboardDensityFilterChips();
     this._setupStoreSubscriptions();
+    this._syncRoleCapabilities();
+    this.disposer.add(authManager.onAuthChange(() => this._syncRoleCapabilities()));
 
     // Initial sync via View Adapter
     const state = stateStore.getState();
@@ -49,10 +52,17 @@ export class SignalsController {
     this.view.updateGreenSplit(greenSplit);
     this._updateDashboardTimeline(greenSplit);
     this._updateActiveOverrideBadges();
+    this._renderSignalState();
   }
 
   deactivate() {
     this.disposer.clear();
+  }
+
+  _syncRoleCapabilities() {
+    const canOperate = authManager.hasRole(['OPERATOR', 'ADMIN']);
+    document.querySelectorAll('#view-signals .force-override-btn, #view-signals .sig-slide, #btnConfirmOverrideModal, #btnConfirmAiRecModal')
+      .forEach((control) => { control.hidden = !canOperate; });
   }
 
   _setupStoreSubscriptions() {
@@ -63,14 +73,70 @@ export class SignalsController {
 
     this.disposer.addStoreSubscription(stateStore, 'traffic:update', () => {
       this._updateActiveOverrideBadges();
+      this._renderSignalState();
     });
+    this.disposer.addStoreSubscription(stateStore, 'state:resynced', () => this._renderSignalState());
+  }
+
+  _renderSignalState() {
+    const state = stateStore.getState();
+    const intersections = Array.isArray(state.intersections) ? state.intersections : [];
+    const updatedAtRaw = state.lastTelemetryAt ?? state.lastTelemetryTime;
+    const parsedUpdate = updatedAtRaw ? new Date(updatedAtRaw) : null;
+    const updatedAt = parsedUpdate && !Number.isNaN(parsedUpdate.getTime())
+      ? parsedUpdate.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      : '—';
+    const phaseName = (phase) => ({ green: 'Hijau', yellow: 'Kuning', red: 'Merah' })[String(phase || '').toLowerCase()] || '—';
+    const densityName = (node) => {
+      const status = String(node.status || '').toLowerCase();
+      if (status.includes('padat') || status.includes('heavy') || status.includes('high')) return 'heavy';
+      if (status.includes('sedang') || status.includes('moderate')) return 'moderate';
+      if (status.includes('lancar') || status.includes('normal') || status.includes('low')) return 'low';
+      return 'unknown';
+    };
+
+    document.querySelectorAll('#view-signals .signals-intersection-card[data-intersection-id]').forEach((card) => {
+      const node = intersections.find((item) => item.id === card.dataset.intersectionId);
+      if (!node) return;
+      const phase = String(node.state || '').toLowerCase();
+      card.querySelector('[data-signal-phase]')?.replaceChildren(document.createTextNode(`Fase: ${phaseName(phase)}`));
+      card.querySelector('[data-signal-wait]')?.replaceChildren(document.createTextNode(`Waktu tunggu: ${node.waitTime ?? '—'}s`));
+      card.querySelector('[data-signal-updated]')?.replaceChildren(document.createTextNode(`Update: ${updatedAt}`));
+      const cycle = card.querySelector('.cycle-number');
+      if (cycle && Number.isFinite(Number(node.timer))) cycle.textContent = String(node.timer);
+      card.querySelectorAll('.signals-apill-lens').forEach((lens) => {
+        lens.classList.toggle('active', lens.classList.contains(`lens-${phase}`));
+      });
+    });
+
+    const table = document.getElementById('intersectionTable');
+    if (!table || typeof table.replaceChildren !== 'function' || intersections.length === 0) return;
+    table.replaceChildren(...intersections.map((node) => {
+      const row = document.createElement('tr');
+      row.tabIndex = 0;
+      row.setAttribute('role', 'button');
+      row.setAttribute('aria-label', `Fokus peta ke ${node.name || node.id}`);
+      const density = densityName(node);
+      row.dataset.density = density;
+      [node.name || node.id, `${phaseName(node.state)} · simulasi`, node.status || '—', node.waitTime === undefined ? '—' : `${node.waitTime} dtk`, updatedAt].forEach((value, index) => {
+        const cell = document.createElement('td');
+        if (index === 2) {
+          const badge = document.createElement('span');
+          badge.className = `tag ${density === 'heavy' ? 'tag-high' : density === 'moderate' ? 'tag-moderate' : density === 'low' ? 'tag-low' : ''}`;
+          badge.textContent = String(value);
+          cell.appendChild(badge);
+        } else cell.textContent = String(value);
+        row.appendChild(cell);
+      });
+      return row;
+    }));
   }
 
   _updateActiveOverrideBadges() {
     const intersections = stateStore.getState().intersections || [];
-    intersections.forEach((node, idx) => {
-      const cards = document.querySelectorAll("#view-signals .signals-intersection-card");
-      const card = cards[idx];
+    intersections.forEach((node) => {
+      const card = [...document.querySelectorAll('#view-signals .signals-intersection-card[data-intersection-id]')]
+        .find((candidate) => candidate.dataset.intersectionId === node.id);
       if (!card) return;
 
       const overrideBtn = card.querySelector(".force-override-btn");
@@ -555,18 +621,22 @@ export class SignalsController {
    * 6. Table Search & Click to Fly
    */
   _bindTableSearchAndClick() {
-    const tableRows = document.querySelectorAll("#intersectionTable tr");
-    tableRows.forEach(row => {
-      row.style.cursor = "pointer";
-      this.disposer.addEventListener(row, "click", () => {
-        const nameCell = row.cells[0];
-        const name = nameCell ? nameCell.textContent.trim() : row.textContent.trim();
-        soundManager.play('click');
-        if (typeof window.showToast === "function") {
-          window.showToast(`🛰️ Navigasi kamera ke: ${name}`);
-        }
-          window.mapManager?.flyToIntersection(name);
-      });
+    const table = document.getElementById('intersectionTable');
+    if (!table) return;
+    this.disposer.addEventListener(table, 'click', (event) => {
+      const row = event.target.closest('tr');
+      if (!row || !table.contains(row)) return;
+      const name = row.cells[0]?.textContent.trim() || row.textContent.trim();
+      soundManager.play('click');
+      window.mapManager?.flyToIntersection(name);
+    });
+    this.disposer.addEventListener(table, 'keydown', (event) => {
+      if (!['Enter', ' '].includes(event.key)) return;
+      const row = event.target.closest('tr[role="button"]');
+      if (!row || !table.contains(row)) return;
+      event.preventDefault();
+      const name = row.cells[0]?.textContent.trim() || row.textContent.trim();
+      window.mapManager?.flyToIntersection(name);
     });
   }
 

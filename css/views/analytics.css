@@ -1391,6 +1391,7 @@ body.theme-light .efh-close-btn,
   gap: 12px;
   margin-bottom: 18px;
 }
+.esg-source-note { display: block; margin-top: 4px; color: var(--text-secondary); font-size: 10px; line-height: 1.35; }
 
 .devices-card-box {
   background: var(--panel-glass);
@@ -2061,6 +2062,11 @@ body.theme-light .report-preview-canvas,
 .esg-fuel, .esg-co2 { color: var(--status-success); }
 .esg-money { color: var(--status-warning); }
 .esg-impact-note { color: var(--text-tertiary); font-size: var(--font-size-label); }
+.trend-panel { border: 1px solid var(--border-subtle); box-shadow: none; }
+.analytics-section-head { align-items: flex-start; gap: var(--space-4); }
+.analytics-chart-legend { color: var(--text-secondary); }
+.summary-card { font-variant-numeric: tabular-nums; }
+.analytics-expanded > article { box-shadow: none; }
 
 @media (max-width: 640px) {
   .time-travel-control-box { padding: var(--space-3); }

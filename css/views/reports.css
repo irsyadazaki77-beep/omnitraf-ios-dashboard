@@ -5,6 +5,37 @@
 
 .print-executive-container { display: none; }
 .report-timestamp { color: var(--text-secondary); }
+.reports-manager-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--space-4); }
+.report-card, .reports-generator, .reports-enterprise { box-shadow: none; border-color: var(--border-subtle); }
+.reports-generator { grid-column: 1 / -1; }
+.reports-enterprise, .reports-history { grid-column: 1 / -1; }
+.report-card, .reports-generator, .reports-enterprise, .reports-history {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+.report-card { display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.report-kicker-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.report-kicker-meta { color: var(--text-secondary); font-size: 11px; }
+.report-card-title { margin: 0 0 6px; color: var(--text-primary); font-size: 18px; font-weight: 700; }
+.report-card-desc { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.report-action-btn { align-self: flex-start; min-height: 36px; }
+.reports-generator { display: flex; flex-direction: column; gap: 12px; }
+.report-snapshots-list { display: flex; flex-direction: column; gap: 8px; }
+.report-snapshot-item { align-items: center; gap: var(--space-4); }
+.report-snapshot-item { display: flex; justify-content: space-between; padding: 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-base); }
+.report-snapshot-item .snap-info strong { display: block; color: var(--text-primary); font-size: 13px; }
+.report-snapshot-item .snap-info p { margin: 3px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.4; }
+.reports-enterprise { border-left: 3px solid var(--primary-2); }
+.reports-enterprise-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.reports-enterprise-actions .btn { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; }
+.report-card:focus-within, .reports-generator:focus-within, .reports-enterprise:focus-within, .reports-history:focus-within { border-color: var(--border-focus); }
+@media (max-width: 760px) {
+  .reports-manager-grid { grid-template-columns: minmax(0, 1fr); }
+  .report-snapshot-item { align-items: stretch; flex-direction: column; }
+}
 
 @media print {
   @page {

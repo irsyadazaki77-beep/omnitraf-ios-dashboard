@@ -10,6 +10,7 @@ import { socketClient } from '../core/socketClient.js';
 import { trafficEngine } from '../modules/trafficEngine.js';
 import { commandLayer } from '../core/commandLayer.js';
 import { Disposer } from '../core/disposer.js';
+import { authManager } from '../core/authManager.js';
 
 export class EmergencyController {
   constructor() {
@@ -33,6 +34,8 @@ export class EmergencyController {
     this._bindGreenWaveConfirmModal();
     this._bindHudRevertButton();
     this._setupStoreListeners();
+    this._syncRoleCapabilities();
+    this.disposer.add(authManager.onAuthChange(() => this._syncRoleCapabilities()));
 
     // Initial sync / render immediately on activation
     const state = stateStore.getState();
@@ -60,6 +63,12 @@ export class EmergencyController {
       this.preemptTimer = null;
     }
     this.disposer.clear();
+  }
+
+  _syncRoleCapabilities() {
+    const canOperate = authManager.hasRole(['OPERATOR', 'ADMIN']);
+    document.querySelectorAll('#view-emergency .emergency-dispatch-btn, #view-emergency .emergency-stop-btn, #view-emergency #emergencyActuatorForm, #btnConfirmGreenWaveModal, #btnRevertEmergencyGw')
+      .forEach((control) => { control.hidden = !canOperate; });
   }
 
   /**
@@ -324,13 +333,14 @@ export class EmergencyController {
     const list = Array.isArray(activeEmergencies) ? activeEmergencies : [];
     
     if (activePriorityCount) {
-      activePriorityCount.textContent = `${list.length} Active priority`;
+      activePriorityCount.textContent = `${list.length} aktif`;
+      activePriorityCount.className = list.length ? 'pill pill-danger' : 'pill pill-live';
     }
 
     if (list.length === 0) {
       emergencyListGrid.innerHTML = `
         <div class="glass-panel p-6 text-center text-slate-400">
-          <p>Tidak ada armada tanggap darurat aktif saat ini.</p>
+          <p><strong>Tidak ada prioritas aktif.</strong><br>Network model saat ini clear.</p>
         </div>
       `;
       return;
@@ -340,26 +350,42 @@ export class EmergencyController {
       const card = document.createElement("div");
       const isPmk = emg.vehicleType === "PMK";
       const isFinished = ["ARRIVED", "COMPLETED", "CANCELLED"].includes(emg.status);
-      const safeVehicleId = escapeHtml(emg.vehicleId);
+      const safeVehicleId = escapeHtml(emg.vehicleId || 'ID simulasi tidak tersedia');
       const safeVehicleType = escapeHtml(emg.vehicleType);
       const safeStatus = escapeHtml(emg.status);
       const safeRoute = escapeHtml(emg.routeId ? emg.routeId.replace('route-', '').toUpperCase() : 'SURABAYA CORRIDOR');
-      const safeEta = escapeHtml(emg.ETA || '0s');
-      const safeSpeed = escapeHtml(emg.speed || 0);
-      const safeIntersection = escapeHtml(emg.nextIntersection || 'Selesai');
+      const safeEta = escapeHtml(emg.ETA || (isFinished ? '—' : 'Belum tersedia'));
+      const safeSpeed = Number.isFinite(Number(emg.speed)) ? escapeHtml(emg.speed) : '—';
+      const safeIntersection = escapeHtml(emg.nextIntersection || (isFinished ? 'Rute selesai' : 'Belum tersedia'));
+      const progressByStatus = {
+        REQUESTED: 2, VERIFIED: 2, DISPATCHED: 3, ROUTE_PREEMPTION: 4,
+        EN_ROUTE: 5, ARRIVED: 6, COMPLETED: 6, CANCELLED: 6, TERMINAL_ARCHIVED: 6
+      };
+      const currentStep = progressByStatus[safeStatus] || 1;
+      const terminalLabel = safeStatus === 'ARRIVED' ? 'Kendaraan tiba'
+        : safeStatus === 'CANCELLED' ? 'Prioritas dibatalkan'
+          : safeStatus === 'TERMINAL_ARCHIVED' ? 'Skenario diarsipkan' : 'Prioritas dilepas';
+      const progressSteps = ['Kendaraan terdeteksi', 'Prioritas diminta', 'Unit didisposisikan', 'Koridor simulasi disiapkan', 'Kendaraan menuju lokasi', terminalLabel];
+      const progressHtml = progressSteps.map((label, index) => {
+        const step = index + 1;
+        const terminalCancelled = safeStatus === 'CANCELLED' || safeStatus === 'TERMINAL_ARCHIVED';
+        const stateClass = terminalCancelled && step === currentStep ? 'is-cancelled' : step < currentStep ? 'is-complete' : step === currentStep ? 'is-current' : '';
+        return `<li class="emergency-progress-step ${stateClass}">${label}</li>`;
+      }).join('');
 
-      card.className = `emergency-card-item pulse-red-border ${isFinished ? 'opacity-70' : ''}`;
+      card.className = `emergency-card-item ${isFinished ? 'is-finished' : ''}`;
       card.innerHTML = `
         <div class="em-header">
-          <span class="badge-em red" style="background: ${isPmk ? '#f97316' : '#ef4444'};">🚨 ${safeVehicleId} (${safeVehicleType})</span>
-          <strong class="em-status" style="color: ${isFinished ? '#22c55e' : '#ef4444'};">${safeStatus}</strong>
+          <span class="badge-em ${isPmk ? 'amber' : 'red'}">${safeVehicleId} · ${safeVehicleType}</span>
+          <strong class="em-status ${isFinished ? 'is-finished' : 'is-active'}">${safeStatus}</strong>
         </div>
         <p>Rute: ${safeRoute}</p>
         <div class="em-meta-row">
           <div><small>ETA</small><strong>${safeEta}</strong></div>
-          <div><small>Kecepatan</small><strong>${safeSpeed} km/jam</strong></div>
+          <div><small>Kecepatan model</small><strong>${safeSpeed}${safeSpeed === '—' ? '' : ' km/jam'}</strong></div>
           <div><small>Status Persimpangan</small><strong class="${isFinished ? 'text-slate-400' : 'text-emerald-400'}">${safeIntersection}</strong></div>
         </div>
+        <ol class="emergency-progress" aria-label="Progres skenario prioritas, status ${safeStatus}">${progressHtml}</ol>
       `;
       emergencyListGrid.appendChild(card);
     });

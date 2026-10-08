@@ -19,14 +19,14 @@
             </article>
           </div>
 
-          <!-- Webhook scrolling terminal logs -->
+          <!-- Simulated integration activity log -->
           <article class="terminal-logs-card glass-panel">
             <div class="section-head compact">
               <div>
-                <h2>Simulasi Webhook & Event Stream</h2>
+                <h2>Log Aktivitas Integrasi</h2>
                 <p>Contoh payload dan log lokal untuk demonstrasi; tidak ada webhook atau integrasi eksternal yang aktif.</p>
               </div>
-              <span class="badge-terminal">LOG DEMO</span>
+              <span class="provenance-badge simulated">LOG SIMULASI</span>
             </div>
             <div class="terminal-body-wrapper">
               <div class="terminal-scanline"></div>
@@ -35,10 +35,10 @@
                 <div class="terminal-line">[DEMO] Deteksi kendaraan berasal dari generator visual sintetis.</div>
                 <div class="terminal-line">[DEMO] Perubahan fase hanya memperbarui state simulator.</div>
               </div>
-              <!-- Retro terminal input bar -->
+              <!-- Local demo command input -->
               <div class="terminal-input-bar terminal-input-bar-wrap">
-                <span class="terminal-prompt-text">SITS:~$</span>
-                <input type="text" id="terminalCommandInput" class="terminal-input-field" placeholder="Ketik perintah (contoh: /help, /clear, /ping)..." autocomplete="off" />
+                <label class="form-label-muted" for="terminalCommandInput">Perintah demo</label>
+                <input type="text" id="terminalCommandInput" class="terminal-input-field" placeholder="/help, /clear, /ping" autocomplete="off" />
               </div>
             </div>
           </article>
@@ -50,13 +50,13 @@
                 <h2>REST API Gateway Sandbox</h2>
                 <p>Jalankan contoh permintaan terhadap endpoint sandbox lokal, bukan API SITS Dishub.</p>
               </div>
-              <span class="badge-terminal">REST Explorer</span>
+              <span class="provenance-badge simulated">SANDBOX</span>
             </div>
             
             <div class="api-explorer-layout api-explorer-grid">
               <div class="api-form-panel">
                 <div class="form-group api-form-mb">
-                  <label class="form-label-muted">HTTP Method & Endpoint</label>
+                  <label class="form-label-muted" for="apiEndpoint">HTTP method &amp; endpoint</label>
                   <div class="header-actions-flex">
                     <span class="api-method-badge" id="apiMethod">GET</span>
                     <select id="apiEndpoint" class="selector api-endpoint-select">
@@ -68,7 +68,7 @@
                 </div>
                 <div class="api-request-preview api-form-mb">
                   <div class="notif-card-header">
-                    <label class="form-label-muted">Request Payload Editor (JSON)</label>
+                    <label class="form-label-muted" for="apiPayloadEditor">Request payload (JSON)</label>
                     <span id="apiJsonValidateTag" class="api-json-tag">JSON VALID</span>
                   </div>
                   <div class="payload-box api-payload-box">
@@ -81,7 +81,7 @@
               <div class="api-response-panel api-response-panel-wrap">
                 <div class="notif-card-header">
                   <label class="form-label-muted">Response Payload (JSON)</label>
-                  <span id="apiStatusBadge" class="api-status-badge">CONTOH RESPONS</span>
+                  <span id="apiStatusBadge" class="api-status-badge">BELUM DIJALANKAN</span>
                 </div>
                 <div class="api-response-body api-response-box">
                   <pre id="apiResponseContent" class="api-pre-content">{

@@ -95,15 +95,17 @@
 .prototype-notice {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin: 0 0 14px;
-  padding: 9px 12px;
-  border: 1px solid var(--warning-border);
+  gap: 8px;
+  min-height: 30px;
+  margin: 0 0 10px;
+  padding: 5px 10px;
+  border: 0;
+  border-left: 2px solid var(--warning);
   border-radius: var(--radius-sm);
-  background: var(--warning-soft);
-  color: var(--text);
-  font-size: 12px;
-  line-height: 1.45;
+  background: color-mix(in srgb, var(--warning-soft) 58%, transparent);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .prototype-notice strong {
@@ -112,14 +114,42 @@
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
+
+.offline-notification-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--warning-border);
+  border-left: 3px solid var(--warning);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--warning-soft);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.offline-notification-banner[data-status="offline"] {
+  border-color: var(--danger-border);
+  border-left-color: var(--danger);
+  background: var(--danger-soft);
+}
+.offline-banner-inner { display: flex; min-width: 0; align-items: center; gap: 9px; }
+.offline-banner-text { min-width: 0; color: var(--text-secondary); }
+.offline-banner-text strong { color: var(--text-primary); }
+.offline-banner-icon { flex: 0 0 auto; }
+.offline-banner-close { border: 0; color: var(--text-secondary); background: transparent; cursor: pointer; font-size: 18px; }
+.offline-banner-close:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
 @media (max-width: 600px) {
   .prototype-notice {
     align-items: flex-start;
-    flex-direction: column;
-    gap: 3px;
+    font-size: 10px;
   }
+  .prototype-notice strong { font-size: 9px; }
 }
 
 .provenance-badge.user-triggered {

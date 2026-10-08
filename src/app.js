@@ -71,7 +71,10 @@ export class App {
     runReleaseHealthCheck();
 
     // 1. Mount the first view alongside independent shell template requests.
-    const initialView = stateStore.getState().currentView || (window.location.hash.slice(1) || 'dashboard');
+    const requestedHash = window.location.hash.slice(1).replace(/^view-/, '');
+    const initialView = requestedHash === 'emergencies' ? 'emergency'
+      : requestedHash && requestedHash !== 'about-engine' ? requestedHash
+        : (stateStore.getState().currentView || 'dashboard');
     await Promise.all([
       viewLoader.mountView(initialView),
       viewLoader.mountShellComponents()

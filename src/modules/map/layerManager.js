@@ -13,19 +13,31 @@ import {
 
 export const TILE_CONFIG = {
   provider: 'CARTO',
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a> — SITS Surabaya GIS Engine',
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
   subdomains: 'abcd',
   maxZoom: 19,
   darkUrl: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-  lightUrl: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'
+  lightUrl: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+  openStreetMapUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 };
 
+export function getBasemapTileUrl(isDark) {
+  const cartoKey = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_CARTO_BASEMAP_KEY : '';
+  if (!cartoKey) return TILE_CONFIG.openStreetMapUrl;
+  const styleUrl = isDark ? TILE_CONFIG.darkUrl : TILE_CONFIG.lightUrl;
+  return `${styleUrl}?key=${encodeURIComponent(cartoKey)}`;
+}
+
 export function createCartoTileLayer(isDark) {
-  const tileUrl = isDark ? TILE_CONFIG.darkUrl : TILE_CONFIG.lightUrl;
+  const cartoKey = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_CARTO_BASEMAP_KEY : '';
+  const tileUrl = getBasemapTileUrl(isDark);
+  const attribution = cartoKey
+    ? `${TILE_CONFIG.attribution} &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>`
+    : TILE_CONFIG.attribution;
 
   const layer = L.tileLayer(tileUrl, {
-    attribution: TILE_CONFIG.attribution,
-    subdomains: TILE_CONFIG.subdomains,
+    attribution,
+    subdomains: cartoKey ? TILE_CONFIG.subdomains : undefined,
     maxZoom: TILE_CONFIG.maxZoom,
     updateWhenIdle: true,
     updateWhenZooming: false,
@@ -109,7 +121,7 @@ export function createClusterGroup(clusterType = 'cctv') {
         }
 
         return L.divIcon({
-          html: `<div class="omni-cluster-bubble ${sizeClass} ${typeClass}"><span>${count}</span></div>`,
+          html: `<div class="omni-cluster-bubble ${sizeClass} ${typeClass}" role="img" aria-label="Cluster berisi ${count} aset"><span aria-hidden="true">${count}</span></div>`,
           className: 'omni-cluster-icon',
           iconSize: L.point(40, 40),
           iconAnchor: [20, 20]

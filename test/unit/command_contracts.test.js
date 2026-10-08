@@ -104,13 +104,13 @@ test('command pipeline exposes parse, normalize, validate stages without executi
 test('invalid and unknown-target commands produce no state, persistence, audit or event changes', async () => {
   const node = backendState.state.intersections.find(item => item.id === 'node-wonokromo');
   const stateBefore = { signal: { state: node.state, timer: node.timer, status: node.status }, sequence: backendState.sequence, audit: backendState.auditLogs.length, signalAudit: backendState.deviceAuditTrail.length };
-  const originalPersist = dbManager.upsertSignalConfig;
+  const originalExecute = dbManager.execute;
   let persistenceCalls = 0;
   let emitted = 0;
   const io = backendState.io;
   const originalEmit = io?.emit;
   try {
-    dbManager.upsertSignalConfig = (...args) => { persistenceCalls++; return originalPersist.apply(dbManager, args); };
+    dbManager.execute = (sql, ...args) => { if (sql.includes('INSERT INTO signal_configs')) persistenceCalls++; return originalExecute.call(dbManager, sql, ...args); };
     if (io) io.emit = (...args) => { emitted++; return originalEmit.apply(io, args); };
     await assert.rejects(commandExecutor.executeCommand({ action: 'signal:override', targetId: 'node-wonokromo', payload: { duration: 180 }, authenticatedUser: admin }), error => error.code === 'INVALID_COMMAND');
     await assert.rejects(commandExecutor.executeCommand({ action: 'signal:override', targetId: 'node-missing', payload: { duration: 45 }, authenticatedUser: admin }), error => error.code === 'NOT_FOUND');
@@ -123,7 +123,7 @@ test('invalid and unknown-target commands produce no state, persistence, audit o
     assert.equal(backendState.deviceAuditTrail.length, stateBefore.signalAudit);
     assert.deepEqual({ state: node.state, timer: node.timer, status: node.status }, stateBefore.signal);
   } finally {
-    dbManager.upsertSignalConfig = originalPersist;
+    dbManager.execute = originalExecute;
     if (io) io.emit = originalEmit;
   }
 });

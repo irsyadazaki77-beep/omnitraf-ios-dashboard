@@ -21,7 +21,7 @@ import { soundManager } from '../core/soundManager.js';
 import { Disposer } from '../core/disposer.js';
 import { diagnostics } from '../core/diagnostics.js';
 
-import { createCartoTileLayer, safeAddLayers, createClusterGroup, layerManager } from './map/layerManager.js';
+import { createCartoTileLayer, getBasemapTileUrl, safeAddLayers, createClusterGroup, layerManager } from './map/layerManager.js';
 import { markerManager } from './map/markerManager.js';
 import { popupManager } from './map/popupManager.js';
 import { mapControls } from './map/mapControls.js';
@@ -873,9 +873,7 @@ export class MapManager {
 
   updateTileTheme(theme) {
     const isDark = theme === 'dark';
-    const tileUrl = isDark
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
+    const tileUrl = getBasemapTileUrl(isDark);
 
     this.tileLayers.forEach(tileLayer => {
       if (tileLayer && tileLayer.setUrl) {

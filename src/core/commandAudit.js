@@ -70,16 +70,14 @@ export class CommandAudit {
 
     const label = log.type.replace(':', ' ').toUpperCase();
     
-    let colorStyle = "color:#94a3b8;"; // default info
-    if (log.result === "FAILED") colorStyle = "color:#f43f5e; font-weight:700;"; // red
-    else if (log.result === "REJECTED") colorStyle = "color:#fbbf24; font-weight:700;"; // orange/yellow
-    else if (log.type.includes("command:acknowledged") || log.details.includes("pulih") || log.details.includes("Selesai")) colorStyle = "color:#10b981; font-weight:700;"; // green success
-    else if (log.type.includes("command:requested") || log.type.includes("validated")) colorStyle = "color:#38bdf8;"; // sky blue
-    else if (log.type.includes("emergency")) colorStyle = "color:#f43f5e;"; // emergency red
+    const resultTone = log.result === 'FAILED' ? 'danger'
+      : log.result === 'REJECTED' ? 'warning'
+        : log.type.includes('command:acknowledged') || log.details.includes('pulih') || log.details.includes('Selesai') ? 'success'
+          : log.type.includes('command:requested') || log.type.includes('validated') ? 'info'
+            : log.type.includes('emergency') ? 'danger' : 'neutral';
 
     const line = document.createElement('div');
-    line.className = 'terminal-line';
-    line.style.cssText = `margin-bottom:4px; font-family:'Share Tech Mono', monospace; font-size:11.5px; border-bottom:1px solid rgba(255,255,255,0.02); padding-bottom:3px; ${colorStyle}`;
+    line.className = `terminal-line audit-log-entry is-${resultTone}`;
     line.textContent = `[${time}] [${label}] • ${String(log.details ?? '')}`;
 
     // Append as text so server/operator-controlled audit details cannot become markup.

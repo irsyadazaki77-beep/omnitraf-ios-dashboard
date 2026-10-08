@@ -8,6 +8,7 @@ import { stateStore, updateIncidentState, escapeHtml } from '../core/stateStore.
 import { soundManager } from '../core/soundManager.js';
 import { socketClient } from '../core/socketClient.js';
 import { commandLayer } from '../core/commandLayer.js';
+import { authManager } from '../core/authManager.js';
 import { Disposer } from '../core/disposer.js';
 
 export class IncidentController {
@@ -15,11 +16,19 @@ export class IncidentController {
     this.selectedIntersection = null;
     this._isInitialized = false;
     this.disposer = new Disposer('IncidentController');
+    this._authUnsubscribe = null;
   }
 
   init() {
     if (this._isInitialized) return;
     this._isInitialized = true;
+    this._authUnsubscribe = authManager.onAuthChange(() => {
+      const incidents = stateStore.getState().incidents || [];
+      this._renderIncidentListUI(incidents);
+      this._renderNotificationDrawer(incidents);
+      const dispatch = document.getElementById('btnIncidentDispatch');
+      if (dispatch) dispatch.hidden = !authManager.hasRole(['OPERATOR', 'ADMIN']);
+    });
   }
 
   activate() {
@@ -36,6 +45,8 @@ export class IncidentController {
     const state = stateStore.getState();
     this._renderIncidentListUI(state.incidents);
     this._renderNotificationDrawer(state.incidents);
+    const dispatch = document.getElementById('btnIncidentDispatch');
+    if (dispatch) dispatch.hidden = !authManager.hasRole(['OPERATOR', 'ADMIN']);
   }
 
   deactivate() {
@@ -56,18 +67,28 @@ export class IncidentController {
    */
   async dispatchIncident(id) {
     try {
+      const incident = (stateStore.getState().incidents || []).find((item) => String(item.id) === String(id));
+      const currentStatus = String(incident?.status || 'ACTIVE').toUpperCase();
+      const nextStatus = ({
+        ACTIVE: 'ACKNOWLEDGED',
+        ACKNOWLEDGED: 'DISPATCHED',
+        DISPATCHED: 'RESPONDING',
+        RESPONDING: 'MITIGATED',
+        MITIGATED: 'RESOLVED'
+      })[currentStatus];
+      if (!nextStatus) throw new Error(`Tidak ada transisi berikutnya dari status ${currentStatus}.`);
+      const action = nextStatus === 'ACKNOWLEDGED' ? 'incident:acknowledge'
+        : nextStatus === 'RESOLVED' ? 'incident:resolve' : 'incident:dispatch';
+      const payload = { assignedUnit: 'Unit Demo', notes: 'Tahap penanganan berubah pada simulator; tidak ada petugas lapangan yang dihubungi.' };
+      if (action === 'incident:dispatch') payload.status = nextStatus;
       await commandLayer.dispatchCommand({
-        action: 'incident:dispatch',
+        action,
         targetType: 'incident',
         targetId: id,
-        payload: {
-          status: 'DISPATCHED',
-          assignedUnit: 'Unit Demo',
-          notes: 'Status penugasan hanya berubah pada simulator; tidak ada petugas yang dihubungi.'
-        }
+        payload
       }, false); // low risk
 
-      window.showToast(`Skenario penugasan #${id} diperbarui di simulator; tidak ada petugas yang dikirim.`, 'success');
+      window.showToast(`Skenario #${id}: ${nextStatus.replaceAll('_', ' ')}. Tidak ada petugas lapangan yang dihubungi.`, 'success');
       soundManager.play('alert');
     } catch (err) {
       console.warn("[IncidentController] Dispatch error:", err);
@@ -327,6 +348,7 @@ export class IncidentController {
     if (!notifContainer) return;
 
     const list = Array.isArray(incidents) ? incidents : [];
+    const canOperate = authManager.hasRole(['OPERATOR', 'ADMIN']);
     notifContainer.innerHTML = "";
     if (list.length === 0) {
       notifContainer.innerHTML = '<p class="text-muted" style="margin:0;">Belum ada skenario demo.</p>';
@@ -335,7 +357,8 @@ export class IncidentController {
 
     list.forEach(inc => {
       const isResolved = ["RESOLVED", "ARCHIVED"].includes(inc.status);
-      const isDispatched = ["DISPATCHED", "RESPONDING", "DISPATCHED/RESPONDING", "ACKNOWLEDGED"].includes(inc.status);
+      const isDispatched = ["DISPATCHED", "RESPONDING", "DISPATCHED/RESPONDING", "ACKNOWLEDGED", "MITIGATED"].includes(inc.status);
+      const workflowAction = this._incidentWorkflowAction(inc.status);
 
       let badgeClass = "red";
       let badgeLabel = "⚠️ BARU (Open)";
@@ -373,7 +396,7 @@ export class IncidentController {
         
         ${isResolved ? `
           <div style="font-size: 10.5px; color: var(--success); font-weight: 600;">
-            ✓ Selesai Ditangani | Response Time: ${responseTimeStr || '3 menit'}
+            ✓ Skenario selesai${responseTimeStr ? ` · Durasi: ${responseTimeStr}` : ''}
           </div>
         ` : ''}
 
@@ -382,12 +405,8 @@ export class IncidentController {
             📍 Buka di Peta
           </button>
           
-          ${!isResolved ? `
-            ${!isDispatched ? `
-              <button class="btn btn-primary compact incident-dispatch-btn" style="padding: 4px 8px; font-size: 10.5px;">▶ Simulasikan</button>
-            ` : `
-              <button class="btn btn-success compact incident-resolve-btn" style="padding: 4px 8px; font-size: 10.5px; background: var(--success); border-color: var(--success);">✓ Selesaikan</button>
-            `}
+          ${!isResolved && canOperate ? `
+            <button class="btn btn-primary compact incident-dispatch-btn" style="padding: 4px 8px; font-size: 10.5px;">${workflowAction}</button>
           ` : ''}
         </div>
       `;
@@ -408,17 +427,21 @@ export class IncidentController {
     listContainer.innerHTML = "";
 
     const list = Array.isArray(incidents) ? incidents : [];
+    const canOperate = authManager.hasRole(['OPERATOR', 'ADMIN']);
     
     // Count unresolved alerts (status not RESOLVED and not ARCHIVED)
     const unresolvedCount = list.filter(inc => !["RESOLVED", "ARCHIVED"].includes(inc.status)).length;
+    const activeSummary = document.getElementById('summaryActiveIncidents');
+    if (activeSummary) activeSummary.textContent = `${unresolvedCount} aktif`;
     if (unresolvedBadge) {
-      unresolvedBadge.textContent = `${unresolvedCount} Unresolved Alerts`;
+      unresolvedBadge.textContent = `${unresolvedCount} aktif`;
+      unresolvedBadge.className = unresolvedCount > 0 ? 'pill pill-danger' : 'pill pill-live';
     }
 
     if (list.length === 0) {
       listContainer.innerHTML = `
         <div class="glass-panel p-6 text-center text-slate-400">
-          <p>Tidak ada insiden lalu lintas terdeteksi saat ini.</p>
+          <p><strong>Network saat ini clear.</strong><br>Tidak ada skenario insiden aktif.</p>
         </div>
       `;
       return;
@@ -426,7 +449,8 @@ export class IncidentController {
 
     list.forEach(inc => {
       const isResolved = ["RESOLVED", "ARCHIVED"].includes(inc.status);
-      const isDispatched = ["DISPATCHED", "RESPONDING", "DISPATCHED/RESPONDING", "ACKNOWLEDGED"].includes(inc.status);
+      const isDispatched = ["DISPATCHED", "RESPONDING", "DISPATCHED/RESPONDING", "ACKNOWLEDGED", "MITIGATED"].includes(inc.status);
+      const workflowAction = this._incidentWorkflowAction(inc.status);
       
       const item = document.createElement("div");
       item.className = `incident-log-item ${isResolved ? 'resolved' : 'unresolved'}`;
@@ -464,7 +488,7 @@ export class IncidentController {
         <div class="inc-meta-row" style="margin-top: 8px; display: flex; gap: 16px; font-size: 11px; color: #94a3b8; background: rgba(255,255,255,0.02); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
           <div>Kategori: <strong style="color: var(--text);">${safeCategory}</strong></div>
           <div>Unit Disposisi: <strong style="color: var(--cyan);">${safeUnit}</strong></div>
-          ${isResolved ? `<div>Durasi Respon: <strong style="color: var(--success);">${responseTimeStr || '3 menit'}</strong></div>` : `<div>Durasi Berjalan: <strong style="color: var(--amber);">${responseTimeStr || '1 menit'}</strong></div>`}
+          ${responseTimeStr ? `<div>Durasi Simulasi: <strong style="color: ${isResolved ? 'var(--success)' : 'var(--amber)'};">${responseTimeStr}</strong></div>` : ''}
         </div>
 
         <div class="inc-actions" style="margin-top: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
@@ -472,24 +496,15 @@ export class IncidentController {
             📍 Buka di Peta
           </button>
 
-          ${!isResolved ? `
-            ${!isDispatched ? `
-              <button class="btn btn-primary compact dispatch-btn" style="padding: 5px 12px; font-size: 11.5px;">
-                ▶ Simulasikan Penugasan
-              </button>
-            ` : `
-              <button class="btn btn-success compact resolve-btn" style="padding: 5px 12px; font-size: 11.5px; background: var(--success); border-color: var(--success);">
-                ✓ Selesaikan Insiden
-              </button>
-            `}
-            <button class="btn btn-ghost compact incident-detail-btn" style="padding: 5px 10px; font-size: 11px; color: var(--text-muted);">
-              📋 Kronologi & Disposisi
+          ${!isResolved && canOperate ? `
+            <button class="btn btn-primary compact dispatch-btn" style="padding: 5px 12px; font-size: 11.5px;">
+              ${workflowAction}
             </button>
-          ` : `
-            <span class="text-emerald-400 font-semibold" style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--success);">
-              ✓ Skenario selesai | Waktu simulasi: ${responseTimeStr || '3 menit'}
-            </span>
-          `}
+          ` : ''}
+          <button class="btn btn-ghost compact incident-detail-btn" style="padding: 5px 10px; font-size: 11px; color: var(--text-muted);" aria-label="Lihat detail ${safeTitle}">
+            Lihat detail
+          </button>
+          ${isResolved ? '<span class="incident-resolved-state" role="status">✓ Selesai</span>' : ''}
         </div>
       `;
       listContainer.appendChild(item);
@@ -500,6 +515,18 @@ export class IncidentController {
     });
 
     this._renderDashboardTimeline(list);
+  }
+
+  _incidentWorkflowAction(status) {
+    const current = String(status || 'ACTIVE').toUpperCase();
+    return ({
+      ACTIVE: 'Akui skenario',
+      ACKNOWLEDGED: 'Disposisi simulasi',
+      DISPATCHED: 'Mulai respons simulasi',
+      'DISPATCHED/RESPONDING': 'Lanjutkan respons simulasi',
+      RESPONDING: 'Tandai mitigasi',
+      MITIGATED: 'Selesaikan skenario'
+    })[current] || 'Lanjutkan alur simulasi';
   }
 
   _renderDashboardTimeline(incidents) {

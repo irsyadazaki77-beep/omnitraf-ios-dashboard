@@ -109,10 +109,11 @@ describe('PHASE 17 — Comprehensive Chaos & Fault Injection Resilience Matrix',
       deterministicSeed: 202
     });
 
-    // Mock dbManager.upsertDeviceTelemetry to throw error during the fault
-    const originalUpsert = dbManager.upsertDeviceTelemetry;
-    dbManager.upsertDeviceTelemetry = () => {
-      throw new Error('CHAOS_INJECTED_SQLITE_IO_DISK_FULL');
+    // Inject failure through the driver-neutral repository contract.
+    const originalExecute = dbManager.execute;
+    dbManager.execute = (sql, ...args) => {
+      if (sql.includes('INSERT INTO device_telemetry')) throw new Error('CHAOS_INJECTED_SQLITE_IO_DISK_FULL');
+      return originalExecute.call(dbManager, sql, ...args);
     };
 
     try {
@@ -136,7 +137,7 @@ describe('PHASE 17 — Comprehensive Chaos & Fault Injection Resilience Matrix',
       assert.strictEqual(devAfter.resolution, originalRes, 'Resolution must remain unchanged');
       assert.strictEqual(devAfter.fps, originalFps, 'FPS must remain unchanged');
     } finally {
-      dbManager.upsertDeviceTelemetry = originalUpsert;
+      dbManager.execute = originalExecute;
       diagnosticEngine.clearFault('CHAOS-DB-FAIL');
     }
   });

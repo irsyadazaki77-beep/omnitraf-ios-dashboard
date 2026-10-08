@@ -250,7 +250,7 @@ describe('PHASE 19 — Unified Time, Seeded Randomness & Deterministic Simulatio
   });
 
   describe('5. Deterministic Emergency & Route Progression', () => {
-    test('Emergency priority progression depends strictly on elapsed simulation time', () => {
+    test('Emergency priority progression depends strictly on elapsed simulation time', async () => {
       const fixedStartTime = 1700000000000;
       const clock = new UnifiedClock({ mode: SIMULATION_MODES.TEST, startTime: fixedStartTime });
       const stateMgr = new BackendStateManager({
@@ -260,7 +260,7 @@ describe('PHASE 19 — Unified Time, Seeded Randomness & Deterministic Simulatio
       });
 
       // Dispatch emergency
-      const res = stateMgr.activateEmergencyPriority('AMB-TEST-01', 'route-soetomo', {
+      const res = await stateMgr.activateEmergencyPriority('AMB-TEST-01', 'route-soetomo', {
         priorityLevel: 'CRITICAL',
         assignedHospital: 'RSUD Dr. Soetomo',
         etaMinutes: 6
@@ -389,4 +389,3 @@ describe('PHASE 19 — Unified Time, Seeded Randomness & Deterministic Simulatio
     });
   });
 });
-

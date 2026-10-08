@@ -8,13 +8,14 @@
           <span class="pill pill-ai">Optimized</span>
         </article>
         <article class="settings-expanded-card glass-panel">
-          <h2>Command Center Surabaya System Configuration</h2>
-          <p>Konfigurasi visual antarmuka, umpan balik audio haptic, dan parameter dasar sistem SITS.</p>
+          <h2>Preferensi Command Center</h2>
+          <p>Pengaturan ini memengaruhi pengalaman antarmuka dan suara prototipe simulasi.</p>
           <div class="settings-options-list">
+            <h3 class="settings-group-heading">Audio &amp; Alerts</h3>
             <div class="opt-row">
               <div>
-                <strong>Mechanical UI Sound Haptics</strong>
-                <p>Umpan balik audio mekanis berfrekuensi tinggi saat berinteraksi dengan elemen kontrol.</p>
+                <strong>Suara interaksi</strong>
+                <p>Umpan balik audio sintetis saat berinteraksi dengan kontrol.</p>
               </div>
               <span class="settings-desc">Status aktivasi dikontrol melalui ikon audio di topbar.</span>
             </div>
@@ -39,8 +40,8 @@
             <!-- Optional Ambient City Traffic Soundscape -->
             <div class="opt-row">
               <div>
-                <strong>City Ambient Traffic Soundscape</strong>
-                <p>Putar efek suara lalu lintas kota cybernetic samar-samar di latar belakang untuk suasana Command Center.</p>
+                <strong>Suasana lalu lintas</strong>
+                <p>Putar ambience simulasi secara opsional di latar belakang.</p>
                 <div class="settings-volume-row">
                   <label class="settings-vol-label">Volume Ambient: </label>
                   <input id="ambientVolumeRange" type="range" min="0" max="100" value="30" class="settings-vol-range" />
@@ -55,8 +56,8 @@
             <!-- Voice Alert TTS (Fitur 2) -->
             <div class="opt-row">
               <div>
-                <strong>AI Voice Broadcast (TTS Alert)</strong>
-                <p>Menyuarakan notifikasi atau peringatan kritis sistem SITS Surabaya menggunakan sintesis suara.</p>
+                <strong>Pembacaan alert</strong>
+                <p>Membacakan notifikasi prototipe menggunakan sintesis suara.</p>
               </div>
               <label class="layer-item settings-chk-label">
                 <input type="checkbox" class="layer-toggle-checkbox" id="chkVoiceAlerts" />
@@ -65,6 +66,7 @@
             </div>
 
             <!-- Keyboard shortcuts visual guide button -->
+            <h3 class="settings-group-heading">Operational Preferences</h3>
             <div class="opt-row">
               <div>
                 <strong>Pintasan Keyboard (Shortcuts) SITS</strong>
@@ -72,13 +74,42 @@
               </div>
               <button class="btn btn-primary compact" id="btnShowShortcuts" type="button">Tampilkan Panduan Pintasan</button>
             </div>
+            <div class="opt-row">
+              <div>
+                <strong>Kepadatan antarmuka</strong>
+                <p>Pilih jarak antarelemen untuk pemantauan berjam-jam atau tampilan yang lebih lega.</p>
+              </div>
+              <div class="density-mode-control" role="group" aria-label="Kepadatan antarmuka">
+                <button class="btn btn-ghost compact" type="button" data-density-choice="compact" aria-pressed="true">Compact</button>
+                <button class="btn btn-ghost compact" type="button" data-density-choice="comfortable" aria-pressed="false">Comfortable</button>
+              </div>
+            </div>
 
+            <h3 class="settings-group-heading">Appearance</h3>
             <div class="opt-row">
               <div>
                 <strong>Sistem Dark Mode Adaptif</strong>
                 <p>Tema gelap kontras tinggi untuk kondisi ruang kendali dengan intensitas cahaya rendah.</p>
               </div>
               <span class="settings-desc">Status tema dikontrol melalui ikon kontras di topbar.</span>
+            </div>
+
+            <h3 class="settings-group-heading">Accessibility</h3>
+            <div class="opt-row">
+              <div>
+                <strong>Keyboard dan motion</strong>
+                <p>Kontrol dapat dijangkau dengan keyboard. Animasi mengikuti preferensi Reduce Motion pada sistem operasi.</p>
+              </div>
+              <span class="settings-desc">Pintasan global: Ctrl/Cmd + K</span>
+            </div>
+
+            <h3 class="settings-group-heading">System</h3>
+            <div class="opt-row">
+              <div>
+                <strong>Batas simulasi</strong>
+                <p>OmniTRAF pada lingkungan ini tidak mengendalikan APILL, CCTV, perangkat, atau layanan darurat fisik.</p>
+              </div>
+              <span class="provenance-badge simulated">SIMULATION ONLY</span>
             </div>
           </div>
         </article>

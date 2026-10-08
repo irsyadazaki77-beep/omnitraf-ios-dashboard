@@ -136,11 +136,6 @@ export class PwaController {
         }
       }
 
-      if (banner && isOnline) {
-        banner.classList.add("is-hidden");
-      } else if (banner) {
-        banner.classList.remove("is-hidden");
-      }
     };
 
     window.addEventListener('online', updateOnlineStatus);
@@ -153,9 +148,7 @@ export class PwaController {
       });
     }
 
-    if (!navigator.onLine && banner) {
-      banner.classList.remove("is-hidden");
-    }
+    if (!navigator.onLine) updateOnlineStatus();
   }
 }
 

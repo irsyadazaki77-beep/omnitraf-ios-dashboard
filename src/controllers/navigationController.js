@@ -26,6 +26,7 @@ export class NavigationController {
     this._initMobileNav();
     this._initCommandPalette();
     this._initThemeToggle();
+    this._initDensityPreference();
     this._initClock();
     this._initDrawersAndPanels();
   }
@@ -145,7 +146,7 @@ export class NavigationController {
       if (savedPreference === null) apply(event.matches);
     });
 
-    document.querySelectorAll('.sidebar [data-view], .sidebar [data-action]').forEach(item => {
+    document.querySelectorAll('.sidebar [data-view], .sidebar [data-action], .app-sidebar [data-view], .app-sidebar [data-action]').forEach(item => {
       const label = item.querySelector('.nav-label')?.textContent.trim() || item.getAttribute('aria-label') || '';
       if (label) {
         item.setAttribute('aria-label', label);
@@ -161,10 +162,32 @@ export class NavigationController {
     const search = document.getElementById('navigationPaletteSearch');
     const groups = [...(palette?.querySelectorAll('[data-palette-group]') || [])];
     const emptyState = document.getElementById('navigationPaletteEmpty');
+    const entityGroup = document.getElementById('paletteEntityResults');
+    const entityLinks = document.getElementById('paletteEntityLinks');
     if (!palette || !search || !openButton) return;
 
     const filterDestinations = () => {
       const query = search.value.trim().toLocaleLowerCase();
+      entityLinks?.replaceChildren();
+      if (query && entityLinks && entityGroup) {
+        const state = stateStore.getState();
+        const candidates = [
+          ...(state.incidents || []).map((entity) => ({ kind: 'Incident', name: entity.title || entity.id, detail: entity.location, route: 'incidents', query: `${entity.id} ${entity.status} ${entity.severity}` })),
+          ...(state.intersections || []).map((entity) => ({ kind: 'Intersection', name: entity.name || entity.id, detail: entity.location || entity.state, route: 'signals', query: `${entity.id} ${entity.state} ${entity.density}` })),
+          ...(state.devices || []).map((entity) => ({ kind: 'Device', name: entity.deviceName || entity.deviceId, detail: entity.location || entity.healthLevel, route: 'devices', query: `${entity.deviceId} ${entity.healthLevel}` })),
+          ...Object.keys(state.cctvVisionData || {}).map((id) => ({ kind: 'CCTV', name: id, detail: 'Simulation camera', route: 'cctv', query: id }))
+        ];
+        const matches = candidates.filter((entity) => `${entity.kind} ${entity.name} ${entity.detail || ''} ${entity.query || ''}`.toLocaleLowerCase().includes(query)).slice(0, 8);
+        matches.forEach((entity) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'navigation-palette-link';
+          button.dataset.entityRoute = entity.route;
+          button.textContent = `${entity.kind} · ${entity.name}${entity.detail ? ` — ${entity.detail}` : ''}`;
+          entityLinks.appendChild(button);
+        });
+        entityGroup.hidden = matches.length === 0;
+      }
       let visibleCount = 0;
       groups.forEach(group => {
         let groupCount = 0;
@@ -190,6 +213,14 @@ export class NavigationController {
     openButton.addEventListener('click', openPalette);
     closeButton?.addEventListener('click', () => palette.close());
     search.addEventListener('input', filterDestinations);
+    entityLinks?.addEventListener('click', (event) => {
+      const result = event.target.closest('[data-entity-route]');
+      if (!result) return;
+      const route = result.dataset.entityRoute;
+      palette.close();
+      if (window.location.hash !== `#${route}`) window.location.hash = route;
+      else document.querySelector(`[data-view="${route}"]`)?.click();
+    });
     palette.querySelectorAll('.navigation-palette-link').forEach(link => {
       link.addEventListener('click', () => palette.close());
     });
@@ -343,6 +374,31 @@ export class NavigationController {
     });
   }
 
+  _initDensityPreference() {
+    this.densityMode = 'compact';
+    const root = document.documentElement;
+    root.dataset.density = this.densityMode;
+    const syncButtons = () => {
+      document.querySelectorAll('[data-density-choice]').forEach((button) => {
+        button.setAttribute('aria-pressed', String(button.dataset.densityChoice === this.densityMode));
+      });
+    };
+    document.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-density-choice]');
+      if (!button) return;
+      this.densityMode = button.dataset.densityChoice === 'comfortable' ? 'comfortable' : 'compact';
+      root.dataset.density = this.densityMode;
+      syncButtons();
+      soundManager.play('click');
+    });
+    const viewContainer = document.getElementById('viewContainer');
+    if (viewContainer && typeof MutationObserver !== 'undefined') {
+      this.densityObserver = new MutationObserver(syncButtons);
+      this.densityObserver.observe(viewContainer, { childList: true });
+    }
+    syncButtons();
+  }
+
   /**
    * 4. Real-Time WIB Digital Clock & Full Date
    */
@@ -399,16 +455,32 @@ export class NavigationController {
     const chatToggle = document.getElementById("btnToggleChatPanel");
     const chatHeader = document.getElementById("staffChatHeader");
     const grabHandle = document.getElementById("chatSheetGrabHandle");
+    const chatOpeners = [document.getElementById('btnTopMobileChat'), document.getElementById('btnOpenMobileChat')].filter(Boolean);
     const notifToggle = document.getElementById("notifToggle");
     const notifDrawer = document.getElementById("notifDrawer");
     const closeNotifDrawer = document.getElementById("closeNotifDrawer");
     const notifBackdrop = document.getElementById("notifDrawerBackdrop");
+    let chatReturnFocus = null;
 
-    const toggleChat = () => {
+    const setChatOpen = (isOpen, returnFocus = false) => {
       if (!chatPanel) return;
-      chatPanel.classList.toggle("collapsed");
+      chatPanel.classList.toggle("collapsed", !isOpen);
+      chatPanel.setAttribute('aria-hidden', String(!isOpen));
+      chatPanel.inert = !isOpen;
+      chatToggle?.setAttribute('aria-expanded', String(isOpen));
+      chatOpeners.forEach((button) => button.setAttribute('aria-expanded', String(isOpen)));
+      if (isOpen) {
+        chatReturnFocus = document.activeElement;
+        document.getElementById('chatInputText')?.focus({ preventScroll: true });
+      } else if (returnFocus) {
+        chatReturnFocus?.focus?.({ preventScroll: true });
+        chatReturnFocus = null;
+      }
       soundManager.play('click');
     };
+
+    const toggleChat = () => setChatOpen(Boolean(chatPanel?.classList.contains('collapsed')));
+    chatOpeners.forEach((button) => button.addEventListener('click', () => setChatOpen(true)));
 
     if (chatToggle) chatToggle.addEventListener("click", toggleChat);
     if (chatHeader) {
@@ -417,6 +489,11 @@ export class NavigationController {
       });
     }
     if (grabHandle) grabHandle.addEventListener("click", toggleChat);
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && chatPanel && !chatPanel.classList.contains('collapsed')) {
+        setChatOpen(false, true);
+      }
+    });
 
     // Notification Drawer
     const toggleNotifDrawer = () => {

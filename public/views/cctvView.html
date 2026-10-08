@@ -13,9 +13,9 @@
             <div class="cctv-toolbar-section cctv-toolbar-left">
               <!-- Matrix View Selector -->
               <div class="ios-segmented-control matrix-selector" role="group" aria-label="Layout Grid Kamera">
-                <button class="matrix-btn active" data-grid="grid-2x2" title="Grid 2x2">⊞ Grid</button>
-                <button class="matrix-btn" data-grid="grid-1x3" title="Kolom 1x3">☰ Stack</button>
-                <button class="matrix-btn" data-grid="grid-focus" title="Fokus Utama">🔍 Fokus</button>
+                <button class="matrix-btn" data-grid="grid-2x2" title="Grid 2x2" aria-pressed="false">⊞ Grid</button>
+                <button class="matrix-btn" data-grid="grid-1x3" title="Kolom 1x3" aria-pressed="false">☰ Stack</button>
+                <button class="matrix-btn active" data-grid="grid-focus" title="Fokus Utama" aria-pressed="true">🔍 Fokus</button>
               </div>
               
               <!-- Play/Pause Simulation Control -->
@@ -54,9 +54,9 @@
             </div>
           </div>
 
-          <div class="cctv-feed-grid">
+          <div class="cctv-feed-grid grid-focus">
             <!-- CCTV 01 -->
-            <div class="camera-card glass-panel" data-cam-id="cctvCanvas1">
+            <div class="camera-card glass-panel camera-card-spotlight" data-cam-id="cctvCanvas1">
               <div class="camera-card-header">
                 <div class="camera-title-wrap">
                   <span class="camera-id-badge">CAM 01</span>

@@ -18,15 +18,15 @@ import { runtimeInstanceId } from '../infrastructure/redis/simulationLeadership.
 import { OMNITRAF_RUNTIME_MODE } from '../config/env.js';
 import { validateDiagnosticEventsQuery } from '../config/contracts.js';
 
-export function getDiagnosticHealth(req, res) {
-  const dbReady = dbManager.isInitialized && dbManager.ping();
+export async function getDiagnosticHealth(req, res) {
+  const dbReady = dbManager.isInitialized && await dbManager.ping();
   let dbStatus = HEALTH_STATUS.UNAVAILABLE;
   let dbLatencyMs = 0;
 
   if (dbReady) {
     const t0 = Date.now();
     try {
-      if (!dbManager.ping()) throw new Error('DATABASE_PING_FAILED');
+      if (!await dbManager.ping()) throw new Error('DATABASE_PING_FAILED');
       dbLatencyMs = Date.now() - t0;
       dbStatus = HEALTH_STATUS.HEALTHY;
     } catch (err) {

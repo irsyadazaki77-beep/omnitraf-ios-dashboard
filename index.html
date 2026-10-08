@@ -72,8 +72,8 @@
       </button>
 
       <nav class="nav-menu" aria-label="Primary navigation">
-  <section class="nav-group" data-nav-group="overview" aria-labelledby="navGroupOverview">
-    <h2 class="nav-section-label" id="navGroupOverview">Overview</h2>
+  <section class="nav-group" data-nav-group="command" aria-labelledby="navGroupCommand">
+    <h2 class="nav-section-label" id="navGroupCommand">Command</h2>
     <a href="#dashboard" class="nav-item active" data-view="dashboard">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -83,11 +83,8 @@
               <rect x="3" y="16" width="7" height="5" rx="1.5"></rect>
             </svg>
           </span>
-          <span class="nav-label">Dashboard</span>
+          <span class="nav-label">Overview</span>
         </a>
-  </section>
-  <section class="nav-group" data-nav-group="traffic-operations" aria-labelledby="navGroupTraffic">
-    <h2 class="nav-section-label" id="navGroupTraffic">Traffic Operations</h2>
     <a href="#map" class="nav-item" aria-label="City Map" title="City Map" data-view="map">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -99,18 +96,17 @@
               <line x1="20" y1="12" x2="23" y2="12"></line>
             </svg>
           </span>
-          <span class="nav-label">City Map</span>
+          <span class="nav-label">Live Map</span>
         </a>
-    <a href="#signals" class="nav-item" aria-label="Traffic Signals" title="Traffic Signals" data-view="signals">
+    <a href="#incidents" class="nav-item" aria-label="Incidents" title="Incidents" data-view="incidents">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="8" y="2" width="8" height="20" rx="3"></rect>
-              <circle cx="12" cy="7" r="2" fill="currentColor"></circle>
-              <circle cx="12" cy="12" r="2"></circle>
-              <circle cx="12" cy="17" r="2"></circle>
+              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
             </svg>
           </span>
-          <span class="nav-label">Traffic Signals</span>
+          <span class="nav-label">Incidents</span>
         </a>
     <a href="#emergency" class="nav-item" aria-label="Emergency Priority" title="Emergency Priority" data-view="emergency">
           <span class="nav-icon">
@@ -123,31 +119,8 @@
           <span class="nav-label">Emergency Priority</span>
         </a>
   </section>
-  <section class="nav-group" data-nav-group="monitoring" aria-labelledby="navGroupMonitoring">
-    <h2 class="nav-section-label" id="navGroupMonitoring">Monitoring &amp; Incidents</h2>
-    <a href="#cctv" class="nav-item" aria-label="CCTV Monitoring" title="CCTV Monitoring" data-view="cctv">
-          <span class="nav-icon">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M23 7l-7 5 7 5V7z"></path>
-              <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-              <circle cx="9" cy="12" r="2"></circle>
-            </svg>
-          </span>
-          <span class="nav-label">CCTV Monitoring</span>
-        </a>
-    <a href="#incidents" class="nav-item" aria-label="Incidents" title="Incidents" data-view="incidents">
-          <span class="nav-icon">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path>
-              <line x1="12" y1="9" x2="12" y2="13"></line>
-              <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>
-          </span>
-          <span class="nav-label">Incidents</span>
-        </a>
-  </section>
   <section class="nav-group" data-nav-group="intelligence" aria-labelledby="navGroupIntelligence">
-    <h2 class="nav-section-label" id="navGroupIntelligence">Traffic Intelligence</h2>
+    <h2 class="nav-section-label" id="navGroupIntelligence">Intelligence</h2>
     <a href="#analytics" class="nav-item" aria-label="Analytics" title="Analytics" data-view="analytics">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -172,7 +145,7 @@
               <line x1="1" y1="15" x2="4" y2="15"></line>
             </svg>
           </span>
-          <span class="nav-label">Prediction</span>
+          <span class="nav-label">Forecast</span>
         </a>
     <button class="nav-item nav-system-action" type="button" data-action="system-check" aria-label="Signal Intelligence" title="Signal Intelligence">
           <span class="nav-icon" aria-hidden="true">
@@ -181,8 +154,41 @@
           <span class="nav-label">Signal Intelligence</span>
         </button>
   </section>
-  <section class="nav-group" data-nav-group="management" aria-labelledby="navGroupManagement">
-    <h2 class="nav-section-label" id="navGroupManagement">Management</h2>
+  <section class="nav-group" data-nav-group="infrastructure" aria-labelledby="navGroupInfrastructure">
+    <h2 class="nav-section-label" id="navGroupInfrastructure">Infrastructure</h2>
+    <a href="#cctv" class="nav-item" aria-label="CCTV Monitoring" title="CCTV Monitoring" data-view="cctv">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 7l-7 5 7 5V7z"></path>
+              <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+              <circle cx="9" cy="12" r="2"></circle>
+            </svg>
+          </span>
+          <span class="nav-label">CCTV</span>
+        </a>
+    <a href="#signals" class="nav-item" aria-label="Traffic Signals" title="Traffic Signals" data-view="signals">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="8" y="2" width="8" height="20" rx="3"></rect>
+              <circle cx="12" cy="7" r="2" fill="currentColor"></circle>
+              <circle cx="12" cy="12" r="2"></circle>
+              <circle cx="12" cy="17" r="2"></circle>
+            </svg>
+          </span>
+          <span class="nav-label">Signals</span>
+        </a>
+    <a href="#devices" class="nav-item" aria-label="Device Management" title="Device Management" data-view="devices">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"></path>
+            </svg>
+          </span>
+          <span class="nav-label">Devices</span>
+        </a>
+  </section>
+  <section class="nav-group" data-nav-group="system" aria-labelledby="navGroupSystem">
+    <h2 class="nav-section-label" id="navGroupSystem">System</h2>
     <a href="#reports" class="nav-item" aria-label="Reports" title="Reports" data-view="reports">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -195,15 +201,6 @@
           </span>
           <span class="nav-label">Reports</span>
         </a>
-    <a href="#devices" class="nav-item" aria-label="Device Management" title="Device Management" data-view="devices">
-          <span class="nav-icon">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"></path>
-            </svg>
-          </span>
-          <span class="nav-label">Device Management</span>
-        </a>
     <a href="#integration" class="nav-item" aria-label="Integrations" title="Integrations" data-view="integration">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -213,9 +210,6 @@
           </span>
           <span class="nav-label">Integrations</span>
         </a>
-  </section>
-  <section class="nav-group" data-nav-group="system" aria-labelledby="navGroupSystem">
-    <h2 class="nav-section-label" id="navGroupSystem">System</h2>
     <a href="#settings" class="nav-item" aria-label="Settings" title="Settings" data-view="settings">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -329,7 +323,7 @@
             <button class="topbar-squircle-btn glass-soft" type="button" id="btnOpenEngineModal" aria-label="Algoritma & Arsitektur OmniTRAF" title="Algoritma demonstrasi (Webster; tanpa YOLOv8)">
               <span class="squircle-btn-icon" aria-hidden="true">⚙️</span>
             </button>
-            <button class="topbar-squircle-btn glass-soft hide-desktop" type="button" id="btnTopMobileChat" aria-label="Buka Chat Petugas Demo" title="Chat simulasi">
+  <button class="topbar-squircle-btn glass-soft" type="button" id="btnTopMobileChat" aria-label="Buka chat koordinasi simulasi" aria-controls="staffChatPanel" aria-expanded="false" title="Chat simulasi">
               <span class="squircle-btn-icon" aria-hidden="true">💬</span>
               <span class="chat-online-dot-mini"></span>
             </button>
@@ -362,8 +356,8 @@
         </div>
       </header>
 
-      <div class="prototype-notice" role="note">
-        <strong>SIMULASI-ONLY • TERKUNCI</strong>
+      <div class="prototype-notice" role="note" aria-label="Batas keselamatan simulasi">
+        <strong><span aria-hidden="true">●</span> SIMULASI-ONLY</strong>
         <span>Semua data dan perintah hanya mengubah model simulasi. Tidak ada adapter hardware atau interlock keselamatan; sistem ini tidak mengendalikan APILL, sensor, CCTV, maupun armada nyata.</span>
       </div>
 
@@ -371,8 +365,8 @@
       <div class="offline-notification-banner glass-soft is-hidden" id="offlineNotificationBanner" role="status" aria-live="polite">
         <div class="offline-banner-inner">
           <span class="offline-banner-icon" aria-hidden="true">📡</span>
-          <div class="offline-banner-text">
-            <strong>Koneksi offline</strong> — Data operasional live tidak tersedia. Sambungkan kembali jaringan untuk melanjutkan pemantauan.
+          <div class="offline-banner-text" id="offlineBannerMessage">
+            <strong>Stream simulasi tidak tersedia</strong> — Data terakhir mungkin sudah tidak baru.
           </div>
         </div>
         <button class="offline-banner-close" id="btnDismissOfflineBanner" type="button" aria-label="Tutup pemberitahuan offline">&times;</button>
@@ -387,44 +381,42 @@
     <div class="navigation-palette-header">
       <div>
         <h2 id="navigationPaletteTitle">Go to a destination</h2>
-        <p id="navigationPaletteHelp">Search pages and open one with Enter. Press Escape to close.</p>
+        <p id="navigationPaletteHelp">Search pages or operational entities. Press Escape to close.</p>
       </div>
       <button class="modal-close" id="closeNavigationPalette" type="button" aria-label="Close destination search">&times;</button>
     </div>
-    <label class="sr-only" for="navigationPaletteSearch">Search destinations</label>
-    <input id="navigationPaletteSearch" class="navigation-palette-search" type="search" placeholder="Search destinations…" autocomplete="off" />
+    <label class="sr-only" for="navigationPaletteSearch">Search pages, incidents, intersections, cameras, or devices</label>
+    <input id="navigationPaletteSearch" class="navigation-palette-search" type="search" placeholder="Search pages or entities…" autocomplete="off" />
     <div class="navigation-palette-results" id="navigationPaletteResults">
-      <section data-palette-group="Overview" aria-label="Overview">
-        <h3>Overview</h3>
+      <section data-palette-group="Command" aria-label="Command">
+        <h3>Command</h3>
         <a class="navigation-palette-link" href="#dashboard" data-view="dashboard" data-search="overview dashboard home">Dashboard</a>
-      </section>
-      <section data-palette-group="Traffic Operations" aria-label="Traffic Operations">
-        <h3>Traffic Operations</h3>
         <a class="navigation-palette-link" href="#map" data-view="map" data-search="city map traffic flow nodes heatmap">City Map</a>
-        <a class="navigation-palette-link" href="#signals" data-view="signals" data-search="traffic signals intersections timing">Traffic Signals</a>
+        <a class="navigation-palette-link" href="#incidents" data-view="incidents" data-search="incidents alerts events">Incidents</a>
         <a class="navigation-palette-link" href="#emergency" data-view="emergency" data-search="emergency priority routing">Emergency Priority</a>
       </section>
-      <section data-palette-group="Monitoring & Incidents" aria-label="Monitoring and Incidents">
-        <h3>Monitoring &amp; Incidents</h3>
-        <a class="navigation-palette-link" href="#cctv" data-view="cctv" data-search="cctv cameras monitoring">CCTV Monitoring</a>
-        <a class="navigation-palette-link" href="#incidents" data-view="incidents" data-search="incidents alerts events">Incidents</a>
-      </section>
-      <section data-palette-group="Traffic Intelligence" aria-label="Traffic Intelligence">
-        <h3>Traffic Intelligence</h3>
+      <section data-palette-group="Intelligence" aria-label="Intelligence">
+        <h3>Intelligence</h3>
         <a class="navigation-palette-link" href="#analytics" data-view="analytics" data-search="traffic analytics">Analytics</a>
-        <a class="navigation-palette-link" href="#prediction" data-view="prediction" data-search="prediction forecast">Prediction</a>
+        <a class="navigation-palette-link" href="#prediction" data-view="prediction" data-search="prediction forecast">Forecast</a>
         <button class="navigation-palette-link" type="button" data-action="system-check" data-search="signal intelligence signal recommendations">Signal Intelligence</button>
       </section>
-      <section data-palette-group="Management" aria-label="Management">
-        <h3>Management</h3>
-        <a class="navigation-palette-link" href="#reports" data-view="reports" data-search="reports export">Reports</a>
-        <a class="navigation-palette-link" href="#devices" data-view="devices" data-search="device management nodes">Device Management</a>
-        <a class="navigation-palette-link" href="#integration" data-view="integration" data-search="integrations api gateway">Integrations</a>
+      <section data-palette-group="Infrastructure" aria-label="Infrastructure">
+        <h3>Infrastructure</h3>
+        <a class="navigation-palette-link" href="#cctv" data-view="cctv" data-search="cctv cameras monitoring">CCTV</a>
+        <a class="navigation-palette-link" href="#signals" data-view="signals" data-search="traffic signals intersections timing">Signals</a>
+        <a class="navigation-palette-link" href="#devices" data-view="devices" data-search="device management nodes">Devices</a>
       </section>
       <section data-palette-group="System" aria-label="System">
         <h3>System</h3>
+        <a class="navigation-palette-link" href="#reports" data-view="reports" data-search="reports export">Reports</a>
+        <a class="navigation-palette-link" href="#integration" data-view="integration" data-search="integrations api gateway">Integrations</a>
         <a class="navigation-palette-link" href="#settings" data-view="settings" data-search="settings preferences">Settings</a>
         <a class="navigation-palette-link" href="#about-engine" data-action="about-engine" data-search="system architecture algorithms">System Architecture</a>
+      </section>
+      <section data-palette-group="Entities" id="paletteEntityResults" aria-label="Operational entities" hidden>
+        <h3>Operational entities</h3>
+        <div id="paletteEntityLinks"></div>
       </section>
       <p class="navigation-palette-empty" id="navigationPaletteEmpty" hidden>No destinations found.</p>
     </div>
