@@ -35,14 +35,19 @@ export function createCartoTileLayer(isDark) {
     ? `${TILE_CONFIG.attribution} &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>`
     : TILE_CONFIG.attribution;
 
-  const layer = L.tileLayer(tileUrl, {
+  const layerOptions = {
+    className: cartoKey ? '' : 'omni-osm-tile',
     attribution,
-    subdomains: cartoKey ? TILE_CONFIG.subdomains : undefined,
     maxZoom: TILE_CONFIG.maxZoom,
     updateWhenIdle: true,
     updateWhenZooming: false,
     keepBuffer: 3
-  });
+  };
+  // An explicit `undefined` overrides Leaflet's default `abc` subdomains and
+  // crashes tile URL generation. OSM uses a single host, so omit the option.
+  if (cartoKey) layerOptions.subdomains = TILE_CONFIG.subdomains;
+
+  const layer = L.tileLayer(tileUrl, layerOptions);
 
   // Isolated tile error handling so network tile drops do not crash the spatial engine
   if (layer && typeof layer.on === 'function') {

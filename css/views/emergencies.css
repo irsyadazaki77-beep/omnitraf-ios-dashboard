@@ -6,6 +6,7 @@
 .emergency-simulator-hero { box-shadow: none; }
 .emergency-dashboard { align-items: start; }
 .emergency-active-feed { min-width: 0; }
+.emergency-permission-note { margin: 10px 0 0; padding: 10px 12px; border-left: 3px solid var(--status-info); border-radius: var(--radius-sm); color: var(--text-secondary); background: var(--info-soft); font-size: var(--font-size-small); line-height: var(--line-height-body); }
 .emergency-list-grid { align-content: start; }
 .emergency-progress { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
 .emergency-progress-step { padding-top: 8px; border-top: 2px solid var(--border); color: var(--text-tertiary); font-size: 10px; line-height: 1.35; }

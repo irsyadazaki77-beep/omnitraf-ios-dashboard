@@ -64,17 +64,17 @@
         <span class="sr-only">Collapse sidebar</span>
       </button>
 
-      <button class="quick-nav-trigger" id="quickNavigationButton" type="button" aria-haspopup="dialog" aria-controls="navigationPalette" aria-keyshortcuts="Control+K Meta+K" title="Search destinations (Ctrl+K)">
+      <button class="quick-nav-trigger" id="quickNavigationButton" type="button" aria-haspopup="dialog" aria-controls="navigationPalette" aria-keyshortcuts="Control+K Meta+K" title="Cari halaman (Ctrl+K)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
         </span>
-        <span class="quick-nav-label">Search destinations <kbd>Ctrl K</kbd></span>
+      <span class="quick-nav-label">Cari halaman <kbd>Ctrl K</kbd></span>
       </button>
 
       <nav class="nav-menu" aria-label="Primary navigation">
-  <section class="nav-group" data-nav-group="command" aria-labelledby="navGroupCommand">
-    <h2 class="nav-section-label" id="navGroupCommand">Command</h2>
-    <a href="#dashboard" class="nav-item active" data-view="dashboard">
+  <section class="nav-group" data-nav-group="operations" aria-labelledby="navGroupOperations">
+    <h2 class="nav-section-label" id="navGroupOperations">Operasi</h2>
+    <a href="#dashboard" class="nav-item active" data-view="dashboard" title="Ikhtisar" aria-label="Ikhtisar">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="3" width="7" height="9" rx="1.5"></rect>
@@ -83,9 +83,9 @@
               <rect x="3" y="16" width="7" height="5" rx="1.5"></rect>
             </svg>
           </span>
-          <span class="nav-label">Overview</span>
+          <span class="nav-label">Ikhtisar</span>
         </a>
-    <a href="#map" class="nav-item" aria-label="City Map" title="City Map" data-view="map">
+    <a href="#map" class="nav-item" aria-label="Peta kota" title="Peta kota" data-view="map">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="10"></circle>
@@ -96,9 +96,9 @@
               <line x1="20" y1="12" x2="23" y2="12"></line>
             </svg>
           </span>
-          <span class="nav-label">Live Map</span>
+          <span class="nav-label">Peta kota</span>
         </a>
-    <a href="#incidents" class="nav-item" aria-label="Incidents" title="Incidents" data-view="incidents">
+    <a href="#incidents" class="nav-item" aria-label="Insiden" title="Insiden" data-view="incidents">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path>
@@ -106,9 +106,9 @@
               <line x1="12" y1="17" x2="12.01" y2="17"></line>
             </svg>
           </span>
-          <span class="nav-label">Incidents</span>
+          <span class="nav-label">Insiden</span>
         </a>
-    <a href="#emergency" class="nav-item" aria-label="Emergency Priority" title="Emergency Priority" data-view="emergency">
+    <a href="#emergency" class="nav-item" aria-label="Prioritas darurat" title="Prioritas darurat" data-view="emergency">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -116,21 +116,54 @@
               <rect x="2" y="2" width="20" height="20" rx="5"></rect>
             </svg>
           </span>
-          <span class="nav-label">Emergency Priority</span>
+          <span class="nav-label">Darurat</span>
+        </a>
+  </section>
+  <section class="nav-group" data-nav-group="monitoring" aria-labelledby="navGroupMonitoring">
+    <h2 class="nav-section-label" id="navGroupMonitoring">Pemantauan</h2>
+    <a href="#cctv" class="nav-item" aria-label="CCTV" title="CCTV" data-view="cctv">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 7l-7 5 7 5V7z"></path>
+              <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+              <circle cx="9" cy="12" r="2"></circle>
+            </svg>
+          </span>
+          <span class="nav-label">CCTV</span>
+        </a>
+    <a href="#signals" class="nav-item" aria-label="Sinyal lalu lintas" title="Sinyal lalu lintas" data-view="signals">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="8" y="2" width="8" height="20" rx="3"></rect>
+              <circle cx="12" cy="7" r="2" fill="currentColor"></circle>
+              <circle cx="12" cy="12" r="2"></circle>
+              <circle cx="12" cy="17" r="2"></circle>
+            </svg>
+          </span>
+          <span class="nav-label">Sinyal</span>
+        </a>
+    <a href="#devices" class="nav-item" aria-label="Perangkat" title="Perangkat" data-view="devices">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"></path>
+            </svg>
+          </span>
+          <span class="nav-label">Perangkat</span>
         </a>
   </section>
   <section class="nav-group" data-nav-group="intelligence" aria-labelledby="navGroupIntelligence">
-    <h2 class="nav-section-label" id="navGroupIntelligence">Intelligence</h2>
-    <a href="#analytics" class="nav-item" aria-label="Analytics" title="Analytics" data-view="analytics">
+    <h2 class="nav-section-label" id="navGroupIntelligence">Analitik &amp; prediksi</h2>
+    <a href="#analytics" class="nav-item" aria-label="Analitik" title="Analitik" data-view="analytics">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 3v18h18"></path>
               <path d="M18.5 9l-5 5-3-3-4.5 4.5"></path>
             </svg>
           </span>
-          <span class="nav-label">Analytics</span>
+          <span class="nav-label">Analitik</span>
         </a>
-    <a href="#prediction" class="nav-item" aria-label="Prediction" title="Prediction" data-view="prediction">
+    <a href="#prediction" class="nav-item" aria-label="Prediksi" title="Prediksi" data-view="prediction">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <rect x="4" y="4" width="16" height="16" rx="2"></rect>
@@ -145,72 +178,31 @@
               <line x1="1" y1="15" x2="4" y2="15"></line>
             </svg>
           </span>
-          <span class="nav-label">Forecast</span>
+          <span class="nav-label">Prediksi</span>
         </a>
-    <button class="nav-item nav-system-action" type="button" data-action="system-check" aria-label="Signal Intelligence" title="Signal Intelligence">
+    <button class="nav-item nav-system-action" type="button" data-action="system-check" aria-label="Intelijen sinyal" title="Intelijen sinyal">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg>
           </span>
-          <span class="nav-label">Signal Intelligence</span>
+          <span class="nav-label">Intelijen sinyal</span>
         </button>
-  </section>
-  <section class="nav-group" data-nav-group="infrastructure" aria-labelledby="navGroupInfrastructure">
-    <h2 class="nav-section-label" id="navGroupInfrastructure">Infrastructure</h2>
-    <a href="#cctv" class="nav-item" aria-label="CCTV Monitoring" title="CCTV Monitoring" data-view="cctv">
-          <span class="nav-icon">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M23 7l-7 5 7 5V7z"></path>
-              <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-              <circle cx="9" cy="12" r="2"></circle>
-            </svg>
-          </span>
-          <span class="nav-label">CCTV</span>
-        </a>
-    <a href="#signals" class="nav-item" aria-label="Traffic Signals" title="Traffic Signals" data-view="signals">
-          <span class="nav-icon">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="8" y="2" width="8" height="20" rx="3"></rect>
-              <circle cx="12" cy="7" r="2" fill="currentColor"></circle>
-              <circle cx="12" cy="12" r="2"></circle>
-              <circle cx="12" cy="17" r="2"></circle>
-            </svg>
-          </span>
-          <span class="nav-label">Signals</span>
-        </a>
-    <a href="#devices" class="nav-item" aria-label="Device Management" title="Device Management" data-view="devices">
-          <span class="nav-icon">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"></path>
-            </svg>
-          </span>
-          <span class="nav-label">Devices</span>
+    <a href="#reports" class="nav-item" aria-label="Laporan" title="Laporan" data-view="reports">
+          <span class="nav-icon" aria-hidden="true">▤</span>
+          <span class="nav-label">Laporan</span>
         </a>
   </section>
   <section class="nav-group" data-nav-group="system" aria-labelledby="navGroupSystem">
-    <h2 class="nav-section-label" id="navGroupSystem">System</h2>
-    <a href="#reports" class="nav-item" aria-label="Reports" title="Reports" data-view="reports">
-          <span class="nav-icon">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="16" y1="13" x2="8" y2="13"></line>
-              <line x1="16" y1="17" x2="8" y2="17"></line>
-              <polyline points="10 9 9 9 8 9"></polyline>
-            </svg>
-          </span>
-          <span class="nav-label">Reports</span>
-        </a>
-    <a href="#integration" class="nav-item" aria-label="Integrations" title="Integrations" data-view="integration">
+    <h2 class="nav-section-label" id="navGroupSystem">Sistem</h2>
+    <a href="#integration" class="nav-item" aria-label="Integrasi" title="Integrasi" data-view="integration">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="10"></circle>
               <path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"></path>
             </svg>
           </span>
-          <span class="nav-label">Integrations</span>
+          <span class="nav-label">Integrasi</span>
         </a>
-    <a href="#settings" class="nav-item" aria-label="Settings" title="Settings" data-view="settings">
+    <a href="#settings" class="nav-item" aria-label="Pengaturan" title="Pengaturan" data-view="settings">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="4" y1="21" x2="4" y2="14"></line>
@@ -224,7 +216,7 @@
               <line x1="17" y1="16" x2="23" y2="16"></line>
             </svg>
           </span>
-          <span class="nav-label">Settings</span>
+          <span class="nav-label">Pengaturan</span>
         </a>
     <a href="#about-engine" class="nav-item" data-action="about-engine" id="navAboutEngine" aria-label="System Architecture" title="System Architecture">
           <span class="nav-icon">
@@ -234,7 +226,7 @@
               <line x1="12" y1="8" x2="12.01" y2="8"></line>
             </svg>
           </span>
-          <span class="nav-label">System Architecture</span>
+          <span class="nav-label">Arsitektur sistem</span>
         </a>
     <button class="nav-item hide-desktop btn-mobile-chat-nav" type="button" id="btnOpenMobileChat" aria-label="Demo Coordination Chat" title="Demo Coordination Chat">
           <span class="nav-icon mobile-chat-icon-wrap" aria-hidden="true">
@@ -246,9 +238,9 @@
 </nav>
 
       <!-- Diagnostic Performance Telemetry Pill Badge -->
-      <div class="telemetry-pill glass-soft" id="perfChip" aria-label="Connection status">
+      <div class="telemetry-pill glass-soft" id="perfChip" aria-label="Status koneksi">
         <span class="perf-dot"></span>
-        <span class="perf-text">Connection: CONNECTING</span>
+        <span class="perf-text">Koneksi: MENGHUBUNGKAN</span>
       </div>
     </aside>
 
@@ -258,8 +250,8 @@
         <div class="emergency-gw-hud-content">
           <div class="emergency-gw-hud-title">
             <span class="emergency-siren-pulse">🚨</span>
-            <strong>KORIDOR DARURAT 112 AKTIF:</strong>
-            <span id="emergencyGwCountdown" class="emergency-gw-timer">05:00</span>
+            <strong>PRIORITAS SIMULASI AKTIF:</strong>
+            <span id="emergencyGwCountdown" class="emergency-gw-timer">SIMULASI</span>
           </div>
           <div class="emergency-gw-hud-route hide-mobile">
             <span>Rute A. Yani ➔ Raya Darmo: HIJAU | Simpang Tegak Lurus: MERAH</span>
@@ -277,14 +269,16 @@
             <span class="menu-line"></span>
             <span class="menu-line"></span>
           </button>
-          <div class="mobile-brand-title hide-desktop">
-            <span class="brand-live-dot"></span>
-            <strong>OmniTRAF</strong>
-            <span class="brand-badge-mini">SITS</span>
+          <div class="shell-page-context" aria-live="polite">
+            <span class="shell-page-kicker">OMNITRAF · SIMULASI</span>
+            <strong id="shellPageTitle">Ikhtisar</strong>
           </div>
         </div>
 
         <div class="topbar-actions" aria-label="Operational status">
+          <button class="header-search-trigger" id="headerSearchButton" type="button" aria-haspopup="dialog" aria-controls="navigationPalette" aria-keyshortcuts="Control+K Meta+K">
+            <span aria-hidden="true">⌕</span><span class="header-search-label">Cari</span><kbd>Ctrl K</kbd>
+          </button>
           <!-- Demo status capsule; no live SITS or weather integrations are connected. -->
           <div class="status-capsule glass-soft" id="statusCapsule" aria-label="Status prototipe OmniTRAF">
             <!-- Hidden original elements kept for 100% JS compatibility -->
@@ -329,7 +323,7 @@
             </button>
             <button class="topbar-squircle-btn notif-toggle glass-soft" type="button" id="notifToggle" aria-label="Notifikasi Insiden" title="Notifikasi Insiden Lalu Lintas">
               <span class="squircle-btn-icon notif-icon" aria-hidden="true">🔔</span>
-              <span class="notif-badge" id="notifBadgeCount">3</span>
+              <span class="notif-badge" id="notifBadgeCount" hidden></span>
             </button>
             <button class="topbar-squircle-btn help-toggle glass-soft" type="button" id="btnQuickTour" aria-label="Bantuan Tour SITS" title="Panduan & Bantuan SITS">
               ?
@@ -343,23 +337,22 @@
           </div>
 
           <!-- Minimalist Operator Profile Squircle -->
-          <div class="profile-squircle glass-soft" aria-label="Operator demo" title="Profil contoh lokal">
+          <div class="profile-squircle glass-soft" id="operatorProfile" aria-label="Profil sesi simulasi" title="Profil sesi saat ini">
             <div class="avatar-container">
-              <div class="avatar" aria-hidden="true">Z</div>
-              <span class="avatar-status status-online"></span>
+              <div class="avatar" id="profileAvatar" aria-hidden="true">D</div>
             </div>
             <div class="profile-info-compact hide-mobile">
-              <strong>Zaki Putra</strong>
-              <small>Operator demo</small>
+              <strong id="profileDisplayName">Demo operator</strong>
+              <small id="profileRoleLabel">Sesi simulasi</small>
             </div>
           </div>
         </div>
       </header>
 
-      <div class="prototype-notice" role="note" aria-label="Batas keselamatan simulasi">
-        <strong><span aria-hidden="true">●</span> SIMULASI-ONLY</strong>
-        <span>Semua data dan perintah hanya mengubah model simulasi. Tidak ada adapter hardware atau interlock keselamatan; sistem ini tidak mengendalikan APILL, sensor, CCTV, maupun armada nyata.</span>
-      </div>
+      <details class="prototype-notice" aria-label="Batas simulasi">
+        <summary><strong>SIMULASI</strong> Data sintetis · tanpa kendali perangkat lapangan</summary>
+        <p>Perintah hanya mengubah model OmniTRAF. Tidak ada koneksi CCTV, APILL, sensor, GPS armada, atau layanan 112 nyata.</p>
+      </details>
 
       <!-- Non-Intrusive Offline Mode Banner -->
       <div class="offline-notification-banner glass-soft is-hidden" id="offlineNotificationBanner" role="status" aria-live="polite">
@@ -369,6 +362,7 @@
             <strong>Stream simulasi tidak tersedia</strong> — Data terakhir mungkin sudah tidak baru.
           </div>
         </div>
+        <button class="btn btn-primary compact" type="button" data-open-session>Masuk</button>
         <button class="offline-banner-close" id="btnDismissOfflineBanner" type="button" aria-label="Tutup pemberitahuan offline">&times;</button>
       </div>
 
@@ -380,46 +374,47 @@
   <dialog class="navigation-palette" id="navigationPalette" aria-labelledby="navigationPaletteTitle" aria-describedby="navigationPaletteHelp">
     <div class="navigation-palette-header">
       <div>
-        <h2 id="navigationPaletteTitle">Go to a destination</h2>
-        <p id="navigationPaletteHelp">Search pages or operational entities. Press Escape to close.</p>
+        <h2 id="navigationPaletteTitle">Cari halaman atau aset</h2>
+        <p id="navigationPaletteHelp">Cari halaman atau aset operasional. Tekan Escape untuk menutup.</p>
       </div>
-      <button class="modal-close" id="closeNavigationPalette" type="button" aria-label="Close destination search">&times;</button>
+      <button class="modal-close" id="closeNavigationPalette" type="button" aria-label="Tutup pencarian">&times;</button>
     </div>
-    <label class="sr-only" for="navigationPaletteSearch">Search pages, incidents, intersections, cameras, or devices</label>
-    <input id="navigationPaletteSearch" class="navigation-palette-search" type="search" placeholder="Search pages or entities…" autocomplete="off" />
-    <div class="navigation-palette-results" id="navigationPaletteResults">
-      <section data-palette-group="Command" aria-label="Command">
-        <h3>Command</h3>
-        <a class="navigation-palette-link" href="#dashboard" data-view="dashboard" data-search="overview dashboard home">Dashboard</a>
-        <a class="navigation-palette-link" href="#map" data-view="map" data-search="city map traffic flow nodes heatmap">City Map</a>
-        <a class="navigation-palette-link" href="#incidents" data-view="incidents" data-search="incidents alerts events">Incidents</a>
-        <a class="navigation-palette-link" href="#emergency" data-view="emergency" data-search="emergency priority routing">Emergency Priority</a>
+    <label class="sr-only" for="navigationPaletteSearch">Cari halaman, insiden, simpang, kamera, atau perangkat</label>
+    <input id="navigationPaletteSearch" class="navigation-palette-search" type="search" role="combobox" aria-autocomplete="list" aria-controls="navigationPaletteResults" aria-expanded="true" aria-activedescendant="" placeholder="Cari halaman atau aset…" autocomplete="off" aria-keyshortcuts="ArrowDown ArrowUp Enter Escape" />
+    <div class="navigation-palette-results" id="navigationPaletteResults" role="listbox" aria-label="Hasil pencarian">
+      <section data-palette-group="Operations" aria-label="Operations" role="group">
+        <h3 aria-hidden="true">Operasi</h3>
+        <a class="navigation-palette-link" role="option" href="#dashboard" data-view="dashboard" data-search="overview dashboard home">Ikhtisar</a>
+        <a class="navigation-palette-link" role="option" href="#map" data-view="map" data-search="city map traffic flow nodes heatmap">Peta kota</a>
+        <a class="navigation-palette-link" role="option" href="#incidents" data-view="incidents" data-search="incidents alerts events">Insiden</a>
+        <a class="navigation-palette-link" role="option" href="#emergency" data-view="emergency" data-search="emergency priority routing">Darurat</a>
       </section>
-      <section data-palette-group="Intelligence" aria-label="Intelligence">
-        <h3>Intelligence</h3>
-        <a class="navigation-palette-link" href="#analytics" data-view="analytics" data-search="traffic analytics">Analytics</a>
-        <a class="navigation-palette-link" href="#prediction" data-view="prediction" data-search="prediction forecast">Forecast</a>
-        <button class="navigation-palette-link" type="button" data-action="system-check" data-search="signal intelligence signal recommendations">Signal Intelligence</button>
+      <section data-palette-group="Intelligence" aria-label="Intelligence" role="group">
+        <h3 aria-hidden="true">Analitik</h3>
+        <a class="navigation-palette-link" role="option" href="#analytics" data-view="analytics" data-search="traffic analytics">Analitik</a>
+        <a class="navigation-palette-link" role="option" href="#prediction" data-view="prediction" data-search="prediction forecast">Prediksi</a>
+        <a class="navigation-palette-link" role="option" href="#reports" data-view="reports" data-search="reports export">Laporan</a>
+        <button class="navigation-palette-link" role="option" type="button" data-action="system-check" data-search="signal intelligence signal recommendations">Intelijen sinyal</button>
       </section>
-      <section data-palette-group="Infrastructure" aria-label="Infrastructure">
-        <h3>Infrastructure</h3>
-        <a class="navigation-palette-link" href="#cctv" data-view="cctv" data-search="cctv cameras monitoring">CCTV</a>
-        <a class="navigation-palette-link" href="#signals" data-view="signals" data-search="traffic signals intersections timing">Signals</a>
-        <a class="navigation-palette-link" href="#devices" data-view="devices" data-search="device management nodes">Devices</a>
+      <section data-palette-group="Monitoring" aria-label="Monitoring" role="group">
+        <h3 aria-hidden="true">Pemantauan</h3>
+        <a class="navigation-palette-link" role="option" href="#cctv" data-view="cctv" data-search="cctv cameras monitoring">CCTV</a>
+        <a class="navigation-palette-link" role="option" href="#signals" data-view="signals" data-search="traffic signals intersections timing">Sinyal</a>
+        <a class="navigation-palette-link" role="option" href="#devices" data-view="devices" data-search="device management nodes">Perangkat</a>
       </section>
-      <section data-palette-group="System" aria-label="System">
-        <h3>System</h3>
-        <a class="navigation-palette-link" href="#reports" data-view="reports" data-search="reports export">Reports</a>
-        <a class="navigation-palette-link" href="#integration" data-view="integration" data-search="integrations api gateway">Integrations</a>
-        <a class="navigation-palette-link" href="#settings" data-view="settings" data-search="settings preferences">Settings</a>
-        <a class="navigation-palette-link" href="#about-engine" data-action="about-engine" data-search="system architecture algorithms">System Architecture</a>
+      <section data-palette-group="System" aria-label="System" role="group">
+        <h3 aria-hidden="true">Sistem</h3>
+        <a class="navigation-palette-link" role="option" href="#integration" data-view="integration" data-search="integrations api gateway">Integrasi</a>
+        <a class="navigation-palette-link" role="option" href="#settings" data-view="settings" data-search="settings preferences">Pengaturan</a>
+        <a class="navigation-palette-link" role="option" href="#about-engine" data-action="about-engine" data-search="system architecture algorithms">Arsitektur sistem</a>
       </section>
-      <section data-palette-group="Entities" id="paletteEntityResults" aria-label="Operational entities" hidden>
-        <h3>Operational entities</h3>
+      <section data-palette-group="Entities" id="paletteEntityResults" aria-label="Operational entities" role="group" hidden>
+        <h3 aria-hidden="true">Aset simulasi</h3>
         <div id="paletteEntityLinks"></div>
       </section>
-      <p class="navigation-palette-empty" id="navigationPaletteEmpty" hidden>No destinations found.</p>
+      <p class="navigation-palette-empty" id="navigationPaletteEmpty" role="status" hidden>Tidak ada hasil pencarian.</p>
     </div>
+    <p class="sr-only" id="navigationPaletteAnnouncement" aria-live="polite" aria-atomic="true"></p>
   </dialog>
 
   <!-- Notification Drawer & Modals Mount Targets -->

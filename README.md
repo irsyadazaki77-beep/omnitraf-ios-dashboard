@@ -179,11 +179,48 @@ DATABASE_URL=postgresql://user:password@host:5432/omnitraf npm run db:migrate:sq
 DATABASE_URL=postgresql://user:password@host:5432/omnitraf npm run db:migrate:sqljs-to-postgres -- --source=./data/omnitraf.sqlite
 ```
 
+### Transaction, audit, dan recovery command
+
+Setiap command yang lolos validasi/RBAC menjalankan perubahan handler, audit sukses, dan command receipt di dalam satu transaksi database. Adapter PostgreSQL memakai koneksi transaksi yang sama untuk repository calls bersarang. SQL.js memakai transaksi serialized dan menyelesaikan flush file sebelum acknowledgement sukses. Event yang dipancarkan handler ditahan sampai transaksi commit; cache command lokal baru diisi sesudah commit. Ini tidak menjadikan Redis, Socket.io, dan memory satu transaksi ACID. Jika publikasi snapshot Redis gagal setelah commit, PostgreSQL receipt menjadi bukti hasil dan retry mengembalikan hasil tersimpan.
+
+Receipt menyimpan actor ID, key idempotensi, fingerprint payload, dan hasil command; tidak menyimpan token autentikasi. Actor dan payload yang berbeda pada key atau command ID sama ditolak sebagai conflict. Receipt command tidak dibersihkan otomatis. Audit durable juga tidak memiliki batas jumlah atau penghapusan otomatis; API repository menyediakan pagination (`limit`, `offset`) serta filter actor, action, command ID, correlation ID, idempotency key, dan waktu. UI recent activity tetap merupakan cache memory terbatas dan bukan arsip audit.
+
+Startup hanya melakukan seed ketika query hydration berhasil dan tabel terkait kosong. Error query membuat hydration gagal sehingga readiness tetap 503; backend tidak mengganti PostgreSQL dengan SQL.js. Setelah koneksi pulih, operasi database berikutnya dapat berhasil lagi, tetapi state manager belum otomatis mengulang hydration yang gagal di startup—restart instance setelah database kembali tersedia adalah recovery yang terjamin. Backup PostgreSQL dan validasi restore tetap menjadi tanggung jawab deployment.
+
+Jalankan PostgreSQL integration suite dengan database uji khusus:
+
+```bash
+DATABASE_URL=postgresql://omnitraf_test:test_only_password@localhost:5432/omnitraf_test npm run test:postgres
+```
+
+Test membuat schema sementara unik dan menghapusnya saat selesai. Tanpa `DATABASE_URL`, Node test menandai suite PostgreSQL sebagai `SKIP`; CI menyediakan service PostgreSQL dan Redis lalu menjalankan suite cluster sungguhan tanpa skip.
+
 Skrip memvalidasi lima tabel durable, mempertahankan primary key/timestamp, dan memakai upsert agar aman dijalankan ulang.
 
 Repository domain berada di `server/repositories`; adapter driver disimpan di `server/db/adapters`. Redis tetap menangani koordinasi ephemeral (leadership, pub/sub, idempotency dan rate limits), bukan persistence permanen. `DB_DRIVER=sqljs` ditolak pada runtime cluster kecuali override eksplisit development/test `ALLOW_SQLJS_CLUSTER=true`.
 
-Untuk multi-instance, set `OMNITRAF_RUNTIME_MODE=cluster` dan `REDIS_URL`. Setiap instance memakai lease Redis `omnitraf:simulation:leader` (TTL 10 detik, renew tiap 3 detik); hanya leader menjalankan simulation/CCTV loop dan command follower diteruskan ke leader. Followers memuat baseline checkpoint dan snapshot/CCTV terbaru dari Redis sebelum readiness dan Socket.io diaktifkan. Redis outage membuat cluster degraded dan menghentikan loop authoritative. Rate limits dan idempotency command memakai counter/registry Redis; Socket.io adapter tetap menjadi satu jalur broadcast ke client agar custom snapshot pub/sub tidak menggandakan packet realtime.
+Untuk multi-instance, set `OMNITRAF_RUNTIME_MODE=cluster`, `DB_DRIVER=postgres`, dan `REDIS_URL`. Lease Redis tetap mengoordinasikan kandidat leader. PostgreSQL migration v4 menyimpan epoch monotonik dan masa berlaku fence. Setiap command transaksi authoritative memverifikasi instance/epoch PostgreSQL sebelum mutasi dan tepat sebelum commit, sambil memvalidasi ulang lease Redis; transaksi memegang shared advisory fence sampai commit/rollback. Klaim epoch baru memakai advisory lock eksklusif, jadi takeover menunggu transaksi lama selesai dan stale epoch ditolak. Redis/DB outage menghentikan loop leader dan command gagal tertutup. Tidak ada transaksi ACID lintas PostgreSQL, Redis, memory, dan Socket.io; durable receipt menyelesaikan retry setelah commit yang acknowledgement-nya hilang.
+
+Hanya leader menjalankan simulation/CCTV loop. CCTV generator hanya maju dari loop authoritative; client baru menerima latest frame yang sudah tersedia, bukan memajukan simulation saat connect. Snapshot Redis adalah checkpoint runtime sementara dengan schema/session/state version, source instance, timestamp, dan leader epoch; Pub/Sub bukan durable queue. Saat snapshot hilang/kedaluwarsa, node membuat session simulasi baru dari durable PostgreSQL state, bukan mengklaim memulihkan RNG/clock lama. Setiap snapshot adalah baseline lengkap; snapshot dengan versi lebih rendah ditolak. Socket.IO Redis adapter tetap satu jalur broadcast client.
+
+`/healthz` adalah liveness; `/readyz` adalah probe infrastruktur minimal tanpa detail diagnostic; `/ready` menyediakan detail readiness dan tetap dilindungi capability. Readiness 503 saat database/Redis coordination/state sync belum siap atau node sedang draining. Shutdown menghentikan ingress, menunggu antrean command lokal, menghentikan simulation, lalu melepaskan lease dan menutup koneksi.
+
+Jalankan 3 node lokal dengan PostgreSQL dan Redis terisolasi (test credentials saja):
+
+```bash
+docker compose -f docker-compose.cluster.yml up -d --build --wait
+docker compose -f docker-compose.cluster.yml ps
+docker compose -f docker-compose.cluster.yml down -v
+```
+
+Volume akan dihapus oleh `down -v`; jalankan hanya untuk lingkungan cluster test. Untuk backup/restore drill, install PostgreSQL client tools (`pg_dump`, `pg_restore`) dan gunakan URL database yang mempunyai izin sesuai. Backup tidak menimpa file lama; restore verifier membuat database scratch unik dan menghapusnya setelah pemeriksaan.
+
+```bash
+DATABASE_URL=postgresql://user:password@host:5432/omnitraf npm run backup:postgres
+DATABASE_URL=postgresql://restore_operator:password@host:5432/maintenance npm run verify:postgres-backup -- backups/omnitraf-<timestamp>.dump
+```
+
+RPO/RTO belum ditetapkan sebagai jaminan; operator harus mengukurnya melalui backup terjadwal dan restore drill pada infrastruktur target. Redis runtime snapshot memiliki TTL 30 detik dan bukan backup. Audit dan command receipts berada di PostgreSQL tanpa penghapusan otomatis; retensi operasional hanya boleh diterapkan melalui prosedur eksplisit yang mempertimbangkan compliance.
 
 ### Development checks
 ```bash
@@ -192,9 +229,11 @@ npm run lint
 npm run build
 npm run validate
 npm test
+npm run test:postgres
+npm run test:cluster
 ```
 
-`npm run lint` memeriksa sintaks JavaScript. `npm run build` menghasilkan bundle Vite ber-hash dan mencetak ukuran entry serta chunk fitur. `npm run validate` memeriksa artefak production/PWA, lalu `npm test` menjalankan seluruh unit dan integration test. `npm run preview` menyajikan build Vite pada port 4173 dan meneruskan API/Socket.io ke backend lokal. Rincian baseline dan batas pengukuran Phase 9 ada di [PHASE9_PERFORMANCE.md](PHASE9_PERFORMANCE.md).
+`npm run lint` memeriksa sintaks JavaScript. `npm run build` menghasilkan bundle Vite ber-hash dan mencetak ukuran entry serta chunk fitur. `npm run validate` memeriksa artefak production/PWA, lalu `npm test` menjalankan seluruh unit dan integration test. `npm run test:cluster` memerlukan PostgreSQL dan Redis aktif; suite menguji election tiga manager dan takeover setelah lease expiry. CI menjalankan keduanya dengan service terisolasi. Rincian baseline dan batas pengukuran Phase 9 ada di [PHASE9_PERFORMANCE.md](PHASE9_PERFORMANCE.md).
 
 ---
 

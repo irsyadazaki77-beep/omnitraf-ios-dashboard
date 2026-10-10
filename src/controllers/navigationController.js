@@ -7,6 +7,7 @@
 import { stateStore } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
 import { viewLoader } from '../core/viewLoader.js';
+import { authManager } from '../core/authManager.js';
 
 const SIDEBAR_PREFERENCE_KEY = 'omnitraf.sidebar.collapsed';
 
@@ -25,6 +26,8 @@ export class NavigationController {
     this._initSidebarCollapse();
     this._initMobileNav();
     this._initCommandPalette();
+    this._initShellProfile();
+    this._initNotificationCount();
     this._initThemeToggle();
     this._initDensityPreference();
     this._initClock();
@@ -41,6 +44,7 @@ export class NavigationController {
       let cleanId = (targetViewId || "dashboard").replace('#', '').replace('view-', '');
       if (!cleanId || cleanId === "about-engine") return;
       if (cleanId === "emergencies") cleanId = "emergency";
+      if (!viewLoader.viewMap[cleanId]) return;
 
       // Sync active state on navigation elements
       document.querySelectorAll("[data-view]").forEach(link => {
@@ -61,6 +65,8 @@ export class NavigationController {
 
       const pageTitle = viewLoader.viewMap[cleanId]?.title || viewLoader.viewMap.dashboard.title;
       document.title = `OmniTRAF — ${pageTitle}`;
+      const shellTitle = document.getElementById('shellPageTitle');
+      if (shellTitle) shellTitle.textContent = cleanId === 'dashboard' ? 'Ikhtisar' : pageTitle;
 
       // Trigger stateStore update which invokes app._handleViewTransition & viewLoader.mountView
       stateStore.setState({ currentView: cleanId });
@@ -82,6 +88,13 @@ export class NavigationController {
       const href = link.getAttribute("href");
       const dataView = link.dataset.view;
       const dataAction = link.dataset.action;
+      if (href === '#mainContent') {
+        e.preventDefault();
+        const main = document.getElementById('mainContent');
+        main?.setAttribute('tabindex', '-1');
+        main?.focus({ preventScroll: true });
+        return;
+      }
 
       if (dataAction === "about-engine" || href === "#about-engine") {
         e.preventDefault();
@@ -97,7 +110,7 @@ export class NavigationController {
 
       const target = dataView || (href && href.startsWith("#") ? href.slice(1) : null);
 
-      if (target) {
+      if (target && viewLoader.viewMap[target.replace('view-', '')]) {
         e.preventDefault();
         if (window.location.hash !== `#${target}`) {
           window.location.hash = target;
@@ -130,8 +143,8 @@ export class NavigationController {
       const isCollapsed = Boolean(collapsed);
       shell.classList.toggle('sidebar-collapsed', isCollapsed);
       toggle.setAttribute('aria-expanded', String(!isCollapsed));
-      toggle.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
-      toggle.setAttribute('title', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
+      toggle.setAttribute('aria-label', isCollapsed ? 'Perluas sidebar' : 'Ciutkan sidebar');
+      toggle.setAttribute('title', isCollapsed ? 'Perluas sidebar' : 'Ciutkan sidebar');
     };
 
     apply(savedPreference ?? media.matches);
@@ -144,6 +157,12 @@ export class NavigationController {
 
     media.addEventListener?.('change', (event) => {
       if (savedPreference === null) apply(event.matches);
+    });
+
+    document.addEventListener('omnitraf:reset-ui-preferences', () => {
+      savedPreference = null;
+      try { window.localStorage.removeItem(SIDEBAR_PREFERENCE_KEY); } catch (_) {}
+      apply(media.matches);
     });
 
     document.querySelectorAll('.sidebar [data-view], .sidebar [data-action], .app-sidebar [data-view], .app-sidebar [data-action]').forEach(item => {
@@ -166,24 +185,46 @@ export class NavigationController {
     const entityLinks = document.getElementById('paletteEntityLinks');
     if (!palette || !search || !openButton) return;
 
+    let activeIndex = -1;
+    const visibleResults = () => [...(palette?.querySelectorAll('[role="option"]') || [])]
+      .filter((result) => !result.hidden && !result.closest('[hidden]'));
+    const updateActiveResult = () => {
+      const results = visibleResults();
+      const active = activeIndex >= 0 ? results[activeIndex] : null;
+      results.forEach((result) => {
+        const selected = result === active;
+        result.setAttribute('aria-selected', String(selected));
+        result.classList.toggle('is-keyboard-active', selected);
+      });
+      search.setAttribute('aria-activedescendant', active?.id || '');
+      if (active) {
+        const announcement = document.getElementById('navigationPaletteAnnouncement');
+        if (announcement) announcement.textContent = `${active.textContent.trim()}, ${activeIndex + 1} dari ${results.length}.`;
+      }
+    };
+
     const filterDestinations = () => {
       const query = search.value.trim().toLocaleLowerCase();
       entityLinks?.replaceChildren();
       if (query && entityLinks && entityGroup) {
         const state = stateStore.getState();
         const candidates = [
-          ...(state.incidents || []).map((entity) => ({ kind: 'Incident', name: entity.title || entity.id, detail: entity.location, route: 'incidents', query: `${entity.id} ${entity.status} ${entity.severity}` })),
-          ...(state.intersections || []).map((entity) => ({ kind: 'Intersection', name: entity.name || entity.id, detail: entity.location || entity.state, route: 'signals', query: `${entity.id} ${entity.state} ${entity.density}` })),
-          ...(state.devices || []).map((entity) => ({ kind: 'Device', name: entity.deviceName || entity.deviceId, detail: entity.location || entity.healthLevel, route: 'devices', query: `${entity.deviceId} ${entity.healthLevel}` })),
-          ...Object.keys(state.cctvVisionData || {}).map((id) => ({ kind: 'CCTV', name: id, detail: 'Simulation camera', route: 'cctv', query: id }))
+          ...(state.incidents || []).map((entity) => ({ kind: 'incident', label: 'Incident', id: entity.id, name: entity.title || entity.id, detail: entity.location, route: 'incidents', query: `${entity.id} ${entity.status} ${entity.severity}` })),
+          ...(state.intersections || []).map((entity) => ({ kind: 'intersection', label: 'Intersection', id: entity.id, name: entity.name || entity.id, detail: entity.location || entity.state, route: 'signals', query: `${entity.id} ${entity.state} ${entity.density}` })),
+          ...(state.devices || []).map((entity) => ({ kind: 'device', label: 'Device', id: entity.deviceId, name: entity.deviceName || entity.deviceId, detail: entity.location || entity.healthLevel, route: 'devices', query: `${entity.deviceId} ${entity.healthLevel}` })),
+          ...Object.keys(state.cctvVisionData || {}).map((id) => ({ kind: 'cctv', label: 'CCTV', id, name: id, detail: 'Simulation camera', route: 'cctv', query: id }))
         ];
-        const matches = candidates.filter((entity) => `${entity.kind} ${entity.name} ${entity.detail || ''} ${entity.query || ''}`.toLocaleLowerCase().includes(query)).slice(0, 8);
+        const matches = candidates.filter((entity) => `${entity.label} ${entity.name} ${entity.detail || ''} ${entity.query || ''}`.toLocaleLowerCase().includes(query)).slice(0, 8);
         matches.forEach((entity) => {
           const button = document.createElement('button');
           button.type = 'button';
           button.className = 'navigation-palette-link';
+          button.setAttribute('role', 'option');
+          button.id = `palette-entity-${entity.kind}-${entity.id}`;
+          button.dataset.entityKind = entity.kind;
+          button.dataset.entityId = String(entity.id);
           button.dataset.entityRoute = entity.route;
-          button.textContent = `${entity.kind} · ${entity.name}${entity.detail ? ` — ${entity.detail}` : ''}`;
+          button.textContent = `${entity.label} · ${entity.name}${entity.detail ? ` — ${entity.detail}` : ''}`;
           entityLinks.appendChild(button);
         });
         entityGroup.hidden = matches.length === 0;
@@ -200,34 +241,75 @@ export class NavigationController {
         group.hidden = groupCount === 0;
         visibleCount += groupCount;
       });
+      visibleCount += entityLinks?.children.length || 0;
       if (emptyState) emptyState.hidden = visibleCount > 0;
+      const announcement = document.getElementById('navigationPaletteAnnouncement');
+      if (announcement) announcement.textContent = visibleCount === 0 ? 'Tidak ada hasil.' : `${visibleCount} hasil tersedia.`;
+      activeIndex = -1;
+      updateActiveResult();
     };
 
     const openPalette = () => {
       if (!palette.open) palette.showModal();
+      search.setAttribute('aria-expanded', 'true');
       search.value = '';
       filterDestinations();
       search.focus();
     };
 
     openButton.addEventListener('click', openPalette);
+    document.getElementById('headerSearchButton')?.addEventListener('click', openPalette);
     closeButton?.addEventListener('click', () => palette.close());
     search.addEventListener('input', filterDestinations);
     entityLinks?.addEventListener('click', (event) => {
       const result = event.target.closest('[data-entity-route]');
       if (!result) return;
       const route = result.dataset.entityRoute;
+      const focusRequest = { kind: result.dataset.entityKind, id: result.dataset.entityId, route };
+      stateStore.setState({ pendingEntityFocus: focusRequest });
       palette.close();
       if (window.location.hash !== `#${route}`) window.location.hash = route;
-      else document.querySelector(`[data-view="${route}"]`)?.click();
+      else {
+        window.dispatchEvent(new CustomEvent('omnitraf:entity-focus', { detail: focusRequest }));
+        stateStore.setState({ pendingEntityFocus: null });
+      }
     });
     palette.querySelectorAll('.navigation-palette-link').forEach(link => {
       link.addEventListener('click', () => palette.close());
     });
     palette.addEventListener('close', () => {
+      search.setAttribute('aria-expanded', 'false');
+      search.setAttribute('aria-activedescendant', '');
       search.value = '';
       filterDestinations();
     });
+    palette.addEventListener('keydown', (event) => {
+      if (event.target === search && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+        const results = visibleResults();
+        if (!results.length) return;
+        event.preventDefault();
+        if (event.key === 'Home') activeIndex = 0;
+        else if (event.key === 'End') activeIndex = results.length - 1;
+        else if (event.key === 'ArrowDown') activeIndex = (activeIndex + 1) % results.length;
+        else activeIndex = activeIndex <= 0 ? results.length - 1 : activeIndex - 1;
+        updateActiveResult();
+        results[activeIndex].scrollIntoView({ block: 'nearest' });
+        return;
+      }
+      if (event.target === search && event.key === 'Enter') {
+        const results = visibleResults();
+        const result = results[activeIndex] || results[0];
+        if (result) {
+          event.preventDefault();
+          result.click();
+        }
+        return;
+      }
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      palette.close();
+    }, true);
 
     document.addEventListener('keydown', (event) => {
       if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'k') return;
@@ -251,8 +333,10 @@ export class NavigationController {
       drawerBackdrop = document.createElement("div");
       drawerBackdrop.id = "drawerBackdrop";
       drawerBackdrop.className = "drawer-backdrop";
-      document.body.appendChild(drawerBackdrop);
+      (document.querySelector(".app-shell") || document.body).appendChild(drawerBackdrop);
     }
+
+    document.querySelector(".app-shell")?.appendChild(drawerBackdrop);
 
     const toggleSidebar = () => {
       const sidebar = document.querySelector(".sidebar, .app-sidebar");
@@ -342,7 +426,7 @@ export class NavigationController {
     menuToggle?.setAttribute("aria-expanded", String(isOpen));
     mobileMenu?.setAttribute('aria-expanded', String(isOpen));
     menuToggle?.setAttribute('aria-label', isOpen ? 'Tutup menu' : 'Buka menu');
-    mobileMenu?.setAttribute('aria-label', isOpen ? 'Close destinations menu' : 'Open all destinations');
+    mobileMenu?.setAttribute('aria-label', isOpen ? 'Tutup menu tujuan' : 'Buka semua tujuan');
 
     if (isOpen) document.getElementById("closeDrawer")?.focus();
     else if (returnFocus && wasOpen) {
@@ -357,6 +441,47 @@ export class NavigationController {
     this._setSidebarOpen(false, { returnFocus: true });
   }
 
+  _initShellProfile() {
+    const nameNode = document.getElementById('profileDisplayName');
+    const roleNode = document.getElementById('profileRoleLabel');
+    const avatarNode = document.getElementById('profileAvatar');
+    const profile = document.getElementById('operatorProfile');
+    if (!nameNode || !roleNode || !avatarNode) return;
+
+    const render = (user = authManager.getUser()) => {
+      const name = String(user?.name || user?.username || '').trim();
+      const role = String(user?.role || '').trim().toUpperCase();
+      nameNode.textContent = name || 'Demo session';
+      roleNode.textContent = ({ ADMIN: 'Admin', OPERATOR: 'Operator', VIEWER: 'Viewer' })[role] || 'Simulation session';
+      const profileLabel = name ? `${name}, ${roleNode.textContent}` : 'Simulation session profile';
+      profile?.setAttribute('aria-label', profileLabel);
+      profile?.setAttribute('title', profileLabel);
+      avatarNode.textContent = name
+        ? name.split(/\s+/).slice(0, 2).map((part) => part.charAt(0)).join('').toUpperCase()
+        : 'D';
+    };
+
+    render();
+    this._profileUnsubscribe = authManager.onAuthChange(render);
+  }
+
+  _initNotificationCount() {
+    const badge = document.getElementById('notifBadgeCount');
+    const button = document.getElementById('notifToggle');
+    if (!badge || !button) return;
+    const update = (incidents = []) => {
+      const count = (Array.isArray(incidents) ? incidents : [])
+        .filter((incident) => !['RESOLVED', 'ARCHIVED'].includes(String(incident.status || '').toUpperCase())).length;
+      badge.textContent = count > 99 ? '99+' : String(count);
+      badge.hidden = count === 0;
+      const label = count > 0 ? `Active scenario notifications: ${count}` : 'Incident notifications';
+      button.setAttribute('aria-label', label);
+      button.setAttribute('title', label);
+    };
+    update(stateStore.getState().incidents);
+    this._notificationUnsubscribe = stateStore.subscribe('state:incidents', ({ value }) => update(value));
+  }
+
   /**
    * 3. Theme Toggle (Dark / Light)
    */
@@ -364,9 +489,35 @@ export class NavigationController {
     const btnTheme = document.getElementById("themeToggle") || document.getElementById("btnToggleTheme");
     if (!btnTheme) return;
 
+    const preferenceKey = 'omnitraf.theme';
+    try {
+      if (window.localStorage.getItem(preferenceKey) === 'light') document.body.classList.add('theme-light');
+    } catch (_) {}
+    stateStore.setState({ theme: document.body.classList.contains('theme-light') ? 'light' : 'dark' });
+    const syncThemeControl = () => {
+      const isLight = document.body.classList.contains('theme-light');
+      btnTheme.setAttribute('aria-pressed', String(isLight));
+      btnTheme.setAttribute('aria-label', isLight ? 'Ganti ke tema gelap' : 'Ganti ke tema terang');
+      btnTheme.setAttribute('title', isLight ? 'Ganti ke tema gelap' : 'Ganti ke tema terang');
+      const icon = btnTheme.querySelector('.theme-icon');
+      if (icon) icon.textContent = isLight ? '☼' : '☾';
+      const themeColor = document.querySelector('meta[name="theme-color"]');
+      if (themeColor) themeColor.content = isLight ? '#f3f6fa' : '#0b1020';
+    };
+    syncThemeControl();
+
+    document.addEventListener('omnitraf:reset-ui-preferences', () => {
+      document.body.classList.remove('theme-light');
+      stateStore.setState({ theme: 'dark' });
+      try { window.localStorage.removeItem(preferenceKey); } catch (_) {}
+      syncThemeControl();
+    });
+
     btnTheme.addEventListener("click", () => {
       const isLight = document.body.classList.toggle("theme-light");
       stateStore.setState({ theme: isLight ? 'light' : 'dark' });
+      try { window.localStorage.setItem(preferenceKey, isLight ? 'light' : 'dark'); } catch (_) {}
+      syncThemeControl();
       soundManager.play('click');
       if (typeof window.showToast === "function") {
         window.showToast(`Tema diubah ke ${isLight ? 'Terang (Day Mode)' : 'Gelap (Night Radar)'}.`);
@@ -376,6 +527,10 @@ export class NavigationController {
 
   _initDensityPreference() {
     this.densityMode = 'compact';
+    try {
+      const storedDensity = window.localStorage.getItem('omnitraf.density');
+      if (storedDensity === 'comfortable' || storedDensity === 'compact') this.densityMode = storedDensity;
+    } catch (_) {}
     const root = document.documentElement;
     root.dataset.density = this.densityMode;
     const syncButtons = () => {
@@ -383,11 +538,18 @@ export class NavigationController {
         button.setAttribute('aria-pressed', String(button.dataset.densityChoice === this.densityMode));
       });
     };
+    document.addEventListener('omnitraf:reset-ui-preferences', () => {
+      this.densityMode = 'compact';
+      root.dataset.density = this.densityMode;
+      try { window.localStorage.removeItem('omnitraf.density'); } catch (_) {}
+      syncButtons();
+    });
     document.addEventListener('click', (event) => {
       const button = event.target.closest('[data-density-choice]');
       if (!button) return;
       this.densityMode = button.dataset.densityChoice === 'comfortable' ? 'comfortable' : 'compact';
       root.dataset.density = this.densityMode;
+      try { window.localStorage.setItem('omnitraf.density', this.densityMode); } catch (_) {}
       syncButtons();
       soundManager.play('click');
     });
@@ -522,6 +684,15 @@ export class NavigationController {
     if (notifToggle) notifToggle.addEventListener("click", toggleNotifDrawer);
     if (closeNotifDrawer) closeNotifDrawer.addEventListener("click", closeNotif);
     if (notifBackdrop) notifBackdrop.addEventListener("click", closeNotif);
+    document.addEventListener('click', (event) => {
+      const dismiss = event.target?.closest('.resolve-notif-btn[data-notif-id]');
+      if (!dismiss) return;
+      const card = document.getElementById(dismiss.dataset.notifId);
+      if (!card || !notifDrawer?.contains(card)) return;
+      card.remove();
+      soundManager.play('click');
+      if (typeof window.showToast === 'function') window.showToast('Contoh notifikasi ditutup. Status insiden simulasi tidak diubah.');
+    });
   }
 }
 

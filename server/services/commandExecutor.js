@@ -11,6 +11,9 @@ import { REALTIME_ROOMS } from '../sockets/eventRegistry.js';
 import { SAFETY_BOUNDARY, assertSimulationOnlyAction } from '../config/safetyBoundary.js';
 import { assertCommandRateLimit } from './commandRateLimit.js';
 import { clusterRuntime } from '../infrastructure/redis/clusterRuntimeSingleton.js';
+import { dbManager } from '../db/database.js';
+import { commandReceiptRepository } from '../repositories/commandReceiptRepository.js';
+import { signalConfigRepository } from '../repositories/signalConfigRepository.js';
 import {
   INCIDENT_STATES,
   EMERGENCY_STATES,
@@ -22,6 +25,7 @@ import {
 
 export const VALID_RESOLUTIONS = ['720p', '1080p', '4k'];
 export const VALID_FAULTS = ["recover", "clear", "latency_spike", "packet_loss", "low_fps", "thermal_warning", "heartbeat_timeout"];
+let commandExecutionQueue = Promise.resolve();
 
 function commandError(code, message, statusCode) {
   const error = new Error(message);
@@ -38,6 +42,45 @@ function commandError(code, message, statusCode) {
 export class CommandExecutor {
   constructor() {
     this.inFlightKeys = new Set();
+  }
+
+  async _executeCommandLocally(parameters) {
+    let release;
+    const previous = commandExecutionQueue;
+    commandExecutionQueue = new Promise((resolve) => { release = resolve; });
+    await previous;
+    try { return await this._executeCommandSerially(parameters); }
+    finally { release(); }
+  }
+
+  async _synchronizeDurableReplay(result) {
+    const command = result?.normalizedCommand;
+    if (!command) return;
+    const { action, targetId, payload = {} } = command;
+    if (action === 'device:config') {
+      const deviceId = payload.deviceId || targetId;
+      const persisted = await deviceRepository.findById(deviceId);
+      const current = backendState.devicesRegistry.find((device) => device.deviceId === deviceId);
+      if (persisted && current) Object.assign(current, persisted);
+      return;
+    }
+    if (['incident:create','incident:acknowledge','incident:update-status','incident:dispatch','incident:resolve'].includes(action)) {
+      const persisted = await incidentRepository.findById(targetId);
+      if (persisted) {
+        const current = backendState.state.incidents.find((incident) => String(incident.id) === String(targetId));
+        if (current) Object.assign(current, persisted);
+        else backendState.state.incidents.unshift(persisted);
+      }
+      return;
+    }
+    if (['signal:override','green-split:update','ai:apply-recommendation'].includes(action)) {
+      const configs = await signalConfigRepository.findAll();
+      if (configs.status !== 'OK') throw new Error(`DURABLE_REPLAY_SYNC_FAILED: ${configs.error || configs.status}`);
+      const config = configs.data.find((entry) => entry.node_id === targetId);
+      const node = backendState.state.intersections.find((entry) => entry.id === targetId);
+      if (config && node) node.greenSplit = Number(config.green_split) || node.greenSplit;
+      if (config && targetId === 'node-wonokromo') backendState.state.greenSplitWonokromo = Number(config.green_split) || 35;
+    }
   }
 
   _pruneProcessedCommands(maxAliases = 300) {
@@ -86,6 +129,7 @@ export class CommandExecutor {
     sourceChannel = 'socket',
     sourceInstanceId = null
   } = {}) {
+    if (backendState.draining) throw commandError('INSTANCE_DRAINING', 'Instance sedang melakukan shutdown dan tidak menerima command baru.', 503);
     const stableCommandId = commandId || `CMD-${randomUUID()}`;
     const stableCorrelationId = correlationId || `CORR-${randomUUID()}`;
     const stableIdempotencyKey = idempotencyKey || stableCommandId;
@@ -106,7 +150,9 @@ export class CommandExecutor {
     return this._executeCommandLocally(parameters);
   }
 
-  async _executeCommandLocally({
+  async drain() { await commandExecutionQueue; }
+
+  async _executeCommandSerially({
     action,
     targetId = null,
     payload = {},
@@ -173,6 +219,18 @@ export class CommandExecutor {
     await assertCommandRateLimit(actorId);
 
     // 3. Idempotency Check & In-Flight Protection
+    const commandFingerprint = JSON.stringify({ action, targetId, payload, actorId, actorRole });
+    const durableReceipt = await commandReceiptRepository.find(actorId, finalIdempotencyKey, dbManager, finalCommandId);
+    if (durableReceipt) {
+      if (durableReceipt.actor_id !== String(actorId) || durableReceipt.fingerprint !== commandFingerprint) {
+        throw commandError('IDEMPOTENCY_CONFLICT', `Key '${finalIdempotencyKey}' has already been used with a different command or actor.`, 409);
+      }
+      if (durableReceipt.status !== 'COMPLETED' || !durableReceipt.result) {
+        throw commandError('COMMAND_IN_PROGRESS', `Command '${finalIdempotencyKey}' has an incomplete durable receipt.`, 409);
+      }
+      await this._synchronizeDurableReplay(durableReceipt.result);
+      return { ...durableReceipt.result, isIdempotentReplay: true };
+    }
     if (backendState.processedCommands && backendState.processedCommands.has(finalIdempotencyKey)) {
       const cached = backendState.processedCommands.get(finalIdempotencyKey);
 
@@ -206,7 +264,10 @@ export class CommandExecutor {
         isIdempotentReplay: true,
         error: null
       };
-      if (clusterRuntime.mode === 'cluster') await clusterRuntime.leadership.publishSnapshot();
+      if (clusterRuntime.mode === 'cluster') {
+        try { await clusterRuntime.leadership.publishSnapshot(); }
+        catch (error) { console.error('[Cluster] Snapshot publication deferred after committed command:', error.code || 'CLUSTER_SNAPSHOT_FAILED'); }
+      }
       return commandResult;
     }
 
@@ -218,121 +279,121 @@ export class CommandExecutor {
 
 
     try {
-      // 4. Authoritative Business Logic Execution by Action Domain
-      const execOutcome = await this._dispatchBusinessLogic({
-        action,
-        targetId,
-        payload,
-        actorId,
-        actorName,
-        actorRole,
-        finalCommandId,
-        finalCorrelationId
-      });
-
-      const { resultingState, previousState, newState, entityId, domainSequence, domainUpdateEvent, customAudit } = execOutcome;
-
-      // 5. Store in Processed Commands History (Authoritative Cache)
-      if (!backendState.processedCommands) {
-        backendState.processedCommands = new Map();
+      const queuedEvents = [];
+      const originalIo = backendState.io;
+      if (originalIo) {
+        backendState.io = new Proxy(originalIo, { get(target, property) {
+          if (property === 'emit') return (...args) => { queuedEvents.push(() => target.emit(...args)); return true; };
+          if (property === 'to') return (...args) => {
+            const emitter = target.to(...args);
+            return new Proxy(emitter, { get(roomTarget, roomProperty) {
+              if (roomProperty === 'emit') return (...emitArgs) => { queuedEvents.push(() => roomTarget.emit(...emitArgs)); return roomTarget; };
+              const value = Reflect.get(roomTarget, roomProperty, roomTarget);
+              return typeof value === 'function' ? value.bind(roomTarget) : value;
+            } });
+          };
+          const value = Reflect.get(target, property, target);
+          return typeof value === 'function' ? value.bind(target) : value;
+        } });
       }
 
-      const record = {
-        success: true,
-        status: 'SERVER_APPLIED',
-        action,
-        targetId,
-        commandId: finalCommandId,
-        correlationId: finalCorrelationId,
-        idempotencyKey: finalIdempotencyKey,
-        payloadFingerprint: JSON.stringify(payload || {}),
-        resultingState,
-        previousState,
-        newState,
-        normalizedCommand: { action, targetId, payload },
-        actor: actorName,
-        actorId,
-        timestamp: Date.now()
-      };
+      const before = backendState.simEngine.createCheckpoint();
+      backendState.commandTransactionActive = true;
+      let committed;
+      try {
+        const leadershipFence = clusterRuntime.mode === 'cluster'
+          ? { instanceId: clusterRuntime.leadership?.instanceId, epoch: clusterRuntime.leadership?.epoch }
+          : null;
+        if (clusterRuntime.mode === 'cluster' && (!leadershipFence.instanceId || !leadershipFence.epoch || !clusterRuntime.leadership?.isLeader())) {
+          throw commandError('LEADERSHIP_FENCE_REJECTED', 'Authoritative leadership is not fenced by PostgreSQL.', 503);
+        }
+        committed = await dbManager.transaction(async (tx) => {
+          const claimed = await commandReceiptRepository.claim({ actorId, idempotencyKey: finalIdempotencyKey, fingerprint: commandFingerprint, commandId: finalCommandId, correlationId: finalCorrelationId, action }, tx);
+          if (!claimed) {
+            const receipt = await commandReceiptRepository.find(actorId, finalIdempotencyKey, tx, finalCommandId);
+            if (!receipt || receipt.actor_id !== String(actorId) || receipt.fingerprint !== commandFingerprint) throw commandError('IDEMPOTENCY_CONFLICT', `Key '${finalIdempotencyKey}' conflicts with a previously committed command.`, 409);
+            if (receipt.status !== 'COMPLETED' || !receipt.result) throw commandError('COMMAND_IN_PROGRESS', `Command '${finalIdempotencyKey}' is still processing.`, 409);
+            await this._synchronizeDurableReplay(receipt.result);
+            return { replay: receipt.result };
+          }
 
+          const execOutcome = await this._dispatchBusinessLogic({ action, targetId, payload, actorId, actorName, actorRole, finalCommandId, finalCorrelationId });
+          const { resultingState, previousState, newState, entityId, domainSequence, customAudit } = execOutcome;
+          const record = {
+            success: true, status: 'SERVER_APPLIED', action, targetId, commandId: finalCommandId,
+            correlationId: finalCorrelationId, idempotencyKey: finalIdempotencyKey,
+            payloadFingerprint: JSON.stringify(payload || {}), resultingState, previousState, newState,
+            normalizedCommand: { action, targetId, payload }, actor: actorName, actorId, timestamp: Date.now(),
+            entityId: entityId || targetId || 'System Core',
+            auditDetails: customAudit?.details || `Perintah [${action}] berhasil diterapkan.`
+          };
+          const commandResult = {
+            ...SAFETY_BOUNDARY, success: true, commandId: finalCommandId, correlationId: finalCorrelationId,
+            idempotencyKey: finalIdempotencyKey, action, status: 'SERVER_APPLIED', result: 'SUCCESS',
+            timestamp: Date.now(), resultingState, data: resultingState, previousState, newState,
+            normalizedCommand: record.normalizedCommand, sequence: domainSequence || backendState.sequence, error: null
+          };
+          const auditLog = {
+            actorId, operator: actorName, actorRole,
+            action: action.toUpperCase().replace(/[-:]/g, '_'), entity: entityId || targetId || 'SITS Core',
+            result: `SUCCESS (CorrelationID: ${finalCorrelationId})`, timestamp: new Date().toISOString(),
+            commandId: finalCommandId, correlationId: finalCorrelationId, idempotencyKey: finalIdempotencyKey,
+            sourceInstanceId: sourceInstanceId || clusterRuntime.leadership?.instanceId || null,
+            leaderInstanceId: clusterRuntime.leadership?.leaderId || clusterRuntime.leadership?.instanceId || null
+          };
+          await auditRepository.insert({ ...auditLog, details: customAudit?.details || `Perintah [${action}] berhasil diterapkan.` }, false, tx);
+          await commandReceiptRepository.complete(actorId, finalIdempotencyKey, commandResult, tx);
+          return { record, commandResult, auditLog };
+        }, leadershipFence ? {
+          leadershipFence,
+          validateLeadershipFence: () => clusterRuntime.leadership.assertCommitFence(leadershipFence)
+        } : undefined);
+      } catch (error) {
+        backendState.simEngine.restoreCheckpoint(before);
+        queuedEvents.length = 0;
+        throw error;
+      } finally {
+        backendState.commandTransactionActive = false;
+        backendState.io = originalIo;
+      }
+
+      if (committed.replay) return { ...committed.replay, isIdempotentReplay: true };
+      const { record, commandResult, auditLog } = committed;
+      if (!backendState.processedCommands) backendState.processedCommands = new Map();
       backendState.stateVersion++;
       backendState.state.stateVersion = backendState.stateVersion;
-
       backendState.processedCommands.set(finalIdempotencyKey, record);
       backendState.processedCommands.set(finalCommandId, record);
       backendState.processedCommands.set(finalCorrelationId, record);
-
-      // Keep each command's idempotency, command, and correlation aliases together.
       this._pruneProcessedCommands(300);
-
-      // 6. Authoritative Audit Trail Persistence & Broadcast
-      const auditLog = {
-        actorId,
-        operator: actorName,
-        actorRole,
-        action: action.toUpperCase().replace(/[-:]/g, '_'),
-        entity: entityId || targetId || 'SITS Core',
-        result: `SUCCESS (CorrelationID: ${finalCorrelationId})`,
-        timestamp: new Date().toISOString(),
-        commandId: finalCommandId,
-        correlationId: finalCorrelationId,
-        idempotencyKey: finalIdempotencyKey,
-        sourceInstanceId: sourceInstanceId || clusterRuntime.leadership?.instanceId || null,
-        leaderInstanceId: clusterRuntime.leadership?.leaderId || clusterRuntime.leadership?.instanceId || null
-      };
-      await auditRepository.insert({ ...auditLog, details: customAudit?.details || `Perintah [${action}] berhasil diterapkan.` }, true);
       backendState.auditLogs.unshift(auditLog);
       if (backendState.auditLogs.length > 250) backendState.auditLogs.pop();
 
+      for (const emit of queuedEvents) emit();
       if (backendState.io) {
+        const customDetails = record.auditDetails;
         backendState.io.to(REALTIME_ROOMS.AUDIT).emit('audit:log', {
           type: 'command:acknowledged',
           timestamp: new Date().toISOString(),
-          entity: entityId || targetId || 'System Core',
+          entity: record.entityId,
           source: actorName,
           actorId,
           reasonCode: 'SERVER_APPLIED',
           result: 'SUCCESS',
           commandId: finalCommandId,
           correlationId: finalCorrelationId,
-          details: customAudit?.details || `Perintah [${action}] berhasil diterapkan secara otoritatif di server.`
+          details: customDetails || `Perintah [${action}] berhasil diterapkan secara otoritatif di server.`
         });
 
         // Emit command:ack event
         backendState.io.emit('command:ack', {
-          ...SAFETY_BOUNDARY,
-          success: true,
-          commandId: finalCommandId,
-          correlationId: finalCorrelationId,
-          action,
-          status: 'SERVER_APPLIED',
-          result: 'SUCCESS',
-          timestamp: Date.now(),
-          resultingState,
-          data: resultingState,
-          error: null
+          ...commandResult
         });
       }
-
-      const commandResult = {
-        ...SAFETY_BOUNDARY,
-        success: true,
-        commandId: finalCommandId,
-        correlationId: finalCorrelationId,
-        idempotencyKey: finalIdempotencyKey,
-        action,
-        status: 'SERVER_APPLIED',
-        result: 'SUCCESS',
-        timestamp: Date.now(),
-        resultingState,
-        data: resultingState,
-        previousState,
-        newState,
-        normalizedCommand: record.normalizedCommand,
-        sequence: domainSequence || backendState.sequence,
-        error: null
-      };
-      if (clusterRuntime.mode === 'cluster') await clusterRuntime.leadership.publishSnapshot();
+      if (clusterRuntime.mode === 'cluster') {
+        try { await clusterRuntime.leadership.publishSnapshot(); }
+        catch (error) { console.error('[Cluster] Snapshot publication deferred after committed command:', error.code || 'CLUSTER_SNAPSHOT_FAILED'); }
+      }
       return commandResult;
 
     } catch (err) {
@@ -849,6 +910,7 @@ export class CommandExecutor {
         const route = payload.route;
 
         const res = await backendState.activateEmergencyPriority(code, route, {
+          vehicleType: payload.type,
           commandId: finalCommandId,
           correlationId: finalCorrelationId,
           actor: actorName,

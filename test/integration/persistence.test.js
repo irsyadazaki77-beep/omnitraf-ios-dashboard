@@ -24,7 +24,7 @@ describe('Phase 17: Persistence, Recovery & Data Integrity Hardening Test Suite'
     } catch (_) {}
   });
 
-  test('1. Fresh database startup: creates schema, metadata, and version 19', async () => {
+  test('1. Fresh database startup: creates schema, metadata, and latest schema version', async () => {
     const db = new DatabaseManager();
     db.dbPath = testDbPath;
     await db.init();
@@ -33,7 +33,7 @@ describe('Phase 17: Persistence, Recovery & Data Integrity Hardening Test Suite'
     assert.ok(fs.existsSync(testDbPath), 'Database file must be written to disk on startup');
 
     const schemaVer = db.getMetadata('schema_version');
-    assert.strictEqual(schemaVer, '19', 'Schema version metadata must match version 19');
+    assert.strictEqual(schemaVer, '20', 'Schema version metadata must match version 20');
 
     const incidentsRes = db.getAllIncidents();
     assert.strictEqual(incidentsRes.status, 'OK');
@@ -187,7 +187,7 @@ describe('Phase 17: Persistence, Recovery & Data Integrity Hardening Test Suite'
     assert.strictEqual(edge01.greenWaveSync, true);
   });
 
-  test('7. Audit log burst: deduplication by correlationId and bounded retention', async () => {
+  test('7. Audit log burst: event deduplication and durable history beyond 500 entries', async () => {
     const db = new DatabaseManager();
     db.dbPath = testDbPath;
     await db.init();
@@ -210,6 +210,12 @@ describe('Phase 17: Persistence, Recovery & Data Integrity Hardening Test Suite'
     assert.strictEqual(logsRes.status, 'OK');
     const duplicates = logsRes.data.filter(l => l.correlationId === burstCorrId);
     assert.strictEqual(duplicates.length, 1, 'Burst logs with identical correlationId must be deduplicated to 1 record');
+    for (let index = 0; index < 510; index++) {
+      db.insertAuditLog({ operator:'retention-test', action:'RETENTION_PROBE', entity:`entry-${index}`, result:'RECORDED', correlationId:`retention-${index}` });
+    }
+    await db.flushSync();
+    const retained = await db.query("SELECT COUNT(*) AS total FROM audit_logs WHERE action='RETENTION_PROBE'");
+    assert.equal(Number(retained.rows[0].total), 510, 'Persistent audit history must not be trimmed at 500 entries');
   });
 
   test('8. Database write failure: uninitialized DB throws and does not report success', () => {

@@ -172,7 +172,14 @@ export class CctvController {
     this._setupVisibilityListener();
     this._connectSocketStream();
     this._bindControls();
+    this._bindZoomPreview();
     this._bindMultiCameraSwitcher();
+    this._bindCameraSearch();
+    this.disposer.addEventListener(window, 'omnitraf:entity-focus', (event) => {
+      if (event.detail?.kind !== 'cctv') return;
+      const tab = [...document.querySelectorAll('.cctv-cam-tab')].find((item) => item.dataset.cam === String(event.detail.id));
+      tab?.click();
+    });
     this._startWatermarkClock();
     this._startHealthTelemetryWatchdog();
 
@@ -183,6 +190,11 @@ export class CctvController {
 
   deactivate() {
     this.isActive = false;
+    const zoomModal = typeof document !== 'undefined' ? document.getElementById('cctvZoomModal') : null;
+    if (zoomModal) {
+      zoomModal.classList.remove('show');
+      zoomModal.style.display = 'none';
+    }
     if (this.animFrameId) {
       cancelAnimationFrame(this.animFrameId);
       this.animFrameId = null;
@@ -587,6 +599,41 @@ export class CctvController {
     });
   }
 
+  _bindZoomPreview() {
+    if (typeof document === 'undefined') return;
+    const openButton = document.getElementById('btnCctvZoom');
+    const modal = document.getElementById('cctvZoomModal');
+    const closeButton = document.getElementById('closeCctvZoomModal');
+    const title = document.getElementById('zoomModalTitle');
+    const description = document.getElementById('zoomModalDesc');
+    if (!openButton || !modal || !closeButton) return;
+
+    const close = () => {
+      modal.classList.remove('show');
+      modal.style.display = 'none';
+    };
+    this.disposer.addEventListener(openButton, 'click', () => {
+      const camId = this.activeCamId || 'cctvCanvas1';
+      const meta = cameraRegistry.getMetadata(camId);
+      const runtime = cameraRegistry.getRuntime(camId);
+      if (!this.renderers.get(camId)?.canvas || !meta) {
+        if (typeof window.showToast === 'function') window.showToast('Pratinjau kamera simulasi belum tersedia.', 'warning');
+        return;
+      }
+      if (title) title.textContent = `${meta.code} · ${meta.name}`;
+      if (description) {
+        const freshness = runtime?.lastFrameAt ? `Pembaruan simulasi ${new Date(runtime.lastFrameAt).toLocaleTimeString('id-ID')}.` : 'Menunggu frame simulasi.';
+        description.textContent = `${meta.location} · ${freshness} Bukan feed CCTV lapangan.`;
+      }
+      modal.style.display = 'flex';
+      modal.classList.add('show');
+    });
+    this.disposer.addEventListener(closeButton, 'click', close);
+    this.disposer.addEventListener(modal, 'click', (event) => {
+      if (event.target === modal) close();
+    });
+  }
+
   _bindMultiCameraSwitcher() {
     if (typeof document === 'undefined') return;
     const tabs = document.querySelectorAll('.cctv-cam-tab');
@@ -595,15 +642,11 @@ export class CctvController {
         e.preventDefault();
         tabs.forEach(t => {
           t.classList.remove('active');
-          t.style.background = 'rgba(15, 23, 42, 0.6)';
-          t.style.borderColor = 'rgba(255,255,255,0.1)';
-          t.style.color = '#94a3b8';
+          t.setAttribute('aria-pressed', 'false');
         });
 
         tab.classList.add('active');
-        tab.style.background = 'rgba(56, 189, 248, 0.2)';
-        tab.style.borderColor = '#38bdf8';
-        tab.style.color = '#fff';
+        tab.setAttribute('aria-pressed', 'true');
 
         const previousCamId = this.activeCamId;
         const newCamId = tab.dataset.cam;
@@ -621,6 +664,31 @@ export class CctvController {
           window.showToast(`Fokus Kamera: ${tab.textContent.trim().replace('📹 ', '')}`);
         }
       });
+    });
+  }
+
+  _bindCameraSearch() {
+    if (typeof document === 'undefined') return;
+    const input = document.getElementById('cctvCameraSearch');
+    if (!input) return;
+
+    const tabs = [...document.querySelectorAll('.cctv-cam-tab')];
+    const emptyState = document.getElementById('cctvCameraSearchEmpty');
+    this.disposer.addEventListener(input, 'input', () => {
+      const query = input.value.trim().toLocaleLowerCase();
+      const visibleTabs = [];
+      tabs.forEach((tab) => {
+        const card = document.querySelector(`[data-cam-id="${tab.dataset.cam}"]`);
+        const searchableText = `${tab.textContent} ${tab.dataset.title || ''}`.toLocaleLowerCase();
+        const matches = !query || searchableText.includes(query);
+        tab.hidden = !matches;
+        if (card) card.hidden = !matches;
+        if (matches) visibleTabs.push(tab);
+      });
+
+      if (emptyState) emptyState.hidden = visibleTabs.length > 0;
+      const activeTab = tabs.find((tab) => tab.classList.contains('active'));
+      if (visibleTabs.length && activeTab?.hidden) visibleTabs[0].click();
     });
   }
 
@@ -692,6 +760,17 @@ export class CctvController {
           const signalState = node ? node.state : 'green';
 
           renderer.render(isChaos, isPaused, showBoxes, dt, metrics, diag, status, signalState, provenance);
+          if (id === this.activeCamId) {
+            const modal = document.getElementById('cctvZoomModal');
+            const zoomCanvas = document.getElementById('cctvZoomCanvas');
+            if (modal && zoomCanvas && modal.style.display !== 'none') {
+              const context = zoomCanvas.getContext('2d');
+              if (context) {
+                context.clearRect(0, 0, zoomCanvas.width, zoomCanvas.height);
+                context.drawImage(renderer.canvas, 0, 0, zoomCanvas.width, zoomCanvas.height);
+              }
+            }
+          }
           totalTrackedCount += renderer.trackedBoxes ? renderer.trackedBoxes.size : 0;
         }
       });

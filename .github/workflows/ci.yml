@@ -10,6 +10,29 @@ jobs:
   test:
     name: Build, Lint, and Test
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: omnitraf_test
+          POSTGRES_PASSWORD: test_only_password
+          POSTGRES_DB: omnitraf_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U omnitraf_test -d omnitraf_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout Repository
@@ -35,3 +58,17 @@ jobs:
 
       - name: Execute Automated Testing Suite
         run: npm test
+
+      - name: Execute PostgreSQL Integration Tests
+        env:
+          DB_DRIVER: postgres
+          REQUIRE_POSTGRES_TESTS: 'true'
+          DATABASE_URL: postgresql://omnitraf_test:test_only_password@localhost:5432/omnitraf_test
+        run: npm run test:postgres
+
+      - name: Execute Redis and PostgreSQL Cluster Tests
+        env:
+          DATABASE_URL: postgresql://omnitraf_test:test_only_password@localhost:5432/omnitraf_test
+          REDIS_URL: redis://localhost:6379
+          REQUIRE_CLUSTER_TESTS: 'true'
+        run: npm run test:cluster

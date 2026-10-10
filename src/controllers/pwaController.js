@@ -57,10 +57,10 @@ export class PwaController {
     notice.setAttribute('role', 'status');
     notice.style.cssText = 'position:fixed;z-index:10000;right:16px;bottom:16px;display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface,#111827);color:var(--text,#fff);box-shadow:0 8px 24px rgba(0,0,0,.3);';
     const message = document.createElement('span');
-    message.textContent = 'A new version is available.';
+    message.textContent = 'Pembaruan aplikasi tersedia.';
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = 'Update';
+    button.textContent = 'Perbarui';
     button.addEventListener('click', () => {
       button.disabled = true;
       navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload(), { once: true });
@@ -105,7 +105,7 @@ export class PwaController {
         <polyline points="7 10 12 15 17 10"></polyline>
         <line x1="12" y1="15" x2="12" y2="3"></line>
       </svg>
-      <span>Install App</span>
+      <span>Pasang aplikasi</span>
     `;
 
     btn.addEventListener("click", async () => {

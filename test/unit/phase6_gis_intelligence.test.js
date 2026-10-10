@@ -126,7 +126,7 @@ import {
 } from '../../src/config/surabayaCoords.js';
 
 import { mapManager, getCorridorLOS } from '../../src/modules/mapManager.js';
-import { layerManager, TILE_CONFIG } from '../../src/modules/map/layerManager.js';
+import { createCartoTileLayer, layerManager, TILE_CONFIG } from '../../src/modules/map/layerManager.js';
 import { markerManager } from '../../src/modules/map/markerManager.js';
 import { popupManager } from '../../src/modules/map/popupManager.js';
 import { mapControls } from '../../src/modules/map/mapControls.js';
@@ -348,6 +348,21 @@ describe('FASE 6 — GIS & Spatial Intelligence Comprehensive Test Suite', () =>
       assert.strictEqual(TILE_CONFIG.provider, 'CARTO');
       assert.ok(TILE_CONFIG.darkUrl.includes('cartocdn.com'));
       assert.ok(TILE_CONFIG.lightUrl.includes('cartocdn.com'));
+    });
+
+    test('OpenStreetMap fallback leaves Leaflet subdomain defaults intact', () => {
+      const originalTileLayer = globalThis.L.tileLayer;
+      let capturedOptions;
+      globalThis.L.tileLayer = (_url, options) => {
+        capturedOptions = options;
+        return originalTileLayer(_url, options);
+      };
+      try {
+        createCartoTileLayer(true);
+        assert.equal(Object.hasOwn(capturedOptions, 'subdomains'), false);
+      } finally {
+        globalThis.L.tileLayer = originalTileLayer;
+      }
     });
 
     test('Mode transition (flow -> heat -> nodes -> all) switches layer visibility safely', () => {

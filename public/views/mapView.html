@@ -4,7 +4,7 @@
           <header class="map-workspace-header">
             <div class="map-header-brand">
               <span class="map-header-dot"></span>
-              <h1 class="map-header-title">Surabaya Spatial Intelligence</h1>
+              <h1 class="map-header-title">Peta simulasi Surabaya</h1>
               <span class="provenance-badge simulated" id="fullMapProvenance">PETA SIMULASI</span>
             </div>
             <div class="map-header-meta">
@@ -41,15 +41,15 @@
 
               <!-- Mode / Layer Quick Toggles -->
               <div class="toolbar-button-group">
-                <button class="spatial-tool-btn active" id="btnMapModeFlow" data-layer-mode="flow" type="button" title="Arus Koridor Lalu Lintas">
+                <button class="spatial-tool-btn active" aria-label="Arus koridor" id="btnMapModeFlow" data-layer-mode="flow" type="button" title="Arus Koridor Lalu Lintas">
                   <span class="tool-dot dot-flow"></span>
                   <span class="tool-label hide-mobile">Arus</span>
                 </button>
-                <button class="spatial-tool-btn" id="btnMapModeHeat" data-layer-mode="heat" type="button" title="Heatmap Kepadatan Arus">
+                <button class="spatial-tool-btn" aria-label="Heatmap kepadatan" id="btnMapModeHeat" data-layer-mode="heat" type="button" title="Heatmap Kepadatan Arus">
                   <span class="tool-dot dot-heat"></span>
                   <span class="tool-label hide-mobile">Heatmap</span>
                 </button>
-                <button class="spatial-tool-btn" id="btnMapModeNodes" data-layer-mode="nodes" type="button" title="SITS Persimpangan & Node">
+                <button class="spatial-tool-btn" aria-label="Simpang dan kamera" id="btnMapModeNodes" data-layer-mode="nodes" type="button" title="SITS Persimpangan & Node">
                   <span class="tool-dot dot-node"></span>
                   <span class="tool-label hide-mobile">Nodes</span>
                 </button>
@@ -124,53 +124,6 @@
               </button>
             </div>
 
-            <!-- Custom Right-Click Context Menu -->
-            <div class="map-spatial-context-menu" id="mapContextMenu" role="menu" aria-hidden="true">
-              <button class="context-menu-item" type="button" data-action="center-here">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"></circle><line x1="12" y1="2" x2="12" y2="5"></line><line x1="12" y1="19" x2="12" y2="22"></line><line x1="2" y1="12" x2="5" y2="12"></line><line x1="19" y1="12" x2="22" y2="22"></line></svg>
-                <span>Pusatkan Kamera Di Sini</span>
-              </button>
-              <button class="context-menu-item" type="button" data-action="filter-incidents">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                <span>Insiden Sekitar Sini</span>
-              </button>
-              <button class="context-menu-item" type="button" data-action="filter-cctv">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2"></rect></svg>
-                <span>CCTV Terdekat</span>
-              </button>
-              <button class="context-menu-item" type="button" data-action="sim-112">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
-                <span>Simulasi Emergency 112</span>
-              </button>
-              <div class="context-menu-divider"></div>
-              <button class="context-menu-item" type="button" data-action="copy-coords">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                <span>Salin Koordinat Spasial</span>
-              </button>
             </div>
-
-            <!-- Interactive Vehicle & Incident Popover (Kept for backwards compatibility) -->
-            <div class="map-interactive-popover glass-panel is-hidden" id="mapVehiclePopover">
-              <button class="popover-close-btn" id="btnCloseVehiclePopover" type="button" aria-label="Tutup info">&times;</button>
-              <div class="popover-header">
-                <span class="popover-badge" id="popoverBadge">🚑 PRIORITAS SITS</span>
-                <h4 id="popoverTitle">Ambulans 02</h4>
-              </div>
-              <div class="popover-content">
-                <div class="popover-metric">
-                  <span class="popover-label">Kecepatan:</span>
-                  <strong class="popover-value text-accent" id="popoverSpeed">58 km/jam</strong>
-                </div>
-                <div class="popover-metric">
-                  <span class="popover-label">Status Rute:</span>
-                  <span class="popover-value" id="popoverRoute">Koridor Darmo - Sinyal Prioritas Aktif</span>
-                </div>
-                <div class="popover-metric">
-                  <span class="popover-label">Estimasi Tiba (ETA):</span>
-                  <strong class="popover-value text-warning" id="popoverEta">1m 45s</strong>
-                </div>
-              </div>
-            </div>
-          </div>
         </article>
       </div>

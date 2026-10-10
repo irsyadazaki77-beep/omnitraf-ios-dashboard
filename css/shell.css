@@ -5,13 +5,15 @@
   position: relative;
   z-index: var(--z-base);
   display: grid;
-  grid-template-columns: 224px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 244px) minmax(0, 1fr);
+  min-width: 0;
   min-height: 100vh;
   transition: grid-template-columns var(--duration-normal) var(--ease);
 }
 
 /* The marquee repeats static demo notices; the persistent simulation boundary below the topbar is clearer. */
-#marqueeContainer { display: none; }
+#marqueeContainer,
+.system-marquee { display: none; }
 
 .app-shell.sidebar-collapsed {
   grid-template-columns: 68px minmax(0, 1fr);
@@ -87,7 +89,7 @@
   }
 
   .app-shell.sidebar-collapsed .nav-item.active {
-    color: #fff;
+    color: var(--text-inverse);
   }
 
   .sidebar-collapse-toggle {
@@ -348,11 +350,11 @@
 }
 
 .nav-item.active {
-  color: #ffffff !important;
-  background: var(--primary) !important;
-  border-color: var(--primary-hover) !important;
+  color: var(--text-primary);
+  background: var(--surface-selected);
+  border-color: var(--primary-border);
   font-weight: 600;
-  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.35);
+  box-shadow: none;
 }
 
 .nav-item.active .nav-icon {
@@ -597,8 +599,10 @@
 }
 
 .topbar-squircle-btn {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -611,6 +615,29 @@
   position: relative;
   transition: all var(--duration-fast) var(--ease);
 }
+
+/* A clear, single recovery panel for failed lazy view loads. */
+.view-load-status,
+.view-load-error {
+  margin: 12px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  background: var(--surface-raised);
+}
+.view-load-status { border-left: 3px solid var(--status-info); }
+.view-load-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  border-left: 3px solid var(--status-danger);
+  background: color-mix(in srgb, var(--danger-soft) 45%, var(--surface-raised));
+}
+.view-load-error p { flex: 1 1 100%; margin: 0 0 4px; color: var(--text-primary); }
+.view-load-error .btn { min-height: 40px; }
+.view-load-error:focus-within { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
 .topbar-squircle-btn:hover {
   color: var(--text);
@@ -695,10 +722,11 @@
    6. Main Content Area & Unified View Container
    -------------------------------------------------------------------------- */
 .main-content {
-  padding: 12px 20px 40px;
-  max-width: 1840px;
+  padding: 0 24px 40px;
+  max-width: none;
   margin: 0 auto;
   width: 100%;
+  min-width: 0;
 }
 
 .settings-group-heading {
@@ -715,11 +743,7 @@
   .topbar .weather-status,
   .topbar .sits-signal-chip,
   .topbar .capsule-divider.sits-heartbeat-sep { display: none; }
-  .app-shell.sidebar-collapsed { grid-template-columns: 60px minmax(0, 1fr); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  .app-shell.sidebar-collapsed { grid-template-columns: 68px minmax(0, 1fr); }
 }
 
 .view-pane {
@@ -877,9 +901,6 @@ body.theme-light .mobile-tab-bar,
 
 /* 3. Tablets Portrait & Small Laptops (< 1024px) */
 @media (max-width: 1024px) {
-  .cctv-feed-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
   .emergency-dashboard,
   .trend-layout,
   .device-mgmt-grid-wrapper,
@@ -895,9 +916,9 @@ body.theme-light .mobile-tab-bar,
 
 /* 4. Tablet Portrait & Mobile (< 768px) */
 @media (max-width: 768px) {
-  .hide-mobile { display: none !important; }
-  .hide-desktop { display: flex !important; }
-  .mobile-tab-bar { display: flex !important; }
+  .app-shell .hide-mobile { display: none; }
+  .app-shell .hide-desktop { display: flex; }
+  .app-shell .mobile-tab-bar { display: flex; }
 
   /* App Shell & Core Layout */
   .app-shell {
@@ -1067,10 +1088,10 @@ body.theme-light .mobile-tab-bar,
   }
 
   .topbar-squircle-btn {
-    width: 36px;
-    height: 36px;
-    min-width: 36px;
-    min-height: 36px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     font-size: 13px;
     border-radius: var(--radius-md);
     touch-action: manipulation;
@@ -1142,6 +1163,10 @@ body.theme-light .mobile-tab-bar,
   }
 }
 
+@media (max-width: 520px) {
+  .topbar .status-capsule { display: none; }
+}
+
 /* 5. Extra Compact Mobile (< 400px) */
 @media (max-width: 400px) {
   .workspace-header-summary-strip,
@@ -1156,10 +1181,6 @@ body.theme-light .mobile-tab-bar,
 
   .mobile-brand-title strong {
     font-size: 13px;
-  }
-
-  .status-capsule {
-    display: none;
   }
 
   .mobile-tab-item {
@@ -1193,9 +1214,6 @@ body.theme-light .mobile-tab-bar,
     grid-template-columns: repeat(3, 1fr);
   }
 
-  .cctv-feed-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
 }
 
 /* ==========================================================================
@@ -1269,22 +1287,21 @@ body.theme-light .mobile-tab-bar,
 }
 
 .revert-gw-btn {
-  background: #ffffff !important;
-  color: #dc2626 !important;
-  font-weight: 700 !important;
-  font-size: 12px !important;
-  padding: 6px 14px !important;
-  border-radius: 8px !important;
-  border: none !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
-  transition: all 0.2s !important;
+  background: var(--surface-raised);
+  color: var(--status-danger);
+  font-weight: 700;
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--danger-border);
+  box-shadow: var(--shadow-xs);
+  transition: background-color var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
   cursor: pointer;
 }
 
 .revert-gw-btn:hover {
-  background: #fef2f2 !important;
-  color: #991b1b !important;
-  transform: translateY(-1.5px) !important;
+  background: var(--danger-soft);
+  color: var(--status-danger);
 }
 
 #card-settings { margin-bottom: var(--space-5); }

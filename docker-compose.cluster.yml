@@ -1,0 +1,83 @@
+name: omnitraf-cluster-test
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-omnitraf_cluster_test}
+      POSTGRES_USER: ${POSTGRES_USER:-omnitraf_test}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cluster_test_only_password}
+    volumes:
+      - omnitraf-cluster-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  node-a:
+    build: .
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment: &cluster-env
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      SIMULATION_ONLY: "true"
+      OMNITRAF_RUNTIME_MODE: cluster
+      DB_DRIVER: postgres
+      DATABASE_URL: postgresql://${POSTGRES_USER:-omnitraf_test}:${POSTGRES_PASSWORD:-cluster_test_only_password}@postgres:5432/${POSTGRES_DB:-omnitraf_cluster_test}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-cluster-test-only-not-for-production}
+      INSTANCE_ID: node-a
+    ports: ["3001:3000"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/readyz | grep -q 'READY'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  node-b:
+    build: .
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment:
+      <<: *cluster-env
+      INSTANCE_ID: node-b
+    ports: ["3002:3000"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/readyz | grep -q 'READY'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  node-c:
+    build: .
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment:
+      <<: *cluster-env
+      INSTANCE_ID: node-c
+    ports: ["3003:3000"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/readyz | grep -q 'READY'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  omnitraf-cluster-postgres:

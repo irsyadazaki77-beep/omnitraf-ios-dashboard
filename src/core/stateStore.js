@@ -825,7 +825,24 @@ export function applyServerSnapshot(serverState, source = 'server') {
   const emergencySeq = serverState.emergencySeq ?? rawState.emergencySeq ?? serverState.emergencySequence ?? rawState.emergencySequence ?? seq;
   const signalSeq = serverState.signalSeq ?? rawState.signalSeq ?? serverState.signalSequence ?? rawState.signalSequence ?? seq;
   const deviceSeq = serverState.deviceSeq ?? rawState.deviceSeq ?? serverState.deviceSequence ?? rawState.deviceSequence ?? seq;
-  const timestampMs = serverState.timestamp ?? serverState.timestampMs ?? rawState.timestampMs ?? rawState.timestamp ?? Date.now();
+  // The legacy `timestamp` field can be a presentation-only clock such as
+  // `08:41:00 WIB`. Prefer the transport epoch/ISO fields and fail back to now
+  // instead of allowing an invalid date to abort the entire snapshot.
+  const rawTimestamp = serverState.timestampMs ?? rawState.timestampMs
+    ?? serverState.timestamp ?? rawState.timestamp ?? Date.now();
+  let timestampMs = NaN;
+  if (Number.isFinite(rawTimestamp)) {
+    timestampMs = rawTimestamp;
+    if (timestampMs >= 1e9 && timestampMs < 1e11) timestampMs *= 1000;
+  } else if (typeof rawTimestamp === 'string' && /^\d{10,13}$/.test(rawTimestamp)) {
+    timestampMs = Number(rawTimestamp);
+    if (timestampMs < 1e11) timestampMs *= 1000;
+  } else if (typeof rawTimestamp === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(rawTimestamp)) {
+    timestampMs = Date.parse(rawTimestamp);
+  }
+  const safeTimestampMs = Number.isFinite(timestampMs) && timestampMs > 0 && timestampMs <= 8.64e15
+    ? timestampMs
+    : Date.now();
   const serverSessionId = serverState.serverSessionId || rawState.serverSessionId || null;
 
   const currentStore = stateStore.getState();
@@ -848,18 +865,18 @@ export function applyServerSnapshot(serverState, source = 'server') {
     lastReceivedEmergencySequence: emergencySeq,
     lastReceivedSignalSequence: signalSeq,
     lastReceivedDeviceSequence: deviceSeq,
-    lastTelemetryAt: timestampMs,
-    lastTelemetryTime: timestampMs,
+    lastTelemetryAt: safeTimestampMs,
+    lastTelemetryTime: safeTimestampMs,
     lastTelemetrySource: 'server'
   };
 
   // Update diagnostics with authoritative baseline
-  diagnostics.recordAcceptedEvent('traffic', updates.lastReceivedSequence, timestampMs);
-  diagnostics.recordAcceptedEvent('cctv', updates.lastReceivedCctvSequence, timestampMs);
-  diagnostics.recordAcceptedEvent('incident', updates.lastReceivedIncidentSequence, timestampMs);
-  diagnostics.recordAcceptedEvent('emergency', updates.lastReceivedEmergencySequence, timestampMs);
-  diagnostics.recordAcceptedEvent('signal', updates.lastReceivedSignalSequence, timestampMs);
-  diagnostics.recordAcceptedEvent('device', updates.lastReceivedDeviceSequence, timestampMs);
+  diagnostics.recordAcceptedEvent('traffic', updates.lastReceivedSequence, safeTimestampMs);
+  diagnostics.recordAcceptedEvent('cctv', updates.lastReceivedCctvSequence, safeTimestampMs);
+  diagnostics.recordAcceptedEvent('incident', updates.lastReceivedIncidentSequence, safeTimestampMs);
+  diagnostics.recordAcceptedEvent('emergency', updates.lastReceivedEmergencySequence, safeTimestampMs);
+  diagnostics.recordAcceptedEvent('signal', updates.lastReceivedSignalSequence, safeTimestampMs);
+  diagnostics.recordAcceptedEvent('device', updates.lastReceivedDeviceSequence, safeTimestampMs);
 
   if (Array.isArray(rawState.intersections)) {
     updates.intersections = reuseEntityArray(currentStore.intersections, rawState.intersections.map(item => ({ ...item })), 'id');
@@ -900,7 +917,7 @@ export function applyServerSnapshot(serverState, source = 'server') {
     ...incomingTelemetry,
     source: 'server',
     provenance: 'SIMULATED',
-    updatedAt: new Date(timestampMs).toISOString()
+    updatedAt: new Date(safeTimestampMs).toISOString()
   });
   const previousCanonical = currentStore.canonical || {};
   const canonicalTelemetry = snapshotValueEqual(previousCanonical.telemetry, normalizedTelemetry) ? previousCanonical.telemetry : normalizedTelemetry;

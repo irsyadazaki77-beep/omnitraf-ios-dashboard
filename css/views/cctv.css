@@ -54,13 +54,6 @@
   background: var(--panel-elevated);
 }
 
-.cctv-cam-tab.active {
-  background: var(--primary) !important;
-  border-color: var(--primary-hover) !important;
-  color: #ffffff !important;
-  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.25);
-}
-
 /* Unified CCTV Control Toolbar */
 .cctv-unified-toolbar {
   display: flex;
@@ -87,7 +80,8 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 32px;
+  min-height: 40px;
+  height: auto;
   padding: 0 12px;
   background: var(--panel-elevated);
   border: 1px solid var(--border);
@@ -104,6 +98,18 @@
 .cctv-toolbar-btn:hover {
   border-color: var(--border-emphasis);
   background: var(--panel-soft);
+}
+
+.matrix-selector button,
+.cctv-filter-selector button { min-height: 40px; }
+
+@media (max-width: 760px) {
+  .cctv-unified-toolbar { align-items: stretch; }
+  .cctv-toolbar-section { width: 100%; }
+  .cctv-toolbar-btn { min-height: 44px; flex: 1 1 auto; }
+  .matrix-selector, .cctv-filter-selector { min-height: 44px; max-width: 100%; overflow-x: auto; }
+  .matrix-selector button, .cctv-filter-selector button { min-height: 44px; white-space: nowrap; }
+  .cctv-threshold-pill { min-height: 44px; flex: 1 1 220px; }
 }
 
 .cctv-toolbar-btn:active {
@@ -157,18 +163,19 @@
 /* Camera Grid Architecture */
 .cctv-feed-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
   gap: 16px;
 }
 
 .cctv-feed-grid.grid-1x3 {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   max-width: 1200px;
   margin: 0 auto;
 }
 
 .cctv-feed-grid.grid-focus {
-  grid-template-columns: minmax(0, 1.8fr) minmax(240px, 0.8fr);
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 0.8fr);
   align-items: start;
 }
 
@@ -181,8 +188,12 @@
 }
 
 @media (max-width: 900px) {
-  .cctv-feed-grid.grid-focus { grid-template-columns: 1fr; }
+  .cctv-feed-grid.grid-focus { grid-template-columns: minmax(0, 1fr); }
   .cctv-feed-grid.grid-focus .camera-card-spotlight { grid-row: auto; }
+}
+
+@media (min-width: 1920px) {
+  .cctv-feed-grid:not(.grid-focus) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 /* Camera Card Surface */
@@ -295,13 +306,31 @@
   letter-spacing: 0.02em;
 }
 
+/* The canvas renderer already draws the camera ID, simulation provenance and time. */
+#view-cctv .camera-timestamp,
+#view-cctv .camera-badge,
+.tactical-camera-box > .camera-timestamp,
+.tactical-camera-box > .camera-badge {
+  display: none;
+}
+
+/* FPS, latency and VRAM in these legacy overlays were static demo values. */
+#view-cctv .camera-hud-bottom .hud-metric-pill:not(:has(.cctv-mini-btn)) {
+  display: none;
+}
+
+#view-cctv .camera-hud-bottom:has(.cctv-mini-btn) {
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .camera-badge {
   top: 8px;
   right: 12px;
   display: flex;
   align-items: center;
   gap: 5px;
-  color: #f87171 !important;
+  color: var(--status-danger);
   font-weight: 700;
 }
 
@@ -403,10 +432,90 @@
 }
 .camera-card { box-shadow: none; border-color: var(--border-subtle); }
 
+/* Focused monitoring controls: keep camera selection searchable and calm. */
+.cctv-cam-switcher-bar {
+  align-items: stretch;
+  gap: 10px;
+  overflow: hidden;
+  padding: 8px;
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+.cctv-camera-search {
+  display: flex;
+  flex: 0 1 260px;
+  min-width: 190px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  background: var(--surface-elevated);
+}
+
+.cctv-camera-search input {
+  min-width: 0;
+  width: 100%;
+  min-height: 38px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  color: var(--text-primary);
+  background: transparent;
+  box-shadow: none;
+}
+
+.cctv-camera-search input:focus-visible { outline: none; box-shadow: none; }
+
+.cctv-camera-tab-list {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.cctv-cam-tab {
+  min-height: 38px;
+  padding: 7px 11px;
+  color: var(--text-secondary);
+  border-color: transparent;
+  transition: background-color var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease);
+}
+
+.cctv-cam-tab.active {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 25%, var(--border));
+  box-shadow: none;
+}
+
+.cctv-cam-tab[hidden], .camera-card[hidden] { display: none; }
+
+.cctv-camera-empty {
+  margin: -8px 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.camera-card:not(.camera-card-spotlight) .btn-cam-snapshot { display: none; }
+
+@media (max-width: 760px) {
+  .cctv-cam-switcher-bar { flex-direction: column; }
+  .cctv-camera-search { flex: 1 1 auto; width: 100%; }
+  .cctv-camera-tab-list { width: 100%; }
+  .cctv-cam-tab { min-height: 42px; }
+}
+
 /* CCTV Responsive */
 @media (max-width: 900px) {
   .cctv-feed-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 12px;
   }
 

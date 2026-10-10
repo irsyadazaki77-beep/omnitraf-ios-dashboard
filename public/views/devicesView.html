@@ -19,7 +19,7 @@
               <span class="workspace-summary-label">Node exception</span>
               <div class="workspace-summary-val-row">
                 <strong class="text-warning" id="nodeStatusSummary">—</strong>
-                <span class="workspace-summary-sub">Offline atau degraded</span>
+                <span class="workspace-summary-sub">Terputus atau menurun</span>
               </div>
             </div>
             <div class="workspace-summary-item hide-mobile">
@@ -50,26 +50,26 @@
             </div>
             
             <div class="device-filter-toolbar" role="search">
-              <label for="deviceSearch">Find device</label>
-              <input id="deviceSearch" type="search" placeholder="Search ID, name or location" autocomplete="off" />
+              <label for="deviceSearch">Cari perangkat</label>
+              <input id="deviceSearch" type="search" placeholder="ID, nama, atau lokasi…" autocomplete="off" />
               <label for="deviceStatusFilter">Status</label>
               <select id="deviceStatusFilter">
-                <option value="all">All devices</option>
-                <option value="exceptions">Exceptions</option>
-                <option value="offline">Offline</option>
-                <option value="degraded">Degraded / stale / fault</option>
-                <option value="maintenance">Maintenance</option>
-                <option value="healthy">Healthy</option>
+                <option value="all">Semua perangkat</option>
+                <option value="exceptions">Pengecualian</option>
+                <option value="offline">Terputus</option>
+                <option value="degraded">Menurun / usang / gangguan</option>
+                <option value="maintenance">Pemeliharaan</option>
+                <option value="healthy">Sehat</option>
               </select>
               <span id="deviceFilterCount" class="device-filter-count" aria-live="polite"></span>
             </div>
-            <p id="deviceFilterEmpty" class="empty-history-notice" role="status" hidden>No devices match these filters.</p>
+            <p id="deviceFilterEmpty" class="empty-history-notice" role="status" hidden>Tidak ada perangkat yang cocok dengan filter ini.</p>
 
-            <div class="table-wrap devices-table-region" role="region" aria-label="Daftar perangkat, gulir horizontal untuk kolom lanjutan" tabindex="0">
+            <div class="table-wrap devices-table-region" role="region" aria-label="Daftar perangkat; gulir horizontal untuk melihat kolom lanjutan" tabindex="0">
               <table class="devices-table">
                 <thead>
                   <tr>
-                    <th>Device ID</th>
+                    <th>ID perangkat</th>
                     <th>Nama Node / Lokasi</th>
                     <th>Tipe Hardware</th>
                     <th>Status Koneksi</th>
@@ -77,142 +77,38 @@
                     <th>Temperatur</th>
                     <th>Latensi</th>
                     <th>Riwayat Latensi</th>
-                    <th>Inference Rate</th>
+                    <th>Laju inferensi</th>
                     <th>Aksi</th>
                   </tr>
                 </thead>
-                <tbody id="deviceTableBody">
-                  <tr class="clickable-device-row" data-device="NODE-EDGE-01">
-                    <td><strong>NODE-EDGE-01</strong></td>
-                    <td>Jl. Ahmad Yani (Wonokromo) Node AI</td>
-                    <td>Jetson Orin Nano</td>
-                    <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span><span class="status-online-text">SIMULASI</span></td>
-                    <td>
-                      <div class="diag-bar-wrap">
-                        <div class="diag-bar-track">
-                          <div class="diag-bar-fill load-green"></div>
-                        </div>
-                        <span class="diag-val">48%</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div class="diag-temp-wrap">
-                        <div class="diag-temp-bar">
-                          <div class="diag-temp-fill temp-cool-fill"></div>
-                        </div>
-                        <span class="badge-temp temp-cool">42°C</span>
-                      </div>
-                    </td>
-                    <td class="device-ping">12 ms</td>
-                    <td class="device-ping-spark"><svg viewBox="0 0 50 15" width="50" height="15"><path d="M0,10 Q10,12 20,8 T40,6 T50,8" fill="none" stroke="var(--primary-2)" stroke-width="1.5"/></svg></td>
-                    <td>28 fps (CV Stream)</td>
-                    <td><button class="btn btn-ghost compact ping-device-btn">Ping</button></td>
-                  </tr>
-                  <tr class="clickable-device-row" data-device="NODE-EDGE-02">
-                    <td><strong>NODE-EDGE-02</strong></td>
-                    <td>Jl. Raya Darmo (Taman Bungkul) Node AI</td>
-                    <td>Jetson Orin Nano</td>
-                    <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span><span class="status-online-text">SIMULASI</span></td>
-                    <td>
-                      <div class="diag-bar-wrap">
-                        <div class="diag-bar-track">
-                          <div class="diag-bar-fill load-green"></div>
-                        </div>
-                        <span class="diag-val">52%</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div class="diag-temp-wrap">
-                        <div class="diag-temp-bar">
-                          <div class="diag-temp-fill temp-cool-fill"></div>
-                        </div>
-                        <span class="badge-temp temp-cool">45°C</span>
-                      </div>
-                    </td>
-                    <td class="device-ping">14 ms</td>
-                    <td class="device-ping-spark"><svg viewBox="0 0 50 15" width="50" height="15"><path d="M0,12 Q10,6 20,9 T40,11 T50,6" fill="none" stroke="var(--primary-2)" stroke-width="1.5"/></svg></td>
-                    <td>29 fps (CV Stream)</td>
-                    <td><button class="btn btn-ghost compact ping-device-btn">Ping</button></td>
-                  </tr>
-                  <tr class="clickable-device-row" data-device="NODE-EDGE-03">
-                    <td><strong>NODE-EDGE-03</strong></td>
-                    <td>Jl. Tunjungan Node AI</td>
-                    <td>Jetson Xavier NX</td>
-                    <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span><span class="status-online-text">SIMULASI</span></td>
-                    <td>
-                      <div class="diag-bar-wrap">
-                        <div class="diag-bar-track">
-                          <div class="diag-bar-fill load-orange"></div>
-                        </div>
-                        <span class="diag-val">74%</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div class="diag-temp-wrap">
-                        <div class="diag-temp-bar">
-                          <div class="diag-temp-fill temp-warm-fill"></div>
-                        </div>
-                        <span class="badge-temp temp-warm">68°C</span>
-                      </div>
-                    </td>
-                    <td class="device-ping">18 ms</td>
-                    <td class="device-ping-spark"><svg viewBox="0 0 50 15" width="50" height="15"><path d="M0,8 Q10,10 20,12 T40,5 T50,10" fill="none" stroke="var(--primary-2)" stroke-width="1.5"/></svg></td>
-                    <td>25 fps (CV Stream)</td>
-                    <td><button class="btn btn-ghost compact ping-device-btn">Ping</button></td>
-                  </tr>
-                  <tr class="clickable-device-row" data-device="NODE-CTRL-01">
-                    <td><strong>NODE-CTRL-01</strong></td>
-                    <td>Controller Demo 01</td>
-                    <td>Perangkat contoh</td>
-                    <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span><span class="status-online-text">SIMULASI</span></td>
-                    <td>
-                      <div class="diag-bar-wrap">
-                        <div class="diag-bar-track">
-                          <div class="diag-bar-fill load-green"></div>
-                        </div>
-                        <span class="diag-val">32%</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div class="diag-temp-wrap">
-                        <div class="diag-temp-bar">
-                          <div class="diag-temp-fill temp-cool-fill"></div>
-                        </div>
-                        <span class="badge-temp temp-cool">38°C</span>
-                      </div>
-                    </td>
-                    <td class="device-ping">8 ms</td>
-                    <td class="device-ping-spark"><svg viewBox="0 0 50 15" width="50" height="15"><path d="M0,6 Q10,8 20,5 T40,7 T50,4" fill="none" stroke="var(--success)" stroke-width="1.5"/></svg></td>
-                    <td>Active Telemetry</td>
-                    <td><button class="btn btn-ghost compact ping-device-btn">Ping</button></td>
-                  </tr>
-                </tbody>
+                <tbody id="deviceTableBody"><tr class="device-empty-row"><td colspan="10">Menunggu data perangkat model dari server simulasi…</td></tr></tbody>
               </table>
             </div>
           </article>
 
           <!-- Slide-out Device Configuration Editor Drawer -->
-          <aside class="device-config-drawer glass-panel" id="deviceDrawerConfig">
+          <aside class="device-config-drawer glass-panel" id="deviceDrawerConfig" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="deviceConfigTitle" tabindex="-1">
             <button class="close-drawer" id="closeDeviceDrawer" type="button" aria-label="Tutup drawer">&times;</button>
-            <h3>Node Parameters</h3>
+            <h3 id="deviceConfigTitle">Detail dan konfigurasi perangkat</h3>
             <p>Konfigurasi parameter telemetri dan Edge AI node.</p>
             <form id="deviceConfigForm" class="cfg-form-gap">
               <div class="form-group cfg-form-group">
-                <label class="cfg-label" for="cfgDeviceName">Device Name</label>
+                <label class="cfg-label" for="cfgDeviceName">Nama perangkat</label>
                 <input type="text" id="cfgDeviceName" class="search-box input cfg-input-readonly" readonly />
               </div>
               <div class="form-group cfg-form-group">
-                <label class="cfg-label" for="cfgDeviceFps">Frame Rate Limit (FPS)</label>
+                <label class="cfg-label" for="cfgDeviceFps">Batas laju bingkai (FPS)</label>
                 <input type="number" id="cfgDeviceFps" class="search-box input cfg-input-readonly" min="5" max="60" value="30" />
               </div>
               <div class="form-group cfg-form-group">
-                <label class="cfg-label" for="cfgDeviceResolution">Camera Resolution</label>
+                <label class="cfg-label" for="cfgDeviceResolution">Resolusi kamera</label>
                 <select id="cfgDeviceResolution" class="selector cfg-select-box">
                   <option value="1080p">1920x1080 (Full HD)</option>
                   <option value="720p">1280x720 (HD)</option>
                   <option value="4k">3840x2160 (4K UHD)</option>
                 </select>
               </div>
+              <p id="deviceConfigPermissionNote" class="device-permission-note" role="status" hidden>Perubahan konfigurasi hanya tersedia untuk Admin. Nilai pada sesi ini bersifat baca saja.</p>
               <div class="device-diagnostics-metrics glass-soft cfg-diagnostics-box">
                 <div>Suhu GPU: <span id="diagTemp">--</span></div>
                 <div>GPU Load: <span id="diagGpu">--</span></div>
@@ -223,7 +119,7 @@
                 <label class="cfg-label">Grafik Latensi Jaringan (Canvas)</label>
                 <canvas id="deviceLatencyCanvas" width="260" height="80" class="cfg-latency-canvas"></canvas>
               </div>
-              <button class="btn btn-primary btn-full" type="submit">Simpan Konfigurasi</button>
+              <button class="btn btn-primary btn-full" type="submit">Simpan konfigurasi</button>
             </form>
           </aside>
         </section>

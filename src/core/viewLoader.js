@@ -7,19 +7,19 @@
 export class ViewLoader {
   constructor() {
     this.viewMap = {
-      'dashboard': { file: '/views/dashboardView.html', id: 'view-dashboard', title: 'Dashboard' },
-      'map': { file: '/views/mapView.html', id: 'view-map', title: 'City Map' },
-      'cctv': { file: '/views/cctvView.html', id: 'view-cctv', title: 'CCTV Monitoring' },
-      'signals': { file: '/views/signalsView.html', id: 'view-signals', title: 'Traffic Signals' },
-      'emergency': { file: '/views/emergenciesView.html', id: 'view-emergency', title: 'Emergency Priority' },
-      'emergencies': { file: '/views/emergenciesView.html', id: 'view-emergency', title: 'Emergency Priority' },
-      'analytics': { file: '/views/analyticsView.html', id: 'view-analytics', title: 'Analytics' },
-      'prediction': { file: '/views/predictionView.html', id: 'view-prediction', title: 'Prediction' },
-      'incidents': { file: '/views/incidentsView.html', id: 'view-incidents', title: 'Incidents' },
-      'reports': { file: '/views/reportsView.html', id: 'view-reports', title: 'Reports' },
-      'devices': { file: '/views/devicesView.html', id: 'view-devices', title: 'Device Management' },
-      'integration': { file: '/views/integrationView.html', id: 'view-integration', title: 'Integrations' },
-      'settings': { file: '/views/settingsView.html', id: 'view-settings', title: 'Settings' }
+      'dashboard': { file: '/views/dashboardView.html', id: 'view-dashboard', title: 'Ikhtisar' },
+      'map': { file: '/views/mapView.html', id: 'view-map', title: 'Peta kota' },
+      'cctv': { file: '/views/cctvView.html', id: 'view-cctv', title: 'Pemantauan CCTV' },
+      'signals': { file: '/views/signalsView.html', id: 'view-signals', title: 'Sinyal lalu lintas' },
+      'emergency': { file: '/views/emergenciesView.html', id: 'view-emergency', title: 'Prioritas darurat' },
+      'emergencies': { file: '/views/emergenciesView.html', id: 'view-emergency', title: 'Prioritas darurat' },
+      'analytics': { file: '/views/analyticsView.html', id: 'view-analytics', title: 'Analitik' },
+      'prediction': { file: '/views/predictionView.html', id: 'view-prediction', title: 'Prediksi' },
+      'incidents': { file: '/views/incidentsView.html', id: 'view-incidents', title: 'Insiden' },
+      'reports': { file: '/views/reportsView.html', id: 'view-reports', title: 'Laporan' },
+      'devices': { file: '/views/devicesView.html', id: 'view-devices', title: 'Perangkat' },
+      'integration': { file: '/views/integrationView.html', id: 'view-integration', title: 'Integrasi' },
+      'settings': { file: '/views/settingsView.html', id: 'view-settings', title: 'Pengaturan' }
     };
 
     this.componentMap = {

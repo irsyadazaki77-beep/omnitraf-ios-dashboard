@@ -114,8 +114,9 @@ export function initializeSocketServer(httpServer, { redisManager = null, leader
       provenance: 'SIMULATED',
       safetyBoundary: SAFETY_BOUNDARY
     });
-    if (isRoomAllowedForRole(REALTIME_ROOMS.CCTV_ALL, socket.user.role) && (OMNITRAF_RUNTIME_MODE === 'single' || leadership?.isLeader())) {
-      socket.emit('cctv:vision-update', cvEngine.generateFramePayload(backendState.state.isChaosMode));
+    if (isRoomAllowedForRole(REALTIME_ROOMS.CCTV_ALL, socket.user.role)) {
+      const latestFrame = cvEngine.getLatestFramePayload();
+      if (latestFrame) socket.emit('cctv:vision-update', latestFrame);
     }
 
     // Dynamic Room Subscription Management (Langkah 4 & 13)
@@ -215,7 +216,9 @@ export function initializeSocketServer(httpServer, { redisManager = null, leader
   const startSimulationLoops = () => {
     if (intervalTimers.length || (leadership && !leadership.isLeader())) return;
     lastTrafficTickMonotonic = backendState.clock.monotonic();
+    const leaseValid = () => OMNITRAF_RUNTIME_MODE === 'single' || leadership?.hasLeaseSafetyMargin();
     const trafficTicker = setInterval(() => {
+      if (!leaseValid()) { stopSimulationLoops(); return; }
       const nowMono = backendState.clock.monotonic();
       const elapsedMs = Math.max(100, Math.round(nowMono - lastTrafficTickMonotonic));
       lastTrafficTickMonotonic = nowMono;
@@ -225,6 +228,7 @@ export function initializeSocketServer(httpServer, { redisManager = null, leader
       leadership?.publishSnapshot().catch(() => {});
     }, 1000);
     const visionTicker = setInterval(() => {
+      if (!leaseValid()) { stopSimulationLoops(); return; }
       if (OMNITRAF_RUNTIME_MODE === 'single' && io.engine.clientsCount === 0) return;
       const visionPayload = cvEngine.generateFramePayload(backendState.state.isChaosMode);
       realtimeDispatcher.dispatchCctvVision(visionPayload);

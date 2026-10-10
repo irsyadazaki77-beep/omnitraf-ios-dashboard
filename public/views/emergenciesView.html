@@ -11,7 +11,7 @@
                 <span class="emergency-kicker-sub">Command Center 112 Surabaya</span>
               </div>
               <h1 class="emergency-hero-title">
-                Simulasi Koridor Demo (Bundaran Waru → RSUD Dr. Soetomo)
+                Simulasi prioritas darurat
               </h1>
               <p class="emergency-hero-desc">
                 Mendemonstrasikan aturan <strong>Green Wave Clearance</strong> pada state sintetis. Tidak ada GPS, armada, APILL, atau telemetri lapangan yang terhubung.
@@ -20,7 +20,7 @@
             <div class="emergency-hero-actions">
               <button class="btn btn-danger btn-lg emergency-dispatch-btn" id="btnStart112Sim" type="button" data-capability="emergency:control">
                 <span class="btn-dot-pulse"></span>
-                <span>Mulai Simulasi Tanggap Darurat 112</span>
+                <span>Atur kendaraan dan rute</span>
               </button>
               <button class="btn btn-outline btn-lg emergency-stop-btn" id="btnStop112Sim" type="button" data-capability="emergency:control">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
@@ -35,10 +35,11 @@
           <article class="emergency-dispatcher glass-panel">
             <div class="section-head">
               <div>
-                <h2>Kontrol Skenario Preemption</h2>
+                <h2>Kontrol simulasi prioritas</h2>
                 <p>Ubah state simulasi prioritas dan fase sinyal. Tidak mengirim perintah ke persimpangan SITS.</p>
               </div>
             </div>
+            <p class="emergency-permission-note" id="emergencyPermissionNote" role="status" hidden>Kontrol simulasi tersedia untuk peran Operator atau Admin. Sesi ini hanya dapat melihat status.</p>
             <form id="emergencyActuatorForm" class="actuator-form">
               <div class="form-group form-group-mb-12">
                 <label class="form-label-muted" for="respType">Tipe Kendaraan Darurat</label>
@@ -53,14 +54,13 @@
                 <label class="form-label-muted" for="respRoute">Rute & Koridor Jalan</label>
                 <select id="respRoute" class="selector select-full">
                   <option value="route-yani-darmo">Jl. Ahmad Yani → Jl. Raya Darmo (RSU Dr. Soetomo)</option>
-                  <option value="route-kertajaya">Jl. Kertajaya → Dharmawangsa (RS Airlangga)</option>
-                  <option value="route-tunjungan">Jl. Tunjungan → Basuki Rahmat (Pusat Kota)</option>
+                  <option value="route-merr-soetomo">MERR Kertajaya → Gubeng (RSUD Dr. Soetomo)</option>
                 </select>
               </div>
               
               <div class="form-group form-group-mb-16">
                 <label class="form-label-muted" for="respName">Identitas Armada / Nomor Lambung</label>
-                <input type="text" id="respName" class="search-box input input-full" value="Ambulans Demo-08" placeholder="Contoh: Ambulans Demo 08, PMK Demo 11" required />
+                <input type="text" maxlength="50" pattern="[A-Za-z0-9][A-Za-z0-9_-]{1,49}" title="2–50 karakter: huruf, angka, tanda hubung atau garis bawah; tanpa spasi" id="respName" class="search-box input input-full" value="AMB-DEMO-08" placeholder="Contoh: AMB-DEMO-08, PMK-DEMO-11" required />
               </div>
               
               <button type="submit" class="btn btn-primary btn-full" id="btnLaunchPreemption">Aktifkan Sinyal Prioritas</button>
@@ -86,7 +86,7 @@
                 <h2>Alur Prioritas Simulasi</h2>
                 <p>Status dan progres kendaraan berasal dari model; tidak ada integrasi GPS atau layanan 112.</p>
               </div>
-              <span class="pill pill-danger" id="activePriorityCount">2 Active priority</span>
+              <span class="pill pill-danger" id="activePriorityCount">Memuat prioritas</span>
             </div>
 
             <div class="emergency-list-grid" id="emergencyListGrid">

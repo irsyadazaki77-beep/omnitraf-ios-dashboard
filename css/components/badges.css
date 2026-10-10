@@ -195,31 +195,31 @@
    Incident Status Badges & Action Buttons
    ========================================================================== */
 .inc-badge-new {
-  background: rgba(239, 68, 68, 0.2) !important;
-  color: #f87171 !important;
-  border: 1px solid rgba(239, 68, 68, 0.4) !important;
+  background: var(--danger-soft);
+  color: var(--status-danger);
+  border: 1px solid var(--danger-border);
 }
 
 .inc-badge-dispatched {
-  background: rgba(56, 189, 248, 0.2) !important;
-  color: #38bdf8 !important;
-  border: 1px solid rgba(56, 189, 248, 0.4) !important;
+  background: var(--info-soft);
+  color: var(--status-info);
+  border: 1px solid var(--info-border);
 }
 
 .inc-badge-resolved {
-  background: rgba(34, 197, 94, 0.2) !important;
-  color: #4ade80 !important;
-  border: 1px solid rgba(34, 197, 94, 0.4) !important;
+  background: var(--success-soft);
+  color: var(--status-success);
+  border: 1px solid var(--success-border);
 }
 
 .btn-map-shortcut {
-  background: rgba(14, 165, 233, 0.15) !important;
-  border: 1px solid rgba(14, 165, 233, 0.35) !important;
-  color: #38bdf8 !important;
-  font-weight: 600 !important;
+  background: var(--info-soft);
+  border: 1px solid var(--info-border);
+  color: var(--status-info);
+  font-weight: 600;
 }
 
 .btn-map-shortcut:hover {
-  background: rgba(14, 165, 233, 0.3) !important;
-  border-color: rgba(14, 165, 233, 0.6) !important;
+  background: var(--info-border);
+  border-color: var(--status-info);
 }

@@ -264,9 +264,14 @@ export class SocketClient {
     authManager.onAuthChange((user, token) => {
       if (this.socket) {
         this.socket.auth = { token: token || null };
-        if (this.socket.connected) {
+        if (user) {
           console.info('🔄 [SocketClient] Memperbarui autentikasi socket session...');
+          this.socket.io.opts.reconnection = true;
           this.socket.disconnect().connect();
+        } else {
+          this.socket.io.opts.reconnection = false;
+          this.socket.disconnect();
+          setConnectionLifecycle('auth_failed', { isStaleData: true });
         }
       }
     });
@@ -383,7 +388,7 @@ export class SocketClient {
     // 3. Connection Error
     this.socket.on('connect_error', (err) => {
       this.connectionAttemptCount++;
-      if (err && err.message && err.message.includes('AUTHENTICATION_FAILED')) {
+      if (err && err.message && /AUTHENTICATION_(FAILED|REQUIRED)/.test(err.message)) {
         console.error('🔒 [SocketClient] Autentikasi ditolak server:', err.message);
         setConnectionLifecycle('auth_failed', {
           connectionAttemptCount: this.connectionAttemptCount,
@@ -393,7 +398,8 @@ export class SocketClient {
 
         // Hapus token kedaluwarsa/tidak valid dari client, lalu coba dapatkan sesi baru
         console.warn('🔑 [SocketClient] Mencoba memulihkan sesi dengan melakukan re-login otomatis...');
-        authManager.logout();
+        this.socket.io.opts.reconnection = false;
+        this.socket.disconnect();
         
         setTimeout(() => {
           authManager.ensureActiveSession()
@@ -643,7 +649,7 @@ export class SocketClient {
     const offlineBanner = document.getElementById("offlineNotificationBanner");
     const updateBanner = (kind, title, detail, visible) => {
       if (!offlineBanner) return;
-      offlineBanner.dataset.status = kind;
+      if (offlineBanner.dataset) offlineBanner.dataset.status = kind;
       offlineBanner.classList.toggle('is-hidden', !visible);
       const message = document.getElementById('offlineBannerMessage');
       if (!message) return;
@@ -679,7 +685,7 @@ export class SocketClient {
       sseText.textContent = `Menghubungkan (#${attempt})...`;
       sseDot.style.background = "var(--warning)";
       sseDot.style.boxShadow = "0 0 6px var(--warning)";
-      updateBanner('reconnecting', 'Menghubungkan ulang', 'Data stream simulasi sementara tidak diperbarui.', true);
+      updateBanner('reconnecting', 'Server simulasi terputus', 'Stream belum tersambung kembali. Angka lokal yang terlihat tetap berlabel simulasi.', true);
       if (sitsStatusText) sitsStatusText.textContent = "DEMO";
 
     } else if (status === 'connecting') {
@@ -697,10 +703,10 @@ export class SocketClient {
       if (sitsStatusText) sitsStatusText.textContent = "DEMO";
 
     } else if (status === 'auth_failed') {
-      sseText.textContent = "Sesi Berakhir (Auth Failed)";
+      sseText.textContent = "Demo lokal · masuk untuk stream";
       sseDot.style.background = "var(--danger)";
       sseDot.style.boxShadow = "0 0 6px var(--danger)";
-      updateBanner('offline', 'Sesi simulator berakhir', 'Autentikasi diperlukan sebelum stream dapat dipulihkan.', true);
+      updateBanner('auth', 'Mode demo lokal', 'Masuk untuk menerima stream server dan mengakses kontrol sesuai peran.', true);
       if (sitsStatusText) sitsStatusText.textContent = "DEMO";
 
     } else { // 'offline' | 'fallback'
@@ -726,7 +732,7 @@ export class SocketClient {
     const status = state.connectionStatus;
 
     if (perfText) {
-      perfText.textContent = `Connection: ${status.toUpperCase()}`;
+      perfText.textContent = status === 'auth_failed' ? 'Demo lokal · belum masuk' : `Koneksi: ${({ connected: 'tersambung', reconnecting: 'menghubungkan ulang', connecting: 'menghubungkan', offline: 'terputus', resyncing: 'sinkronisasi' })[status] || status}`;
     }
 
     if (perfDot) {

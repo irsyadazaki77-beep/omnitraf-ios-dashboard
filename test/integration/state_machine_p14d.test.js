@@ -451,4 +451,20 @@ describe('PHASE 14D — Formal Incident & Emergency State Machine + Cross-Module
     backendState.state.activeEmergencies = backendState.state.activeEmergencies.filter(e => e.id !== emgId);
     backendState.state.greenWaveActive = false;
   });
+  test('emergency gateway preserves selected vehicle type and route, then cancellation removes priority', async () => {
+    const actor = { id: 'usr-admin', name: 'Test Admin', role: ROLES.ADMIN };
+    const code = `UNIT-QA-${Date.now()}`;
+    const result = await commandExecutor.executeCommand({
+      action: 'emergency:activate', targetId: code,
+      payload: { code, type: 'Pemadam', route: 'route-merr-soetomo' },
+      commandId: `CMD-TYPE-${Date.now()}`, authenticatedUser: actor
+    });
+    assert.equal(result.success, true);
+    const emergency = backendState.state.activeEmergencies.find(item => item.vehicleId === code);
+    assert.equal(emergency.vehicleType, 'PMK');
+    assert.equal(emergency.routeId, 'route-merr-soetomo');
+    await commandExecutor.executeCommand({ action: 'emergency:cancel', targetId: emergency.id, authenticatedUser: actor });
+    assert.equal(emergency.status, EMERGENCY_STATES.CANCELLED);
+  });
+
 });

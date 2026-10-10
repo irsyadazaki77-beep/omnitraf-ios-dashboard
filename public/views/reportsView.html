@@ -16,9 +16,9 @@
               </div>
             </div>
             <div class="workspace-summary-item">
-              <span class="workspace-summary-label">Kompilasi Harian</span>
+              <span class="workspace-summary-label">Ekspor Lokal</span>
               <div class="workspace-summary-val-row">
-                <strong class="text-success">Siap Diekspor</strong>
+                <strong class="text-success">PDF lokal tersedia</strong>
                 <span class="workspace-summary-sub">State simulator</span>
               </div>
             </div>
@@ -44,33 +44,14 @@
           <article class="report-card glass-panel reveal-card">
             <div class="report-card-content">
               <div class="report-kicker-row">
-                <span class="badge badge-primary-soft">REPORT CENTER</span>
+                <span class="badge badge-primary-soft">PUSAT LAPORAN</span>
                 <span class="unboxed-meta-sep">·</span>
-                <span class="report-kicker-meta">Snapshot Harian</span>
+                <span class="report-kicker-meta">Snapshot Sesi</span>
               </div>
-              <h2 class="report-card-title">Daily Mobility Snapshot</h2>
+              <h2 class="report-card-title">Snapshot mobilitas sesi</h2>
               <p class="report-card-desc">Contoh ringkasan dari model lalu lintas OmniTRAF; tidak ditujukan untuk keputusan atau evaluasi operasional.</p>
             </div>
-            <button class="btn btn-primary compact report-action-btn" type="button" data-action="download-report" data-report-type="Daily Mobility">Generate daily snapshot</button>
-          </article>
-
-          <!-- Weekly & Synthesis Snapshots List -->
-          <article class="reports-generator glass-panel">
-            <div class="section-head">
-              <div>
-                <h2>Mobility Snapshots & PDF Report</h2>
-                <p>Unduh kompilasi data simulasi untuk ditinjau sebagai bahan demonstrasi.</p>
-              </div>
-            </div>
-            <div class="report-snapshots-list">
-              <div class="report-snapshot-item">
-                <div class="snap-info">
-                  <strong>Contoh sintesis mingguan — data sintetis</strong>
-                  <p>Bukan histori mingguan aktual, perbandingan SPM, atau pengukuran reduksi emisi.</p>
-                </div>
-                <button class="btn btn-ghost compact" data-action="download-report" data-report-type="Weekly Synthesis">Generate & Download</button>
-              </div>
-            </div>
+            <button class="btn btn-primary compact report-action-btn" type="button" data-action="download-report" data-report-type="Snapshot sesi">Buat snapshot sesi</button>
           </article>
 
           <!-- Reporting tools for the simulation prototype -->
@@ -78,7 +59,7 @@
             <div class="section-head">
               <div>
                 <h2>Ekspor Data Prototipe</h2>
-                <p>Ekspor data prototipe simulasi ke CSV, PDF demo, atau salin payload telemetri. Berkas yang dihasilkan bukan dokumen resmi atau laporan operasional Dishub.</p>
+                <p>Ekspor insiden CSV atau snapshot sesi PDF/JSON. Buat pratinjau snapshot untuk menetapkan data dan waktu yang dipakai oleh semua format laporan.</p>
               </div>
               <span class="badge badge-simulated">SIMULASI</span>
             </div>
@@ -86,27 +67,27 @@
             <div class="reports-enterprise-actions">
               <button class="btn btn-primary" id="btnExportCsv" type="button">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                <span>Export CSV Data Insiden</span>
+                <span>Ekspor CSV insiden</span>
               </button>
               <button class="btn btn-outline" id="btnPrintExecutive" type="button">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-                <span>Cetak Laporan Eksekutif (PDF)</span>
+                <span>Buka dialog cetak</span>
               </button>
               <button class="btn btn-secondary" id="btnCopyTelemetryJson" type="button">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                <span>Salin Data Telemetri (JSON API)</span>
+                <span>Salin snapshot (JSON)</span>
               </button>
             </div>
           </article>
           <article class="reports-history glass-panel">
             <div class="section-head">
               <div>
-                <h2>Riwayat ekspor sesi ini</h2>
+                <h2>Riwayat berkas sesi ini</h2>
                 <p>Daftar hanya disimpan selama sesi browser saat ini.</p>
               </div>
             </div>
             <div class="export-history-list export-history-scroll" id="exportHistoryList" aria-live="polite">
-              <p class="empty-history-text empty-history-notice">Belum ada laporan yang diekspor.</p>
+              <p class="empty-history-text empty-history-notice">Belum ada berkas yang dibuat.</p>
             </div>
           </article>
         </section>
@@ -125,7 +106,7 @@
           </div>
 
           <div class="print-report-heading">
-            <h3 class="print-report-title">LAPORAN EKSEKUTIF MOBILITAS & KINERJA APILL ADAPTIF</h3>
+            <h3 class="print-report-title">SNAPSHOT SESI MOBILITAS SIMULASI</h3>
             <p class="print-meta-line">ID Demo: OMNITRAF-SIM &nbsp;|&nbsp; Waktu pembuatan: <span id="printDateStr">—</span></p>
             <p class="print-safety-note">DATA SIMULASI • BUKAN DOKUMEN RESMI ATAU HASIL PENGUKURAN KOTA</p>
           </div>
@@ -179,9 +160,9 @@
                 <th>Status Terakhir</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="printCorridorRows">
               <tr>
-                <td colspan="5" id="printCorridorRows">Data koridor belum tersedia pada snapshot ini.</td>
+                <td colspan="5">Data koridor belum tersedia pada snapshot ini.</td>
               </tr>
             </tbody>
           </table>

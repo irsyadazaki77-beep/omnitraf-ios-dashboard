@@ -55,52 +55,51 @@ export function calculateDiurnalIntensity(hour, params = {}) {
  * Calculates Data Quality & Health Layer
  */
 export function calculateDataQuality(inputState = {}) {
-  const isStale = !!inputState.isStaleData;
   const isConnected = inputState.connectionStatus === 'connected' || inputState.sseConnected === true;
-  const cctvOnline = Number(inputState.telemetry?.cctvOnline ?? inputState.cctvOnline ?? 184);
-  const totalCctv = 184;
-  const cameraCoveragePct = Math.min(100, Math.round((cctvOnline / totalCctv) * 100));
+  const cctvOnlineRaw = inputState.telemetry?.cctvOnline ?? inputState.cctvOnline;
+  const cctvOnline = Number(cctvOnlineRaw);
+  const totalCctv = Number(inputState.telemetry?.cctvTotal ?? inputState.cctvTotal);
+  const cameraCoveragePct = Number.isFinite(cctvOnline) && Number.isFinite(totalCctv) && totalCctv > 0
+    ? Math.min(100, Math.round((cctvOnline / totalCctv) * 100))
+    : null;
+  const rawTimestamp = inputState.lastTelemetryAt ?? inputState.timestampMs;
+  const parsedTimestamp = typeof rawTimestamp === 'string' && !/^\d{10,13}$/.test(rawTimestamp)
+    ? Date.parse(rawTimestamp)
+    : Number(rawTimestamp);
+  const telemetryAgeMs = Number.isFinite(parsedTimestamp) && parsedTimestamp > 0
+    ? Math.max(0, Date.now() - parsedTimestamp)
+    : null;
+  const isStale = !!inputState.isStaleData || !isConnected || telemetryAgeMs === null || telemetryAgeMs > 15000;
 
   let freshness = "FRESH";
-  let healthStatus = "HEALTHY";
-  let completeness = 98;
-  let penalty = 0;
+  let healthStatus = "SIMULATED";
+  const completeness = null;
 
   if (!isConnected || isStale) {
     freshness = "STALE";
     healthStatus = "DEGRADED";
-    completeness = 65;
-    penalty += 28;
   }
 
-  if (cameraCoveragePct < 80) {
+  if (cameraCoveragePct !== null && cameraCoveragePct < 80) {
     healthStatus = "DEGRADED";
-    penalty += Math.round((80 - cameraCoveragePct) * 0.4);
   }
 
   if (inputState.isChaosMode) {
     healthStatus = "CHAOS_ALERT";
-    penalty += 20;
   }
 
-  const baseConfidence = 96;
-  const finalConfidence = Math.max(35, Math.min(99, baseConfidence - penalty));
-
-  let provenance = "REALTIME-DERIVED";
-  if (inputState.isTimeTravel || inputState.isSimulated) {
-    provenance = "SIMULATED";
-  } else if (!isConnected || isStale || cameraCoveragePct < 70) {
-    provenance = "DEGRADED";
-  }
+  // This engine uses a deterministic curve and scenario assumptions. A live
+  // connection does not make its output field-calibrated.
+  const provenance = "SIMULATED";
 
   return {
     freshness,
     completeness,
-    sourceAvailability: isConnected ? 100 : 40,
+    sourceAvailability: isConnected ? 100 : 0,
     cameraCoverage: cameraCoveragePct,
-    telemetryAgeMs: isConnected ? 250 : 15000,
+    telemetryAgeMs,
     predictionInputHealth: healthStatus,
-    confidence: finalConfidence,
+    confidence: null,
     provenance
   };
 }
@@ -117,7 +116,10 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
   const isRain = !!state.isRainMode || state.roadCondition === 'wet';
   const greenWave = !!state.greenWaveActive;
   const greenSplit = Number(state.greenSplitWonokromo || 35);
-  const incidents = Array.isArray(state.incidents) ? state.incidents.filter(i => i.status === 'ACTIVE') : [];
+  const terminalIncidentStatuses = new Set(['RESOLVED', 'ARCHIVED', 'CLOSED', 'CANCELLED']);
+  const incidents = Array.isArray(state.incidents)
+    ? state.incidents.filter(i => !terminalIncidentStatuses.has(String(i.status || 'ACTIVE').toUpperCase()))
+    : [];
   const activeEmergencies = Array.isArray(state.activeEmergencies) ? state.activeEmergencies.filter(e => e.status !== 'COMPLETED' && e.status !== 'CANCELLED') : [];
 
   // Modifiers
@@ -128,28 +130,29 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
   if (greenWave) intensity = Math.max(0.12, intensity - 0.15);
 
   const probabilityValue = Math.round(intensity * 100);
+  const candidateOptimizedSplit = Math.min(90, Math.max(35, greenSplit + (probabilityValue > 60 ? 10 : 0)));
   const expectedSpeedKmh = Math.max(8, Math.round(54 - (intensity * 40)));
   const expectedVolume = Math.round(500 + intensity * 1200);
   const expectedQueueLength = Math.round(20 + intensity * 280);
 
   // Risk Classification
   let riskLevel = "LOW";
-  let riskText = "Low Risk (Lancar)";
+  let riskText = "Indeks risiko model rendah";
   let riskColor = "var(--success)";
-  let trafficStatus = "Lancar / Bebas Hambatan";
+  let trafficStatus = "Lancar / bebas hambatan";
   let tomorrowStatus = "Rendah";
 
   if (probabilityValue >= 75) {
     riskLevel = "HIGH";
-    riskText = "High Risk Kemacetan (Kritis)";
+    riskText = "Indeks risiko model tinggi";
     riskColor = "var(--danger)";
-    trafficStatus = "Peak Hour / Kepadatan Tinggi";
+    trafficStatus = "Jam puncak / kepadatan tinggi";
     tomorrowStatus = "Tinggi";
   } else if (probabilityValue >= 48) {
     riskLevel = "MODERATE";
-    riskText = "Moderate Risk (Padat Merayap)";
+    riskText = "Indeks risiko model sedang";
     riskColor = "var(--warning)";
-    trafficStatus = "Moderat / Padat Teratur";
+    trafficStatus = "Sedang / padat teratur";
     tomorrowStatus = "Sedang";
   }
 
@@ -167,33 +170,33 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
   if (isRain) factors.push("Pengurangan Kecepatan & Jarak Aman Akibat Hujan");
   if (isChaos) factors.push("Mode Keos Aktif — Sinyal Tidak Sinkron");
   if (incidents.length > 0) factors.push(`Deteksi ${incidents.length} Insiden Aktif di Koridor`);
-  if (dataQuality.provenance === "DEGRADED") factors.push("Data Telemetri Basi / Koneksi Terdegradasi");
+  if (dataQuality.freshness === "STALE") factors.push("Koneksi atau waktu telemetri tidak cukup untuk menilai kebaruan input");
 
   // Rule-Based Decision Support Recommendation
   let recText = "Kondisi arus lalu lintas optimal. Pertahankan siklus hijau standar ATCS SITS.";
   let reasonCodes = ["NORMAL_FLOW"];
-  let expectedImpact = "Waktu tunggu stabil 28-35 detik";
+  let expectedImpact = "Dampak lapangan tidak tersedia; lihat perbandingan skenario model.";
   let recRisk = "Low";
 
   if (activeEmergencies.length > 0) {
     recText = `🚨 Sinyal Prioritas Darurat: Prioritaskan koridor ${activeEmergencies[0].routeId || 'A. Yani - Darmo'} untuk ${activeEmergencies[0].vehicleId || 'Ambulans 112'}.`;
     reasonCodes = ["CRITICAL_EMERGENCY"];
-    expectedImpact = "Waktu tanggap darurat <3 menit ke RSUD Dr. Soetomo";
+    expectedImpact = "Rute prioritas divisualisasikan pada simulasi; estimasi waktu tempuh tidak tersedia.";
     recRisk = "Controlled High";
   } else if (isRain) {
     recText = "🌧️ Mode Hujan Aktif: Tambah durasi lampu kuning (+1.5s) dan All-Red pembersihan (+1s) untuk keselamatan jalan basah.";
     reasonCodes = ["RAIN_SAFETY_ADJUSTMENT"];
-    expectedImpact = "Mencegah kecelakaan akibat selip di persimpangan";
+    expectedImpact = "Parameter keselamatan disimulasikan; dampak terhadap kecelakaan tidak dihitung.";
     recRisk = "Low";
   } else if (probabilityValue >= 75) {
-    recText = "⚡ Rekomendasi AI: Aktifkan Koridor Gelombang Hijau A. Yani - Wonokromo (+12s Green Split) & alihkan beban ke MERR.";
+    recText = `⚡ Skenario model: uji Green Split A. Yani–Wonokromo +${Math.max(0, candidateOptimizedSplit - greenSplit)} detik; bandingkan dampaknya pada MERR.`;
     reasonCodes = ["HIGH_CONGESTION", "LOW_SPEED", "LONG_QUEUE"];
-    expectedImpact = "Reduksi waktu tunggu -18 detik, peningkatan kecepatan +6 km/jam";
+    expectedImpact = "Perubahan indikator hanya berupa skenario model; dampak lapangan belum divalidasi.";
     recRisk = "Medium";
   } else if (probabilityValue >= 48) {
-    recText = "✨ Rekomendasi AI: Tingkatkan Green Split Wonokromo +8 detik untuk mengurai akumulasi antrean frontage.";
+    recText = `✨ Skenario model: uji Green Split Wonokromo +${Math.max(0, candidateOptimizedSplit - greenSplit)} detik untuk membandingkan antrean frontage.`;
     reasonCodes = ["MODERATE_CONGESTION", "QUEUE_BUILDUP"];
-    expectedImpact = "Reduksi antrean -45 meter";
+    expectedImpact = "Perubahan indikator hanya berupa skenario model; dampak lapangan belum divalidasi.";
     recRisk = "Low";
   }
 
@@ -214,15 +217,24 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
   };
 
   // Scenario Comparison: Baseline vs AI Optimized
-  const optimizedSplit = Math.min(75, Math.max(35, greenSplit + (probabilityValue > 60 ? 10 : 0)));
+  const optimizedSplit = candidateOptimizedSplit;
   const waitTimeBaseline = Math.round(30 + intensity * 50);
-  const waitTimeOptimized = Math.max(18, Math.round(waitTimeBaseline * 0.72));
   const queueBaselineMeters = Math.round(50 + intensity * 250);
-  const queueOptimizedMeters = Math.max(20, Math.round(queueBaselineMeters * 0.65));
   const speedBaselineKmh = expectedSpeedKmh;
-  const speedOptimizedKmh = Math.min(55, Math.round(expectedSpeedKmh * 1.22));
   const throughputBaseline = Math.round(1100 + intensity * 800);
-  const throughputOptimized = Math.round(throughputBaseline * 1.18);
+  // Illustrative simulator response is proportional to the configured split
+  // change. Identical inputs produce zero claimed benefit. This is still a
+  // transparent scenario assumption, not a field-calibrated traffic model.
+  const addedGreenSec = Math.max(0, optimizedSplit - greenSplit);
+  const responseScale = Math.min(1, addedGreenSec / 10);
+  const waitReductionRatio = 0.28 * responseScale;
+  const queueReductionRatio = 0.35 * responseScale;
+  const speedGainRatio = 0.20 * responseScale;
+  const throughputGainRatio = 0.18 * responseScale;
+  const waitTimeOptimized = Math.round(waitTimeBaseline * (1 - waitReductionRatio));
+  const queueOptimizedMeters = Math.round(queueBaselineMeters * (1 - queueReductionRatio));
+  const speedOptimizedKmh = Math.round(speedBaselineKmh * (1 + speedGainRatio));
+  const throughputOptimized = Math.round(throughputBaseline * (1 + throughputGainRatio));
 
   const idlingHoursSaved = Number(((waitTimeBaseline - waitTimeOptimized) * expectedVolume / 3600).toFixed(1));
   const fuelSavedLiters = Number((idlingHoursSaved * ESG_CONSTANTS.IDLING_FUEL_LITERS_PER_HOUR).toFixed(1));
@@ -248,7 +260,7 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
       waitTimeReductionPct: Math.round(((waitTimeBaseline - waitTimeOptimized) / waitTimeBaseline) * 100),
       queueReductionPct: Math.round(((queueBaselineMeters - queueOptimizedMeters) / queueBaselineMeters) * 100),
       speedGainPct: Math.round(((speedOptimizedKmh - speedBaselineKmh) / speedBaselineKmh) * 100),
-      throughputGainPct: 18,
+      throughputGainPct: Math.round(throughputGainRatio * 100),
       fuelSavedLiters,
       co2SavedKg,
       monetarySavedRp
@@ -256,7 +268,9 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
     assumptions: {
       idlingFuelFactor: "0.28 L/jam per kendaraan mengantre",
       emissionFactor: "2.31 kg CO2 per Liter BBM",
-      fuelPrice: "Rp 14.500/Liter (Pertalite/Solar proxy)"
+      fuelPrice: "Rp 14.500/Liter (Pertalite/Solar proxy)",
+      responseModel: "Asumsi demonstrasi: manfaat penuh bertahap untuk tambahan 10 detik green split; tidak divalidasi dengan data lapangan.",
+      addedGreenSec
     }
   };
 
@@ -311,8 +325,8 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
     scenarioComparison,
     esgImpact: {
       observedSavings: {
-        co2SavedKg: Number(state.telemetry?.co2SavedKg || state.co2SavedKg || 1420),
-        fuelSavedLiters: Number(state.telemetry?.fuelSavedLiters || state.fuelSavedLiters || 580)
+        co2SavedKg: state.telemetry?.co2SavedKg ?? state.co2SavedKg ?? null,
+        fuelSavedLiters: state.telemetry?.fuelSavedLiters ?? state.fuelSavedLiters ?? null
       },
       simulatedScenarioSavings: {
         co2SavedKg,
@@ -322,7 +336,7 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
     },
     // Backward compatibility fields for legacy UI cards
     congestionProbability: probabilityValue,
-    probability: `${probabilityValue}%`,
+    probability: `${probabilityValue}/100`,
     riskText,
     riskLabel: `Status: ${riskText}`,
     riskColor,

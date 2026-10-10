@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { normalizeCanonicalIncident, normalizeCanonicalDevice, CompatibilityAdapters } from '../../config/domainModels.js';
 import { runPostgresMigrations } from '../migrations/postgresMigrations.js';
 
@@ -22,12 +23,14 @@ export class PostgresAdapter {
       max,
       idleTimeoutMillis: timeoutValue(process.env.DB_IDLE_TIMEOUT_MS, 30000, 'DB_IDLE_TIMEOUT_MS'),
       connectionTimeoutMillis: timeoutValue(process.env.DB_CONNECTION_TIMEOUT_MS, 5000, 'DB_CONNECTION_TIMEOUT_MS'),
+      statement_timeout: timeoutValue(process.env.DB_STATEMENT_TIMEOUT_MS, 30000, 'DB_STATEMENT_TIMEOUT_MS'),
       ...(ssl === 'true' ? { ssl: { rejectUnauthorized: true } } : {})
     });
     this.pool.on('error', (error) => { this.lastQueryError = safeError(error); });
     this.isInitialized = false;
     this.shuttingDown = false;
     this.lastQueryError = null;
+    this.transactionContext = new AsyncLocalStorage();
   }
 
   async init() {
@@ -45,8 +48,9 @@ export class PostgresAdapter {
 
   async query(sql, params = []) {
     if (!this.isInitialized || this.shuttingDown) throw new Error('DATABASE_UNAVAILABLE');
+    const transactionClient = this.transactionContext.getStore();
     try {
-      const result = await this.pool.query(sql, params);
+      const result = await (transactionClient || this.pool).query(sql, params);
       this.lastQueryError = null;
       return { rows: result.rows, rowCount: result.rowCount ?? 0 };
     } catch (error) {
@@ -57,14 +61,41 @@ export class PostgresAdapter {
 
   execute(sql, params = []) { return this.query(sql, params); }
 
-  async transaction(callback) {
+  async transaction(callback, { leadershipFence = null, validateLeadershipFence = null } = {}) {
     if (!this.isInitialized || this.shuttingDown) throw new Error('DATABASE_UNAVAILABLE');
+    const activeClient = this.transactionContext.getStore();
+    if (activeClient) {
+      if (leadershipFence) throw new Error('NESTED_TRANSACTION_CANNOT_CHANGE_LEADERSHIP_FENCE');
+      return callback(this._transactionHandle(activeClient));
+    }
     let client;
     try { client = await this.pool.connect(); }
     catch (error) {
       this.lastQueryError = safeError(error);
       throw Object.assign(new Error(`DATABASE_CONNECTION_FAILED${error?.code ? ` (${error.code})` : ''}`), { code: error?.code || 'DATABASE_CONNECTION_FAILED', cause: error });
     }
+    const tx = this._transactionHandle(client);
+    try {
+      await client.query('BEGIN');
+      if (leadershipFence) await this._assertLeadershipFence(client, leadershipFence);
+      const result = await this.transactionContext.run(client, () => callback(tx));
+      // Redis is not part of the database transaction. Revalidate its lease at
+      // the commit boundary, then check the DB fence again while holding the
+      // transaction-scoped shared advisory lock. A new epoch cannot be claimed
+      // until this transaction commits or rolls back.
+      if (validateLeadershipFence) await validateLeadershipFence();
+      if (leadershipFence) await this._assertLeadershipFence(client, leadershipFence);
+      await client.query('COMMIT');
+      this.lastQueryError = null;
+      return result;
+    } catch (error) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+      this.lastQueryError = safeError(error);
+      throw error;
+    } finally { client.release(); }
+  }
+
+  _transactionHandle(client) {
     const tx = { query: async (sql, params = []) => {
       try {
         const result = await client.query(sql, params);
@@ -74,17 +105,61 @@ export class PostgresAdapter {
         throw Object.assign(new Error(`DATABASE_QUERY_FAILED${error?.code ? ` (${error.code})` : ''}`), { code: error?.code || 'DATABASE_QUERY_FAILED', cause: error });
       }
     }, execute: async (sql, params = []) => tx.query(sql, params) };
-    try {
-      await client.query('BEGIN');
-      const result = await callback(tx);
-      await client.query('COMMIT');
-      this.lastQueryError = null;
-      return result;
-    } catch (error) {
-      try { await client.query('ROLLBACK'); } catch (_) {}
-      this.lastQueryError = safeError(error);
-      throw error;
-    } finally { client.release(); }
+    return tx;
+  }
+
+  async _assertLeadershipFence(client, fence) {
+    await client.query('SELECT pg_advisory_xact_lock_shared($1)', [741903123]);
+    const { rows } = await client.query(
+      `SELECT epoch, leader_instance_id, lease_expires_at > clock_timestamp() AS valid
+       FROM cluster_leadership_fence WHERE scope = 'simulation'`,
+    );
+    const row = rows[0];
+    if (!row || !row.valid || row.leader_instance_id !== fence.instanceId || String(row.epoch) !== String(fence.epoch)) {
+      throw Object.assign(new Error('LEADERSHIP_FENCE_REJECTED'), { code: 'LEADERSHIP_FENCE_REJECTED', statusCode: 503 });
+    }
+  }
+
+  async claimLeadershipFence(instanceId, leaseTtlMs) {
+    const result = await this.transaction(async (tx) => {
+      await tx.query("SELECT set_config('lock_timeout', $1, true)", [`${Math.min(5000, Math.max(500, leaseTtlMs))}ms`]);
+      await tx.query('SELECT pg_advisory_xact_lock($1)', [741903123]);
+      const { rows } = await tx.query(
+        `INSERT INTO cluster_leadership_fence(scope, epoch, leader_instance_id, lease_expires_at)
+         VALUES('simulation', 1, $1, clock_timestamp() + ($2 * interval '1 millisecond'))
+         ON CONFLICT(scope) DO UPDATE SET
+           epoch = cluster_leadership_fence.epoch + 1,
+           leader_instance_id = EXCLUDED.leader_instance_id,
+           lease_expires_at = EXCLUDED.lease_expires_at,
+           updated_at = clock_timestamp()
+         WHERE cluster_leadership_fence.lease_expires_at <= clock_timestamp()
+         RETURNING epoch`,
+        [instanceId, leaseTtlMs],
+      );
+      if (!rows[0]) return null;
+      return String(rows[0].epoch);
+    });
+    return result;
+  }
+
+  async renewLeadershipFence(instanceId, epoch, leaseTtlMs) {
+    const { rowCount } = await this.query(
+      `UPDATE cluster_leadership_fence
+       SET lease_expires_at = clock_timestamp() + ($3 * interval '1 millisecond'), updated_at = clock_timestamp()
+       WHERE scope = 'simulation' AND leader_instance_id = $1 AND epoch = $2
+         AND lease_expires_at > clock_timestamp()`,
+      [instanceId, String(epoch), leaseTtlMs],
+    );
+    return rowCount === 1;
+  }
+
+  async releaseLeadershipFence(instanceId, epoch) {
+    const { rowCount } = await this.query(
+      `UPDATE cluster_leadership_fence SET lease_expires_at = clock_timestamp(), updated_at = clock_timestamp()
+       WHERE scope = 'simulation' AND leader_instance_id = $1 AND epoch = $2`,
+      [instanceId, String(epoch)],
+    );
+    return rowCount === 1;
   }
 
   async ping() {
@@ -135,9 +210,15 @@ export class PostgresAdapter {
   async insertAuditLog(log = {}, _flushImmediate = false, tx = null) {
     const corrId=log.correlationId||log.commandId||null;
     const insert = async (target) => {
-      if(corrId && (await target.query('SELECT 1 FROM audit_logs WHERE correlation_id=$1 LIMIT 1',[corrId])).rowCount) return;
-      await target.query('INSERT INTO audit_logs(operator,action,entity,result,correlation_id,details,command_id,idempotency_key,actor_role,source_instance_id,leader_instance_id,timestamp) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[String(log.operator||'System'),String(log.action||'ACTION'),String(log.entity||'Global'),String(log.result||'OK'),corrId,String(log.details||''),log.commandId||corrId,log.idempotencyKey||null,log.actorRole||null,log.sourceInstanceId||null,log.leaderInstanceId||null,log.timestamp||new Date().toISOString()]);
-      await target.query('DELETE FROM audit_logs WHERE id NOT IN (SELECT id FROM audit_logs ORDER BY id DESC LIMIT 500)');
+      const action = String(log.action || 'ACTION');
+      const key = log.idempotencyKey ? `audit-event:${action}:idem:${log.idempotencyKey}`
+        : (corrId ? `audit-event:${action}:corr:${corrId}` : null);
+      if (key) {
+        const claim = await target.query('INSERT INTO audit_deduplication_keys(dedupe_key,created_at) VALUES($1,$2) ON CONFLICT(dedupe_key) DO NOTHING', [key, new Date().toISOString()]);
+        if (claim.rowCount === 0) return false;
+      }
+      await target.query('INSERT INTO audit_logs(operator,action,entity,result,correlation_id,details,command_id,idempotency_key,actor_role,source_instance_id,leader_instance_id,timestamp) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[String(log.operator||'System'),action,String(log.entity||'Global'),String(log.result||'OK'),corrId,String(log.details||''),log.commandId||corrId,log.idempotencyKey||null,log.actorRole||null,log.sourceInstanceId||null,log.leaderInstanceId||null,log.timestamp||new Date().toISOString()]);
+      return true;
     };
     if (tx) await insert(tx); else await this.transaction(insert);
     return true;

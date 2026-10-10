@@ -30,7 +30,7 @@
             </div>
             <div class="terminal-body-wrapper">
               <div class="terminal-scanline"></div>
-              <div class="terminal-body" id="terminalLogs">
+              <div class="terminal-body" id="terminalLogs" role="log" aria-live="polite" aria-label="Log perintah sandbox lokal">
                 <div class="terminal-line">[DEMO] Tidak ada webhook eksternal yang dikirim.</div>
                 <div class="terminal-line">[DEMO] Deteksi kendaraan berasal dari generator visual sintetis.</div>
                 <div class="terminal-line">[DEMO] Perubahan fase hanya memperbarui state simulator.</div>
@@ -38,7 +38,7 @@
               <!-- Local demo command input -->
               <div class="terminal-input-bar terminal-input-bar-wrap">
                 <label class="form-label-muted" for="terminalCommandInput">Perintah demo</label>
-                <input type="text" id="terminalCommandInput" class="terminal-input-field" placeholder="/help, /clear, /ping" autocomplete="off" />
+                <input type="text" id="terminalCommandInput" class="terminal-input-field" placeholder="/help, /clear, /ping, /status" autocomplete="off" aria-keyshortcuts="Enter" />
               </div>
             </div>
           </article>
@@ -58,7 +58,7 @@
                 <div class="form-group api-form-mb">
                   <label class="form-label-muted" for="apiEndpoint">HTTP method &amp; endpoint</label>
                   <div class="header-actions-flex">
-                    <span class="api-method-badge" id="apiMethod">GET</span>
+                    <span class="api-method-badge" id="apiMethod">CONTOH</span>
                     <select id="apiEndpoint" class="selector api-endpoint-select">
                       <option value="/sits/api/v1/telemetry">/sits/api/v1/telemetry</option>
                       <option value="/sits/api/v1/incidents">/sits/api/v1/incidents</option>
@@ -69,25 +69,22 @@
                 <div class="api-request-preview api-form-mb">
                   <div class="notif-card-header">
                     <label class="form-label-muted" for="apiPayloadEditor">Request payload (JSON)</label>
-                    <span id="apiJsonValidateTag" class="api-json-tag">JSON VALID</span>
+                    <span id="apiJsonValidateTag" class="api-json-tag" data-state="valid" role="status">JSON VALID</span>
                   </div>
                   <div class="payload-box api-payload-box">
-                    <textarea id="apiPayloadEditor" class="api-textarea" spellcheck="false">{}</textarea>
+                    <textarea id="apiPayloadEditor" class="api-textarea" spellcheck="false" maxlength="8192" aria-describedby="apiJsonValidateTag">{}</textarea>
                   </div>
                 </div>
-                <button class="btn btn-primary btn-api-send" id="btnSendApiRequest">Kirim ke API Demo</button>
+                <button class="btn btn-primary btn-api-send" id="btnSendApiRequest" type="button">Jalankan contoh lokal</button>
               </div>
               
               <div class="api-response-panel api-response-panel-wrap">
                 <div class="notif-card-header">
                   <label class="form-label-muted">Response Payload (JSON)</label>
-                  <span id="apiStatusBadge" class="api-status-badge">BELUM DIJALANKAN</span>
+                  <span id="apiStatusBadge" class="api-status-badge" data-state="idle" role="status" aria-live="polite">BELUM DIJALANKAN</span>
                 </div>
                 <div class="api-response-body api-response-box">
-                  <pre id="apiResponseContent" class="api-pre-content">{
-  "status": "demo",
-  "message": "Contoh respons lokal dari prototipe OmniTRAF; bukan status sistem SITS"
-}</pre>
+                  <pre id="apiResponseContent" class="api-pre-content" aria-live="polite">Belum ada permintaan. Respons akan berasal dari state simulator lokal.</pre>
                 </div>
               </div>
             </div>

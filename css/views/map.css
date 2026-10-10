@@ -90,7 +90,7 @@
   border-radius: var(--radius-xl);
   overflow: hidden;
   border: 1px solid var(--border);
-  background: #080c14;
+  background: var(--bg-base);
   box-shadow: var(--shadow-lg);
 }
 
@@ -99,13 +99,13 @@
   width: 100%;
   height: 100%;
   min-height: 480px;
-  background-color: #080c14 !important;
+  background-color: var(--bg-base);
 }
 
 .leaflet-container {
-  background-color: #080c14 !important;
-  font-family: var(--font-sans) !important;
-  outline: none !important;
+  background-color: var(--bg-base);
+  font-family: var(--font-sans);
+  outline: none;
 }
 
 /* Hide Default Leaflet Zoom Controls */
@@ -505,36 +505,34 @@
   100% { stroke-opacity: 1; filter: brightness(1.2) drop-shadow(0 0 8px #ef4444); }
 }
 
-/* Modern Apple-HIG Dark Glassmorphism Leaflet Popups */
+/* Leaflet popups use the same surface and text roles as the rest of the UI. */
 .leaflet-popup-content-wrapper {
-  background: rgba(10, 18, 32, 0.78) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.1) !important;
-  border-radius: 16px !important;
-  padding: 0 !important;
+  background: var(--surface-overlay);
+  border: 1px solid var(--border-emphasis);
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-lg);
+  padding: 0;
   overflow: hidden;
-  color: #f8fafc !important;
+  color: var(--text-primary);
 }
 
 .leaflet-popup-tip {
-  background: rgba(10, 18, 32, 0.78) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5) !important;
+  background: var(--surface-overlay);
+  border: 1px solid var(--border-emphasis);
+  box-shadow: var(--shadow-sm);
 }
 
 .leaflet-popup-content {
-  margin: 0 !important;
-  line-height: inherit !important;
+  margin: 0;
+  line-height: inherit;
 }
 
 /* Glassmorphism Popup Cards */
 .ios-popup-card {
-  padding: 16px !important;
+  padding: 16px;
   min-width: 260px;
   max-width: 300px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  font-family: var(--font-sans);
 }
 
 .ios-popup-header {
@@ -543,7 +541,7 @@
   justify-content: space-between;
   margin-bottom: 10px;
   padding-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .cctv-live-tag {
@@ -574,17 +572,17 @@
 .ios-popup-subtitle {
   font-size: 9px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-dim);
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
 
 .ios-popup-title {
-  margin: 0 0 10px 0 !important;
-  font-size: 13.5px !important;
-  font-weight: 700 !important;
-  color: #ffffff !important;
-  line-height: 1.3 !important;
+  margin: 0 0 10px;
+  font-size: var(--font-size-card);
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: var(--line-height-tight);
 }
 
 .ios-popup-info-grid {
@@ -601,12 +599,12 @@
 }
 
 .ios-info-label {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary);
 }
 
 .ios-info-value {
   font-weight: 600;
-  color: #ffffff;
+  color: var(--text-primary);
 }
 
 /* Glassmorphism Popup Buttons */
@@ -1063,28 +1061,14 @@
         from { stroke-dashoffset: 48; }
         to { stroke-dashoffset: 0; }
       }
-      .leaflet-popup-content-wrapper {
-        background: rgba(5, 11, 20, 0.92) !important;
-        backdrop-filter: blur(20px) !important;
-        -webkit-backdrop-filter: blur(20px) !important;
-        border: 1.5px solid rgba(0, 229, 255, 0.45) !important;
-        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 24px rgba(0, 229, 255, 0.25) !important;
-        border-radius: 14px !important;
-        padding: 0 !important;
-        color: #fff !important;
-      }
-      .leaflet-popup-tip {
-        background: rgba(5, 11, 20, 0.92) !important;
-        border: 1px solid rgba(0, 229, 255, 0.45) !important;
-      }
       .leaflet-popup-close-button {
-        color: #94a3b8 !important;
-        font-size: 16px !important;
-        padding: 6px 8px !important;
-        transition: color 0.2s !important;
+        color: var(--text-secondary);
+        font-size: 16px;
+        padding: 6px 8px;
+        transition: color var(--duration-fast) var(--ease);
       }
       .leaflet-popup-close-button:hover {
-        color: #ef4444 !important;
+        color: var(--danger);
       }
       .ios-popup-card {
         padding: 14px 16px;
@@ -1127,3 +1111,52 @@
         font-family: var(--font-mono);
         font-weight: 700;
       }
+
+/* Phase 5B map overlays: compact scenario controls and token-based surfaces. */
+.map-layer-mode-switcher {
+  border-color: var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.map-layer-pill-btn { color: var(--text-secondary); }
+.map-layer-pill-btn.active {
+  color: var(--primary);
+  border-color: var(--primary-border);
+  background: var(--primary-soft);
+  box-shadow: none;
+}
+.map-weather-micro-widget {
+  top: 60px;
+  right: 12px;
+  min-width: 0;
+  max-width: calc(100% - 24px);
+  padding: 5px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.map-weather-micro-widget .mww-weather-col,
+.map-weather-micro-widget .mww-bottom { display: none; }
+.map-weather-micro-widget .mww-top { justify-content: flex-end; }
+.map-weather-micro-widget .mww-cond-toggle { min-height: 34px; }
+.map-overview,
+.legend,
+.map-layer-deck {
+  border-color: var(--border-default);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+@media (max-width: 520px) {
+  .map-layer-mode-switcher { top: 10px; left: 10px; max-width: calc(100% - 20px); }
+  .map-layer-mode-switcher .mlm-label { display: none; }
+  .map-weather-micro-widget { top: 54px; right: 10px; }
+}

@@ -8,12 +8,14 @@ import { soundManager } from '../core/soundManager.js';
 import { stateStore } from '../core/stateStore.js';
 import { commandLayer } from '../core/commandLayer.js';
 import { Disposer } from '../core/disposer.js';
+import { buildIncidentCsv } from '../core/csv.js';
+import { createReportSnapshot } from '../../shared/reportSnapshot.js';
 
 export class ReportController {
   constructor() {
     this.isGenerating = false;
     this.abortController = null;
-    this.lastType = "Daily Mobility";
+    this.lastType = "Snapshot sesi";
     this._isBound = false;
     this.disposer = new Disposer('ReportController');
   }
@@ -27,6 +29,7 @@ export class ReportController {
     this.deactivate(); // Ensure clean slate before binding
 
     this._bindExportButtons();
+    this._bindExportCsv();
     this._bindModalControls();
     this._bindPrintExecutive();
     this._bindCopyJson();
@@ -51,8 +54,43 @@ export class ReportController {
       const btn = e.target.closest(".btn-export-report, [data-action='download-report'], [data-action='export'], .btn-download-report, #btnGenerateReport");
       if (btn) {
         e.preventDefault();
-        const type = btn.dataset.reportType || btn.getAttribute("data-type") || "Daily Mobility";
+        const type = btn.dataset.reportType || btn.getAttribute("data-type") || "Snapshot sesi";
         this.generateMobilitySnapshot(type);
+      }
+    });
+  }
+
+  _bindExportCsv() {
+    const button = document.getElementById('btnExportCsv');
+    if (!button) return;
+    this.disposer.addEventListener(button, 'click', () => {
+      if (button.disabled) return;
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      try {
+        const snapshot = this._getActiveSnapshot();
+        const csv = buildIncidentCsv(snapshot.incidents, snapshot.source, snapshot);
+        this._logExportHistory(`CSV · ${snapshot.id} · berkas dibuat`);
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `OmniTRAF-Simulation-Incidents-${new Date().toISOString().slice(0, 10)}.csv`;
+        link.hidden = true;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 0);
+        if (typeof window.showToast === 'function') {
+          const count = Array.isArray(snapshot.incidents) ? snapshot.incidents.length : 0;
+          window.showToast(count ? `CSV simulasi berhasil dibuat dari ${count} insiden pada state saat ini.` : 'CSV dibuat; snapshot ini tidak memiliki insiden.');
+        }
+        soundManager.play('success');
+      } catch (error) {
+        if (typeof window.showToast === 'function') window.showToast(`Ekspor CSV gagal: ${error.message}`, 'danger');
+        soundManager.play('alert');
+      } finally {
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
       }
     });
   }
@@ -99,24 +137,11 @@ export class ReportController {
         printDocBtn.textContent = "Mengunduh PDF...";
 
         try {
-          const downloadUrl = `/api/reports/download?type=${encodeURIComponent(this.lastType || "Daily Mobility")}`;
-          const res = await fetch(downloadUrl);
-          const contentType = res.headers.get("content-type") || "";
-
-          if (!res.ok || !contentType.includes("application/pdf")) {
-            let errorMsg = `Server mengembalikan status HTTP ${res.status}`;
-            try {
-              const errJson = await res.json();
-              if (errJson?.error?.message) errorMsg = errJson.error.message;
-              else if (errJson?.message) errorMsg = errJson.message;
-            } catch (_) {}
-            throw new Error(errorMsg);
-          }
-
-          const blob = await res.blob();
-          if (blob.size < 100) {
-            throw new Error("Dokumen PDF yang diterima kosong atau korup.");
-          }
+          const { generateReportPdf } = await import('../../shared/reportPdf.js');
+          const snapshot = this.snapshot;
+          if (!snapshot) throw new Error('Buat pratinjau snapshot terlebih dahulu.');
+          const bytes = await generateReportPdf(snapshot);
+          const blob = new Blob([bytes], { type: 'application/pdf' });
 
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
@@ -127,8 +152,9 @@ export class ReportController {
           a.remove();
           setTimeout(() => URL.revokeObjectURL(url), 5000);
 
+          this._logExportHistory(`PDF · ${snapshot.id} · berkas dibuat`);
           if (typeof window.showToast === "function") {
-            window.showToast("✓ Laporan demo simulasi berhasil diunduh.");
+            window.showToast("PDF simulasi dibuat dan unduhan dimulai.");
           }
           soundManager.play('success');
         } catch (err) {
@@ -148,7 +174,7 @@ export class ReportController {
   /**
    * Main Pipeline for Generating Mobility Snapshot
    */
-  async generateMobilitySnapshot(type = "Daily Mobility") {
+  async generateMobilitySnapshot(type = "Snapshot sesi") {
     if (this.isGenerating) {
       console.warn("[ReportController] Laporan sedang diproses. Mengabaikan request ganda.");
       return;
@@ -177,41 +203,40 @@ export class ReportController {
     if (errorState) errorState.style.display = "none";
     if (previewState) previewState.style.display = "none";
 
-    this._updateLoaderProgress(5, "Menginisialisasi pencatatan telemetri SITS...");
-
     try {
       this.isGenerating = true;
+      this._updateLoaderProgress(5, "Menyiapkan snapshot simulasi...");
 
       // Stage 1: Fast Telemetry Aggregation (10% -> 50%)
-      this._updateLoaderProgress(20, "Mengagregasi telemetri SITS & status sensor...");
-      await this._delay(200);
+      this._updateLoaderProgress(20, "Membaca state simulator...");
+      await this._delay(0);
       if (signal.aborted) return;
 
       this._updateLoaderProgress(50, "Mengkalkulasi indikator volume & SPM...");
       const telemetryData = this._getReportTelemetry(type);
-      await this._delay(200);
+      await this._delay(0);
       if (signal.aborted) return;
 
       // Stage 2: Complete the report preview without adding an illustrative, non-data chart.
       this._updateLoaderProgress(100, "Selesai!");
-      await this._delay(150);
+      await this._delay(0);
       if (signal.aborted) return;
 
       this._showDocPreviewState(telemetryData);
-      this._logExportHistory(type);
+
 
       // Log to centralized audit trail
       commandLayer.addAuditEvent({
-        type: "report:generated",
-        entity: `Report ${type}`,
+        type: "report:preview-generated",
+        entity: `Preview report ${type}`,
         source: commandLayer.actor,
-        reasonCode: "REPORT_GEN",
+        reasonCode: "REPORT_PREVIEW",
         result: "SUCCESS",
-        details: `Laporan Mobility Snapshot (${type}) berhasil digenerate (${telemetryData.docId}).`
+        details: `Pratinjau Mobility Snapshot simulasi (${type}) berhasil dibuat (${telemetryData.docId}).`
       });
 
       if (typeof window.showToast === "function") {
-        window.showToast(`✓ Mobility Snapshot Surabaya (${type}) berhasil dibuat.`);
+        window.showToast(`Pratinjau snapshot simulasi berhasil dibuat.`);
       }
       soundManager.play('success');
 
@@ -226,15 +251,13 @@ export class ReportController {
   }
 
   _getReportTelemetry(type) {
-    const state = stateStore.getState() || {};
-    const telemetry = state.telemetry || {};
-    return {
-      volume: telemetry.vehiclesToday ?? telemetry.totalVehicles ?? null,
-      waitTime: telemetry.avgWaitTime ?? null,
-      co2Saved: telemetry.co2SavedKg ?? null,
-      incidents: Array.isArray(state.incidents) ? state.incidents.filter(i => i.status === 'RESOLVED').length : null,
-      docId: `SITS-EKS-${new Date().getFullYear()}/${(new Date().getMonth() + 1).toString().padStart(2, '0')}/REC-${Math.floor(1000 + Math.random() * 9000)}`
-    };
+    this.snapshot = createReportSnapshot(stateStore.getState() || {}, 'Snapshot sesi');
+    return { ...this.snapshot.metrics, docId: this.snapshot.id, timestamp: this.snapshot.timestamp };
+  }
+
+  _getActiveSnapshot() {
+    if (!this.snapshot) this.snapshot = createReportSnapshot(stateStore.getState() || {}, 'Snapshot sesi');
+    return this.snapshot;
   }
 
   _showDocPreviewState(data) {
@@ -263,7 +286,10 @@ export class ReportController {
     if (waitEl) waitEl.textContent = formatValue(data.waitTime, ' detik');
     if (co2El) co2El.textContent = formatValue(data.co2Saved, ' kg');
     if (incidentsEl) incidentsEl.textContent = formatValue(data.incidents, ' insiden');
-    if (docIdEl) docIdEl.textContent = `ID DEMO: ${data.docId} • DATA SIMULASI, TIDAK TERVERIFIKASI UNTUK OPERASI`;
+    const createdAt = data.timestamp && Number.isFinite(new Date(data.timestamp).getTime())
+      ? new Date(data.timestamp).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB'
+      : 'waktu tidak tersedia';
+    if (docIdEl) docIdEl.textContent = `ID: ${data.docId} · dibuat ${createdAt} · snapshot simulasi`;
   }
 
   _showErrorState(message) {
@@ -281,6 +307,16 @@ export class ReportController {
       errorState.style.display = "block";
       errorState.classList.remove("is-hidden");
     }
+  }
+
+  _updateLoaderProgress(percent, message) {
+    const progress = Math.min(100, Math.max(0, Math.round(Number(percent) || 0)));
+    const percentageEl = document.getElementById('loaderPercentage');
+    const statusEl = document.getElementById('loaderStatus');
+    const circle = document.getElementById('modalLoaderCircle');
+    if (percentageEl) percentageEl.textContent = `${progress}%`;
+    if (statusEl) statusEl.textContent = String(message || 'Menyiapkan pratinjau laporan simulasi…');
+    if (circle) circle.style.strokeDashoffset = String(264 * (1 - progress / 100));
   }
 
   closeReportModal() {
@@ -303,12 +339,12 @@ export class ReportController {
     const empty = list.querySelector(".empty-history-text");
     if (empty) empty.remove();
 
-    const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    const time = new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' });
     const item = document.createElement("div");
     item.className = "export-history-item glass-soft";
     item.style.cssText = "padding: 8px 12px; border-radius: 8px; margin-bottom: 6px; display: flex; justify-content: space-between; font-size: 11.5px;";
     const label = document.createElement('span');
-    label.textContent = `📄 Laporan ${String(type ?? '')} (PDF)`;
+    label.textContent = `${String(type ?? '')}`;
     const timestamp = document.createElement('span');
     timestamp.className = 'report-timestamp';
     timestamp.textContent = `${time} WIB`;
@@ -318,14 +354,14 @@ export class ReportController {
 
   _bindPrintExecutive() {
     const printBtns = [
-      document.getElementById("btnPrintExecutive"),
-      document.getElementById("btnPrintReportDoc")
+      document.getElementById("btnPrintExecutive")
     ].filter(Boolean);
 
     printBtns.forEach(btn => {
       this.disposer.addEventListener(btn, "click", () => {
         soundManager.play('click');
         this._refreshExecutivePrintDocument();
+        this._logExportHistory(`Cetak · ${(this.snapshot || {}).id || "snapshot sesi"} · dialog dibuka`);
         window.print();
       });
     });
@@ -334,25 +370,23 @@ export class ReportController {
   _refreshExecutivePrintDocument() {
     const root = document.getElementById('executivePrintDoc');
     if (!root) return;
-    const state = stateStore.getState() || {};
-    const telemetry = state.telemetry || {};
+    const snapshot = this._getActiveSnapshot();
+    const telemetry = { vehiclesToday: snapshot.metrics.volume, avgWaitTime: snapshot.metrics.waitTime, co2SavedKg: snapshot.metrics.co2Saved };
     const formatValue = (value, unit = '') => value === null || value === undefined || value === ''
       ? 'Tidak tersedia'
       : `${Number.isFinite(Number(value)) ? Number(value).toLocaleString('id-ID') : String(value)}${unit}`;
     const setText = (id, value) => { const element = document.getElementById(id); if (element) element.textContent = value; };
 
-    setText('printDateStr', new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB');
+    setText('printDateStr', new Date(snapshot.timestamp).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB');
     setText('printVolVal', formatValue(telemetry.vehiclesToday ?? telemetry.totalVehicles, ' kendaraan'));
     setText('printWaitVal', formatValue(telemetry.avgWaitTime, ' detik'));
     setText('printCo2Val', formatValue(telemetry.co2SavedKg, ' kg CO₂'));
-    setText('printIncVal', Array.isArray(state.incidents)
-      ? `${state.incidents.filter((incident) => String(incident.status).toUpperCase() === 'RESOLVED').length} insiden selesai`
-      : 'Tidak tersedia');
+    setText('printIncVal', `${snapshot.metrics.incidents} insiden selesai`);
 
     const rows = root.querySelector('#printCorridorRows');
     if (!rows) return;
     rows.replaceChildren();
-    const intersections = Array.isArray(state.intersections) ? state.intersections.slice(0, 8) : [];
+    const intersections = snapshot.intersections;
     if (intersections.length === 0) {
       const row = document.createElement('tr');
       const cell = document.createElement('td');
@@ -366,9 +400,9 @@ export class ReportController {
       const row = document.createElement('tr');
       const values = [
         intersection.name || intersection.id || 'Simpang tanpa nama',
-        intersection.traffic?.volume ?? intersection.traffic?.vehicleCount,
-        intersection.traffic?.speed,
-        intersection.signal?.controlMode,
+        intersection.volume,
+        intersection.speed,
+        intersection.controlMode,
         intersection.status
       ];
       values.forEach((value, index) => {
@@ -389,18 +423,23 @@ export class ReportController {
 
     copyBtns.forEach(btn => {
       this.disposer.addEventListener(btn, "click", () => {
-        const state = stateStore.getState();
-        const payload = JSON.stringify(state.telemetry || state, null, 2);
+        const snapshot = this._getActiveSnapshot();
+        const payload = JSON.stringify(snapshot, null, 2);
+        if (!navigator.clipboard?.writeText) {
+          if (typeof window.showToast === "function") window.showToast("Clipboard tidak tersedia pada browser ini.", "danger");
+          return;
+        }
         navigator.clipboard.writeText(payload).then(() => {
           if (typeof window.showToast === "function") {
-            window.showToast("✓ Format JSON Telemetri SITS disalin ke Clipboard.");
+            window.showToast("✓ Snapshot sesi dalam format JSON disalin ke Clipboard.");
           }
+          this._logExportHistory(`JSON · ${snapshot.id} · disalin`);
           soundManager.play('success');
-        }).catch(() => {
+        }).catch((error) => {
           if (typeof window.showToast === "function") {
-            window.showToast("✓ Format JSON Telemetri SITS disalin.");
+            window.showToast(`Gagal menyalin snapshot: ${error.message || 'akses clipboard ditolak'}.`, "danger");
           }
-          soundManager.play('success');
+          soundManager.play('alert');
         });
       });
     });

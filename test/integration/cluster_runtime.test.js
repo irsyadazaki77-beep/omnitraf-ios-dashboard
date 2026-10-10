@@ -4,6 +4,7 @@ import { FakeRedisManager, FakeRedisState } from '../helpers/fakeRedisManager.js
 import { ClusterEventBus } from '../../server/infrastructure/redis/clusterEventBus.js';
 import { SimulationLeadership } from '../../server/infrastructure/redis/simulationLeadership.js';
 import { ClusterRuntime } from '../../server/infrastructure/redis/clusterRuntime.js';
+import { ComputerVisionEngine } from '../../server/services/visionEngine.js';
 
 const waitFor = async (predicate, timeoutMs = 1000) => {
   const deadline = Date.now() + timeoutMs;
@@ -80,6 +81,34 @@ test('cluster runtime: follower loads a baseline before applying newer canonical
   assert.equal(followerState.marker, 'command mutation');
 });
 
+test('cluster runtime: stale and duplicate snapshots cannot move follower state backwards', async () => {
+  const applied = [];
+  const follower = new SimulationLeadership({
+    redisManager: new FakeRedisManager(new FakeRedisState(), 'follower'), mode: 'cluster', instanceId: 'follower',
+    applySnapshot: async (snapshot) => { applied.push(snapshot.stateVersion); return true; }
+  });
+  const snapshot = (version) => ({ eventId: `event-${version}`, sourceInstanceId: 'leader', sequence: version,
+    payload: { stateVersion: version, leaderEpoch: '4', schemaVersion: 1, simulationSessionId: 'session-a' } });
+  assert.equal(await follower.onSnapshotEvent(snapshot(12)), true);
+  assert.equal(await follower.onSnapshotEvent(snapshot(11)), false);
+  assert.equal(await follower.onSnapshotEvent(snapshot(12)), false);
+  assert.deepEqual(applied, [12]);
+  assert.equal(follower.lastSnapshotVersion, 12);
+  assert.equal(follower.stateVersion, 12);
+});
+
+test('cluster runtime: CCTV latest-frame reads do not advance the synthetic generator', () => {
+  const vision = new ComputerVisionEngine();
+  assert.equal(vision.getLatestFramePayload(), null);
+  const generated = vision.generateFramePayload(false);
+  const sequence = vision.frameSequence;
+  const firstRead = vision.getLatestFramePayload();
+  const secondRead = vision.getLatestFramePayload();
+  assert.equal(firstRead.seq, generated.seq);
+  assert.deepEqual(secondRead, firstRead);
+  assert.equal(vision.frameSequence, sequence, 'subscribers read the latest frame without becoming generators');
+});
+
 test('cluster runtime: follower forwards commands and leader returns one idempotent result', async (t) => {
   const redisState = new FakeRedisState();
   const redisA = new FakeRedisManager(redisState, 'A');
@@ -106,9 +135,21 @@ test('cluster runtime: follower forwards commands and leader returns one idempot
   let concurrentExecutions = 0;
   let releaseExecution;
   const executionGate = new Promise((resolve) => { releaseExecution = resolve; });
-  const execute = async () => { concurrentExecutions++; await executionGate; return { success: true, value: 'shared' }; };
+  let durableResult = null;
+  let durableInFlight = null;
+  const execute = async () => {
+    if (durableResult) return { ...durableResult, isIdempotentReplay: true };
+    if (durableInFlight) { await durableInFlight; return { ...durableResult, isIdempotentReplay: true }; }
+    let finish;
+    durableInFlight = new Promise((resolve) => { finish = resolve; });
+    concurrentExecutions++;
+    await executionGate;
+    durableResult = { success: true, value: 'shared' };
+    finish();
+    return durableResult;
+  };
   const first = leader.executeIdempotently('concurrent-key', 'concurrent-fingerprint', execute);
-  const second = follower.executeIdempotently('concurrent-key', 'concurrent-fingerprint', async () => { concurrentExecutions++; return { success: true, value: 'duplicate' }; });
+  const second = follower.executeIdempotently('concurrent-key', 'concurrent-fingerprint', execute);
   await new Promise((resolve) => setTimeout(resolve, 30));
   releaseExecution();
   const [firstResult, secondResult] = await Promise.all([first, second]);

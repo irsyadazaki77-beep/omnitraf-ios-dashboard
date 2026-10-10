@@ -1,0 +1,70 @@
+/* Shared interaction and responsive foundations. */
+[hidden] { display: none !important; }
+.session-dialog { width: min(460px, calc(100vw - 32px)); padding: 28px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 18px; }
+.session-dialog::backdrop { background: rgb(0 0 0 / 65%); }
+.session-dialog form { display: grid; gap: 12px; }
+.session-dialog input { width: 100%; min-height: 44px; padding: 10px; background: var(--panel-inset); color: var(--text); border: 1px solid var(--border); border-radius: 8px; }
+.session-dialog p { color: var(--text-muted); line-height: 1.6; }
+.session-dialog #sessionError { color: var(--danger); }
+.session-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+#operatorProfile[role="button"] { cursor: pointer; }
+body .prototype-notice { display: block; padding: 10px 14px; font-size: 12px; background: var(--panel); border-color: var(--border); color: var(--text-muted); }
+.prototype-notice summary { cursor: pointer; line-height: 1.5; }
+.prototype-notice p { padding-top: 10px; margin: 0; max-width: 90ch; }
+body .offline-notification-banner { gap: 12px; flex-wrap: wrap; }
+.offline-banner-inner { flex: 1; min-width: 180px; }
+.toast-item[data-tone="error"] { border-left: 4px solid var(--danger) !important; }
+.toast-item[data-tone="success"] { border-left: 4px solid var(--success) !important; }
+.table-scroll { overflow-x: auto; max-width: 100%; }
+.series-detail { margin-top: 12px; color: var(--text-muted); }
+.series-detail summary { cursor: pointer; padding: 12px 0; }
+.series-detail td, .series-detail th { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+.series-detail table { width: 100%; }
+body #trendChart text { fill: var(--text-muted); font-size: 12px; }
+.series-grid { stroke: var(--border); stroke-width: 1; }
+.series-line { stroke: var(--primary); stroke-width: 3; }
+.series-point { fill: var(--primary); stroke: var(--panel); stroke-width: 2; cursor: help; }
+body .model-dynamic { border-left-color: var(--primary) !important; }
+body.theme-light .model-dynamic div[style*="background: rgba(15, 23, 42"] { background: var(--panel-soft) !important; }
+body.theme-light .model-dynamic td[style*="color: #ffffff"], body.theme-light #predictRecText div { color: var(--text) !important; }
+body .view-pane .section-head p, body .workspace-header-desc { font-size: 13px; line-height: 1.6; }
+body .view-pane .workspace-header-summary-strip { gap: 12px; }
+body .clickable-device-row:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+body .map-floating-legend { max-width: calc(100% - 28px); border-radius: 12px; }
+body .legend-items-row { flex-wrap: wrap; gap: 8px 12px; }
+body .map-floating-toolbar { max-width: calc(100% - 28px); }
+body .time-range-seg-btn:disabled { opacity: .5; cursor: not-allowed; }
+body:not(.theme-light) .omni-osm-tile { filter: invert(.9) hue-rotate(180deg) saturate(.55) brightness(.9); }
+body .signals-intersection-card [data-signal-command-status] { font-size: 12px; line-height: 1.5; margin: 12px 0; }
+body .view-pane .signals-console-grid { align-items: start; }
+body.theme-light .toast-item { background: var(--panel) !important; }
+@media (max-width: 768px) {
+  body .prototype-notice { margin: 8px 10px; font-size: 11px; }
+  body .topbar-action-buttons { gap: 2px; }
+  body #btnOpenEngineModal, body #audioToggle, body #btnQuickTour { display: none; }
+  body .topbar-actions { min-width: 0; gap: 4px; }
+  #sessionLogout { font-size: 11px; padding: 6px; }
+  body .view-pane .workspace-header-summary-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body .map-floating-legend { left: 10px; bottom: 10px; max-width: calc(100% - 20px); }
+  body .legend-chip { font-size: 11px; }
+  body .map-layer-panel { max-width: calc(100% - 24px); }
+  body .spatial-map-workspace { height: calc(100dvh - 190px); min-height: 510px; }
+  body #map-surabaya { min-height: 420px; }
+  body .map-weather-micro-widget { top: 64px; }
+  body .cctv-controls-toolbar { flex-wrap: wrap; }
+  body .model-dynamic { padding: 14px !important; }
+  body .series-detail td, body .series-detail th { padding: 8px; font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .series-line, .series-point { transition: none; }
+}
+
+/* Mobile backdrop shares the sidebar stacking context; it must stay below it. */
+#drawerBackdrop { z-index: 1900; }
+.theme-light .modal-content { background: var(--panel) !important; }
+#incidentDetailDesc { white-space: pre-line; }
+
+body.theme-light #analyticsHourBadge, body.theme-light #timeTravelTimeVal { color: #1d4ed8; }
+body.theme-light .provenance-badge.simulated { color: #805a14; }
+
+.view-pane[aria-busy="true"] { visibility: hidden; }

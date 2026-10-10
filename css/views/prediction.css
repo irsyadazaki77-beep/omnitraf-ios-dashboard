@@ -1,4 +1,15 @@
 /* Forecast metrics use the same operational surfaces as other view summaries. */
+#view-prediction:not(.active) { display: none; }
+
+.prediction-panel { max-width: 1480px; padding: var(--space-5); }
+.prediction-panel .section-head { align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+.prediction-panel .section-head h2 { margin: var(--space-2) 0; color: var(--text-primary); font-size: var(--font-size-section); }
+.prediction-panel .section-head p { margin: 0; color: var(--text-secondary); font-size: var(--font-size-small); line-height: var(--line-height-body); }
+.prediction-status-badge { flex: 0 0 auto; padding: 8px 10px; border: 1px solid var(--warning-border); border-radius: var(--radius-md); color: var(--text-secondary); background: var(--warning-soft); font-size: var(--font-size-caption); }
+.prediction-status-badge strong { color: var(--status-warning); }
+.risk-label { color: var(--status-danger); font-size: var(--font-size-small); font-weight: 700; }
+.timeline-ticks { font-variant-numeric: tabular-nums; }
+
 .prediction-metrics-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -38,6 +49,13 @@
   color: var(--chart-primary);
   font-size: var(--font-size-body);
   font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .prediction-panel { padding: var(--space-4); }
+  .prediction-panel .section-head { flex-direction: column; }
+  .prediction-status-badge { align-self: flex-start; }
+  .prediction-metric-card.recommendation { grid-column: 1 / -1; }
 }
 
 @media (max-width: 640px) {

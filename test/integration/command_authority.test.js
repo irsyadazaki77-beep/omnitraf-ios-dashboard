@@ -2,7 +2,8 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
 import fs from 'fs';
 import { ROLES } from '../../server/config/constants.js';
-import { commandExecutor } from '../../server/services/commandExecutor.js';
+import { commandExecutor, CommandExecutor } from '../../server/services/commandExecutor.js';
+import { auditRepository } from '../../server/repositories/auditRepository.js';
 import { backendState } from '../../server/services/stateManager.js';
 import { dbManager } from '../../server/db/database.js';
 import { testDatabasePath } from '../helpers/testDatabasePath.js';
@@ -14,7 +15,7 @@ process.env.DB_PATH = testDbPath;
 
 const { server } = await import('../../server.js');
 
-describe('PHASE 14C — Command Authority, Idempotency, Authorization & Audit Integrity Tests', () => {
+describe('PHASE 14C — Command Authority, Idempotency, Authorization & Audit Integrity Tests', { concurrency: 1 }, () => {
   let baseUrl;
   let adminToken;
   let operatorToken;
@@ -135,7 +136,8 @@ describe('PHASE 14C — Command Authority, Idempotency, Authorization & Audit In
   });
 
   test('3. Duplicate Command ID & Idempotency Key: Replays authoritative cached result without double mutation', async () => {
-    const firstOutcome = await commandExecutor.executeCommand({
+    const sequenceBefore = backendState.signalSequence;
+    const firstRequest = commandExecutor.executeCommand({
       action: 'green-split:update',
       targetId: 'node-wonokromo',
       payload: { value: 50 },
@@ -144,26 +146,24 @@ describe('PHASE 14C — Command Authority, Idempotency, Authorization & Audit In
       correlationId: 'CORR-IDEMP-01',
       authenticatedUser: { id: 'usr-admin', name: 'Zaki Admin', role: ROLES.ADMIN }
     });
-
-    assert.strictEqual(firstOutcome.success, true);
-    assert.strictEqual(firstOutcome.status, 'SERVER_APPLIED');
-    const seqAfterFirst = backendState.signalSequence;
-
-    // Second execution with SAME idempotency key
-    const replayOutcome = await commandExecutor.executeCommand({
-      action: 'green-split:update',
-      targetId: 'node-wonokromo',
-      payload: { value: 50 },
-      commandId: 'CMD-IDEMP-01-RETRY',
-      idempotencyKey: 'IDEMP-KEY-GREEN-SPLIT-50',
+    const retryRequest = new CommandExecutor().executeCommand({
+      action: 'green-split:update', targetId: 'node-wonokromo', payload: { value: 50 },
+      commandId: 'CMD-IDEMP-01-RETRY', idempotencyKey: 'IDEMP-KEY-GREEN-SPLIT-50',
       correlationId: 'CORR-IDEMP-01-RETRY',
       authenticatedUser: { id: 'usr-admin', name: 'Zaki Admin', role: ROLES.ADMIN }
     });
-
+    const [firstOutcome, replayOutcome] = await Promise.all([firstRequest, retryRequest]);
+    assert.strictEqual(firstOutcome.success, true);
+    assert.strictEqual(firstOutcome.status, 'SERVER_APPLIED');
     assert.strictEqual(replayOutcome.success, true);
     assert.strictEqual(replayOutcome.isIdempotentReplay, true, 'Must indicate idempotent replay');
     assert.strictEqual(replayOutcome.status, 'SERVER_APPLIED');
-    assert.strictEqual(backendState.signalSequence, seqAfterFirst, 'Sequence must NOT increment on duplicate replay');
+    assert.strictEqual(backendState.signalSequence, sequenceBefore + 1, 'Concurrent duplicate commands must increment sequence once');
+    await assert.rejects(commandExecutor.executeCommand({
+      action:'green-split:update', targetId:'node-wonokromo', payload:{value:55},
+      commandId:'CMD-IDEMP-CONFLICT', idempotencyKey:'IDEMP-KEY-GREEN-SPLIT-50',
+      authenticatedUser:{id:'usr-admin',name:'Zaki Admin',role:ROLES.ADMIN}
+    }), (error) => error.code === 'IDEMPOTENCY_CONFLICT');
   });
 
   test('4. Command Status Lookup: Accurate lookup including in-flight or applied states', async () => {
@@ -217,6 +217,30 @@ describe('PHASE 14C — Command Authority, Idempotency, Authorization & Audit In
       // Restore original DB method
       dbManager.execute = originalExecute;
     }
+  });
+
+  test('Audit failure rolls back durable mutation and withholds success acknowledgement', async () => {
+    const dev = backendState.devicesRegistry.find((entry) => entry.deviceId === 'NODE-EDGE-01');
+    const original = { fps:dev.fps, resolution:dev.resolution };
+    const originalInsert = auditRepository.insert;
+    const originalEmit = backendState.io.emit;
+    const acknowledgements = [];
+    backendState.io.emit = function(event, payload, ...rest) {
+      if (event === 'command:ack') acknowledgements.push(payload);
+      return originalEmit.call(this, event, payload, ...rest);
+    };
+    auditRepository.insert = async () => { throw new Error('INJECTED_AUDIT_FAILURE'); };
+    try {
+      await assert.rejects(commandExecutor.executeCommand({
+        action:'device:config', targetId:'NODE-EDGE-01', payload:{fps:27,resolution:'720p'},
+        commandId:'CMD-AUDIT-ROLLBACK', idempotencyKey:'IDEMP-AUDIT-ROLLBACK',
+        authenticatedUser:{id:'usr-admin',name:'Zaki Admin',role:ROLES.ADMIN}
+      }), /INJECTED_AUDIT_FAILURE/);
+    } finally { auditRepository.insert = originalInsert; backendState.io.emit = originalEmit; }
+    assert.deepEqual({fps:dev.fps,resolution:dev.resolution}, original);
+    assert.equal((await dbManager.query("SELECT status FROM command_receipts WHERE idempotency_key=$1", ['IDEMP-AUDIT-ROLLBACK'])).rowCount, 0);
+    assert.equal((await dbManager.query("SELECT id FROM audit_logs WHERE idempotency_key=$1", ['IDEMP-AUDIT-ROLLBACK'])).rowCount, 0);
+    assert.equal(acknowledgements.some((ack) => ack.success === true), false);
   });
 
   test('6. REST vs Socket Consistency: Calling device:config via REST produces identical commandExecutor semantics', async () => {

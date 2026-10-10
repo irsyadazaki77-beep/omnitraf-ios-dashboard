@@ -29,18 +29,41 @@
           <div class="section-head">
             <div>
               <h2>Daftar Insiden Contoh</h2>
-                <p>Severity, lokasi, usia, sumber, dan status penanganan setiap skenario.</p>
+                <p>Keparahan, lokasi, sumber, dan status penanganan setiap skenario.</p>
             </div>
             <span class="pill pill-danger" id="unresolvedAlertsBadge">3 Unresolved Alerts</span>
           </div>
 
           <!-- Incident Category Filters -->
-          <div class="incident-filters incident-filter-bar" role="group" aria-label="Filter Kategori Insiden">
-            <button class="filter-chip active" type="button" data-inc-filter="all">Semua Insiden</button>
-            <button class="filter-chip" type="button" data-inc-filter="accident">Kecelakaan</button>
-            <button class="filter-chip" type="button" data-inc-filter="roadblock">Galian & Hambatan</button>
-            <button class="filter-chip" type="button" data-inc-filter="resolved">Arsip Selesai</button>
+          <div class="incident-filter-toolbar" role="search" aria-label="Cari dan filter insiden simulasi">
+            <label class="sr-only" for="incidentSearch">Cari insiden</label>
+            <input id="incidentSearch" type="search" placeholder="Cari nama, lokasi, atau unit…" autocomplete="off" />
+            <label for="incidentSeverityFilter">Keparahan</label>
+            <select id="incidentSeverityFilter">
+              <option value="all">Semua tingkat</option>
+              <option value="danger">Kritis</option>
+              <option value="warning">Peringatan</option>
+              <option value="info">Informasi</option>
+            </select>
+            <label for="incidentStatusFilter">Status</label>
+            <select id="incidentStatusFilter">
+              <option value="all">Semua status</option>
+              <option value="ACTIVE">Baru</option>
+              <option value="ACKNOWLEDGED">Diakui</option>
+              <option value="DISPATCHED">Disposisi simulasi</option>
+              <option value="RESPONDING">Respons simulasi</option>
+              <option value="MITIGATED">Terkendali</option>
+              <option value="RESOLVED">Selesai</option>
+            </select>
+            <span id="incidentFilterCount" class="incident-filter-count" aria-live="polite"></span>
           </div>
+          <div class="incident-filters incident-filter-bar" role="group" aria-label="Filter kategori insiden">
+            <button class="filter-chip active" type="button" data-inc-filter="all" aria-pressed="true">Semua kategori</button>
+            <button class="filter-chip" type="button" data-inc-filter="accident" aria-pressed="false">Kecelakaan</button>
+            <button class="filter-chip" type="button" data-inc-filter="weather" aria-pressed="false">Cuaca</button>
+            <button class="filter-chip" type="button" data-inc-filter="congestion" aria-pressed="false">Kepadatan</button>
+          </div>
+          <p id="incidentFilterEmpty" class="empty-history-notice" role="status" hidden>Tidak ada insiden yang sesuai filter.</p>
           
           <div class="incident-logs-list" id="incidentLogsList">
             <div class="glass-panel text-center incident-empty-state">

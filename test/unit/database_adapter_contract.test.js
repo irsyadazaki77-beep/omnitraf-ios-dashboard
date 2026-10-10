@@ -5,6 +5,7 @@ import { DatabaseManager } from '../../server/db/database.js';
 import { testDatabasePath } from '../helpers/testDatabasePath.js';
 import { createIncidentRepository } from '../../server/repositories/incidentRepository.js';
 import { createAuditRepository } from '../../server/repositories/auditRepository.js';
+import { createCommandReceiptRepository } from '../../server/repositories/commandReceiptRepository.js';
 
 test('sqljs implements shared query and rollback contract', async () => {
   const database = new DatabaseManager({ driver: 'sqljs' });
@@ -15,12 +16,23 @@ test('sqljs implements shared query and rollback contract', async () => {
     assert.equal(await database.ping(), true);
     const incidents = createIncidentRepository(database);
     const audits = createAuditRepository(database);
+    const receipts = createCommandReceiptRepository(database);
     await incidents.upsert({id:'REPO-1',category:'collision',status:'ACTIVE',coordinates:[1,2]});
     assert.equal((await incidents.findById('REPO-1')).category,'collision');
     const audit = {commandId:'sqljs-command',idempotencyKey:'sqljs-idempotency',action:'test'};
     await audits.insert(audit);
     await audits.insert(audit);
     assert.equal((await audits.findAll({commandId:'sqljs-command'})).data.length,1);
+    const receipt = {actorId:'operator-contract',idempotencyKey:'key-contract',fingerprint:'same-payload',commandId:'cmd-contract',correlationId:'corr-contract',action:'incident:create'};
+    await database.transaction(async (tx) => {
+      assert.equal(await receipts.claim(receipt, tx), true);
+      await receipts.complete(receipt.actorId, receipt.idempotencyKey, {success:true}, tx);
+    });
+    assert.equal((await receipts.find(receipt.actorId, receipt.idempotencyKey)).result.success, true);
+    assert.equal(await database.transaction((tx) => receipts.claim(receipt, tx)), false);
+    assert.equal((await receipts.find(receipt.actorId, 'rotated-key', database, receipt.commandId)).result.success, true);
+    for (let index = 0; index < 510; index++) await audits.insert({action:'retention_probe',result:'RECORDED',commandId:`retention-${index}`});
+    assert.equal((await audits.findAll({limit:10,offset:500,action:'retention_probe'})).data.length,10);
     await database.execute('INSERT INTO incidents(id,status) VALUES($1,$2)', ['CONTRACT-1', 'ACTIVE']);
     assert.equal((await database.query('SELECT id FROM incidents WHERE id=$1', ['CONTRACT-1'])).rows[0].id, 'CONTRACT-1');
     await assert.rejects(database.transaction(async (tx) => {
@@ -28,6 +40,15 @@ test('sqljs implements shared query and rollback contract', async () => {
       throw new Error('force rollback');
     }), /force rollback/);
     assert.equal((await database.query('SELECT id FROM incidents WHERE id=$1', ['CONTRACT-2'])).rowCount, 0);
+    const pathOnDisk = database.dbPath;
+    await database.close();
+    const restarted = new DatabaseManager({ driver:'sqljs' });
+    restarted.dbPath = pathOnDisk;
+    await restarted.init();
+    try {
+      const restartedReceipts = createCommandReceiptRepository(restarted);
+      assert.equal((await restartedReceipts.find(receipt.actorId, receipt.idempotencyKey)).result.success, true);
+    } finally { await restarted.close(); }
   } finally { await database.close(); }
 });
 

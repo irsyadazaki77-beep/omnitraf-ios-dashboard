@@ -76,6 +76,7 @@ export class BackendStateManager {
 
     this.sequence = 1;
     this.stateVersion = 1;
+    this.simulationSessionId = `sim-${randomUUID()}`;
     this.cctvSequence = 1;
     this.incidentSequence = 1;
     this.emergencySequence = 1;
@@ -86,6 +87,7 @@ export class BackendStateManager {
     this.co2SavedKg = 1420;
     this.fuelSavedLiters = 580;
     this.io = null;
+    this.draining = false;
     this.pendingSimulationEvents = [];
     this.processedCommands = new Map();
 
@@ -318,6 +320,7 @@ export class BackendStateManager {
     this.redDurationBase = 25;
     this.resolutionInterval = null;
     this.isHydrated = false;
+    this.commandTransactionActive = false;
     this._initPromise = null;
 
     // Trigger asynchronous initialization
@@ -365,30 +368,33 @@ export class BackendStateManager {
 
         // 1. Deterministic Hydration: Incidents (Database is authoritative)
         const incRes = await incidentRepository.findAll();
-        const dbIncidents = Array.isArray(incRes) ? incRes : (incRes?.data || []);
+        if (!Array.isArray(incRes) && incRes?.status !== 'OK') throw new Error(`HYDRATION_FAILED: incidents (${incRes?.error || incRes?.status || 'unknown'})`);
+        const dbIncidents = Array.isArray(incRes) ? incRes : incRes.data;
         if (dbIncidents && dbIncidents.length > 0) {
           const incidentMap = new Map();
           dbIncidents.forEach(inc => incidentMap.set(String(inc.id), inc));
 
           // Merge any pre-configured seed not yet present in SQLite
-          for (const seed of (this.state.incidents || [])) {
-            if (!incidentMap.has(String(seed.id))) {
-              try {
-                await incidentRepository.upsert(seed);
-                incidentMap.set(String(seed.id), seed);
-              } catch (_) {}
+          const missingSeeds = (this.state.incidents || []).filter((seed) => !incidentMap.has(String(seed.id)));
+          await dbManager.transaction(async (tx) => {
+            for (const seed of missingSeeds) {
+              await incidentRepository.upsert(seed, false, tx);
             }
-          }
+          });
+          missingSeeds.forEach((seed) => incidentMap.set(String(seed.id), seed));
           this.state.incidents = Array.from(incidentMap.values());
           console.log(`🗄️ [State Manager] Memuat & memulihkan ${this.state.incidents.length} insiden dari SQLite.`);
         } else {
           // Fresh database: persist initial seed incidents
-          for (const inc of this.state.incidents) { try { await incidentRepository.upsert(inc); } catch (_) {} }
+          await dbManager.transaction(async (tx) => {
+            for (const inc of this.state.incidents) await incidentRepository.upsert(inc, false, tx);
+          });
         }
 
         // 2. Deterministic Hydration: Audit Logs (Deduplicated with Stable Identifiers)
         const logRes = await auditRepository.findAll(100);
-        const dbLogs = Array.isArray(logRes) ? logRes : (logRes?.data || []);
+        if (!Array.isArray(logRes) && logRes?.status !== 'OK') throw new Error(`HYDRATION_FAILED: audit logs (${logRes?.error || logRes?.status || 'unknown'})`);
+        const dbLogs = Array.isArray(logRes) ? logRes : logRes.data;
         if (dbLogs && dbLogs.length > 0) {
           const knownCorrs = new Set();
           const mergedLogs = [];
@@ -401,12 +407,15 @@ export class BackendStateManager {
           });
           this.auditLogs = mergedLogs;
         } else {
-          for (const log of this.auditLogs) { try { await auditRepository.insert(log); } catch (_) {} }
+          await dbManager.transaction(async (tx) => {
+            for (const log of this.auditLogs) await auditRepository.insert(log, false, tx);
+          });
         }
 
         // 3. Hydrate Signal Configs
         const sigRes = await signalConfigRepository.findAll();
-        const dbSignals = Array.isArray(sigRes) ? sigRes : (sigRes?.data || []);
+        if (!Array.isArray(sigRes) && sigRes?.status !== 'OK') throw new Error(`HYDRATION_FAILED: signal configs (${sigRes?.error || sigRes?.status || 'unknown'})`);
+        const dbSignals = Array.isArray(sigRes) ? sigRes : sigRes.data;
         if (dbSignals && dbSignals.length > 0) {
           dbSignals.forEach(cfg => {
             const node = this.state.intersections.find(n => n.id === cfg.node_id);
@@ -418,20 +427,21 @@ export class BackendStateManager {
             }
           });
         } else {
-          for (const node of this.state.intersections) {
-            try {
+          await dbManager.transaction(async (tx) => {
+            for (const node of this.state.intersections) {
               await signalConfigRepository.upsert(node.id, {
                 greenSplit: node.greenSplit || 35,
                 cycleTime: 90,
                 mode: 'ADAPTIVE_AI'
-              });
-            } catch (_) {}
-          }
+              }, false, tx);
+            }
+          });
         }
 
         // 4. Hydrate Device Configs & Recover with Safe Defaults
         const devRes = await deviceRepository.findAll();
-        const dbDevices = Array.isArray(devRes) ? devRes : (devRes?.data || []);
+        if (!Array.isArray(devRes) && devRes?.status !== 'OK') throw new Error(`HYDRATION_FAILED: devices (${devRes?.error || devRes?.status || 'unknown'})`);
+        const dbDevices = Array.isArray(devRes) ? devRes : devRes.data;
         if (dbDevices && dbDevices.length > 0) {
           dbDevices.forEach(dbDev => {
             const idx = this.devicesRegistry.findIndex(d => d.deviceId === dbDev.deviceId);
@@ -446,7 +456,9 @@ export class BackendStateManager {
             }
           });
         } else {
-          for (const dev of this.devicesRegistry) { try { await deviceRepository.upsert(dev); } catch (_) {} }
+          await dbManager.transaction(async (tx) => {
+            for (const dev of this.devicesRegistry) await deviceRepository.upsert(dev, false, tx);
+          });
         }
 
         // 5. Emergency Recovery Guard: Do not leave orphaned active dispatches after crash
@@ -801,6 +813,7 @@ export class BackendStateManager {
   }
 
   tick(deltaMs = 1000, options = {}) {
+    if (this.commandTransactionActive && !options.force) return this.state;
     this.pendingSimulationEvents = [];
     this.stateVersion++;
     const result = this.simEngine.step(deltaMs, options);
@@ -809,15 +822,16 @@ export class BackendStateManager {
   }
 
   getClusterSnapshot() {
-    return { stateVersion: this.stateVersion, simulationCheckpoint: this.simEngine.createCheckpoint(), auditLogs: this.auditLogs.slice(0, 250) };
+    return { schemaVersion: 1, simulationSessionId: this.simulationSessionId, stateVersion: this.stateVersion, simulationCheckpoint: this.simEngine.createCheckpoint(), auditLogs: this.auditLogs.slice(0, 250) };
   }
 
   applyClusterSnapshot(snapshot) {
-    if (!snapshot || !Number.isSafeInteger(snapshot.stateVersion) || !snapshot.simulationCheckpoint || !Array.isArray(snapshot.auditLogs)) return false;
+    if (!snapshot || snapshot.schemaVersion !== 1 || typeof snapshot.simulationSessionId !== 'string' || !snapshot.simulationSessionId || !Number.isSafeInteger(snapshot.stateVersion) || !snapshot.simulationCheckpoint || !Array.isArray(snapshot.auditLogs)) return false;
     if (snapshot.stateVersion < this.stateVersion) return false;
     this.simEngine.restoreCheckpoint(snapshot.simulationCheckpoint);
     this.auditLogs = cloneSimulationValue(snapshot.auditLogs).slice(0, 250);
     this.stateVersion = snapshot.stateVersion;
+    this.simulationSessionId = snapshot.simulationSessionId;
     this.isHydrated = true;
     this._simulationBaseline = this._snapshotSimulationState();
     return true;
@@ -831,6 +845,33 @@ export class BackendStateManager {
       for (const entry of this.auditLogs.filter((item) => item.correlationId || item.commandId)) await auditRepository.insert(entry, false, tx);
     });
     return dbManager.flush();
+  }
+
+  async reconcileDurableStateFromDatabase() {
+    const [incidents, devices, signals, audits] = await Promise.all([
+      incidentRepository.findAll(), deviceRepository.findAll(), signalConfigRepository.findAll(), auditRepository.findAll(250)
+    ]);
+    const requireOk = (name, result) => {
+      if (!Array.isArray(result) && result?.status !== 'OK') throw new Error(`DURABLE_RECONCILIATION_FAILED: ${name} (${result?.error || result?.status || 'unknown'})`);
+      return Array.isArray(result) ? result : result.data;
+    };
+    const durableIncidents = requireOk('incidents', incidents);
+    const durableDevices = requireOk('devices', devices);
+    const durableSignals = requireOk('signals', signals);
+    const durableAudits = requireOk('audit', audits);
+
+    this.state.incidents = cloneSimulationValue(durableIncidents);
+    const localDevices = new Map(this.devicesRegistry.map((device) => [device.deviceId, device]));
+    this.devicesRegistry = durableDevices.map((device) => ({ ...(localDevices.get(device.deviceId) || {}), ...cloneSimulationValue(device) }));
+    this.state.devices = this.devicesRegistry;
+    for (const config of durableSignals) {
+      const node = this.state.intersections.find((entry) => entry.id === config.node_id);
+      if (node) node.greenSplit = Number(config.green_split) || node.greenSplit;
+      if (config.node_id === 'node-wonokromo') this.state.greenSplitWonokromo = Number(config.green_split) || 35;
+    }
+    this.auditLogs = cloneSimulationValue(durableAudits).slice(0, 250);
+    this._simulationBaseline = this._snapshotSimulationState();
+    return true;
   }
 
   _queueSimulationEvent(name, payload) {
@@ -858,6 +899,7 @@ export class BackendStateManager {
     return cloneSimulationValue({
       state: this.state,
       devicesRegistry: this.devicesRegistry,
+      auditLogs: this.auditLogs,
       activeFaults: this.activeFaults,
       deviceAuditTrail: this.deviceAuditTrail,
       sequence: this.sequence,
@@ -882,9 +924,26 @@ export class BackendStateManager {
       if (!Number.isFinite(snapshot[key])) throw new TypeError(`invalid state-manager snapshot field '${key}'`);
     }
     const restored = cloneSimulationValue(snapshot);
+    const existingDevices = new Map((this.devicesRegistry || []).map((device) => [device.deviceId, device]));
+    restored.devicesRegistry = restored.devicesRegistry.map((device) => {
+      const existing = existingDevices.get(device.deviceId);
+      if (!existing) return device;
+      for (const key of Object.keys(existing)) if (!(key in device)) delete existing[key];
+      Object.assign(existing, device);
+      return existing;
+    });
+    const existingIncidents = new Map((this.state?.incidents || []).map((incident) => [String(incident.id), incident]));
+    if (Array.isArray(restored.state.incidents)) restored.state.incidents = restored.state.incidents.map((incident) => {
+      const existing = existingIncidents.get(String(incident.id));
+      if (!existing) return incident;
+      for (const key of Object.keys(existing)) if (!(key in incident)) delete existing[key];
+      Object.assign(existing, incident);
+      return existing;
+    });
     this.state = restored.state;
     this.devicesRegistry = restored.devicesRegistry;
     this.state.devices = this.devicesRegistry;
+    if (Array.isArray(restored.auditLogs)) this.auditLogs = restored.auditLogs;
     this.activeFaults = restored.activeFaults || {};
     this.deviceAuditTrail = restored.deviceAuditTrail || [];
     for (const key of ['sequence', 'stateVersion', 'cctvSequence', 'incidentSequence', 'emergencySequence', 'signalSequence', 'deviceSequence', 'lastUpdated', 'vehiclesCountToday', 'co2SavedKg', 'fuelSavedLiters']) {
@@ -1046,7 +1105,7 @@ export class BackendStateManager {
             });
 
             this._queueSimulationEvent('system:toast', {
-              message: `✅ DISPATCH BERHASIL: ${emg.vehicleId} (${emg.vehicleType}) telah sampai di RSUD Dr. Soetomo.`,
+              message: `✅ DISPATCH BERHASIL: ${emg.vehicleId} (${emg.vehicleType}) telah sampai di ${emg.destination || "tujuan rute"}.`,
               type: 'success'
             });
 
@@ -1562,7 +1621,7 @@ export class BackendStateManager {
   }
 
   async activateEmergencyPriority(code, routeId, options = {}) {
-    const canonical = validateDomainCommand('emergency:activate', code, { code, route: routeId, incidentId: options.incidentId || options.associatedIncidentId });
+    const canonical = validateDomainCommand('emergency:activate', code, { code, route: routeId, type: options.vehicleType, incidentId: options.incidentId || options.associatedIncidentId });
     code = canonical.code;
     routeId = canonical.route;
     const existing = this.state.activeEmergencies.find(
@@ -1609,7 +1668,7 @@ export class BackendStateManager {
     const emergencyItem = {
       id: id,
       vehicleId: code,
-      vehicleType: (code && (code.toLowerCase().includes("damkar") || code.toLowerCase().includes("pmk") || code.toLowerCase().includes("pemadam"))) ? "PMK" : "Ambulance",
+      vehicleType: ({ Ambulans: "Ambulance", Pemadam: "PMK", Patroli: "Patrol" })[canonical.type] || ((code && (code.toLowerCase().includes("damkar") || code.toLowerCase().includes("pmk") || code.toLowerCase().includes("pemadam"))) ? "PMK" : "Ambulance"),
       origin: route[0].name,
       destination: route[route.length - 1].name,
       routeId: routeId,

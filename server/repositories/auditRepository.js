@@ -11,7 +11,9 @@ const repository = {
     const filters = [];
     const params = [];
     const add = (column, value, operator = '=') => { if (value !== undefined && value !== null && value !== '') { params.push(value); filters.push(`${column} ${operator} $${params.length}`); } };
+    add('action', opts.action);
     add('command_id', opts.commandId);
+    add('correlation_id', opts.correlationId);
     add('idempotency_key', opts.idempotencyKey);
     add('operator', opts.actor);
     add('timestamp', opts.since, '>=');
@@ -28,7 +30,12 @@ const repository = {
     const correlationId = log.correlationId || log.commandId || null;
     const insert = async (connection) => {
       const idempotencyKey = log.idempotencyKey || null;
-      const dedupeKey = idempotencyKey ? `idem:${idempotencyKey}` : (correlationId ? `corr:${correlationId}` : null);
+      // Dedupe command result audit records by action and command key. This keeps
+      // semantically distinct audit events for one command independently recordable.
+      const action = String(log.action || 'ACTION');
+      const dedupeKey = idempotencyKey
+        ? `audit-event:${action}:idem:${idempotencyKey}`
+        : (correlationId ? `audit-event:${action}:corr:${correlationId}` : null);
       if (dedupeKey) {
         const claimed = await connection.execute('INSERT INTO audit_deduplication_keys(dedupe_key,created_at) VALUES($1,$2) ON CONFLICT(dedupe_key) DO NOTHING', [dedupeKey, new Date().toISOString()]);
         if (claimed.rowCount === 0) return false;
@@ -36,7 +43,6 @@ const repository = {
       await connection.execute('INSERT INTO audit_logs(operator,action,entity,result,correlation_id,details,command_id,idempotency_key,actor_role,source_instance_id,leader_instance_id,timestamp) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [
         String(log.operator || 'System'),String(log.action || 'ACTION'),String(log.entity || 'Global'),String(log.result || 'OK'),correlationId,String(log.details || ''),log.commandId || correlationId,log.idempotencyKey || null,log.actorRole || null,log.sourceInstanceId || null,log.leaderInstanceId || null,log.timestamp || new Date().toISOString()
       ]);
-      await connection.execute('DELETE FROM audit_logs WHERE id NOT IN (SELECT id FROM audit_logs ORDER BY id DESC LIMIT 500)');
       return true;
     };
     try {

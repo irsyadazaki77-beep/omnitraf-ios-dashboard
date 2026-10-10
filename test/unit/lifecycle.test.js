@@ -13,13 +13,17 @@ if (typeof globalThis.window === 'undefined') {
       if (!elements.has(id)) {
         elements.set(id, {
           id,
+          dataset: {},
           style: {},
           classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
           addEventListener() {},
           removeEventListener() {},
+          closest() { return null; },
           querySelectorAll() { return []; },
           querySelector() { return null; },
           setAttribute() {},
+          removeAttribute() {},
+          replaceChildren() {},
           getAttribute() { return null; },
           contains() { return false; },
           appendChild(child) { return child; },
@@ -50,9 +54,11 @@ if (typeof globalThis.window === 'undefined') {
     },
     querySelector() { return null; },
     querySelectorAll() { return []; },
+    createTextNode(text) { return { textContent: text }; },
     createElement(tag) {
       return {
         tagName: tag,
+        dataset: {},
         style: {},
         classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
         addEventListener() {},
@@ -60,6 +66,8 @@ if (typeof globalThis.window === 'undefined') {
         querySelectorAll() { return []; },
         querySelector() { return null; },
         setAttribute() {},
+          removeAttribute() {},
+          replaceChildren() {},
         getAttribute() { return null; },
         appendChild(child) { return child; },
         getContext() {

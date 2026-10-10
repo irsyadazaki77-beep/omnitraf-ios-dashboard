@@ -59,6 +59,7 @@ try {
   }
   leadershipManager = new SimulationLeadership({
     redisManager,
+    databaseManager: dbManager,
     eventBus: clusterEventBus,
     mode: OMNITRAF_RUNTIME_MODE,
     instanceId: runtimeInstanceId,
@@ -68,7 +69,12 @@ try {
       if (snapshot.cctvSnapshot) cvEngine.restoreSnapshot(snapshot.cctvSnapshot);
       return true;
     },
-    onLeaderReady: () => OMNITRAF_RUNTIME_MODE === 'cluster' ? backendState.persistClusterSnapshot() : undefined,
+    // A Redis runtime checkpoint can lag a command commit whose acknowledgement
+    // was interrupted. Reconcile durable domains from PostgreSQL before this
+    // candidate begins authoritative work.
+    onLeaderReady: () => OMNITRAF_RUNTIME_MODE === 'cluster'
+      ? backendState.reconcileDurableStateFromDatabase()
+      : undefined,
     onRoleChange: ({ previousRole, role }) => {
       if (role === 'LEADER') backendState.startRuntime();
       else backendState.stopRuntime();
@@ -133,6 +139,17 @@ app.get('/healthz', requireCapability('health:liveness'), (req, res) => {
     status: 'OK',
     timestamp: new Date().toISOString()
   });
+});
+
+// Minimal infrastructure readiness probe: no identity or cluster diagnostics.
+app.get('/readyz', async (_req, res) => {
+  const databaseReady = startupLifecycle === 'READY' && dbManager.isInitialized && await dbManager.ping();
+  const cluster = leadershipManager?.getDiagnostics();
+  const clusterReady = OMNITRAF_RUNTIME_MODE === 'single' || Boolean(
+    redisManager.isConnected() && cluster?.synchronized && ['LEADER', 'FOLLOWER'].includes(cluster?.role)
+  );
+  const ready = databaseReady && clusterReady && backendState.isHydrated && !backendState.draining;
+  res.status(ready ? 200 : 503).json({ ready, status: ready ? 'READY' : (backendState.draining ? 'DRAINING' : 'UNAVAILABLE') });
 });
 
 app.get('/ready', requireCapability('diagnostics:read'), async (req, res) => {
@@ -354,10 +371,12 @@ export function shutdown(signal = 'manual', timeoutMs = 10000) {
   shutdownPromise = (async () => {
     const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('SHUTDOWN_TIMEOUT')), timeoutMs).unref());
     const work = (async () => {
+      backendState.draining = true;
       const httpClosed = new Promise((resolve) => {
         if (!server.listening) return resolve();
         server.close(() => resolve());
       });
+      await commandExecutor.drain();
       backendState.stopRuntime?.();
       backendState.simEngine?.stop?.();
       io?.data?.stopSimulationLoops?.();

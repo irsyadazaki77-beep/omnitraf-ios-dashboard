@@ -8,39 +8,40 @@
    1. Central Design System Tokens (Dark Theme Baseline & Semantic Mapping)
    -------------------------------------------------------------------------- */
 :root {
+  color-scheme: dark;
   /* Surfaces & Structural Planes (60% Canvas / 30% Structural Surfaces) */
-  --bg-base: #080c14;
-  --bg-subtle: #0d131f;
-  --bg-canvas: #080c14;
-  --bg-top: #080c14;
+  --bg-base: #0b1020;
+  --bg-subtle: #0e1626;
+  --bg-canvas: #0b1020;
+  --bg-top: #0b1020;
   --bg-bottom: #0e1626;
 
-  --panel: #0f172a;
-  --panel-elevated: #162035;
-  --panel-soft: rgba(22, 32, 53, 0.75);
-  --panel-glass: rgba(15, 23, 42, 0.88);
-  --panel-glass-subtle: rgba(15, 23, 42, 0.65);
-  --panel-inset: #090e18;
+  --panel: #111827;
+  --panel-elevated: #182235;
+  --panel-soft: #151f31;
+  --panel-glass: rgba(17, 24, 39, 0.98);
+  --panel-glass-subtle: rgba(17, 24, 39, 0.94);
+  --panel-inset: #0d1422;
 
   /* Hairline Borders & Structural Dividers (1px hairline depth) */
-  --border: rgba(255, 255, 255, 0.08);
-  --border-subtle: rgba(255, 255, 255, 0.04);
-  --border-emphasis: rgba(255, 255, 255, 0.16);
-  --border-focus: #2563eb;
+  --border: #273449;
+  --border-subtle: #202c3f;
+  --border-emphasis: #36465d;
+  --border-focus: #75a7ff;
   --border-glow: rgba(37, 99, 235, 0.28);
 
   /* Typography & High-Contrast Hierarchy (WCAG 2.1 AA Compliant) */
-  --text: #f8fafc;
-  --text-muted: #94a3b8;
-  --text-dim: #64748b;
+  --text: #f3f6fc;
+  --text-muted: #9aa9be;
+  --text-dim: #718198;
   --text-inverse: #080c14;
 
   /* 10% Intent-Driven Accent Palette (Cobalt, Cyan & Azure) */
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --primary-active: #1e40af;
-  --primary-soft: rgba(37, 99, 235, 0.12);
-  --primary-border: rgba(37, 99, 235, 0.28);
+  --primary: #4d8dff;
+  --primary-hover: #3978e8;
+  --primary-active: #2864cf;
+  --primary-soft: rgba(77, 141, 255, 0.12);
+  --primary-border: rgba(77, 141, 255, 0.28);
 
   --primary-2: #0284c7;
   --primary-2-hover: #0369a1;
@@ -52,20 +53,20 @@
   --cyan-border: rgba(6, 182, 212, 0.28);
 
   /* Semantic Operations & Telemetry Status */
-  --success: #10b981;
-  --success-hover: #059669;
-  --success-soft: rgba(16, 185, 129, 0.12);
-  --success-border: rgba(16, 185, 129, 0.25);
+  --success: #27b88a;
+  --success-hover: #1fa77c;
+  --success-soft: rgba(39, 184, 138, 0.12);
+  --success-border: rgba(39, 184, 138, 0.25);
 
-  --warning: #f59e0b;
-  --warning-hover: #d97706;
-  --warning-soft: rgba(245, 158, 11, 0.12);
-  --warning-border: rgba(245, 158, 11, 0.25);
+  --warning: #e7af49;
+  --warning-hover: #d89d33;
+  --warning-soft: rgba(231, 175, 73, 0.13);
+  --warning-border: rgba(231, 175, 73, 0.28);
 
-  --danger: #ef4444;
-  --danger-hover: #dc2626;
-  --danger-soft: rgba(239, 68, 68, 0.12);
-  --danger-border: rgba(239, 68, 68, 0.25);
+  --danger: #e05c68;
+  --danger-hover: #cc4c59;
+  --danger-soft: rgba(224, 92, 104, 0.13);
+  --danger-border: rgba(224, 92, 104, 0.28);
 
   --info: #3b82f6;
   --info-soft: rgba(59, 130, 246, 0.12);
@@ -122,9 +123,9 @@
   --space-10: 40px;
 
   /* Typography roles */
-  --font-size-display: 28px;
-  --font-size-title: 20px;
-  --font-size-section: 16px;
+  --font-size-display: 26px;
+  --font-size-title: 19px;
+  --font-size-section: 15px;
   --font-size-card: 14px;
   --font-size-body: 13px;
   --font-size-small: 12px;
@@ -134,7 +135,7 @@
   --line-height-body: 1.5;
 
   --control-height-sm: 28px;
-  --control-height-md: 34px;
+  --control-height-md: 40px;
   --control-height-lg: 40px;
 
   /* Geometry, Radius & Elevation Scale */
@@ -192,35 +193,37 @@
    -------------------------------------------------------------------------- */
 body.theme-light,
 [data-theme="light"] {
-  --bg-base: #f8fafc;
-  --bg-subtle: #f1f5f9;
-  --bg-canvas: #f8fafc;
+  color-scheme: light;
+  --bg-base: #f3f6fa;
+  --bg-subtle: #edf2f8;
+  --bg-canvas: #f3f6fa;
   --bg-top: #ffffff;
-  --bg-bottom: #e2e8f0;
+  --bg-bottom: #e8edf4;
 
   --panel: #ffffff;
   --panel-elevated: #f8fafc;
   --panel-soft: #f1f5f9;
-  --panel-glass: rgba(255, 255, 255, 0.94);
-  --panel-glass-subtle: rgba(255, 255, 255, 0.85);
+  --panel-glass: rgba(255, 255, 255, 0.98);
+  --panel-glass-subtle: rgba(255, 255, 255, 0.94);
   --panel-inset: #f1f5f9;
 
-  --border: #e2e8f0;
-  --border-subtle: #f1f5f9;
-  --border-emphasis: #cbd5e1;
-  --border-focus: #2563eb;
+  --border: #dce3ec;
+  --border-subtle: #e8edf3;
+  --border-emphasis: #c7d1de;
+  --border-focus: #286cf0;
   --border-glow: rgba(37, 99, 235, 0.16);
 
-  --text: #0f172a;
-  --text-muted: #475569;
-  --text-dim: #94a3b8;
+  --text: #172033;
+  /* Keep secondary and tertiary copy readable on the light canvas at small sizes. */
+  --text-muted: #56657a;
+  --text-dim: #5b6b80;
   --text-inverse: #ffffff;
 
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --primary-active: #1e40af;
-  --primary-soft: rgba(37, 99, 235, 0.08);
-  --primary-border: rgba(37, 99, 235, 0.2);
+  --primary: #286cf0;
+  --primary-hover: #1f5ed8;
+  --primary-active: #184eb8;
+  --primary-soft: rgba(40, 108, 240, 0.09);
+  --primary-border: rgba(40, 108, 240, 0.22);
 
   --primary-2: #0284c7;
   --primary-2-hover: #0369a1;
@@ -246,4 +249,16 @@ body.theme-light,
   --text-disabled: rgba(71, 85, 105, 0.55);
   --border-default: var(--border);
   --border-strong: var(--border-emphasis);
+  --success: #148765;
+  --success-hover: #0f7455;
+  --success-soft: rgba(20, 135, 101, 0.09);
+  --success-border: rgba(20, 135, 101, 0.2);
+  --warning: #9a6400;
+  --warning-hover: #805300;
+  --warning-soft: rgba(154, 100, 0, 0.09);
+  --warning-border: rgba(154, 100, 0, 0.2);
+  --danger: #b83848;
+  --danger-hover: #a52e3e;
+  --danger-soft: rgba(184, 56, 72, 0.08);
+  --danger-border: rgba(184, 56, 72, 0.2);
 }

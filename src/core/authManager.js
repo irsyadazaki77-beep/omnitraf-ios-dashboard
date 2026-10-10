@@ -118,15 +118,12 @@ class AuthManager {
    * Logout dan bersihkan session di client dan server
    */
   async logout() {
-    try {
-      if (typeof fetch === 'function') {
-        await fetch('/api/auth/logout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin'
-        }).catch(() => {});
-      }
-    } catch (_) {}
+    if (typeof fetch === 'function') {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin'
+      });
+      if (!response.ok) throw new Error('Server belum mengakhiri sesi. Coba keluar lagi.');
+    }
 
     this.token = null;
     this.user = null;

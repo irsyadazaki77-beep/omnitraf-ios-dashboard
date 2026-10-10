@@ -231,7 +231,7 @@ body.theme-light .surface-grid {
 
 .ambient,
 .ambient-particle-container {
-  display: none !important;
+  display: none;
 }
 
 /* System Announcement Ticker */
@@ -277,15 +277,6 @@ body.theme-light .system-marquee {
    22. Accessibility, Focus Ring & Motion Governance (WCAG 2.1 AA)
    -------------------------------------------------------------------------- */
 :focus-visible {
-  outline: 2px solid var(--border-focus) !important;
-  outline-offset: 2px !important;
-}
-
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
   outline: 2px solid var(--border-focus) !important;
   outline-offset: 2px !important;
 }

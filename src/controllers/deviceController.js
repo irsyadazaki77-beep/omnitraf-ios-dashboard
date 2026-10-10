@@ -20,6 +20,8 @@ export class DeviceController {
     this._isInitialized = false;
     this.selectedDeviceId = "NODE-EDGE-01";
     this.disposer = new Disposer('DeviceController');
+    this.deviceAuditCache = new Map();
+    this.deviceAuditInFlight = new Set();
   }
 
   init() {
@@ -40,6 +42,11 @@ export class DeviceController {
     this._setupSocketListeners();
     this._bindTableEvents();
     this._bindDrawerEvents();
+    this.disposer.addEventListener(window, 'omnitraf:entity-focus', (event) => {
+      if (event.detail?.kind !== 'device') return;
+      const exists = (stateStore.getState().devices || []).some((device) => String(device.deviceId) === String(event.detail.id));
+      if (exists) this.selectDevice(String(event.detail.id));
+    });
     this.disposer.add(authManager.onAuthChange(() => this.render()));
     
     this.render();
@@ -70,8 +77,6 @@ export class DeviceController {
   render() {
     const state = stateStore.getState();
     const devices = state.devices || [];
-
-    if (devices.length === 0) return;
 
     // 1. Render Summary Cards di atas dashboard Device Management
     this._renderSummaryCards(devices);
@@ -113,8 +118,8 @@ export class DeviceController {
 
     const values = [
       [document.querySelector('#view-devices .workspace-header-summary-strip .workspace-summary-item:first-child strong'), `${totalCount} Perangkat`],
-      [document.getElementById('nodeStatusSummary'), `${exceptionCount} exception`],
-      [document.getElementById('nodeGpuSummary'), activeDevicesCount ? `${avgCpu}% Load` : '—'],
+      [document.getElementById('nodeStatusSummary'), `${exceptionCount} pengecualian`],
+      [document.getElementById('nodeGpuSummary'), activeDevicesCount ? `${avgCpu}% beban model` : '—'],
       [document.getElementById('nodeTempSummary'), activeDevicesCount ? `${avgTemp}°C` : '—']
     ];
     values.forEach(([element, value]) => { if (element) element.textContent = value; });
@@ -141,11 +146,13 @@ export class DeviceController {
       const safeType = escapeHtml(dev.type);
       const resolvedHealth = dev.status === 'MAINTENANCE' ? 'MAINTENANCE' : String(dev.healthLevel || '').toUpperCase();
       const safeHealthLevel = ['HEALTHY', 'DEGRADED', 'STALE', 'FAULT', 'RECOVERING', 'OFFLINE', 'SIMULATED', 'MAINTENANCE'].includes(resolvedHealth) ? resolvedHealth : 'OFFLINE';
-      const numericValue = value => Number.isFinite(Number(value)) ? Number(value) : 0;
-      const cpuPercent = Math.max(0, Math.min(100, numericValue(dev.cpuPercent)));
-      const temperatureC = Math.max(0, Math.min(150, numericValue(dev.temperatureC)));
-      const latencyMs = Math.max(0, numericValue(dev.latencyMs));
-      const fps = Math.max(0, numericValue(dev.fps));
+      const numericValue = value => value === null || value === undefined || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
+      const cpuReading = numericValue(dev.cpuPercent);
+      const temperatureReading = numericValue(dev.temperatureC);
+      const latencyMs = numericValue(dev.latencyMs);
+      const fps = numericValue(dev.fps);
+      const cpuPercent = Math.max(0, Math.min(100, cpuReading ?? 0));
+      const temperatureC = Math.max(0, Math.min(150, temperatureReading ?? 0));
       // Tentukan status badge HTML
       let badgeHtml = "";
       if (safeHealthLevel === "HEALTHY") {
@@ -168,7 +175,7 @@ export class DeviceController {
 
       // Bar indikator CPU load
       const cpuColor = cpuPercent > 80 ? 'load-orange' : 'load-green';
-      const cpuBarHtml = `
+      const cpuBarHtml = cpuReading === null ? '<span class="metric-unavailable">Tidak tersedia</span>' : `
         <div class="diag-bar-wrap">
           <div class="diag-bar-track">
             <div class="diag-bar-fill ${cpuColor}" style="width: ${cpuPercent}%;"></div>
@@ -180,7 +187,7 @@ export class DeviceController {
       // Bar indikator suhu
       const tempColorClass = temperatureC > 75 ? 'temp-warm-fill' : 'temp-cool-fill';
       const tempBadgeClass = temperatureC > 75 ? 'temp-warm' : 'temp-cool';
-      const tempBarHtml = `
+      const tempBarHtml = temperatureReading === null ? '<span class="metric-unavailable">Tidak tersedia</span>' : `
         <div class="diag-temp-wrap">
           <div class="diag-temp-bar">
             <div class="diag-temp-fill ${tempColorClass}" style="width: ${Math.min(100, (temperatureC / 100) * 100)}%;"></div>
@@ -205,17 +212,17 @@ export class DeviceController {
       });
 
       const sparklineHtml = `
-        <svg viewBox="0 0 50 15" width="50" height="15" style="overflow:visible;">
-          <path d="${points}" fill="none" stroke="${safeHealthLevel === 'OFFLINE' ? '#64748b' : safeHealthLevel === 'DEGRADED' ? '#f59e0b' : '#00e5ff'}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <svg viewBox="0 0 50 15" width="50" height="15" class="device-sparkline" aria-label="Tren latensi model">
+          <path d="${points}" fill="none" class="device-sparkline-line ${safeHealthLevel.toLowerCase()}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       `;
 
-      const inferenceRateText = fps > 0 ? `${fps} FPS simulasi` : (typeof dev.type === 'string' && dev.type.includes("PLC")) ? "Telemetri demo" : "N/A";
+      const inferenceRateText = fps === null ? (typeof dev.type === 'string' && dev.type.includes("PLC")) ? "Telemetri demo" : "Tidak tersedia" : `${fps} FPS simulasi`;
 
       // Row layout HTML murni
       html += `
-        <tr class="clickable-device-row ${this.selectedDeviceId === dev.deviceId ? 'active-row-highlight' : ''}" data-device="${safeDeviceId}" data-health="${safeHealthLevel.toLowerCase()}" style="border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.2s;">
-          <td><strong style="font-family:'Share Tech Mono'; color:#00e5ff;">${safeDeviceId}</strong></td>
+        <tr class="device-row ${this.selectedDeviceId === dev.deviceId ? 'active-row-highlight' : ''}" data-device="${safeDeviceId}" data-health="${safeHealthLevel.toLowerCase()}">
+          <td><strong>${safeDeviceId}</strong></td>
           <td>
             <div style="font-weight:600;">${safeDeviceName}</div>
             <small style="color:#64748b; font-size:10px;">${safeLocation}</small>
@@ -224,15 +231,26 @@ export class DeviceController {
           <td>${badgeHtml}</td>
           <td>${cpuBarHtml}</td>
           <td>${tempBarHtml}</td>
-          <td class="device-ping" style="font-family:'Share Tech Mono';">${safeHealthLevel === 'OFFLINE' ? '--' : latencyMs + ' ms demo'}</td>
+          <td class="device-ping" style="font-family:'Share Tech Mono';">${latencyMs === null || safeHealthLevel === 'OFFLINE' ? '—' : latencyMs + ' ms model'}</td>
           <td class="device-ping-spark">${sparklineHtml}</td>
           <td style="font-size:11px; font-family:'Share Tech Mono';">${inferenceRateText}</td>
-          <td>${authManager.hasRole(['OPERATOR', 'ADMIN']) && !['SIMULATED', 'MAINTENANCE'].includes(safeHealthLevel) ? `<button aria-label="Ping simulation for ${safeDeviceId}" class="btn btn-ghost compact btn-ping-device-row" data-device="${safeDeviceId}" style="font-size:10px; padding:3px 8px;">Ping demo</button>` : ''}</td>
+        <td><button type="button" class="btn btn-ghost compact btn-device-detail" aria-label="Lihat detail ${safeDeviceName}">Lihat detail</button>${authManager.hasRole(['OPERATOR', 'ADMIN']) && !['SIMULATED', 'MAINTENANCE'].includes(safeHealthLevel) ? `<button type="button" aria-label="Uji koneksi simulasi ${safeDeviceId}" class="btn btn-ghost compact btn-ping-device-row" data-device="${safeDeviceId}">Uji koneksi demo</button>` : ''}</td>
         </tr>
       `;
     });
 
+    if (sortedDevices.length === 0) {
+      html = '<tr class="device-empty-row"><td colspan="10">Belum ada data perangkat dari server simulasi.</td></tr>';
+    }
+
     tbody.innerHTML = html;
+    const columnLabels = Array.from(tbody.closest('table')?.querySelectorAll('thead th') || [], header => header.textContent.trim());
+    tbody.querySelectorAll('tr').forEach(row => {
+      row.querySelectorAll('td').forEach((cell, index) => {
+        if (cell.colSpan > 1) return;
+        if (columnLabels[index]) cell.dataset.label = columnLabels[index];
+      });
+    });
     this._applyDeviceFilters();
 
     // Kembalikan scroll position
@@ -253,7 +271,7 @@ export class DeviceController {
     // centralized click delegator
     this.disposer.addEventListener(tbody, "click", (e) => {
       const pingBtn = e.target.closest(".btn-ping-device-row");
-      const row = e.target.closest(".clickable-device-row");
+      const detailBtn = e.target.closest('.btn-device-detail');
 
       if (pingBtn) {
         e.stopPropagation();
@@ -262,8 +280,9 @@ export class DeviceController {
         return;
       }
 
-      if (row) {
-        const devId = row.dataset.device;
+      if (detailBtn) {
+        const devId = detailBtn.closest('.device-row')?.dataset.device;
+        if (!devId) return;
         this.selectDevice(devId);
         soundManager.play('click');
       }
@@ -312,7 +331,7 @@ export class DeviceController {
     const query = (document.getElementById('deviceSearch')?.value || '').trim().toLowerCase();
     const status = document.getElementById('deviceStatusFilter')?.value || 'all';
     let visible = 0;
-    const rows = [...tbody.querySelectorAll('.clickable-device-row')];
+    const rows = [...tbody.querySelectorAll('.device-row')];
     rows.forEach((row) => {
       const health = row.dataset.health || 'offline';
       const matchesQuery = !query || row.textContent.toLowerCase().includes(query);
@@ -327,9 +346,9 @@ export class DeviceController {
       if (!row.hidden) visible += 1;
     });
     const count = document.getElementById('deviceFilterCount');
-    if (count) count.textContent = `${visible} / ${rows.length} devices`;
+    if (count) count.textContent = `${visible} / ${rows.length} perangkat`;
     const emptyState = document.getElementById('deviceFilterEmpty');
-    if (emptyState) emptyState.hidden = visible > 0;
+    if (emptyState) emptyState.hidden = visible > 0 || rows.length === 0;
   }
 
   async pingDevice(deviceId, btnElement = null) {
@@ -368,7 +387,7 @@ export class DeviceController {
     this.selectedDeviceId = deviceId;
     
     // Highlight row active di tabel
-    document.querySelectorAll(".clickable-device-row").forEach(row => {
+    document.querySelectorAll(".device-row").forEach(row => {
       if (row.dataset.device === deviceId) {
         row.classList.add("active-row-highlight");
       } else {
@@ -380,7 +399,8 @@ export class DeviceController {
     const drawer = document.getElementById("deviceDrawerConfig") || document.getElementById("deviceConfigDrawer");
     if (drawer) {
       drawer.classList.add("open");
-      drawer.style.display = "block";
+      drawer.style.display = "flex";
+      drawer.setAttribute('aria-hidden', 'false');
     }
 
     // Force update detail drawer
@@ -390,11 +410,21 @@ export class DeviceController {
 
   _updateDrawerDetailsLive(devices, isInitialSelect = false) {
     const dev = devices.find(d => d.deviceId === this.selectedDeviceId);
-    if (!dev) return;
+    if (!dev) {
+      const drawer = document.getElementById("deviceDrawerConfig") || document.getElementById("deviceConfigDrawer");
+      if (drawer?.classList.contains('open')) {
+        drawer.classList.remove('open');
+        drawer.setAttribute('aria-hidden', 'true');
+        drawer.style.display = 'none';
+      }
+      this.selectedDeviceId = null;
+      return;
+    }
     const deviceType = typeof dev.type === "string" ? dev.type : "";
-    const numericMetric = (value, fallback = 0) => {
+    const numericMetric = (value) => {
+      if (value === null || value === undefined || value === '') return null;
       const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : fallback;
+      return Number.isFinite(parsed) ? parsed : null;
     };
     const temperatureC = numericMetric(dev.temperatureC);
     const cpuPercent = numericMetric(dev.cpuPercent);
@@ -416,6 +446,18 @@ export class DeviceController {
     }
 
     const fpsInput = document.getElementById("cfgDeviceFps");
+    const canConfigure = authManager.hasRole('ADMIN');
+    const permissionNote = document.getElementById('deviceConfigPermissionNote');
+    if (permissionNote) permissionNote.hidden = canConfigure;
+    const saveButton = drawer.querySelector('button[type="submit"]');
+    if (saveButton) {
+      saveButton.disabled = !canConfigure;
+      saveButton.setAttribute('aria-describedby', 'deviceConfigPermissionNote');
+    }
+    if (fpsInput) {
+      fpsInput.disabled = !canConfigure;
+      fpsInput.setAttribute('aria-readonly', String(!canConfigure));
+    }
     if (fpsInput && (isInitialSelect || document.activeElement !== fpsInput)) {
       fpsInput.value = dev.fps || 30;
       if (fpsInput.parentElement && fpsInput.parentElement.style) {
@@ -430,6 +472,7 @@ export class DeviceController {
     const resSelect = document.getElementById("cfgDeviceResolution");
     if (resSelect && (isInitialSelect || document.activeElement !== resSelect)) {
       resSelect.value = dev.resolution || "1080p";
+      resSelect.disabled = !canConfigure;
       if (resSelect.parentElement && resSelect.parentElement.style) {
         if (deviceType.includes("PLC")) {
           resSelect.parentElement.style.display = "none";
@@ -451,52 +494,67 @@ export class DeviceController {
       if (dev.healthLevel === "STALE") activeFlags.push("STALE_TELEMETRY");
       if (dev.healthLevel === "OFFLINE") activeFlags.push("HEARTBEAT_TIMEOUT");
 
-      const flagsText = activeFlags.length > 0 
-        ? activeFlags.map(f => `<span style="background:rgba(239,68,68,0.15); color:#ef4444; padding:2px 6px; border-radius:4px; font-size:9.5px; border:1px solid rgba(239,68,68,0.3); margin-right:4px;">${f}</span>`).join("")
-        : `<span style="color:#22c55e; font-weight:700;">🟢 None (Optimal)</span>`;
+      const flagLabels = { HIGH_LATENCY: 'Latensi tinggi', LOW_FPS: 'Laju bingkai rendah', HIGH_TEMPERATURE: 'Suhu tinggi', RESOURCE_PRESSURE: 'Tekanan sumber daya', STALE_TELEMETRY: 'Telemetri usang', HEARTBEAT_TIMEOUT: 'Waktu heartbeat habis' };
+      const flagsText = activeFlags.length > 0
+        ? activeFlags.map(flag => `<span class="device-flag">${flagLabels[flag]}</span>`).join("")
+        : `<span class="device-flag-empty">Tidak ada · optimal</span>`;
 
       const healthColor = dev.healthLevel === 'HEALTHY' ? '#22c55e' : dev.healthLevel === 'DEGRADED' ? '#f59e0b' : '#ef4444';
+      const faultInjectionHtml = canConfigure ? `
+        <div class="fault-injection-container">
+            <label class="cfg-label">Suntik gangguan (simulasi)</label>
+          <div class="fault-injection-actions">
+            <button class="btn btn-ghost compact btn-inject-fault" type="button" data-fault="latency_spike">Lonjakan latensi</button>
+            <button class="btn btn-ghost compact btn-inject-fault" type="button" data-fault="packet_loss">Kehilangan paket</button>
+            <button class="btn btn-ghost compact btn-inject-fault" type="button" data-fault="low_fps" ${deviceType.includes("PLC") ? 'disabled' : ''}>Laju bingkai rendah</button>
+            <button class="btn btn-ghost compact btn-inject-fault" type="button" data-fault="thermal_warning">Peringatan suhu</button>
+            <button class="btn btn-ghost compact btn-inject-fault" type="button" data-fault="heartbeat_timeout">Batas waktu heartbeat</button>
+            <button class="btn btn-ghost compact btn-inject-fault" type="button" data-fault="recover">Pulihkan node</button>
+          </div>
+        </div>
+      ` : '';
 
       diagBox.innerHTML = `
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:11px; margin-bottom:12px;">
-          <div>🌡️ Suhu GPU: <strong style="color:${temperatureC > 75 ? '#ef4444' : '#fff'};">${temperatureC}°C</strong></div>
-          <div>📊 CPU/GPU Load: <strong>${cpuPercent}%</strong></div>
+          <div>🌡️ Suhu GPU: <strong style="color:${temperatureC > 75 ? '#ef4444' : '#fff'};">${temperatureC === null ? '—' : `${temperatureC}°C`}</strong></div>
+          <div>📊 Beban CPU/GPU: <strong>${cpuPercent === null ? '—' : `${cpuPercent}%`}</strong></div>
           <div>💾 RAM Node: <strong>${deviceType.includes("PLC") ? "256 KB" : "4.2 / 8.0 GB"}</strong></div>
           <div>🌀 Fan Speed: <strong>${deviceType.includes("PLC") ? "N/A" : dev.healthLevel === "OFFLINE" ? "0 RPM" : "2400 RPM"}</strong></div>
           <div>⏳ Uptime %: <strong style="color:#10b981;">${dev.healthLevel === 'OFFLINE' ? '0.0%' : uptimePercent + '%'}</strong></div>
-          <div>❌ Packet Loss: <strong style="color:${packetLossPercent > 5 ? '#ef4444' : '#fff'};">${packetLossPercent}%</strong></div>
-          <div>📶 Status: <strong style="color:${healthColor};">${escapeHtml(dev.healthLevel)}</strong></div>
-          <div>🎯 Skor Sehat: <strong style="color:${healthColor}; font-size:12px; font-family:'Share Tech Mono';">${healthScore}/100</strong></div>
+          <div>❌ Kehilangan paket: <strong style="color:${packetLossPercent > 5 ? '#ef4444' : '#fff'};">${packetLossPercent === null ? '—' : `${packetLossPercent}%`}</strong></div>
+          <div>📶 Status: <strong style="color:${healthColor};">${escapeHtml(({ HEALTHY: 'Sehat', DEGRADED: 'Menurun', STALE: 'Usang', FAULT: 'Gangguan', RECOVERING: 'Pemulihan', OFFLINE: 'Terputus', SIMULATED: 'Simulasi' })[dev.healthLevel] || dev.healthLevel || 'Tidak diketahui')}</strong></div>
+          <div>🎯 Skor kesehatan: <strong style="color:${healthColor}; font-size:12px; font-family:'Share Tech Mono';">${healthScore === null ? '—' : `${healthScore}/100`}</strong></div>
         </div>
         <div class="diag-extra-details" style="font-size:10.5px; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px; margin-top:10px; color:#94a3b8;">
-          <div style="margin-bottom:6px;">🚩 Active Flags: ${flagsText}</div>
-          <div style="margin-bottom:4px;">⏰ Last Heartbeat: <strong style="color:#fff;">${escapeHtml(heartbeatLabel)} WIB</strong></div>
-          <div style="margin-bottom:6px;">📦 Provenance: <strong style="color:#00e5ff; font-family:'Share Tech Mono';">${escapeHtml(dev.source)}</strong></div>
+          <div style="margin-bottom:6px;">🚩 Tanda aktif: ${flagsText}</div>
+          <div style="margin-bottom:4px;">⏰ Heartbeat terakhir: <strong style="color:#fff;">${escapeHtml(heartbeatLabel)} WIB</strong></div>
+          <div style="margin-bottom:6px;">📦 Sumber data: <strong style="color:#00e5ff; font-family:'Share Tech Mono';">${escapeHtml(dev.source || 'SIMULATED')} · MODEL SIMULASI</strong></div>
           <div style="border-top:1px solid rgba(255,255,255,0.05); margin-top:8px; padding-top:8px;">
-            <strong>Last Action / Command Audit:</strong>
-            <div id="diagLastCommand" style="font-family:'Share Tech Mono', monospace; font-size:10px; color:#38bdf8; margin-top:3px; word-break:break-all; line-height:1.3;">Memuat histori audit...</div>
+            <strong>Audit perintah terakhir:</strong>
+            <div id="diagLastCommand" style="font-family:'Share Tech Mono', monospace; font-size:10px; color:#38bdf8; margin-top:3px; word-break:break-all; line-height:1.3;">Memuat riwayat audit...</div>
           </div>
         </div>
-        <!-- Fault Injection Controls -->
-        <div class="fault-injection-container" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:10px; margin-top:10px;">
-          <label class="cfg-label" style="display:block; margin-bottom:6px; font-weight:700; color:#ef4444; font-size:10.5px; letter-spacing:0.3px;">⚠️ DETECTABLE FAULT INJECTION (DEMO)</label>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
-            <button class="btn btn-ghost compact btn-inject-fault" type="button" data-fault="latency_spike" style="font-size:9.5px; padding:4px 6px;">Latency Spike</button>
-            <button class="btn btn-ghost compact btn-inject-fault" type="button" data-fault="packet_loss" style="font-size:9.5px; padding:4px 6px;">Packet Loss</button>
-            <button class="btn btn-ghost compact btn-inject-fault" type="button" data-fault="low_fps" style="font-size:9.5px; padding:4px 6px;" ${deviceType.includes("PLC") ? 'disabled' : ''}>Low FPS</button>
-            <button class="btn btn-ghost compact btn-inject-fault" type="button" data-fault="thermal_warning" style="font-size:9.5px; padding:4px 6px;">Thermal Warning</button>
-            <button class="btn btn-ghost compact btn-inject-fault" type="button" data-fault="heartbeat_timeout" style="font-size:9.5px; padding:4px 6px;">HB Timeout</button>
-            <button class="btn btn-primary compact btn-inject-fault" type="button" data-fault="recover" style="font-size:9.5px; padding:4px 6px; background:#10b981; border-color:#10b981; color:#fff;">Recover Node</button>
-          </div>
-        </div>
+        ${faultInjectionHtml}
       `;
+      const auditEl = diagBox.querySelector('#diagLastCommand');
+      if (auditEl) {
+        auditEl.dataset.deviceId = String(this.selectedDeviceId);
+        const cachedAudit = this.deviceAuditCache.get(String(this.selectedDeviceId));
+        if (cachedAudit) {
+          auditEl.innerHTML = cachedAudit;
+        } else if (this.deviceAuditInFlight.has(String(this.selectedDeviceId))) {
+          auditEl.textContent = 'Memuat histori audit…';
+        } else {
+          auditEl.textContent = 'Histori audit belum dimuat.';
+        }
+      }
     }
 
     // Render Latency Sparkline di Drawer Canvas
     this._drawLatencySparklineDrawer(dev.history || []);
 
     // Jika ini inisialisasi klik awal, lakukan fetch audit trail terpusat
-    if (isInitialSelect) {
+    if (isInitialSelect && !this.deviceAuditCache.has(String(this.selectedDeviceId))) {
       this._fetchDeviceAuditTrail(this.selectedDeviceId);
     }
   }
@@ -565,14 +623,16 @@ export class DeviceController {
   }
 
   async _fetchDeviceAuditTrail(deviceId) {
+    const key = String(deviceId);
+    if (this.deviceAuditInFlight.has(key)) return;
+    this.deviceAuditInFlight.add(key);
+    this._setDeviceAuditContent(key, 'Memuat histori audit…');
     try {
       const payload = await fetchWithCacheAndDedupe(
         `/api/devices/audit?deviceId=${encodeURIComponent(deviceId)}`,
         { method: 'GET', ttlMs: 1500 }
       );
-      const el = document.getElementById("diagLastCommand");
-      if (!el) return;
-
+      let html = '';
       if (payload && payload.success && Array.isArray(payload.data) && payload.data.length > 0) {
         const cmd = payload.data[0];
         const time = new Date(cmd.requestedAt).toLocaleTimeString('id-ID');
@@ -586,18 +646,29 @@ export class DeviceController {
           desc = `Fault: ${typeof cmd.newState === 'object' ? (cmd.newState?.status || 'Active') : cmd.newState} disuntik oleh ${cmd.actor}`;
         }
 
-        el.innerHTML = `
+        html = `
           <strong>[${time} WIB] ID: ${escapeHtml(typeof cmd.actionId === 'string' ? cmd.actionId.slice(-6) : '-')}</strong><br/>
           <span style="color:#10b981;">• Status: ${escapeHtml(cmd.status || 'APPLIED')}</span><br/>
           <span>• Detail: ${escapeHtml(desc)}</span>
         `;
       } else {
-        el.textContent = "Belum ada riwayat audit perintah.";
+        html = "Belum ada riwayat audit perintah.";
       }
+      this.deviceAuditCache.set(key, html);
+      this._setDeviceAuditContent(key, html, true);
     } catch (err) {
-      const el = document.getElementById("diagLastCommand");
-      if (el) el.textContent = "Gagal memuat log audit.";
+      this._setDeviceAuditContent(key, 'Histori gagal dimuat. <button type="button" class="btn btn-ghost compact btn-retry-device-audit">Coba lagi</button>', true);
+    } finally {
+      this.deviceAuditInFlight.delete(key);
     }
+  }
+
+  _setDeviceAuditContent(deviceId, content, isHtml = false) {
+    if (String(this.selectedDeviceId) !== String(deviceId)) return;
+    const el = document.getElementById('diagLastCommand');
+    if (!el || el.dataset.deviceId !== String(deviceId)) return;
+    if (isHtml) el.innerHTML = content;
+    else el.textContent = content;
   }
 
   _bindDrawerEvents() {
@@ -609,6 +680,7 @@ export class DeviceController {
     const closeDrawer = () => {
       if (drawer) {
         drawer.classList.remove("open");
+        drawer.setAttribute('aria-hidden', 'true');
         setTimeout(() => { drawer.style.display = "none"; }, 200);
       }
       soundManager.play('click');
@@ -620,13 +692,17 @@ export class DeviceController {
 
     const handleFormSubmit = async (e) => {
       if (e) e.preventDefault();
+      if (!authManager.hasRole('ADMIN')) {
+        window.showToast('Perubahan konfigurasi perangkat memerlukan peran Admin.', 'warning');
+        return;
+      }
       
       const fpsInput = document.getElementById("cfgDeviceFps");
       const resSelect = document.getElementById("cfgDeviceResolution");
 
       const payload = {
         deviceId: this.selectedDeviceId,
-        actor: "Zaki Putra (Operator)"
+        actor: authManager.getUser()?.name || 'Demo session'
       };
 
       if (fpsInput) payload.fps = parseInt(fpsInput.value, 10);
@@ -672,6 +748,11 @@ export class DeviceController {
     // Event delegation on drawer for fault injection clicks - absolutely 100% leak-proof!
     if (drawer) {
       this.disposer.addEventListener(drawer, "click", (e) => {
+        const retryAuditBtn = e.target.closest('.btn-retry-device-audit');
+        if (retryAuditBtn) {
+          this._fetchDeviceAuditTrail(this.selectedDeviceId);
+          return;
+        }
         const injectBtn = e.target.closest(".btn-inject-fault");
         if (injectBtn) {
           this._handleFaultInjectionClick(this.selectedDeviceId, injectBtn.dataset.fault);
@@ -681,6 +762,10 @@ export class DeviceController {
   }
 
   async _handleFaultInjectionClick(deviceId, faultType) {
+    if (!authManager.hasRole('ADMIN')) {
+      window.showToast('Fault injection simulasi hanya tersedia untuk Admin.', 'warning');
+      return;
+    }
     try {
       const payload = await fetchWithCacheAndDedupe("/api/devices/fault", {
         method: "POST",
@@ -729,11 +814,13 @@ export class DeviceController {
       else if (data.status === "APPLIED") statusColor = "#22c55e";
       else if (data.status === "REJECTED") statusColor = "#ef4444";
 
-      el.innerHTML = `
+      const html = `
         <strong>[${time} WIB] ID: ${escapeHtml(typeof data.actionId === 'string' ? data.actionId.slice(-6) : '-')}</strong><br/>
         <span style="color:${statusColor}; font-weight:700;">• Status: ${escapeHtml(data.status)}</span><br/>
         <span>• Param: FPS:${escapeHtml(safeFps)}, Res:${escapeHtml(safeResolution)}</span>
       `;
+      this.deviceAuditCache.set(String(data.deviceId), html);
+      if (el.dataset.deviceId === String(data.deviceId)) el.innerHTML = html;
     }
   }
 

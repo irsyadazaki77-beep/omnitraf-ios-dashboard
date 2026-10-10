@@ -11,12 +11,15 @@ import { commandLayer } from '../core/commandLayer.js';
 import { authManager } from '../core/authManager.js';
 import { Disposer } from '../core/disposer.js';
 
+const TERMINAL_INCIDENT_STATUSES = new Set(['RESOLVED', 'ARCHIVED', 'CLOSED', 'CANCELLED']);
+
 export class IncidentController {
   constructor() {
     this.selectedIntersection = null;
     this._isInitialized = false;
     this.disposer = new Disposer('IncidentController');
     this._authUnsubscribe = null;
+    this.incidentFilters = { category: 'all', severity: 'all', status: 'all', search: '' };
   }
 
   init() {
@@ -27,17 +30,18 @@ export class IncidentController {
       this._renderIncidentListUI(incidents);
       this._renderNotificationDrawer(incidents);
       const dispatch = document.getElementById('btnIncidentDispatch');
-      if (dispatch) dispatch.hidden = !authManager.hasRole(['OPERATOR', 'ADMIN']);
+      const selected = incidents.find(incident => String(incident.id) === String(this.activeIncidentId));
+      if (dispatch) dispatch.hidden = !authManager.hasRole(['OPERATOR', 'ADMIN'])
+        || !selected || TERMINAL_INCIDENT_STATUSES.has(String(selected.status || '').toUpperCase());
     });
   }
 
   activate() {
     this.deactivate(); // Ensure clean slate before binding
 
-    this._bindContextMenu();
+    this._resetIncidentFilters();
     this._bindIncidentModal();
     this._bindIncidentFilterChips();
-    this._bindExportCsv();
     this._setupStoreListeners();
     this._registerGlobalHandlers();
 
@@ -45,8 +49,19 @@ export class IncidentController {
     const state = stateStore.getState();
     this._renderIncidentListUI(state.incidents);
     this._renderNotificationDrawer(state.incidents);
+    this.disposer.addEventListener(window, 'omnitraf:entity-focus', (event) => {
+      if (event.detail?.kind !== 'incident') return;
+      const target = document.getElementById(`incident-${event.detail.id}`);
+      if (!target) return;
+      target.tabIndex = -1;
+      target.classList.add('entity-search-focus');
+      target.focus({ preventScroll: true });
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
     const dispatch = document.getElementById('btnIncidentDispatch');
-    if (dispatch) dispatch.hidden = !authManager.hasRole(['OPERATOR', 'ADMIN']);
+    const selectedIncident = state.incidents?.find(incident => String(incident.id) === String(this.activeIncidentId));
+    if (dispatch) dispatch.hidden = !authManager.hasRole(['OPERATOR', 'ADMIN'])
+      || !selectedIncident || TERMINAL_INCIDENT_STATUSES.has(String(selectedIncident.status || '').toUpperCase());
   }
 
   deactivate() {
@@ -73,6 +88,8 @@ export class IncidentController {
         ACTIVE: 'ACKNOWLEDGED',
         ACKNOWLEDGED: 'DISPATCHED',
         DISPATCHED: 'RESPONDING',
+        'DISPATCHED/RESPONDING': 'RESPONDING',
+        CONTAINED: 'MITIGATED',
         RESPONDING: 'MITIGATED',
         MITIGATED: 'RESOLVED'
       })[currentStatus];
@@ -95,75 +112,6 @@ export class IncidentController {
       window.showToast(`Aksi simulasi gagal diproses: ${err.message}`, "danger");
       soundManager.play('alert');
     }
-  }
-
-  /**
-   * 1. Interactive Map Context Menu (Right Click on Map or Markers)
-   */
-  _bindContextMenu() {
-    const menu = document.getElementById("mapContextMenu");
-    if (!menu) return;
-
-    // Right-click listener on map containers and document
-    const handleContextMenu = (e) => {
-      const mapElem = e.target.closest("#map-surabaya, #dashboardMapBox, .leaflet-container");
-      if (!mapElem) return;
-
-      e.preventDefault();
-      this.selectedIntersection = e.target.closest(".leaflet-marker-icon")?.dataset?.name || "Simpang Wonokromo (A. Yani)";
-
-      const x = Math.min(window.innerWidth - 170, Math.max(10, e.clientX));
-      const y = Math.min(window.innerHeight - 150, Math.max(10, e.clientY));
-
-      menu.style.left = `${x}px`;
-      menu.style.top = `${y}px`;
-      menu.style.display = "flex";
-      menu.style.flexDirection = "column";
-      menu.classList.add("show");
-      soundManager.play('click');
-    };
-
-    this.disposer.addEventListener(document, "contextmenu", handleContextMenu);
-
-    // Hide context menu when clicking elsewhere
-    this.disposer.addEventListener(document, "click", (e) => {
-      if (menu && menu.style.display !== "none" && !menu.contains(e.target)) {
-        menu.style.display = "none";
-        menu.classList.remove("show");
-      }
-    });
-
-    // Handle context menu action buttons
-    menu.querySelectorAll(".context-item").forEach(btn => {
-      this.disposer.addEventListener(btn, "click", (e) => {
-        e.stopPropagation();
-        menu.style.display = "none";
-        menu.classList.remove("show");
-        const action = btn.dataset.action;
-        const target = this.selectedIntersection || "Simpang Wonokromo";
-
-        if (action === "override-sinyal") {
-          commandLayer.dispatchCommand({
-            action: 'signal:override',
-            targetType: 'intersection',
-            targetId: 'node-wonokromo',
-            payload: { duration: 45 }
-          }, true).then(() => {
-            window.showToast(`State simulasi ${target} diperbarui ke fase contoh 45 detik; APILL tidak terhubung.`);
-            soundManager.play('success');
-          }).catch((err) => {
-            window.showToast(`❌ Gagal override sinyal: ${err.message}`, "danger");
-            soundManager.play('alert');
-          });
-        } else if (action === "lapor-insiden") {
-          this.openIncidentDetail("NEW-112", target, "Baru saja", `Laporan insiden kepadatan/hambatan lajur dilaporkan pada ${target}.`);
-        } else if (action === "zoom-simpang") {
-          window.mapManager?.flyToIntersection(target);
-          window.showToast(`🔍 Memperbesar kamera ke ${target}.`);
-          soundManager.play('click');
-        }
-      });
-    });
   }
 
   /**
@@ -195,7 +143,7 @@ export class IncidentController {
       this.disposer.addEventListener(btnIncDispatch, "click", () => {
         closeModal();
         if (this.activeIncidentId) {
-          this.updateIncidentStatus(this.activeIncidentId, "DISPATCHED", "Unit Demo");
+          this.dispatchIncident(this.activeIncidentId);
         } else {
           window.showToast("Status skenario diperbarui pada simulator; tidak ada petugas yang dihubungi.");
           soundManager.play('alert');
@@ -210,66 +158,71 @@ export class IncidentController {
   _bindIncidentFilterChips() {
     document.querySelectorAll(".incident-filter-bar .filter-chip").forEach(chip => {
       this.disposer.addEventListener(chip, "click", () => {
-        document.querySelectorAll(".incident-filter-bar .filter-chip").forEach(c => c.classList.remove("active"));
-        chip.classList.add("active");
-        const filter = chip.dataset.incFilter || "all";
-        
-        document.querySelectorAll(".incident-log-item").forEach(item => {
-          if (filter === "all") {
-            item.style.display = "block";
-          } else if (filter === "accident") {
-            item.style.display = item.textContent.toLowerCase().includes("kecelakaan") ? "block" : "none";
-          } else if (filter === "roadblock") {
-            item.style.display = (item.textContent.toLowerCase().includes("penutupan") || item.textContent.toLowerCase().includes("galian")) ? "block" : "none";
-          } else if (filter === "resolved") {
-            item.style.display = item.classList.contains("resolved") ? "block" : "none";
-          }
+        document.querySelectorAll(".incident-filter-bar .filter-chip").forEach(c => {
+          c.classList.remove("active");
+          c.setAttribute('aria-pressed', 'false');
         });
+        chip.classList.add("active");
+        chip.setAttribute('aria-pressed', 'true');
+        this.incidentFilters.category = chip.dataset.incFilter || 'all';
+        this._applyIncidentFilters();
         soundManager.play('click');
       });
     });
+
+    const search = document.getElementById('incidentSearch');
+    const severity = document.getElementById('incidentSeverityFilter');
+    const status = document.getElementById('incidentStatusFilter');
+    if (search) this.disposer.addEventListener(search, 'input', () => {
+      this.incidentFilters.search = search.value.trim().toLocaleLowerCase();
+      this._applyIncidentFilters();
+    });
+    if (severity) this.disposer.addEventListener(severity, 'change', () => {
+      this.incidentFilters.severity = severity.value;
+      this._applyIncidentFilters();
+    });
+    if (status) this.disposer.addEventListener(status, 'change', () => {
+      this.incidentFilters.status = status.value;
+      this._applyIncidentFilters();
+    });
   }
 
-  /**
-   * 4. Export CSV Data Insiden
-   */
-  _bindExportCsv() {
-    const btnExport = document.getElementById("btnExportCsv");
-    if (!btnExport) return;
-
-    this.disposer.addEventListener(btnExport, "click", () => {
-      const incidents = [
-        { time: "Contoh", loc: "Simpang Demo 01", type: "Skenario antrean padat", status: "Simulasi", officer: "Unit Demo" },
-        { time: "Contoh", loc: "Koridor Demo 02", type: "Skenario volume tinggi", status: "Simulasi", officer: "Operator Demo" },
-        { time: "Contoh", loc: "Jalan Demo 03", type: "Skenario hambatan jalan", status: "Simulasi", officer: "Unit Demo" },
-        { time: "Contoh", loc: "Simpang Demo 04", type: "Skenario penyempitan lajur", status: "Simulasi", officer: "Unit Demo" },
-        { time: "Contoh", loc: "Koridor Demo 05", type: "Skenario prioritas kendaraan", status: "Simulasi", officer: "Operator Demo" }
-      ];
-
-      const csvHeader = "Waktu Contoh,Lokasi Demo,Skenario,Status Simulasi,Unit Demo\n";
-      let csvRows = "";
-      incidents.forEach(inc => {
-        csvRows += `"${inc.time}","${inc.loc}","${inc.type}","${inc.status}","${inc.officer}"\n`;
-      });
-
-      // Include UTF-8 BOM (\uFEFF) so Excel opens Indonesian accents and characters cleanly
-      const bom = "\uFEFF";
-      const blob = new Blob([bom + csvHeader + csvRows], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `OmniTRAF-Simulasi-Insiden-${new Date().toISOString().slice(0, 10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-
-      if (typeof window.showToast === "function") {
-        window.showToast("✓ Berkas CSV skenario demo berhasil diunduh.");
-      }
-      soundManager.play('success');
+  _resetIncidentFilters() {
+    this.incidentFilters = { category: 'all', severity: 'all', status: 'all', search: '' };
+    const search = document.getElementById('incidentSearch');
+    const severity = document.getElementById('incidentSeverityFilter');
+    const status = document.getElementById('incidentStatusFilter');
+    if (search) search.value = '';
+    if (severity) severity.value = 'all';
+    if (status) status.value = 'all';
+    document.querySelectorAll('.incident-filter-bar .filter-chip').forEach((chip) => {
+      const selected = chip.dataset.incFilter === 'all';
+      chip.classList.toggle('active', selected);
+      chip.setAttribute('aria-pressed', String(selected));
     });
+  }
+
+  _applyIncidentFilters() {
+    const items = [...document.querySelectorAll('#incidentLogsList .incident-log-item')];
+    let visibleCount = 0;
+    items.forEach((item) => {
+      const matchesCategory = this.incidentFilters.category === 'all'
+        || item.dataset.incidentCategory === this.incidentFilters.category;
+      const matchesSeverity = this.incidentFilters.severity === 'all'
+        || item.dataset.incidentSeverity === this.incidentFilters.severity;
+      const matchesStatus = this.incidentFilters.status === 'all'
+        || item.dataset.incidentStatus === this.incidentFilters.status;
+      const matchesSearch = !this.incidentFilters.search
+        || item.textContent.toLocaleLowerCase().includes(this.incidentFilters.search);
+      const visible = matchesCategory && matchesSeverity && matchesStatus && matchesSearch;
+      item.hidden = !visible;
+      if (visible) visibleCount += 1;
+    });
+
+    const count = document.getElementById('incidentFilterCount');
+    if (count) count.textContent = `${visibleCount} / ${items.length} ditampilkan`;
+    const empty = document.getElementById('incidentFilterEmpty');
+    if (empty) empty.hidden = visibleCount > 0 || items.length === 0;
   }
 
   /**
@@ -282,8 +235,24 @@ export class IncidentController {
     const locationEl = document.getElementById("incModalLocation");
     const timeEl = document.getElementById("incModalTime");
     const descEl = document.getElementById("incModalDesc");
+    const actionButton = document.getElementById('btnIncidentDispatch');
 
-    if (heading) heading.textContent = `Detail Insiden #${id}`;
+    const incident = (stateStore.getState().incidents || []).find(item => String(item.id) === String(id));
+    if (incident) {
+      loc = incident.location || 'Lokasi belum tersedia';
+      const date = new Date(incident.reportedAt || incident.createdAt || NaN);
+      time = Number.isNaN(date.getTime()) ? 'Waktu belum tersedia' : `${date.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB`;
+      const notes = incident.notes || incident.description || 'Deskripsi belum tersedia';
+      desc = `${notes}\nStatus: ${incident.status || 'Belum tersedia'} · Sumber: ${incident.source || 'Simulasi'}\nUnit: ${incident.assignedUnit || 'Belum ditugaskan'}`;
+      if (actionButton) {
+        actionButton.textContent = this._incidentWorkflowAction(incident.status);
+        actionButton.hidden = TERMINAL_INCIDENT_STATUSES.has(String(incident.status || '').toUpperCase())
+          || !authManager.hasRole(['OPERATOR', 'ADMIN']);
+      }
+    } else if (actionButton) {
+      actionButton.hidden = true;
+    }
+    if (heading) heading.textContent = incident?.title || `Detail Insiden #${id}`;
     if (locationEl) locationEl.textContent = loc;
     if (timeEl) timeEl.textContent = time;
     if (descEl) descEl.textContent = desc;
@@ -356,18 +325,22 @@ export class IncidentController {
     }
 
     list.forEach(inc => {
-      const isResolved = ["RESOLVED", "ARCHIVED"].includes(inc.status);
-      const isDispatched = ["DISPATCHED", "RESPONDING", "DISPATCHED/RESPONDING", "ACKNOWLEDGED", "MITIGATED"].includes(inc.status);
+      const isResolved = TERMINAL_INCIDENT_STATUSES.has(String(inc.status || '').toUpperCase());
+      const normalizedStatus = String(inc.status || 'ACTIVE').toUpperCase();
+      const isDispatched = ["DISPATCHED", "RESPONDING", "DISPATCHED/RESPONDING", "MITIGATED"].includes(normalizedStatus);
       const workflowAction = this._incidentWorkflowAction(inc.status);
 
       let badgeClass = "red";
       let badgeLabel = "⚠️ BARU (Open)";
       if (isDispatched) {
         badgeClass = "yellow";
-        badgeLabel = "🚔 DITANGANI (Dispatched)";
+        badgeLabel = normalizedStatus === 'MITIGATED' ? "🛠️ Dimitigasi" : "🚔 Ditangani";
+      } else if (normalizedStatus === 'ACKNOWLEDGED') {
+        badgeClass = "yellow";
+        badgeLabel = "✓ Diakui · menunggu disposisi";
       } else if (isResolved) {
         badgeClass = "green";
-        badgeLabel = "✅ SELESAI (Resolved)";
+        badgeLabel = "✅ Selesai";
       }
 
       let responseTimeStr = "";
@@ -430,7 +403,7 @@ export class IncidentController {
     const canOperate = authManager.hasRole(['OPERATOR', 'ADMIN']);
     
     // Count unresolved alerts (status not RESOLVED and not ARCHIVED)
-    const unresolvedCount = list.filter(inc => !["RESOLVED", "ARCHIVED"].includes(inc.status)).length;
+    const unresolvedCount = list.filter(inc => !TERMINAL_INCIDENT_STATUSES.has(String(inc.status || '').toUpperCase())).length;
     const activeSummary = document.getElementById('summaryActiveIncidents');
     if (activeSummary) activeSummary.textContent = `${unresolvedCount} aktif`;
     if (unresolvedBadge) {
@@ -444,64 +417,81 @@ export class IncidentController {
           <p><strong>Network saat ini clear.</strong><br>Tidak ada skenario insiden aktif.</p>
         </div>
       `;
+      const filterCount = document.getElementById('incidentFilterCount');
+      if (filterCount) filterCount.textContent = '0 insiden';
+      const filterEmpty = document.getElementById('incidentFilterEmpty');
+      if (filterEmpty) filterEmpty.hidden = true;
       return;
     }
 
     list.forEach(inc => {
-      const isResolved = ["RESOLVED", "ARCHIVED"].includes(inc.status);
-      const isDispatched = ["DISPATCHED", "RESPONDING", "DISPATCHED/RESPONDING", "ACKNOWLEDGED", "MITIGATED"].includes(inc.status);
+      const isResolved = TERMINAL_INCIDENT_STATUSES.has(String(inc.status || '').toUpperCase());
       const workflowAction = this._incidentWorkflowAction(inc.status);
       
       const item = document.createElement("div");
       item.className = `incident-log-item ${isResolved ? 'resolved' : 'unresolved'}`;
       item.id = `incident-${inc.id}`;
+      item.dataset.incidentCategory = String(inc.category || 'general').toLocaleLowerCase();
+      item.dataset.incidentSeverity = String(inc.severity || 'info').toLocaleLowerCase();
+      item.dataset.incidentStatus = String(inc.status || 'ACTIVE').toUpperCase();
 
-      const safeTitle = escapeHtml(inc.title);
-      const safeLocation = escapeHtml(inc.location);
+      const safeTitle = escapeHtml(inc.title || 'Insiden simulasi');
+      const safeLocation = escapeHtml(inc.location || 'Lokasi belum tersedia');
       const safeNotes = escapeHtml(inc.notes || 'Skenario contoh pada simulator; bukan laporan lapangan.');
-      const safeCategory = escapeHtml(inc.category ? inc.category.toUpperCase() : 'UMUM');
-      const safeUnit = escapeHtml(inc.assignedUnit || 'Unit Demo');
-
-      let statusBadgeHtml = `<span class="pill inc-badge-new" style="font-size: 11px; padding: 3px 8px;">⚠️ BARU (Demo)</span>`;
-      if (isDispatched) {
-        statusBadgeHtml = `<span class="pill inc-badge-dispatched" style="font-size: 11px; padding: 3px 8px;">▶ SIMULASI (${safeUnit})</span>`;
-      } else if (isResolved) {
-        statusBadgeHtml = `<span class="pill inc-badge-resolved" style="font-size: 11px; padding: 3px 8px;">✅ SKENARIO SELESAI</span>`;
-      }
+      const categoryLabels = { ACCIDENT: 'Kecelakaan', WEATHER: 'Cuaca', CONGESTION: 'Kepadatan', ROADBLOCK: 'Hambatan jalan' };
+      const rawCategory = String(inc.category || 'GENERAL').toUpperCase();
+      const safeCategory = escapeHtml(categoryLabels[rawCategory] || 'Umum');
+      const safeUnit = escapeHtml(inc.assignedUnit || 'Belum ada disposisi');
+      const severityLabels = { CRITICAL: 'Kritis', DANGER: 'Kritis', HIGH: 'Tinggi', WARNING: 'Peringatan', MEDIUM: 'Sedang', INFO: 'Informasi', LOW: 'Rendah' };
+      const rawSeverity = String(inc.severity || inc.priority || 'INFO').toUpperCase();
+      const safeSeverity = escapeHtml(severityLabels[rawSeverity] || 'Belum diklasifikasikan');
+      const severityClass = ['CRITICAL', 'DANGER', 'HIGH'].includes(rawSeverity) ? 'is-critical'
+        : ['WARNING', 'MEDIUM'].includes(rawSeverity) ? 'is-warning' : 'is-neutral';
+      const statusLabels = {
+        ACTIVE: 'Baru', ACKNOWLEDGED: 'Diakui', DISPATCHED: 'Unit simulasi ditugaskan',
+        RESPONDING: 'Respons simulasi', 'DISPATCHED/RESPONDING': 'Respons simulasi',
+        MITIGATED: 'Terkendali', RESOLVED: 'Selesai', ARCHIVED: 'Diarsipkan', CLOSED: 'Ditutup', CANCELLED: 'Dibatalkan'
+      };
+      const safeStatus = escapeHtml(statusLabels[String(inc.status || 'ACTIVE').toUpperCase()] || 'Status simulasi');
 
       let responseTimeStr = "";
-      if (inc.reportedAt) {
+      if (inc.reportedAt && Number.isFinite(new Date(inc.reportedAt).getTime())) {
         const startMs = new Date(inc.reportedAt).getTime();
         const endMs = inc.resolvedAt ? new Date(inc.resolvedAt).getTime() : Date.now();
         const diffMin = Math.max(1, Math.round((endMs - startMs) / 60000));
         responseTimeStr = `${diffMin} menit`;
       }
 
+      const reportedTime = inc.reportedAt && Number.isFinite(new Date(inc.reportedAt).getTime())
+        ? new Date(inc.reportedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' }) + ' WIB'
+        : 'Waktu simulasi belum tersedia';
+      const sourceLabel = escapeHtml(inc.source || inc.provenance || 'Model simulasi');
       item.innerHTML = `
-        <div class="inc-meta" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          ${statusBadgeHtml}
-          <span class="inc-time" style="font-size: 11px; color: var(--text-muted);">${inc.reportedAt ? new Date(inc.reportedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : 'Baru saja'}</span>
+        <div class="inc-meta">
+          <div class="incident-status-group">
+            <span class="incident-severity ${severityClass}">${safeSeverity}</span>
+            <span class="incident-status-pill">${safeStatus}</span>
+          </div>
+          <span class="inc-time">${reportedTime}</span>
         </div>
-        <strong style="font-size: 14px; color: var(--text);">${safeTitle} - ${safeLocation}</strong>
-        <p style="margin: 6px 0; font-size: 12px; color: var(--text-muted); line-height: 1.45;">${safeNotes}</p>
-        
-        <div class="inc-meta-row" style="margin-top: 8px; display: flex; gap: 16px; font-size: 11px; color: #94a3b8; background: rgba(255,255,255,0.02); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
-          <div>Kategori: <strong style="color: var(--text);">${safeCategory}</strong></div>
-          <div>Unit Disposisi: <strong style="color: var(--cyan);">${safeUnit}</strong></div>
-          ${responseTimeStr ? `<div>Durasi Simulasi: <strong style="color: ${isResolved ? 'var(--success)' : 'var(--amber)'};">${responseTimeStr}</strong></div>` : ''}
+        <h3 class="incident-title">${safeTitle}</h3>
+        <p class="incident-location">${safeLocation}</p>
+        <p class="incident-notes">${safeNotes}</p>
+        <div class="inc-meta-row">
+          <span>Kategori <strong>${safeCategory}</strong></span>
+          <span>Sumber <strong>${sourceLabel}</strong></span>
+          <span>Disposisi <strong>${safeUnit}</strong></span>
+          ${responseTimeStr ? `<span>Durasi simulasi <strong>${responseTimeStr}</strong></span>` : ''}
         </div>
-
-        <div class="inc-actions" style="margin-top: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-          <button class="btn btn-ghost compact btn-map-shortcut" style="padding: 5px 12px; font-size: 11.5px;">
-            📍 Buka di Peta
-          </button>
+        <div class="inc-actions">
+          <button type="button" class="btn btn-ghost compact btn-map-shortcut">📍 Buka di Peta</button>
 
           ${!isResolved && canOperate ? `
-            <button class="btn btn-primary compact dispatch-btn" style="padding: 5px 12px; font-size: 11.5px;">
+            <button type="button" class="btn btn-primary compact dispatch-btn">
               ${workflowAction}
             </button>
           ` : ''}
-          <button class="btn btn-ghost compact incident-detail-btn" style="padding: 5px 10px; font-size: 11px; color: var(--text-muted);" aria-label="Lihat detail ${safeTitle}">
+          <button type="button" class="btn btn-ghost compact incident-detail-btn" aria-label="Lihat detail ${safeTitle}">
             Lihat detail
           </button>
           ${isResolved ? '<span class="incident-resolved-state" role="status">✓ Selesai</span>' : ''}
@@ -514,7 +504,8 @@ export class IncidentController {
       item.querySelector('.incident-detail-btn')?.addEventListener('click', () => this.openIncidentDetail(inc.id, inc.location || '', inc.reportedAt || '', inc.notes || ''));
     });
 
-    this._renderDashboardTimeline(list);
+    this._applyIncidentFilters();
+    // Dashboard timeline is rendered by TrafficEngine from the same state snapshot.
   }
 
   _incidentWorkflowAction(status) {
@@ -524,6 +515,7 @@ export class IncidentController {
       ACKNOWLEDGED: 'Disposisi simulasi',
       DISPATCHED: 'Mulai respons simulasi',
       'DISPATCHED/RESPONDING': 'Lanjutkan respons simulasi',
+      CONTAINED: 'Tandai mitigasi simulasi',
       RESPONDING: 'Tandai mitigasi',
       MITIGATED: 'Selesaikan skenario'
     })[current] || 'Lanjutkan alur simulasi';
@@ -535,7 +527,7 @@ export class IncidentController {
     if (!timelineEl) return;
 
     const list = Array.isArray(incidents) ? incidents : [];
-    const activeList = list.filter(inc => !["RESOLVED", "ARCHIVED"].includes(inc.status));
+    const activeList = list.filter(inc => !TERMINAL_INCIDENT_STATUSES.has(String(inc.status || '').toUpperCase()));
 
     if (countBadge) {
       countBadge.textContent = `${activeList.length} Alert`;
@@ -550,8 +542,9 @@ export class IncidentController {
     timelineEl.innerHTML = "";
     // Display up to 3 most recent incidents
     list.slice(0, 3).forEach(inc => {
-      const isResolved = ["RESOLVED", "ARCHIVED"].includes(inc.status);
-      const isDispatched = ["DISPATCHED", "RESPONDING", "DISPATCHED/RESPONDING", "ACKNOWLEDGED"].includes(inc.status);
+      const isResolved = TERMINAL_INCIDENT_STATUSES.has(String(inc.status || '').toUpperCase());
+      const normalizedStatus = String(inc.status || 'ACTIVE').toUpperCase();
+      const isDispatched = ["DISPATCHED", "RESPONDING", "DISPATCHED/RESPONDING", "MITIGATED"].includes(normalizedStatus);
 
       let dotClass = "danger pulse-red-dot";
       if (isDispatched) dotClass = "warning";
@@ -565,7 +558,7 @@ export class IncidentController {
         <span class="timeline-dot ${dotClass}"></span>
         <div>
           <strong>${safeTitle}</strong>
-          <small>${safeLocation} • ${isResolved ? 'selesai' : (inc.reportedAt ? new Date(inc.reportedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : 'baru saja')}</small>
+          <small>${safeLocation} • ${isResolved ? 'selesai' : (normalizedStatus === 'ACKNOWLEDGED' ? 'diakui · menunggu disposisi' : (inc.reportedAt ? new Date(inc.reportedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : 'baru saja'))}</small>
         </div>
       `;
       timelineEl.appendChild(li);

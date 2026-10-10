@@ -138,17 +138,19 @@ export function toIncidentMarkerProjection(inc) {
  * @returns {EmergencyVehicleProjection}
  */
 export function toEmergencyVehicleProjection(emg) {
-  let position = [-7.3510, 112.7290];
-  if (Array.isArray(emg.currentPosition) && emg.currentPosition.length >= 2) {
-    position = [emg.currentPosition[0], emg.currentPosition[1]];
-  }
+  const rawPosition = emg?.currentPosition;
+  const position = Array.isArray(rawPosition) && rawPosition.length >= 2
+    && rawPosition.slice(0, 2).every(value => value !== null && value !== '' && Number.isFinite(Number(value)))
+    ? [Number(rawPosition[0]), Number(rawPosition[1])]
+    : null;
+  const rawSpeed = emg?.speed === null || emg?.speed === undefined || emg?.speed === '' ? NaN : Number(emg.speed);
 
   return {
     id: emg.id || emg.vehicleId || `emg-${Date.now()}`,
     vehicleId: emg.vehicleId || 'EMG-01',
     vehicleType: (emg.vehicleType || 'AMBULANS').toUpperCase(),
     status: emg.status || 'EN_ROUTE',
-    speed: emg.speed || 60,
+    speed: Number.isFinite(rawSpeed) && rawSpeed >= 0 ? rawSpeed : null,
     origin: emg.origin || 'Posko',
     destination: emg.destination || 'RSUD Dr. Soetomo',
     nextIntersection: emg.nextIntersection || 'Menuju UGD',

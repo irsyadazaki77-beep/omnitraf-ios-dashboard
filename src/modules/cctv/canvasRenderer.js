@@ -538,11 +538,11 @@ export class CctvCanvasRenderer {
     ctx.fillText(osdTime, w - timeWidth - 10, 15);
     ctx.restore();
 
-    // 6. Compact Camera Insight Overlay (Bottom-left corner)
+    // 6. Compact simulated camera insight overlay (Bottom-left corner)
     if (metrics && typeof metrics.vehicleCount !== 'undefined') {
       ctx.save();
-      const panelW = 126;
-      const panelH = 64;
+      const panelW = 154;
+      const panelH = 48;
       const panelX = 10;
       const panelY = h - panelH - 22;
 
@@ -561,45 +561,30 @@ export class CctvCanvasRenderer {
 
       ctx.fillStyle = '#94a3b8';
       ctx.font = '700 7px "Plus Jakarta Sans", sans-serif';
-      ctx.fillText('CAMERA INSIGHTS', panelX + 7, panelY + 10);
+      ctx.fillText('ESTIMASI SIMULASI', panelX + 7, panelY + 10);
 
       ctx.font = '500 7.5px "Plus Jakarta Sans", sans-serif';
       
-      // Density
+      // Keep the useful operational estimates and omit uncalibrated confidence.
       ctx.fillStyle = 'rgba(248, 250, 252, 0.6)';
-      ctx.fillText('Density', panelX + 7, panelY + 22);
+      ctx.fillText('Density', panelX + 7, panelY + 23);
       let densityColor = '#10b981';
       if (metrics.trafficDensity > 75) densityColor = '#f87171';
       else if (metrics.trafficDensity > 45) densityColor = '#f59e0b';
       ctx.fillStyle = densityColor;
-      ctx.fillText(`${metrics.trafficDensity}%`, panelX + 48, panelY + 22);
+      ctx.fillText(`${metrics.trafficDensity}%`, panelX + 48, panelY + 23);
 
       // Queue
       ctx.fillStyle = 'rgba(248, 250, 252, 0.6)';
-      ctx.fillText('Queue', panelX + 72, panelY + 22);
+      ctx.fillText('Queue', panelX + 82, panelY + 23);
       ctx.fillStyle = '#f8fafc';
-      ctx.fillText(`${metrics.queueLengthMeters}m`, panelX + 100, panelY + 22);
+      ctx.fillText(`${metrics.queueLengthMeters} m`, panelX + 119, panelY + 23);
 
       // Avg Speed
       ctx.fillStyle = 'rgba(248, 250, 252, 0.6)';
-      ctx.fillText('Avg Speed', panelX + 7, panelY + 34);
+      ctx.fillText('Avg speed', panelX + 7, panelY + 37);
       ctx.fillStyle = '#f8fafc';
-      ctx.fillText(`${metrics.estimatedAverageSpeed} km/h`, panelX + 48, panelY + 34);
-
-      // Risk
-      ctx.fillStyle = 'rgba(248, 250, 252, 0.6)';
-      ctx.fillText('Risk', panelX + 7, panelY + 46);
-      let riskColor = '#10b981';
-      if (metrics.incidentRisk > 70) riskColor = '#f87171';
-      else if (metrics.incidentRisk > 40) riskColor = '#f59e0b';
-      ctx.fillStyle = riskColor;
-      ctx.fillText(metrics.incidentRisk > 60 ? 'High' : metrics.incidentRisk > 35 ? 'Moderate' : 'Low', panelX + 48, panelY + 46);
-
-      // Detection Confidence
-      ctx.fillStyle = 'rgba(248, 250, 252, 0.6)';
-      ctx.fillText('Confidence', panelX + 7, panelY + 57);
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillText(`${metrics.aiConfidence}%`, panelX + 54, panelY + 57);
+      ctx.fillText(`${metrics.estimatedAverageSpeed} km/h`, panelX + 58, panelY + 37);
 
       ctx.restore();
     }

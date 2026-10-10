@@ -7,6 +7,7 @@ export class ComputerVisionEngine {
     this.randomRegistry = options.randomRegistry || defaultRandomRegistry;
     this.prng = options.randomStream || (this.randomRegistry ? this.randomRegistry.getStream('cctv') : new SeededRandom(42));
     this.frameSequence = 1;
+    this.latestFramePayload = null;
     this.cameras = ['dashCameraCanvas', 'cctvCanvas1', 'cctvCanvas2', 'cctvCanvas3', 'cctvCanvas4'];
     this.classes = ['car', 'bus', 'truck', 'motorcycle', 'ambulance', 'person'];
     this.vehiclesPerCam = new Map();
@@ -116,13 +117,14 @@ export class ComputerVisionEngine {
       };
     });
 
-    return {
+    this.latestFramePayload = {
       seq: this.frameSequence,
       timestamp: timestamp,
       source: 'server',
       cameras: camerasData,
       ...Object.fromEntries(Object.entries(camerasData).map(([cid, cam]) => [cid, cam.detections]))
     };
+    return this.latestFramePayload;
   }
 
   reset() {
@@ -137,6 +139,8 @@ export class ComputerVisionEngine {
     return { frameSequence: this.frameSequence, randomState: this.prng.getSnapshot(), vehicles: Array.from(this.vehiclesPerCam.entries()) };
   }
 
+  getLatestFramePayload() { return this.latestFramePayload ? structuredClone(this.latestFramePayload) : null; }
+
   restoreSnapshot(snapshot) {
     if (!snapshot || !Number.isSafeInteger(snapshot.frameSequence) || snapshot.frameSequence < 0 || !Array.isArray(snapshot.vehicles)) {
       throw new TypeError('invalid computer vision snapshot');
@@ -146,6 +150,7 @@ export class ComputerVisionEngine {
     this.prng.restoreSnapshot(snapshot.randomState);
     this.frameSequence = snapshot.frameSequence;
     this.vehiclesPerCam = vehicles;
+    this.latestFramePayload = null;
   }
 }
 

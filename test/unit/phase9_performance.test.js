@@ -40,7 +40,7 @@ test('Phase 9: hashed build cache namespace is versioned and old versions are re
 test('Phase 9: network-first navigation falls back to the app shell', () => {
   assert.match(worker, /caches\.match\('\/index\.html', \{ cacheName: CACHE_NAME \}\)/);
   assert.match(worker, /request\.mode === 'navigate'/);
-  assert.match(html, /Data operasional live tidak tersedia/);
+  assert.match(html, /Stream simulasi tidak tersedia/);
 });
 
 test('Phase 9: independent shell templates are requested concurrently and retain DOM order', async () => {

@@ -9,11 +9,13 @@ if (typeof globalThis.window === 'undefined') {
     readyState: 'complete',
     hidden: false,
     head: { appendChild() {} },
-    body: { classList: { add() {}, remove() {}, contains() { return false; }, toggle() {} } },
+    body: { classList: { add() {}, remove() {}, contains() { return false; },
+          closest() { return null; }, toggle() {} } },
     getElementById(id) {
       if (!elements.has(id)) {
         elements.set(id, {
           id,
+          dataset: {},
           style: {},
           textContent: '',
           innerHTML: '',
@@ -23,8 +25,11 @@ if (typeof globalThis.window === 'undefined') {
           querySelectorAll() { return []; },
           querySelector() { return null; },
           setAttribute() {},
+          removeAttribute() {},
+          replaceChildren() {},
           getAttribute() { return null; },
           contains() { return false; },
+          closest() { return null; },
           appendChild(child) { return child; }
         });
       }
@@ -37,9 +42,11 @@ if (typeof globalThis.window === 'undefined') {
       return null;
     },
     querySelectorAll() { return []; },
+    createTextNode(text) { return { textContent: text }; },
     createElement(tag) {
       const el = {
         tagName: tag,
+        dataset: {},
         style: {},
         textContent: '',
         innerHTML: '',
@@ -50,6 +57,8 @@ if (typeof globalThis.window === 'undefined') {
         querySelectorAll() { return []; },
         querySelector() { return null; },
         setAttribute() {},
+          removeAttribute() {},
+          replaceChildren() {},
         getAttribute() { return null; },
         appendChild(child) {
           el.children.push(child);

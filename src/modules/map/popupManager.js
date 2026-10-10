@@ -105,7 +105,9 @@ export class PopupManager {
     const safeVehId = escapeHtml(emg.vehicleId || 'EMG-01');
     const safeVehType = escapeHtml((emg.vehicleType || 'AMBULANS').toUpperCase());
     const safeStatus = escapeHtml(emg.status || 'EN_ROUTE');
-    const safeSpeed = Number(emg.speed || 60);
+    const safeSpeed = emg.speed !== null && emg.speed !== undefined && emg.speed !== '' && Number.isFinite(Number(emg.speed))
+      ? `${Number(emg.speed)} km/jam`
+      : 'Belum tersedia';
     const safeOrigin = escapeHtml(emg.origin || '-');
     const safeDest = escapeHtml(emg.destination || '-');
     const safeNext = escapeHtml(emg.nextIntersection || 'Menuju UGD');
@@ -120,7 +122,7 @@ export class PopupManager {
         <div class="ios-popup-info-grid">
           <div class="ios-info-row">
             <span class="ios-info-label">Kecepatan:</span>
-            <span class="ios-info-value speed-val" style="color: #ef4444; font-weight: 800;">${safeSpeed} km/jam</span>
+            <span class="ios-info-value speed-val" style="color: #ef4444; font-weight: 800;">${safeSpeed}</span>
           </div>
           <div class="ios-info-row">
             <span class="ios-info-label">Asal:</span>

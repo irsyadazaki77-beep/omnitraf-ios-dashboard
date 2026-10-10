@@ -5,6 +5,7 @@
  */
 
 import { soundManager } from '../core/soundManager.js';
+import { socketClient } from '../core/socketClient.js';
 
 export class TourShortcutsController {
   constructor() {
@@ -12,24 +13,34 @@ export class TourShortcutsController {
     this._isInitialized = false;
     this.tourSteps = [
       {
-        title: "Langkah 1: Status Prototipe",
-        text: "Melihat status koneksi ke server simulasi dan jam lokal. Koneksi ini tidak menunjukkan status CCTV atau layanan BMKG."
+        title: "1. Tinjau ikhtisar dan insiden prioritas",
+        text: "Periksa sumber simulasi dan pembaruan terakhir. Pilih insiden prioritas untuk membuka catatan dan statusnya.",
+        route: "dashboard", view: "Ikhtisar"
       },
       {
-        title: "Langkah 2: Peta Geospasial Arteri Surabaya",
-        text: "Peta interaktif Leaflet menyajikan koridor utama A. Yani, Darmo, Basuki Rahmat, dan rute Green Wave aktif."
+        title: "2. Periksa status sebuah insiden",
+        text: "Buka daftar insiden, tinjau waktu, lokasi dan catatan, lalu akui atau tutup skenario sesuai peran. Perubahan hanya tercatat pada simulator.",
+        route: "incidents", view: "Insiden"
       },
       {
-        title: "Langkah 3: Model Sinyal & Green Split",
-        text: "Menjelajahi contoh perhitungan dan skenario sinyal. Perintah hanya memperbarui simulator, bukan APILL lapangan."
+        title: "3. Temukan lokasi pada peta",
+        text: "Pilih penanda simpang atau kamera untuk membuka detail model dan memusatkan peta. Garis koridor bukan rute lapangan terverifikasi.",
+        route: "map", view: "Peta kota"
       },
       {
-        title: "Langkah 4: Visualisasi Kamera Simulasi",
-        text: "Melihat adegan dan deteksi kendaraan sintetis; tidak ada feed CCTV SITS atau model YOLOv8 yang berjalan."
+        title: "4. Periksa fase simpang",
+        text: "Pilih simpang, bandingkan fase berjalan dengan durasi siklus berikutnya, lalu tinjau konfirmasi. Perintah hanya mengubah state simulator.",
+        route: "signals", view: "Sinyal"
       },
       {
-        title: "Langkah 5: Skenario Koordinasi",
-        text: "Mencoba alur chat dan dispatch contoh. Tidak ada pesan ke petugas atau layanan 112 yang dikirim."
+        title: "5. Inspeksi kamera model",
+        text: "Pilih kamera, cek waktu dan sumber frame, lalu buka cuplikan jika tersedia. Tidak ada feed kamera SITS yang terhubung.",
+        route: "cctv", view: "CCTV"
+      },
+      {
+        title: "6. Bandingkan lalu buat laporan sesi",
+        text: "Pilih koridor pada profil 24 jam lalu bandingkan KPI. Buat snapshot laporan untuk menyimpan nilai dan waktu yang sama pada pratinjau dan ekspor.",
+        route: "analytics", view: "Analitik"
       }
     ];
   }
@@ -75,15 +86,16 @@ export class TourShortcutsController {
     const tourText = document.getElementById("tourStepText");
     const tourIndicator = document.getElementById("tourStepIndicator");
     const tourCard = document.getElementById("tourStepCard");
+    const explore = document.getElementById('btnTourExplore');
 
     // Add Close (✕) button to Tour Card if not present
     if (tourCard && !document.getElementById("btnCloseTourOverlay")) {
       const closeX = document.createElement("button");
       closeX.id = "btnCloseTourOverlay";
+      closeX.className = 'modal-close tour-close-button';
       closeX.innerHTML = "&times;";
-      closeX.style.cssText = "position: absolute; top: 8px; right: 10px; background: none; border: none; color: var(--text-muted); font-size: 16px; cursor: pointer; line-height: 1;";
       closeX.addEventListener("click", () => {
-        if (tourOverlay) tourOverlay.style.display = "none";
+        if (tourOverlay) { tourOverlay.style.display = "none"; tourOverlay.setAttribute('aria-hidden', 'true'); }
         soundManager.play('click');
       });
       tourCard.appendChild(closeX);
@@ -92,18 +104,22 @@ export class TourShortcutsController {
     const renderTourStep = () => {
       if (!tourTitle || !tourText || !tourIndicator) return;
       const step = this.tourSteps[this.currentStep];
+      tourOverlay?.setAttribute('aria-hidden', 'false');
       tourTitle.textContent = step.title;
       tourText.textContent = step.text;
       tourIndicator.textContent = `${this.currentStep + 1} / ${this.tourSteps.length}`;
+      if (explore) { explore.href = `#${step.route}`; explore.textContent = `Buka ${step.view}`; }
       if (btnTourPrev) btnTourPrev.style.visibility = this.currentStep === 0 ? "hidden" : "visible";
       if (btnTourNext) btnTourNext.textContent = this.currentStep === this.tourSteps.length - 1 ? "Selesai" : "Lanjut";
     };
 
     const startTour = () => {
-      this.currentStep = 0;
+      const route = String(window.location.hash || '#dashboard').slice(1);
+      this.currentStep = Math.max(0, this.tourSteps.findIndex(step => step.route === route));
       if (tourOverlay) {
         tourOverlay.style.display = "block";
         renderTourStep();
+        (document.getElementById('btnCloseTourOverlay') || btnTourNext)?.focus();
       }
       soundManager.play('click');
     };
@@ -120,6 +136,7 @@ export class TourShortcutsController {
           soundManager.play('click');
         } else {
           tourOverlay.style.display = "none";
+          tourOverlay.setAttribute('aria-hidden', 'true');
           if (typeof window.showToast === "function") {
             window.showToast("Panduan Quick Tour SITS selesai.");
           }
@@ -139,9 +156,14 @@ export class TourShortcutsController {
     }
 
     if (tourOverlay) {
+      explore?.addEventListener('click', () => {
+        tourOverlay.style.display = 'none';
+        tourOverlay.setAttribute('aria-hidden', 'true');
+      });
       tourOverlay.addEventListener("click", (e) => {
         if (e.target === tourOverlay) {
           tourOverlay.style.display = "none";
+          tourOverlay.setAttribute('aria-hidden', 'true');
           soundManager.play('click');
         }
       });
@@ -153,11 +175,11 @@ export class TourShortcutsController {
    */
   _bindShortcutsModal() {
     const shortcutsModal = document.getElementById("keyboardShortcutsModal");
-    const btnShow = document.getElementById("btnShowShortcuts");
     const closeBtn = document.getElementById("closeShortcutsModal");
 
-    if (btnShow && shortcutsModal) {
-      btnShow.addEventListener("click", () => {
+    if (shortcutsModal) {
+      document.addEventListener("click", (event) => {
+        if (!event.target?.closest?.('#btnShowShortcuts')) return;
         shortcutsModal.style.display = "flex";
         shortcutsModal.classList.add("show");
         soundManager.play('click');
@@ -240,10 +262,13 @@ export class TourShortcutsController {
    */
   _bindGlobalKeydown() {
     window.addEventListener("keydown", (e) => {
-      if (e.target.matches("input, textarea, select")) return;
+      const target = e.target;
+      if (e.repeat || target?.matches?.("input, textarea, select, [role='textbox'], [contenteditable='true']") || target?.isContentEditable) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 
       const key = e.key.toLowerCase();
+      const openDialog = document.querySelector('[role="dialog"][aria-modal="true"]:not([aria-hidden="true"])');
+      if (openDialog && key !== 'escape') return;
       if (key === "k") {
         const chaosToggle = document.getElementById("btnToggleChaos") || document.getElementById("chaosModeToggle");
         if (chaosToggle) chaosToggle.click();
@@ -266,9 +291,13 @@ export class TourShortcutsController {
       } else if (key === "i") {
         document.querySelector('.nav-item[data-view="incidents"]')?.click();
       } else if (key === "r") {
-        if (typeof window.showToast === "function") {
-          window.showToast("🔄 Menyinkronkan ulang data telemetri SITS...");
-        }
+        e.preventDefault();
+        socketClient.requestResync().then((result) => {
+          const succeeded = result?.status === 'SUCCESS';
+          window.showToast?.(succeeded ? 'Sinkronisasi state simulasi selesai.' : `Sinkronisasi gagal (${result?.status || 'tidak tersedia'}).`, succeeded ? 'success' : 'warning');
+        }).catch((error) => {
+          window.showToast?.(`Sinkronisasi gagal: ${error?.message || 'server tidak tersedia'}.`, 'warning');
+        });
         soundManager.play('click');
       } else if (key === "escape") {
         // 1. Close all active modals
@@ -297,7 +326,7 @@ export class TourShortcutsController {
 
         // 2. Close Tour Overlay
         const tourOverlay = document.getElementById("quickTourOverlay");
-        if (tourOverlay) tourOverlay.style.display = "none";
+        if (tourOverlay) { tourOverlay.style.display = "none"; tourOverlay.setAttribute('aria-hidden', 'true'); }
 
         // 3. Close Context Menu
         const contextMenu = document.getElementById("mapContextMenu");

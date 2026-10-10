@@ -11,9 +11,13 @@
     "preview": "vite preview",
     "validate": "node scripts/validate-pwa.mjs",
     "lint": "node scripts/run-lint.mjs",
+    "lint:css": "node scripts/lint-css.mjs",
     "start": "node server.js",
     "test": "node scripts/run-tests.mjs",
     "test:postgres": "node --test test/postgres/*.test.js",
+    "test:cluster": "node --test test/cluster/leadership_failover.test.js",
+    "backup:postgres": "node scripts/backup-postgres.mjs",
+    "verify:postgres-backup": "node scripts/verify-postgres-backup.mjs",
     "db:migrate:sqljs-to-postgres": "node scripts/migrate-sqljs-to-postgres.mjs"
   },
   "dependencies": {
@@ -33,6 +37,7 @@
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
+    "postcss": "^8.5.29",
     "vite": "^8.3.3"
   }
 }

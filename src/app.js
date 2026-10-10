@@ -21,6 +21,8 @@ import { uiMarquee } from './modules/uiMarquee.js';
 import { navigationController } from './controllers/navigationController.js';
 import { tourShortcutsController } from './controllers/tourShortcutsController.js';
 import { pwaController } from './controllers/pwaController.js';
+import { sessionController } from './controllers/sessionController.js';
+import { settingsController } from './controllers/settingsController.js';
 
 const isViteRuntime = Boolean(import.meta.env);
 
@@ -43,7 +45,9 @@ const controllerLoaders = {
   emergencyController: async () => { if (isViteRuntime) await import('../css/views/emergencies.css'); return import('./controllers/emergencyController.js'); },
   analyticsController: async () => { if (isViteRuntime) await import('../css/views/analytics.css'); return import('./controllers/analyticsController.js'); },
   deviceController: async () => { if (isViteRuntime) await import('../css/views/devices.css'); return import('./controllers/deviceController.js'); },
-  reportController: async () => { if (isViteRuntime) await import('../css/views/reports.css'); return import('./controllers/reportController.js'); }
+  reportController: async () => { if (isViteRuntime) await import('../css/views/reports.css'); return import('./controllers/reportController.js'); },
+  settingsController: async () => ({ settingsController }),
+  integrationController: async () => import('./controllers/integrationController.js')
 };
 
 export class App {
@@ -90,6 +94,8 @@ export class App {
     if (uiMarquee && typeof uiMarquee.init === 'function') uiMarquee.init();
     if (chatSystem && typeof chatSystem.init === 'function') chatSystem.init();
     if (navigationController && typeof navigationController.init === 'function') navigationController.init();
+    sessionController.init();
+    settingsController.restorePreferences();
     if (tourShortcutsController && typeof tourShortcutsController.init === 'function') tourShortcutsController.init();
     if (pwaController && typeof pwaController.init === 'function') pwaController.init();
     if (trafficEngine && typeof trafficEngine.init === 'function') trafficEngine.init();
@@ -128,7 +134,7 @@ export class App {
 
     // Lazy load & mount HTML partial into DOM
     this._showViewLoading(newView);
-    const { isFirstMount, success } = await viewLoader.mountView(newView, {
+    const { isFirstMount, success, element } = await viewLoader.mountView(newView, {
       shouldActivate: () => navigationId === this.navigationId
     });
     if (navigationId !== this.navigationId) return;
@@ -136,6 +142,8 @@ export class App {
       this._showViewLoadError(newView, () => this._handleViewTransition(newView, oldView));
       return;
     }
+
+    if (element) { element.inert = true; element.setAttribute('aria-busy', 'true'); }
 
     // Dynamic Socket Channel Subscription Management (Langkah 4 & 13)
     this._manageSocketChannelSubscriptions(newView, oldView);
@@ -149,11 +157,19 @@ export class App {
       return;
     }
     if (navigationId !== this.navigationId) return;
+    if (element) { element.inert = false; element.removeAttribute('aria-busy'); }
     const loadingStatus = document.getElementById('viewLoadStatus');
     if (loadingStatus) loadingStatus.hidden = true;
+    const loadError = document.getElementById('viewLoadError');
+    if (loadError) loadError.hidden = true;
 
     // If switching to Map view or Dashboard, trigger Leaflet size invalidation
     const cleanId = (newView || '').replace('#', '').replace('view-', '');
+    const pendingEntityFocus = stateStore.getState().pendingEntityFocus;
+    if (pendingEntityFocus?.route === cleanId) {
+      window.dispatchEvent(new CustomEvent('omnitraf:entity-focus', { detail: pendingEntityFocus }));
+      stateStore.setState({ pendingEntityFocus: null });
+    }
     if (cleanId === 'map' || cleanId === 'dashboard') {
       this.controllerModules.get('mapManager')?.debouncedInvalidateSize?.(120);
     }
@@ -195,13 +211,16 @@ export class App {
   async _activateViewModules(view, isFirstMount = false) {
     diagnostics.recordInit('view:' + view);
     const cleanView = (view || '').replace('#', '').replace('view-', '');
+    if (cleanView === 'settings' && isViteRuntime) await import('../css/views/settings.css');
+    if (cleanView === 'prediction' && isViteRuntime) await import('../css/views/prediction.css');
 
     const viewControllers = {
       dashboard: ['cctvController', 'signalsController', 'incidentController', 'emergencyController'],
       map: ['mapManager'], cctv: ['cctvController'], signals: ['mapManager', 'signalsController'],
       incidents: ['mapManager', 'incidentController'], emergency: ['emergencyController'], emergencies: ['emergencyController'],
       analytics: ['analyticsController'], prediction: ['analyticsController'],
-      devices: ['deviceController'], reports: ['reportController']
+      devices: ['deviceController'], reports: ['reportController'],
+      settings: ['settingsController'], integration: ['integrationController']
     };
     const navigationId = this.navigationId;
     const names = viewControllers[cleanView] || [];
@@ -303,6 +322,8 @@ export class App {
   _showViewLoadError(view, retry) {
     const container = document.getElementById('viewContainer');
     if (!container) return;
+    const loadingStatus = document.getElementById('viewLoadStatus');
+    if (loadingStatus) loadingStatus.hidden = true;
     let panel = document.getElementById('viewLoadError');
     if (!panel) {
       panel = document.createElement('div');
@@ -321,14 +342,22 @@ export class App {
       panel.textContent = '';
     }
     const message = document.createElement('p');
-    message.textContent = `Unable to load ${String(view).replace('#', '')}. Check the connection and retry.`;
+    const viewNames = {
+      dashboard: 'Ikhtisar', map: 'Peta', incidents: 'Insiden', emergency: 'Darurat',
+      cctv: 'CCTV', signals: 'Sinyal', devices: 'Perangkat', analytics: 'Analitik',
+      prediction: 'Prediksi', reports: 'Laporan', settings: 'Pengaturan', integration: 'Integrasi'
+    };
+    const cleanView = String(view).replace('#', '').replace('view-', '');
+    message.textContent = `Halaman ${viewNames[cleanView] || cleanView} belum dapat dimuat. Periksa koneksi lalu coba lagi.`;
     const retryButton = document.createElement('button');
     retryButton.type = 'button';
-    retryButton.textContent = 'Retry';
+    retryButton.className = 'btn btn-primary compact';
+    retryButton.textContent = 'Coba lagi';
     retryButton.addEventListener('click', retry, { once: true });
     const reloadButton = document.createElement('button');
     reloadButton.type = 'button';
-    reloadButton.textContent = 'Reload application';
+    reloadButton.className = 'btn btn-ghost compact';
+    reloadButton.textContent = 'Muat ulang aplikasi';
     reloadButton.addEventListener('click', () => window.location.reload(), { once: true });
     if (typeof panel.append === 'function') {
       panel.append(message, retryButton, reloadButton);
@@ -410,10 +439,10 @@ export class App {
     };
 
     window.dismissAiRecommendation = () => {
-      const card = document.getElementById("ai-rec-card") || document.querySelector(".ai-rec-card");
+      const card = document.getElementById("widgetAiRec");
       if (card) {
-        card.style.opacity = "0";
-        setTimeout(() => { card.style.display = "none"; }, 300);
+        card.hidden = true;
+        stateStore.setState({ dismissedRecommendation: true });
       }
       if (typeof window.showToast === "function") {
         window.showToast("Rekomendasi AI diabaikan untuk siklus ini.");
@@ -457,11 +486,13 @@ export class App {
         align-items: center;
         gap: 8px;
       `;
-      const icon = type === 'warning' || type === 'alert' ? '⚠️' : '✓';
+      const icon = ['danger', 'error'].includes(type) ? '✕' : ['warning', 'alert'].includes(type) ? '⚠' : type === 'info' ? 'ℹ' : '✓';
+      item.dataset.tone = ['danger', 'error'].includes(type) ? 'error' : type;
+      item.setAttribute('role', ['danger', 'error'].includes(type) ? 'alert' : 'status');
       const iconEl = document.createElement('span');
       iconEl.textContent = icon;
       const messageEl = document.createElement('span');
-      messageEl.textContent = msg == null ? '' : String(msg);
+      messageEl.textContent = msg == null ? '' : String(msg).replace(/^[✓✅❌✕⚠️ℹ️]+\s*/u, '');
       item.append(iconEl, messageEl);
       stack.appendChild(item);
 
@@ -523,8 +554,27 @@ export class App {
     const dialogSelector = '[role="dialog"][aria-modal="true"]';
     const openerByDialog = new WeakMap();
     let activeDialog = null;
+    const originalInert = new Map();
+    const restoreBackground = () => {
+      originalInert.forEach((wasInert, element) => { element.inert = wasInert; });
+      originalInert.clear();
+    };
+    const inertDialogBackground = (dialog) => {
+      restoreBackground();
+      let branch = dialog;
+      while (branch?.parentElement && branch.parentElement !== document.body) {
+        const parent = branch.parentElement;
+        for (const sibling of parent.children) {
+          if (sibling === branch || sibling.contains(dialog)) continue;
+          originalInert.set(sibling, sibling.inert);
+          sibling.inert = true;
+        }
+        branch = parent;
+      }
+    };
 
     const isDialogVisible = (dialog) => {
+      if (dialog.getAttribute('aria-hidden') === 'true') return false;
       if (dialog.id === 'notifDrawer') return dialog.classList.contains('open');
       return dialog.classList.contains('show') || dialog.classList.contains('open') ||
         dialog.classList.contains('active') || (dialog.style.display !== 'none' &&
@@ -533,10 +583,14 @@ export class App {
 
     const getFocusableElements = (dialog) => Array.from(dialog.querySelectorAll(
       'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    )).filter((element) => element.getClientRects().length > 0 && !element.hasAttribute('aria-hidden'));
+    )).filter((element) => {
+      if (!element.getClientRects().length || element.hasAttribute('aria-hidden') || element.closest('[inert], [aria-hidden="true"]')) return false;
+      const style = window.getComputedStyle(element);
+      return style.visibility !== 'hidden' && style.display !== 'none';
+    });
 
     const closeDialog = (dialog) => {
-      const closeButton = dialog.querySelector('.modal-close, .notif-drawer-close-btn, [data-dialog-close]');
+      const closeButton = dialog.querySelector('.modal-close, .notif-drawer-close-btn, .close-drawer, [data-dialog-close]');
       if (closeButton) {
         closeButton.click();
         return;
@@ -550,7 +604,14 @@ export class App {
       const visibleDialogs = dialogs.filter(isDialogVisible);
       const nextActiveDialog = visibleDialogs[visibleDialogs.length - 1] || null;
 
-      dialogs.forEach((dialog) => dialog.setAttribute('aria-hidden', isDialogVisible(dialog) ? 'false' : 'true'));
+      dialogs.forEach((dialog) => {
+        const visible = isDialogVisible(dialog);
+        const ariaHidden = visible ? 'false' : 'true';
+        if (dialog.getAttribute('aria-hidden') !== ariaHidden) dialog.setAttribute('aria-hidden', ariaHidden);
+        dialog.inert = !visible;
+      });
+      if (nextActiveDialog) inertDialogBackground(nextActiveDialog);
+      else restoreBackground();
 
       if (activeDialog && activeDialog !== nextActiveDialog && !isDialogVisible(activeDialog)) {
         const opener = openerByDialog.get(activeDialog);
@@ -583,14 +644,14 @@ export class App {
           observedDialogs.add(dialog);
           dialogStateObserver.observe(dialog, {
             attributes: true,
-            attributeFilter: ['class', 'style']
+            attributeFilter: ['class', 'style', 'aria-hidden']
           });
         });
       };
       mountObserver.observe(document.body, { childList: true });
-      ['modalsContainer', 'drawersContainer'].forEach((id) => {
+      ['viewContainer', 'modalsContainer', 'drawersContainer'].forEach((id) => {
         const mountPoint = document.getElementById(id);
-        if (mountPoint) mountObserver.observe(mountPoint, { childList: true });
+        if (mountPoint) mountObserver.observe(mountPoint, { childList: true, subtree: id === 'viewContainer' });
       });
       // Discover the initial dialogs before watching only their own open/close state.
       observeDialogs();

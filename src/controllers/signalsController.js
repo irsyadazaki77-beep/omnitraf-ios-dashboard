@@ -31,6 +31,7 @@ export class SignalsController {
   activate() {
     this.deactivate(); // deterministic cleanup first
 
+    this._ensureIntersectionCards();
     this._bindDashboardSignalSlider();
     this._bindSignalsViewSliders();
     this._bindWebsterCalculator();
@@ -44,6 +45,16 @@ export class SignalsController {
     this._setupStoreSubscriptions();
     this._syncRoleCapabilities();
     this.disposer.add(authManager.onAuthChange(() => this._syncRoleCapabilities()));
+    this.disposer.addEventListener(window, 'omnitraf:entity-focus', (event) => {
+      if (event.detail?.kind !== 'intersection') return;
+      const target = [...document.querySelectorAll('#view-signals [data-intersection-id]')]
+        .find((item) => item.dataset.intersectionId === String(event.detail.id));
+      if (!target) return;
+      target.tabIndex = target.tabIndex >= 0 ? target.tabIndex : -1;
+      target.classList.add('entity-search-focus');
+      target.focus({ preventScroll: true });
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
 
     // Initial sync via View Adapter
     const state = stateStore.getState();
@@ -57,6 +68,37 @@ export class SignalsController {
 
   deactivate() {
     this.disposer.clear();
+  }
+
+  _ensureIntersectionCards() {
+    const grid = document.querySelector('#view-signals .signals-console-grid');
+    const template = grid?.querySelector('.signals-intersection-card');
+    if (!template) return;
+    const nodes = stateStore.getState().intersections || [];
+    for (const node of nodes) {
+      if ([...grid.querySelectorAll('[data-intersection-id]')].some(card => card.dataset.intersectionId === node.id)) continue;
+      const card = template.cloneNode(true);
+      card.dataset.intersectionId = node.id;
+      card.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+      card.querySelector('h2').textContent = node.name || node.id;
+      grid.appendChild(card);
+    }
+    grid.querySelectorAll('.signals-intersection-card').forEach(card => {
+      if (!card.querySelector('[data-signal-command-status]')) {
+        const status = document.createElement('p');
+        status.dataset.signalCommandStatus = 'true';
+        status.setAttribute('role', 'status');
+        status.className = 'text-muted';
+        card.querySelector('.signal-active-panel').after(status);
+      }
+      const sliders = [...card.querySelectorAll('.sig-slide')];
+      sliders.slice(1).forEach(slider => { slider.previousElementSibling?.remove(); slider.remove(); });
+      const slider = sliders[0];
+      if (slider) {
+        slider.setAttribute('aria-label', `Durasi hijau ${card.querySelector('h2').textContent}`);
+        slider.previousElementSibling.querySelector('span').textContent = 'Durasi hijau konfigurasi';
+      }
+    });
   }
 
   _syncRoleCapabilities() {
@@ -89,7 +131,7 @@ export class SignalsController {
     const phaseName = (phase) => ({ green: 'Hijau', yellow: 'Kuning', red: 'Merah' })[String(phase || '').toLowerCase()] || '—';
     const densityName = (node) => {
       const status = String(node.status || '').toLowerCase();
-      if (status.includes('padat') || status.includes('heavy') || status.includes('high')) return 'heavy';
+      if (status.includes('padat') || status.includes('heavy') || status.includes('high')) return 'high';
       if (status.includes('sedang') || status.includes('moderate')) return 'moderate';
       if (status.includes('lancar') || status.includes('normal') || status.includes('low')) return 'low';
       return 'unknown';
@@ -100,10 +142,22 @@ export class SignalsController {
       if (!node) return;
       const phase = String(node.state || '').toLowerCase();
       card.querySelector('[data-signal-phase]')?.replaceChildren(document.createTextNode(`Fase: ${phaseName(phase)}`));
-      card.querySelector('[data-signal-wait]')?.replaceChildren(document.createTextNode(`Waktu tunggu: ${node.waitTime ?? '—'}s`));
+      card.querySelector('[data-signal-wait]')?.replaceChildren(document.createTextNode(`Waktu tunggu: ${node.waitTime ?? '—'} detik`));
       card.querySelector('[data-signal-updated]')?.replaceChildren(document.createTextNode(`Update: ${updatedAt}`));
       const cycle = card.querySelector('.cycle-number');
       if (cycle && Number.isFinite(Number(node.timer))) cycle.textContent = String(node.timer);
+      const splitSlider = card.querySelector('.sig-slide');
+      const pending = node.pendingGreenSplit != null ? Number(node.pendingGreenSplit) : null;
+      const greenSplit = Number(pending ?? node.greenSplit ?? node.signal?.greenSplit);
+      const status = card.querySelector('[data-signal-command-status]');
+      if (status) status.textContent = pending !== null
+        ? `Dikonfirmasi server: ${pending} detik akan berlaku pada siklus berikutnya. Fase saat ini memakai ${node.greenSplit} detik.`
+        : `Konfigurasi aktif: ${node.greenSplit ?? '—'} detik hijau. Sisa fase ditampilkan di atas.`;
+      if (splitSlider && Number.isFinite(greenSplit) && splitSlider.dataset.commandPending !== 'true') {
+        splitSlider.value = String(greenSplit);
+        splitSlider.dataset.acknowledgedValue = String(greenSplit);
+        this._renderSignalSliderPreview(splitSlider, greenSplit);
+      }
       card.querySelectorAll('.signals-apill-lens').forEach((lens) => {
         lens.classList.toggle('active', lens.classList.contains(`lens-${phase}`));
       });
@@ -113,8 +167,8 @@ export class SignalsController {
     if (!table || typeof table.replaceChildren !== 'function' || intersections.length === 0) return;
     table.replaceChildren(...intersections.map((node) => {
       const row = document.createElement('tr');
-      row.tabIndex = 0;
-      row.setAttribute('role', 'button');
+
+
       row.setAttribute('aria-label', `Fokus peta ke ${node.name || node.id}`);
       const density = densityName(node);
       row.dataset.density = density;
@@ -122,9 +176,15 @@ export class SignalsController {
         const cell = document.createElement('td');
         if (index === 2) {
           const badge = document.createElement('span');
-          badge.className = `tag ${density === 'heavy' ? 'tag-high' : density === 'moderate' ? 'tag-moderate' : density === 'low' ? 'tag-low' : ''}`;
+          badge.className = `tag ${density === 'high' ? 'tag-high' : density === 'moderate' ? 'tag-moderate' : density === 'low' ? 'tag-low' : ''}`;
           badge.textContent = String(value);
           cell.appendChild(badge);
+        } else if (index === 0) {
+          const button = document.createElement('button');
+          button.type = 'button'; button.className = 'btn btn-ghost compact';
+          button.textContent = String(value);
+          button.setAttribute('aria-label', `Fokus peta ke ${value}`);
+          cell.appendChild(button);
         } else cell.textContent = String(value);
         row.appendChild(cell);
       });
@@ -177,18 +237,38 @@ export class SignalsController {
     const tooltip = document.getElementById("sliderTooltip");
     const valDisplay = document.getElementById("greenValue");
 
-    if (!slider) return;
+    if (!slider || !slider.dataset) return;
+    slider.dataset.acknowledgedValue = String(stateStore.getState().greenSplitWonokromo ?? slider.value);
 
     this.disposer.addEventListener(slider, "input", (e) => {
       const val = parseInt(e.target.value, 10);
+      if (!Number.isInteger(val)) return;
       if (tooltip) tooltip.textContent = `${val}s`;
       if (valDisplay) valDisplay.textContent = `${val} dtk`;
-
       this._updateDashboardTimeline(val);
     });
 
     this.disposer.addEventListener(slider, "change", async (e) => {
       const val = parseInt(e.target.value, 10);
+      const previous = Number(slider.dataset.acknowledgedValue ?? stateStore.getState().greenSplitWonokromo ?? slider.defaultValue);
+      const min = Number(slider.min || 15);
+      const max = Number(slider.max || 90);
+      if (!Number.isInteger(val) || val < min || val > max) {
+        slider.value = String(previous);
+        this.view.updateGreenSplit(previous);
+        this._updateDashboardTimeline(previous);
+        return;
+      }
+      if (slider.dataset.commandPending === 'true') return;
+      if (!authManager.hasRole(['OPERATOR', 'ADMIN'])) {
+        slider.value = String(previous);
+        this.view.updateGreenSplit(previous);
+        this._updateDashboardTimeline(previous);
+        return;
+      }
+      slider.dataset.commandPending = 'true';
+      slider.disabled = true;
+      slider.setAttribute('aria-busy', 'true');
       soundManager.play('click');
       try {
         await commandLayer.dispatchCommand({
@@ -197,13 +277,21 @@ export class SignalsController {
           targetId: 'node-wonokromo',
           payload: { value: val }
         }, false); // low-risk
+        slider.dataset.acknowledgedValue = String(val);
         if (typeof window.showToast === "function") {
-          window.showToast(`✓ Penyesuaian Green Split Wonokromo (${val}s) dijadwalkan pada siklus berikutnya.`);
+          window.showToast(`Penyesuaian simulasi Green Split Wonokromo (${val}s) dikonfirmasi server.`);
         }
       } catch (err) {
+        slider.value = String(previous);
+        this.view.updateGreenSplit(previous);
+        this._updateDashboardTimeline(previous);
         if (typeof window.showToast === "function") {
           window.showToast(`❌ Gagal menyetel Green Split: ${err.message}`, "danger");
         }
+      } finally {
+        delete slider.dataset.commandPending;
+        slider.disabled = false;
+        slider.removeAttribute('aria-busy');
       }
     });
   }
@@ -214,37 +302,34 @@ export class SignalsController {
   _bindSignalsViewSliders() {
     const sliders = document.querySelectorAll("#view-signals .sig-slide");
     sliders.forEach((slider, idx) => {
+      slider.dataset.acknowledgedValue = slider.value;
       this.disposer.addEventListener(slider, "input", (e) => {
         const val = parseInt(e.target.value, 10);
-        const parent = slider.closest(".signal-sliders");
-        const prevRow = slider.previousElementSibling;
-        if (prevRow && prevRow.querySelector("strong")) {
-          prevRow.querySelector("strong").textContent = `${val} dtk`;
-        }
-
-        // Update cycle ring if present
-        const card = slider.closest(".widget");
-        const cycleNum = card ? card.querySelector(".cycle-number") : null;
-        if (cycleNum) cycleNum.textContent = `${val}`;
-
-        // Update timeline in widget
-        const timeline = parent ? parent.querySelector(".phase-timeline-bar") : null;
-        if (timeline) {
-          const greenSec = timeline.querySelector(".phase-green");
-          const redSec = timeline.querySelector(".phase-red");
-          if (greenSec && redSec) {
-            const greenPct = Math.min(75, Math.max(25, Math.round((val / 90) * 100)));
-            greenSec.style.width = `${greenPct}%`;
-            redSec.style.width = `${100 - greenPct - 10}%`;
-          }
-        }
+        if (Number.isInteger(val)) this._renderSignalSliderPreview(slider, val);
       });
 
       this.disposer.addEventListener(slider, "change", async (e) => {
         const val = parseInt(e.target.value, 10);
+        const previous = Number(slider.dataset.acknowledgedValue ?? slider.defaultValue);
+        const min = Number(slider.min || 15);
+        const max = Number(slider.max || 90);
+        if (!Number.isInteger(val) || val < min || val > max) {
+          slider.value = String(previous);
+          this._renderSignalSliderPreview(slider, previous);
+          return;
+        }
+        if (slider.dataset.commandPending === 'true') return;
+        if (!authManager.hasRole(['OPERATOR', 'ADMIN'])) {
+          slider.value = String(previous);
+          this._renderSignalSliderPreview(slider, previous);
+          return;
+        }
+        slider.dataset.commandPending = 'true';
+        slider.disabled = true;
+        slider.setAttribute('aria-busy', 'true');
         soundManager.play('click');
-        const nodeIds = ["node-wonokromo", "node-darmo", "node-tunjungan", "node-jemursari"];
-        const targetId = nodeIds[idx] || "node-wonokromo";
+        const targetId = slider.closest('[data-intersection-id]')?.dataset.intersectionId;
+        if (!targetId) { delete slider.dataset.commandPending; slider.disabled = false; slider.removeAttribute('aria-busy'); return; }
 
         try {
           await commandLayer.dispatchCommand({
@@ -253,16 +338,38 @@ export class SignalsController {
             targetId,
             payload: { value: val }
           }, false); // low-risk
+          slider.dataset.acknowledgedValue = String(val);
           if (typeof window.showToast === "function") {
-            window.showToast(`✓ Sinyal ${targetId} disesuaikan ke ${val} detik.`);
+            window.showToast(`Green split simulasi ${targetId} (${val}s) dikonfirmasi server.`);
           }
         } catch (err) {
+          slider.value = String(previous);
+          this._renderSignalSliderPreview(slider, previous);
           if (typeof window.showToast === "function") {
             window.showToast(`❌ Gagal menyesuaikan sinyal: ${err.message}`, "danger");
           }
+        } finally {
+          delete slider.dataset.commandPending;
+          slider.disabled = false;
+          slider.removeAttribute('aria-busy');
         }
       });
     });
+  }
+
+  _renderSignalSliderPreview(slider, value) {
+    const parent = slider.closest('.signal-sliders');
+    const previousRow = slider.previousElementSibling;
+    if (previousRow?.querySelector('strong')) previousRow.querySelector('strong').textContent = `${value} dtk`;
+    const card = slider.closest('.widget');
+    const timeline = parent?.querySelector('.phase-timeline-bar');
+    const green = timeline?.querySelector('.phase-green');
+    const red = timeline?.querySelector('.phase-red');
+    if (green && red) {
+      const greenPercent = Math.min(75, Math.max(25, Math.round((value / 90) * 100)));
+      green.style.width = `${greenPercent}%`;
+      red.style.width = `${100 - greenPercent - 10}%`;
+    }
   }
 
   /**
@@ -271,16 +378,10 @@ export class SignalsController {
   _bindForceOverrideButtons() {
     document.querySelectorAll(".force-override-btn").forEach((btn, idx) => {
       this.disposer.addEventListener(btn, "click", () => {
-        const nodeIds = ["node-wonokromo", "node-tunjungan", "node-darmo", "node-jemursari"];
-        const nodeNames = [
-          "Simpang Wonokromo (Jl. Ahmad Yani)",
-          "Simpang Tunjungan (Gedung Siola)",
-          "Simpang Raya Darmo (Polisi Istimewa)",
-          "Simpang Jemursari (Jl. Ahmad Yani)"
-        ];
-        
-        this._currentTargetNode = nodeIds[idx] || "node-wonokromo";
-        const targetName = nodeNames[idx] || "Simpang Wonokromo (A. Yani)";
+        const card = btn.closest('[data-intersection-id]');
+        this._currentTargetNode = card?.dataset.intersectionId;
+        if (!this._currentTargetNode) return;
+        const targetName = card.querySelector('h2')?.textContent || this._currentTargetNode;
 
         this.openManualOverrideModal(this._currentTargetNode, targetName);
       });
@@ -450,14 +551,14 @@ export class SignalsController {
     if (confirmBtn) {
       this.disposer.addEventListener(confirmBtn, "click", async () => {
         confirmBtn.disabled = true;
-        confirmBtn.textContent = "APPLYING...";
+        confirmBtn.textContent = "Menerapkan…";
 
         try {
           await commandLayer.dispatchCommand({
             action: 'ai:apply-recommendation',
             targetType: 'intersection',
             targetId: this._currentTargetNode || 'node-wonokromo',
-            payload: { targetSplit: 48 }
+            payload: { targetSplit: this._recommendedSplit }
           }, false); // low-risk
 
           closeModal();
@@ -489,11 +590,24 @@ export class SignalsController {
 
     if (!modal) return;
 
-    if (title) title.textContent = `Konfirmasi Optimasi Webster: ${nodeName}`;
-    if (volQ) volQ.textContent = "2,450 smp/jam";
-    if (flowRatio) flowRatio.textContent = "0.72";
-    if (delaySaved) delaySaved.textContent = "-12.4 dtk/kend";
-    if (splitDiff) splitDiff.textContent = "35s ➔ 48s (+13s)";
+    const node = (stateStore.getState().intersections || []).find(item => item.id === nodeId);
+    if (!node) { window.showToast?.('Simpang tidak tersedia. Muat ulang data.', 'warning'); return; }
+    const current = Number(node.pendingGreenSplit ?? node.greenSplit ?? 35);
+    const target = Math.max(10, Math.min(90, current + 8));
+    this._recommendedSplit = target;
+    const cycle = target + Number(node.redDuration ?? 25) + Number(node.yellowDuration ?? 3);
+    if (title) title.textContent = `Pratinjau skenario: ${node.name || nodeName}`;
+    if (volQ) volQ.textContent = 'Tidak tersedia';
+    if (flowRatio) flowRatio.textContent = 'belum diukur';
+    if (delaySaved) delaySaved.textContent = 'Belum dievaluasi';
+    if (splitDiff) splitDiff.textContent = `${current} dtk → ${target} dtk (+${target - current})`;
+    const update = (id, text) => { const element = document.getElementById(id); if (element) element.textContent = text; };
+    update('aiRecOldText', `${current} dtk`);
+    update('aiRecNewText', `${target} dtk`);
+    const oldBar = document.getElementById('aiRecBarOld');
+    const newBar = document.getElementById('aiRecBarNew');
+    if (oldBar) oldBar.style.width = `${current / cycle * 100}%`;
+    if (newBar) newBar.style.width = `${(target - current) / cycle * 100}%`;
 
     modal.style.display = "flex";
     modal.classList.add("show");

@@ -45,6 +45,7 @@ export class ChatSystem {
     this.chatInput = null;
     this.typingWrapper = null;
     this._isInitialized = false;
+    this.soundEnabled = true;
   }
 
   init() {
@@ -54,9 +55,11 @@ export class ChatSystem {
     this.chatBody = document.getElementById("staffChatBody");
     this.chatInput = document.getElementById("chatInputText");
     this.typingWrapper = document.getElementById("chatTypingWrapper");
+    try { this.soundEnabled = window.localStorage.getItem('omnitraf.chatSound') !== 'false'; } catch (_) {}
 
     this._renderInitialMessages();
     this._bindEvents();
+    this._syncSoundToggle();
   }
 
   _renderInitialMessages() {
@@ -109,6 +112,13 @@ export class ChatSystem {
 
     bubble.appendChild(meta);
     bubble.appendChild(textBubble);
+    if (msg.image && msg.image.startsWith('data:image/png;base64,')) {
+      const image = document.createElement('img');
+      image.src = msg.image;
+      image.alt = 'Snapshot kamera sintetis pada waktu pesan';
+      image.style.cssText = 'max-width:85%;height:auto;border-radius:12px;margin-top:8px;';
+      bubble.appendChild(image);
+    }
     if (this.chatBody) {
       this.chatBody.appendChild(bubble);
     }
@@ -124,6 +134,15 @@ export class ChatSystem {
     const btnSend = document.getElementById("btnSendChat");
     const quickChips = document.querySelectorAll("#chatQuickSuggestions .quick-chip");
     const btnAttach = document.getElementById("btnChatAttach");
+    const btnSound = document.getElementById("btnToggleChatSound");
+
+    if (btnSound) {
+      btnSound.addEventListener('click', () => {
+        this.soundEnabled = !this.soundEnabled;
+        try { window.localStorage.setItem('omnitraf.chatSound', String(this.soundEnabled)); } catch (_) {}
+        this._syncSoundToggle();
+      });
+    }
 
     if (btnSend && this.chatInput) {
       btnSend.addEventListener("click", () => this.sendMessage());
@@ -148,7 +167,15 @@ export class ChatSystem {
     if (btnAttach) {
       btnAttach.addEventListener("click", () => {
         const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        const canvas = document.getElementById('dashCameraCanvas') || document.querySelector('#view-cctv.active canvas');
+        let image;
+        try { if (canvas?.width) image = canvas.toDataURL('image/png'); } catch (_) {}
+        if (!image) {
+          window.showToast?.('Buka kamera sintetis sampai frame tersedia, lalu lampirkan kembali.', 'warning');
+          return;
+        }
         const attachMsg = {
+          image,
           sender: "Operator Demo",
           role: "user",
           text: "📷 [Cuplikan Kamera Demo] Node contoh — metrik antrean sintetis.",
@@ -210,7 +237,7 @@ export class ChatSystem {
     const text = this.chatInput.value.trim();
     if (!text) return;
 
-    soundManager.play('click');
+    this._playSound('click');
 
     const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     const userMsg = {
@@ -258,7 +285,7 @@ export class ChatSystem {
         replySender = "Sistem Demo";
         replyRole = "admin";
         replyText = "Aksi sirine hanya disimulasikan di antarmuka; tidak ada sirine persimpangan yang diaktifkan.";
-        soundManager.play('alert');
+        this._playSound('alert');
       } else if (lower.includes("pohon") || lower.includes("tumbang") || lower.includes("dkrth")) {
         replySender = "Unit Demo";
         replyRole = "field";
@@ -267,7 +294,7 @@ export class ChatSystem {
         replySender = "Dispatcher Demo";
         replyRole = "dispatcher";
         replyText = "Skenario prioritas kendaraan berjalan di simulator saja. Layanan 112, GPS, dan APILL tidak terhubung.";
-        soundManager.play('siren');
+        this._playSound('siren');
       } else if (lower.includes("patroli") || lower.includes("dishub")) {
         replySender = "Patroli Demo";
         replyRole = "field";
@@ -304,12 +331,25 @@ export class ChatSystem {
       }
       this._scrollToBottom();
 
-      soundManager.play('dispatch');
+      this._playSound('dispatch');
 
       if (typeof window.showToast === "function") {
         window.showToast(`📻 Pesan Radio dari ${replySender}`);
       }
     }, 1200);
+  }
+
+  _playSound(type) {
+    if (this.soundEnabled) soundManager.play(type);
+  }
+
+  _syncSoundToggle() {
+    const button = document.getElementById('btnToggleChatSound');
+    if (!button) return;
+    button.textContent = this.soundEnabled ? '🔊' : '🔇';
+    button.setAttribute('aria-pressed', String(this.soundEnabled));
+    button.setAttribute('aria-label', this.soundEnabled ? 'Matikan suara chat' : 'Aktifkan suara chat');
+    button.setAttribute('title', this.soundEnabled ? 'Suara chat aktif' : 'Suara chat nonaktif');
   }
 }
 

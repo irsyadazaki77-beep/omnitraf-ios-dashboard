@@ -23,9 +23,9 @@
                 🕒 08:00 WIB
               </span>
               <div class="time-range-segmented glass-soft" id="analyticsTimeRangeSegmented" role="group" aria-label="Rentang Waktu Analitik">
-                <button class="time-range-seg-btn active" data-range="today" type="button">Hari Ini</button>
-                <button class="time-range-seg-btn" data-range="7d" type="button">7 Hari</button>
-                <button class="time-range-seg-btn" data-range="30d" type="button">30 Hari</button>
+                <button class="time-range-seg-btn active" data-range="today" type="button">Profil 24 jam</button>
+                <button class="time-range-seg-btn" data-range="7d" type="button">Histori 7 hari</button>
+                <button class="time-range-seg-btn" data-range="30d" type="button">Histori 30 hari</button>
               </div>
             </div>
           </div>
@@ -34,7 +34,7 @@
           <div class="time-travel-control-box">
             <div class="time-travel-header">
               <label for="timeTravelRange" class="time-travel-label">
-                <span>⏳ Time-Travel 24 Jam:</span>
+                <span>⏳ Jam simulasi:</span>
                 <span id="timeTravelStatusText">Jam Puncak Sibuk Pagi</span>
               </label>
               <span id="timeTravelTimeVal">08:00 WIB</span>
@@ -52,8 +52,8 @@
           <div class="trend-layout">
             <div class="trend-summary">
               <article class="summary-card glass-soft">
-                <strong id="analyticsTotalVehicles" data-counter="128540">128.540</strong>
-                <span>Total kendaraan</span>
+                <strong id="analyticsTotalVehicles">—</strong>
+                <span>Volume model · 24 jam</span>
                 <small class="metric-up" id="analyticsVolumeTrend" hidden></small>
               </article>
               <article class="summary-card glass-soft">
@@ -61,8 +61,8 @@
                 <span>Jam puncak</span>
               </article>
               <article class="summary-card glass-soft">
-                <strong id="analyticsAvgSpeed" data-counter="34">34 km/jam</strong>
-                <span>Rata-rata kecepatan</span>
+                <strong id="analyticsAvgSpeed">—</strong>
+                <span>Kecepatan model · 24 jam</span>
                 <small class="metric-down" id="analyticsSpeedTrend" hidden></small>
               </article>
             </div>
@@ -72,15 +72,15 @@
               <div class="analytics-chart-legend">
                 <span class="analytics-legend-item">
                   <span class="legend-swatch legend-swatch-actual"></span>
-                  <strong>Baseline model</strong>
+                  <strong>Volume koridor · model</strong>
                 </span>
                 <span class="analytics-legend-item">
                   <span class="legend-swatch legend-swatch-forecast"></span>
-                  <strong>Proyeksi model</strong>
+                  <strong>Nilai per jam pada titik grafik</strong>
                 </span>
                 <span class="analytics-legend-item">
                   <span class="legend-swatch legend-swatch-peak"></span>
-                  <strong>Jam Puncak Sibuk</strong>
+                  <strong>Data sintetis</strong>
                 </span>
               </div>
 
@@ -138,8 +138,8 @@
             <div class="esg-header">
               <div>
                 <span class="esg-eyebrow">🌱 GREEN MOBILITY SURABAYA (ESG)</span>
-                <h2>Carbon Emission & Fuel Efficiency Impact</h2>
-                <p>Kalkulasi reduksi emisi karbon dioksida dan efisiensi konsumsi bahan bakar minyak (BBM) melalui manajemen lalu lintas berbasis kecerdasan buatan.</p>
+                <h2>Estimasi emisi karbon &amp; efisiensi BBM</h2>
+                <p>Perkiraan model simulasi untuk emisi karbon dioksida dan konsumsi bahan bakar. Nilainya bukan hasil pengukuran lapangan.</p>
               </div>
               <div class="esg-methodology-actions">
                 <button id="btnEsgMethodology" class="btn btn-ghost compact btn-esg-methodology" type="button">
@@ -155,7 +155,7 @@
                 <div>
                   <strong id="co2Saved">—</strong>
                   <span>Estimasi CO₂ Tereduksi</span>
-                  <small>Model simulasi terhadap siklus statis</small>
+                  <small id="co2MethodNote">Perkiraan model; berbeda dari kalkulator skenario di bawah.</small>
                 </div>
               </div>
               <div class="esg-metric-box">
@@ -173,8 +173,8 @@
           <article class="esg-configurator-card glass-panel esg-card-padded">
             <div class="section-head compact">
               <div>
-                <h2>ESG Carbon Target Configurator</h2>
-                <p>Konfigurasi target reduksi karbon harian Kota Surabaya.</p>
+                <h2>Pengaturan target karbon simulasi</h2>
+                <p>Atur target model harian. Target ini tidak mewakili komitmen atau capaian resmi Kota Surabaya.</p>
               </div>
             </div>
             <div class="esg-config-layout esg-config-grid">
@@ -205,9 +205,9 @@
                   <span class="provenance-badge simulated">SIMULATED / MODEL</span>
                 </div>
                 <h2>🌱 Kalkulator Simulasi Dampak ESG & Penghematan BBM</h2>
-                <p>Simulasi model matematis dampak optimasi durasi sinyal adaptif SITS terhadap efisiensi energi kota dan emisi karbon.</p>
+                <p>Skenario matematis terpisah untuk memperkirakan dampak asumsi optimasi durasi sinyal pada konsumsi energi dan emisi. Jangan jumlahkan dengan angka teramati di atas.</p>
               </div>
-              <span class="badge esg-model-badge">ESG Impact Model</span>
+              <span class="badge esg-model-badge">Model dampak simulasi</span>
             </div>
             
             <div class="esg-slider-section">
@@ -229,7 +229,7 @@
               <div class="esg-impact-metric">
                 <div class="esg-impact-label">Jam Antrean Dipangkas</div>
                 <div class="esg-impact-value esg-hours" id="esgQueueHoursSaved">3.000 Jam</div>
-                <small class="esg-impact-note">Kumulatif armada Surabaya/hari</small>
+                <small class="esg-impact-note">Asumsi model agregat; bukan data armada teramati</small>
               </div>
 
               <div class="esg-impact-metric">
@@ -247,7 +247,7 @@
               <div class="esg-impact-metric">
                 <div class="esg-impact-label">Nilai Finansial Dihemat</div>
                 <div class="esg-impact-value esg-money" id="esgCalcMoneySaved">Rp 12.180.000</div>
-                <small class="esg-impact-note">Ref: Rp 14.500/Liter subsidi</small>
+                <small class="esg-impact-note">Asumsi harga model: Rp 14.500/liter</small>
               </div>
             </div>
           </article>

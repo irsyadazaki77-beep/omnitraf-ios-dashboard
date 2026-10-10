@@ -1,7 +1,7 @@
 /**
  * OmniTRAF Surabaya - Traffic Analytics & AI Prediction Controller
  * Controls 24-Hour Time-Travel Simulator, AI Congestion Forecasting,
- * Single Forecast Snapshot Sync, Scenario Comparison (Baseline vs AI Optimized),
+ * Single Forecast Snapshot Sync, Scenario Comparison (Kondisi dasar vs optimasi model),
  * Corridor-Level Analytics, ESG Green Mobility Monitor, and Model Test Suite.
  */
 
@@ -9,6 +9,7 @@ import { soundManager } from '../core/soundManager.js';
 import { stateStore, escapeHtml } from '../core/stateStore.js';
 import { generateForecastSnapshot, runForecastTestSuite, MODEL_VERSION } from '../modules/forecastEngine.js';
 import { Disposer } from '../core/disposer.js';
+import { buildAnalyticsSeries } from '../modules/analyticsSeries.js';
 
 export class AnalyticsController {
   constructor() {
@@ -25,6 +26,7 @@ export class AnalyticsController {
 
   activate() {
     this.deactivate(); // Ensure clean slate before binding
+    this.active = true;
 
     this._bindSlidersAndSnapshotSync();
     this._bindTrendsTabSwitching();
@@ -39,12 +41,18 @@ export class AnalyticsController {
   }
 
   deactivate() {
+    this.active = false;
+    this._forecastRequestToken = (this._forecastRequestToken || 0) + 1;
+    this.abortController?.abort();
+    clearTimeout(this.refreshTimer);
+    clearTimeout(this.sliderTimer);
     this.disposer.clear();
   }
 
   _setupStoreListeners() {
     this.disposer.addStoreSubscription(stateStore, "traffic:update", () => {
-      this.refreshCurrentHourSnapshot();
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = setTimeout(() => { if (this.active) this.refreshCurrentHourSnapshot(); }, 250);
     });
 
     this.disposer.addStoreSubscription(stateStore, "state:stale-changed", () => {
@@ -59,39 +67,10 @@ export class AnalyticsController {
     const select = document.getElementById("analyticsCorridorSelect");
     if (!select) return;
 
-    const pathPrimary = document.getElementById("chartPathPrimary");
-    const pathMuted = document.getElementById("chartPathMuted");
-
-    const CORRIDOR_PATHS = {
-      "corridor-ayani": {
-        primary: "M0 206 C65 200 100 132 158 92 S285 112 352 152 S530 115 760 96",
-        muted: "M0 180 C80 185 155 166 252 120 S410 86 540 104 S650 85 760 72"
-      },
-      "corridor-darmo": {
-        primary: "M0 220 C70 210 120 150 180 110 S300 130 380 160 S550 120 760 110",
-        muted: "M0 200 C80 190 140 140 220 100 S350 110 480 120 S620 90 760 85"
-      },
-      "corridor-jemursari": {
-        primary: "M0 230 C80 220 130 160 200 130 S320 140 400 170 S560 130 760 120",
-        muted: "M0 210 C90 200 150 150 230 110 S360 120 490 130 S630 100 760 95"
-      },
-      "corridor-merr": {
-        primary: "M0 190 C60 180 110 110 170 80 S290 100 370 140 S520 100 760 80",
-        muted: "M0 170 C70 160 130 120 210 90 S340 100 460 110 S600 80 760 65"
-      }
-    };
-
-    this.disposer.addEventListener(select, "change", (e) => {
-      const selectedKey = e.target.value;
-      const paths = CORRIDOR_PATHS[selectedKey] || CORRIDOR_PATHS["corridor-ayani"];
-
-      if (pathPrimary && paths.primary) pathPrimary.setAttribute("d", paths.primary);
-      if (pathMuted && paths.muted) pathMuted.setAttribute("d", paths.muted);
-
-      soundManager.play('click');
-      if (typeof window.showToast === "function") {
-        window.showToast(`📊 Kurva Diurnal diperbarui untuk ${e.target.options[e.target.selectedIndex].text}`);
-      }
+    select.value = this.corridorId || 'corridor-ayani';
+    this.disposer.addEventListener(select, 'change', () => {
+      this.corridorId = select.value;
+      this.refreshCurrentHourSnapshot(this.currentHour, true);
     });
   }
 
@@ -139,34 +118,12 @@ export class AnalyticsController {
 
     const currentState = stateStore.getState();
 
-    // Generate snapshot locally or fetch from backend API
-    let snapshot = null;
-    try {
-      const res = await fetch(`/api/prediction/v1/forecast?hour=${targetHour}`);
-      if (res.ok) {
-        const json = await res.json();
-        if (json && json.success) {
-          snapshot = json;
-        }
-      }
-    } catch {
-      // Fallback
-    }
-
-    // Guard check: discard response if user already slid to a newer hour
-    if (currentToken !== this._forecastRequestToken) {
-      console.warn(`[AnalyticsController] Discarding stale forecast response for hour ${targetHour} due to newer request active.`);
-      return;
-    }
-
-    if (!snapshot) {
-      snapshot = generateForecastSnapshot(targetHour, {
-        ...currentState,
-        isTimeTravel: isUserAction
-      });
-    }
+    // One client snapshot drives every model panel; no separate server sample can drift.
+    const snapshot = generateForecastSnapshot(targetHour, { ...currentState, isTimeTravel: isUserAction });
+    if (currentToken !== this._forecastRequestToken || !this.active) return;
 
     this._applyForecastSnapshotToUI(snapshot);
+    this._renderSeries(currentState);
 
     if (isUserAction) {
       soundManager.play('click');
@@ -204,13 +161,14 @@ export class AnalyticsController {
       statusText.style.color = snapshot.riskColor || "var(--primary)";
     }
     if (sliderRiskLabel) {
-      sliderRiskLabel.textContent = snapshot.riskLabel || `Status: ${snapshot.riskText}`;
+      const riskLabels = { HIGH: 'Risiko macet tinggi', MODERATE: 'Risiko macet sedang', LOW: 'Risiko macet rendah' };
+      sliderRiskLabel.textContent = `Status: ${riskLabels[snapshot.riskLevel] || 'Risiko belum tersedia'}`;
     }
     if (predTomorrowStatus) {
       predTomorrowStatus.textContent = snapshot.tomorrowStatus || "Sedang";
     }
 
-    // 4. Metrics Cards (Total Vehicles, Speed, Volume, Probability)
+    // 4. Metrics Cards (volume, speed, and model risk index)
     const totalVehicles = document.getElementById("analyticsTotalVehicles");
     const peakHourText = document.getElementById("analyticsPeakHourText");
     const avgSpeed = document.getElementById("analyticsAvgSpeed");
@@ -219,13 +177,13 @@ export class AnalyticsController {
     const predictSpeedVal = document.getElementById("predictSpeedVal");
     const predictProbVal = document.getElementById("predictProbVal");
 
-    if (totalVehicles) totalVehicles.textContent = Number(snapshot.expectedVolume * 90).toLocaleString('id-ID');
-    if (peakHourText) peakHourText.textContent = snapshot.factors?.[0] || "Arus Reguler SITS";
+    if (totalVehicles) totalVehicles.textContent = Number(snapshot.expectedVolume).toLocaleString('id-ID');
+    if (peakHourText) peakHourText.textContent = snapshot.hourLabel;
     if (avgSpeed) avgSpeed.textContent = `${snapshot.expectedSpeedKmh} km/jam`;
     if (volumeTrend) volumeTrend.hidden = true;
     if (speedTrend) speedTrend.hidden = true;
     if (predictSpeedVal) predictSpeedVal.textContent = `${snapshot.expectedSpeedKmh} km/jam`;
-    if (predictProbVal) predictProbVal.textContent = `${snapshot.probabilityValue}%`;
+    if (predictProbVal) predictProbVal.textContent = `${snapshot.probabilityValue}/100`;
 
     // 5. Data Quality, Provenance, and Model Version Tags
     this._updateDataQualityBadges(snapshot);
@@ -233,7 +191,7 @@ export class AnalyticsController {
     // 6. Rule-Based Recommendation Card
     this._updateRecommendationCard(snapshot);
 
-    // 7. Scenario Comparison Card (Baseline vs AI Optimized)
+    // 7. Scenario Comparison Card (Kondisi dasar vs optimasi model)
     this._updateScenarioComparisonCard(snapshot);
 
     // 8. Corridor-Level Analytics Breakdown
@@ -269,7 +227,7 @@ export class AnalyticsController {
       const provColor = provenance === 'DEGRADED' ? 'var(--warning)' : 'var(--status-warning)';
       qualityBadge.innerHTML = `
         <span class="badge provenance-badge simulated" style="border-color: ${provColor};">
-          SOURCE: ${escapeHtml(provenance)}
+          SUMBER: ${escapeHtml(({ 'REALTIME-DERIVED': 'STREAM SIMULATOR', SIMULATED: 'MODEL LOKAL', DEGRADED: 'MODEL · INPUT TIDAK TERKINI' })[provenance] || 'MODEL SIMULASI')}
         </span>
         <span class="badge provenance-badge simulated">
           MODEL: ${escapeHtml(snapshot.modelVersion || MODEL_VERSION)}
@@ -285,12 +243,12 @@ export class AnalyticsController {
     if (recTextEl && rec) {
       recTextEl.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 4px;">
-          <strong style="color: #00e5ff; font-size: 11px;">[ID: ${escapeHtml(rec.recommendationId || 'REC-AI')}]</strong>
-          <span style="font-size: 10px; color: var(--text-muted);">Impact: ${escapeHtml(rec.expectedImpact)}</span>
+          <strong style="color: var(--primary-2); font-size: 11px;">[ID: ${escapeHtml(rec.recommendationId || 'REC-AI')}]</strong>
+          <span style="font-size: 10px; color: var(--text-muted);">Dampak model: ${escapeHtml(rec.expectedImpact)}</span>
         </div>
         <div style="font-size: 13px; font-weight: 600; color: #e2e8f0; line-height: 1.4;">${escapeHtml(rec.text)}</div>
         <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;">
-          ${(Array.isArray(rec.reasonCodes) ? rec.reasonCodes : []).map(r => `<span style="font-size: 9.5px; padding: 2px 6px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; border-radius: 4px;">${escapeHtml(r)}</span>`).join('')}
+          ${(Array.isArray(rec.reasonCodes) ? rec.reasonCodes : []).map(r => `<span style="font-size: 9.5px; padding: 2px 6px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--primary-2); border-radius: 4px;">${escapeHtml(r)}</span>`).join('')}
         </div>
       `;
     }
@@ -300,13 +258,15 @@ export class AnalyticsController {
     const sc = snapshot.scenarioComparison;
     if (!sc) return;
 
-    let scenarioCard = document.getElementById("analyticsScenarioCard");
+    const container = document.querySelector('.view-pane.active .analytics-expanded, .view-pane.active .prediction-panel');
+    if (!container) return;
+    let scenarioCard = container.querySelector('[data-scenario-comparison]');
     if (!scenarioCard) {
-      const container = document.querySelector("#view-analytics .analytics-expanded") || document.querySelector("#view-prediction .prediction-panel");
+
       if (container) {
         scenarioCard = document.createElement("article");
-        scenarioCard.id = "analyticsScenarioCard";
-        scenarioCard.className = "glass-panel";
+        scenarioCard.dataset.scenarioComparison = "true";
+        scenarioCard.className = "glass-panel model-dynamic";
         scenarioCard.style.cssText = "margin-top: 16px; padding: 20px; border-left: 4px solid #00e5ff;";
         container.insertBefore(scenarioCard, container.firstChild);
       }
@@ -316,57 +276,57 @@ export class AnalyticsController {
       scenarioCard.innerHTML = `
         <div class="section-head compact" style="margin-bottom: 12px;">
           <div>
-            <h2>⚖️ Simulasi Skenario: Baseline vs AI Optimized (${escapeHtml(snapshot.hourLabel)})</h2>
-            <p>Eksplisit membandingkan parameter kondisi saat ini (Baseline) dengan rekayasa sinyal adaptif AI SITS.</p>
+            <h2>⚖️ Simulasi Skenario: Kondisi dasar vs optimasi model (${escapeHtml(snapshot.hourLabel)})</h2>
+            <p>Perbandingan jaringan simulasi pada jam terpilih. Filter koridor hanya mengubah grafik dan KPI yang terikat pada filter tersebut.</p>
           </div>
-          <span class="badge" style="background: rgba(0, 229, 255, 0.15); color: #00e5ff; font-weight: 700; padding: 4px 10px; border-radius: 8px;">Deterministic Scenario Model</span>
+          <span class="badge" style="background: rgba(0, 229, 255, 0.15); color: var(--primary-2); font-weight: 700; padding: 4px 10px; border-radius: 8px;">Model skenario deterministik</span>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 12px;">
-          <div style="background: rgba(15, 23, 42, 0.7); padding: 14px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08);">
-            <div style="font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px;">📊 BASELINE SITS</div>
+          <div style="background: var(--panel-soft); padding: 14px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08);">
+            <div style="font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px;">📊 KONDISI DASAR SIMULASI</div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Waktu Tunggu:</span><strong>${escapeHtml(sc.baseline.waitTimeSec)}s</strong>
+              <span>Waktu Tunggu:</span><strong>${escapeHtml(sc.baseline.waitTimeSec)} detik</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
               <span>Panjang Antrean:</span><strong>${escapeHtml(sc.baseline.queueMeters)} m</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Kecepatan Rerata:</span><strong>${escapeHtml(sc.baseline.speedKmh)} km/h</strong>
+              <span>Kecepatan Rerata:</span><strong>${escapeHtml(sc.baseline.speedKmh)} km/jam</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between;">
-              <span>Throughput:</span><strong>${escapeHtml(sc.baseline.throughputVehPerHour)} veh/h</strong>
+              <span>Kendaraan per jam:</span><strong>${escapeHtml(sc.baseline.throughputVehPerHour)} kend/jam</strong>
             </div>
           </div>
 
-          <div style="background: rgba(15, 23, 42, 0.7); padding: 14px; border-radius: 10px; border: 1px solid rgba(0, 229, 255, 0.3);">
-            <div style="font-size: 11px; font-weight: 800; color: #00e5ff; text-transform: uppercase; margin-bottom: 8px;">✨ AI OPTIMIZED</div>
+          <div style="background: var(--panel-soft); padding: 14px; border-radius: 10px; border: 1px solid rgba(0, 229, 255, 0.3);">
+            <div style="font-size: 11px; font-weight: 800; color: var(--primary-2); text-transform: uppercase; margin-bottom: 8px;">✨ SKENARIO SPLIT KANDIDAT</div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Waktu Tunggu:</span><strong style="color: #10b981;">${escapeHtml(sc.optimized.waitTimeSec)}s (-${escapeHtml(sc.delta.waitTimeReductionPct)}%)</strong>
+              <span>Waktu Tunggu:</span><strong style="color: #10b981;">${escapeHtml(sc.optimized.waitTimeSec)} detik (-${escapeHtml(sc.delta.waitTimeReductionPct)}%)</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
               <span>Panjang Antrean:</span><strong style="color: #10b981;">${escapeHtml(sc.optimized.queueMeters)} m (-${escapeHtml(sc.delta.queueReductionPct)}%)</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Kecepatan Rerata:</span><strong style="color: #38bdf8;">${escapeHtml(sc.optimized.speedKmh)} km/h (+${escapeHtml(sc.delta.speedGainPct)}%)</strong>
+              <span>Kecepatan Rerata:</span><strong style="color: var(--primary-2);">${escapeHtml(sc.optimized.speedKmh)} km/jam (+${escapeHtml(sc.delta.speedGainPct)}%)</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between;">
-              <span>Throughput:</span><strong style="color: #38bdf8;">${escapeHtml(sc.optimized.throughputVehPerHour)} veh/h (+${escapeHtml(sc.delta.throughputGainPct)}%)</strong>
+              <span>Kendaraan per jam:</span><strong style="color: var(--primary-2);">${escapeHtml(sc.optimized.throughputVehPerHour)} kend/jam (+${escapeHtml(sc.delta.throughputGainPct)}%)</strong>
             </div>
           </div>
 
-          <div style="background: rgba(15, 23, 42, 0.7); padding: 14px; border-radius: 10px; border: 1px solid rgba(16, 185, 129, 0.3);">
-            <div style="font-size: 11px; font-weight: 800; color: #10b981; text-transform: uppercase; margin-bottom: 8px;">🌱 IMPACT SCENARIO PROJECTION</div>
+          <div style="background: var(--panel-soft); padding: 14px; border-radius: 10px; border: 1px solid rgba(16, 185, 129, 0.3);">
+            <div style="font-size: 11px; font-weight: 800; color: #10b981; text-transform: uppercase; margin-bottom: 8px;">🌱 DAMPAK TURUNAN SIMULASI</div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>BBM Diselamatkan:</span><strong style="color: #10b981;">${escapeHtml(sc.delta.fuelSavedLiters)} Litres</strong>
+              <span>BBM model:</span><strong style="color: #10b981;">${escapeHtml(sc.delta.fuelSavedLiters)} liter</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>CO₂ Tereduksi:</span><strong style="color: #34d399;">${escapeHtml(sc.delta.co2SavedKg)} Kg</strong>
+              <span>CO₂ model:</span><strong style="color: #34d399;">${escapeHtml(sc.delta.co2SavedKg)} kg</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Nilai Subsidi:</span><strong style="color: #f59e0b;">Rp ${Number(sc.delta.monetarySavedRp || 0).toLocaleString('id-ID')}</strong>
+              <span>Nilai biaya model:</span><strong style="color: #f59e0b;">Rp ${Number(sc.delta.monetarySavedRp || 0).toLocaleString('id-ID')}</strong>
             </div>
-            <small style="color: var(--text-muted); font-size: 10px; display: block; margin-top: 6px;">Catatan: Angka ini merupakan estimasi simulasi berbasis asumsi PKJI / HCM.</small>
+            <small style="color: var(--text-muted); font-size: 10px; display: block; margin-top: 6px;">${escapeHtml(sc.assumptions.responseModel)} Faktor BBM, emisi, dan harga juga merupakan asumsi; bukan hasil ukur.</small>
           </div>
         </div>
       `;
@@ -383,7 +343,7 @@ export class AnalyticsController {
       if (container) {
         corridorCard = document.createElement("article");
         corridorCard.id = "analyticsCorridorBreakdownCard";
-        corridorCard.className = "glass-panel";
+        corridorCard.className = "glass-panel model-dynamic";
         corridorCard.style.cssText = "margin-top: 16px; padding: 20px;";
         container.appendChild(corridorCard);
       }
@@ -393,10 +353,10 @@ export class AnalyticsController {
       corridorCard.innerHTML = `
         <div class="section-head compact" style="margin-bottom: 12px;">
           <div>
-            <h2>🛣️ Corridor-Level Mobility Analytics & Operational Priority</h2>
+            <h2>🛣️ Kinerja koridor & prioritas model</h2>
             <p>Pemantauan beban, kecepatan, kepadatan, dan tingkat risiko operasional per koridor utama Surabaya.</p>
           </div>
-          <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-weight: 700; padding: 4px 10px; border-radius: 8px;">Operational Severity Ranking</span>
+          <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: var(--primary-2); font-weight: 700; padding: 4px 10px; border-radius: 8px;">Peringkat risiko model</span>
         </div>
 
         <div style="overflow-x: auto;">
@@ -406,10 +366,10 @@ export class AnalyticsController {
                 <th style="padding: 8px;">Koridor Utama</th>
                 <th style="padding: 8px;">Volume / Kapasitas</th>
                 <th style="padding: 8px;">Kecepatan</th>
-                <th style="padding: 8px;">Density</th>
-                <th style="padding: 8px;">Queue Length</th>
-                <th style="padding: 8px;">Delay</th>
-                <th style="padding: 8px;">Signal Efficiency</th>
+                <th style="padding: 8px;">Kepadatan</th>
+                <th style="padding: 8px;">Antrean</th>
+                <th style="padding: 8px;">Tundaan</th>
+                <th style="padding: 8px;">Efisiensi model</th>
                 <th style="padding: 8px;">Status Risiko</th>
               </tr>
             </thead>
@@ -418,9 +378,9 @@ export class AnalyticsController {
                 const riskBadge = c.riskLevel === 'CRITICAL' ? '<span style="color:#ef4444; font-weight:800;">🔴 KRITIS</span>' : c.riskLevel === 'WARNING' ? '<span style="color:#f59e0b; font-weight:800;">🟡 WASPADA</span>' : '<span style="color:#10b981; font-weight:800;">🟢 NORMAL</span>';
                 return `
                   <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                    <td style="padding: 10px 8px; font-weight: 700; color: #ffffff;">${escapeHtml(c.name)}</td>
+                    <td style="padding: 10px 8px; font-weight: 700; color: var(--text);">${escapeHtml(c.name)}</td>
                     <td style="padding: 10px 8px;">${escapeHtml(c.volume)} / ${escapeHtml(c.capacity)} veh/h</td>
-                    <td style="padding: 10px 8px; color: #00e5ff; font-weight: 700;">${escapeHtml(c.speed)} km/h</td>
+                    <td style="padding: 10px 8px; color: var(--primary-2); font-weight: 700;">${escapeHtml(c.speed)} km/h</td>
                     <td style="padding: 10px 8px;">${escapeHtml(c.density)} veh/km</td>
                     <td style="padding: 10px 8px;">${escapeHtml(c.queueMeters)} m</td>
                     <td style="padding: 10px 8px;">${escapeHtml(c.delaySec)}s</td>
@@ -470,10 +430,12 @@ export class AnalyticsController {
     if (ttSlider) {
       this.disposer.addEventListener(ttSlider, "input", (e) => {
         const hour = parseInt(e.target.value, 10) || 0;
-        this.refreshCurrentHourSnapshot(hour, false);
+        clearTimeout(this.sliderTimer);
+        this.sliderTimer = setTimeout(() => { if (this.active) this.refreshCurrentHourSnapshot(hour, false); }, 180);
       });
       this.disposer.addEventListener(ttSlider, "change", (e) => {
         const hour = parseInt(e.target.value, 10) || 0;
+        clearTimeout(this.sliderTimer);
         this.refreshCurrentHourSnapshot(hour, true);
       });
     }
@@ -481,64 +443,60 @@ export class AnalyticsController {
     if (predSlider) {
       this.disposer.addEventListener(predSlider, "input", (e) => {
         const hour = parseInt(e.target.value, 10) || 0;
-        this.refreshCurrentHourSnapshot(hour, false);
+        clearTimeout(this.sliderTimer);
+        this.sliderTimer = setTimeout(() => { if (this.active) this.refreshCurrentHourSnapshot(hour, false); }, 180);
       });
       this.disposer.addEventListener(predSlider, "change", (e) => {
         const hour = parseInt(e.target.value, 10) || 0;
+        clearTimeout(this.sliderTimer);
         this.refreshCurrentHourSnapshot(hour, true);
       });
     }
   }
 
   _bindTrendsTabSwitching() {
-    const buttons = document.querySelectorAll("#analyticsTimeRangeSegmented .time-range-seg-btn, .time-range-seg-btn");
-    const pathPrimary = document.getElementById("chartPathPrimary");
-    const pathMuted = document.getElementById("chartPathMuted");
-    const pathCyan = document.getElementById("chartPathCyan");
-    const chartArea = document.querySelector("#trendChart .chart-area");
-
-    const PATH_PRESETS = {
-      today: {
-        primary: "M0 206 C65 200 100 132 158 92 S285 112 352 152 S530 115 760 96",
-        muted: "M0 180 C80 185 155 166 252 120 S410 86 540 104 S650 85 760 72",
-        cyan: "M0 228 C88 218 142 158 224 84 S350 180 468 168 S624 142 760 176",
-        area: "M0 206 C65 200 100 132 158 92 S285 112 352 152 S530 115 760 96 L760 260 L0 260 Z"
-      },
-      "7d": {
-        primary: "M0 160 C80 140 140 80 230 70 S380 130 490 85 S640 60 760 110",
-        muted: "M0 195 C90 190 180 150 270 140 S440 110 560 125 S680 90 760 85",
-        cyan: "M0 210 C70 190 160 110 250 100 S390 150 510 130 S650 95 760 140",
-        area: "M0 160 C80 140 140 80 230 70 S380 130 490 85 S640 60 760 110 L760 260 L0 260 Z"
-      },
-      "30d": {
-        primary: "M0 180 C100 160 200 120 300 110 S500 70 600 80 S700 95 760 60",
-        muted: "M0 170 C95 165 190 140 310 130 S480 95 590 100 S690 80 760 75",
-        cyan: "M0 220 C110 200 210 130 320 120 S470 110 580 90 S680 120 760 130",
-        area: "M0 180 C100 160 200 120 300 110 S500 70 600 80 S700 95 760 60 L760 260 L0 260 Z"
-      }
-    };
-
-    buttons.forEach(btn => {
-      this.disposer.addEventListener(btn, "click", () => {
-        buttons.forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-
-        const range = btn.dataset.range || "today";
-        const paths = PATH_PRESETS[range] || PATH_PRESETS.today;
-
-        if (pathPrimary && paths.primary) pathPrimary.setAttribute("d", paths.primary);
-        if (pathMuted && paths.muted) pathMuted.setAttribute("d", paths.muted);
-        if (pathCyan && paths.cyan) pathCyan.setAttribute("d", paths.cyan);
-        if (chartArea && paths.area) chartArea.setAttribute("d", paths.area);
-
-        soundManager.play('click');
-      });
+    document.querySelectorAll('.time-range-seg-btn').forEach(button => {
+      const available = button.dataset.range === 'today';
+      button.disabled = !available;
+      button.title = available ? 'Profil model selama 24 jam' : 'Histori belum tersedia; simulator hanya menyediakan profil 24 jam.';
+      button.setAttribute('aria-pressed', String(available));
     });
+  }
+
+  _renderSeries(state) {
+    const root = document.getElementById('view-analytics');
+    if (!root?.classList.contains('active')) return;
+    const series = buildAnalyticsSeries(state, this.corridorId);
+    const selected = series.points[this.currentHour];
+    const set = (id, value) => { const el = root.querySelector(`#${id}`); if (el) el.textContent = value; };
+    set('analyticsTotalVehicles', series.totalVolume.toLocaleString('id-ID'));
+    set('analyticsPeakHourText', `${String(series.peak.hour).padStart(2, '0')}:00–${String(series.peak.hour + 1).padStart(2, '0')}:00`);
+    set('analyticsAvgSpeed', `${series.averageSpeed} km/jam`);
+    const svg = root.querySelector('#trendChart');
+    const max = Math.ceil(Math.max(...series.points.map(point => point.volume)) / 500) * 500;
+    const x = hour => 64 + hour * 28;
+    const y = value => 220 - value / max * 175;
+    const path = series.points.map((point, index) => `${index ? 'L' : 'M'}${x(point.hour)} ${y(point.volume)}`).join(' ');
+    if (svg) {
+      svg.innerHTML = `<title>Volume model ${escapeHtml(series.corridor.name)} selama 24 jam</title>
+        ${[0, .25, .5, .75, 1].map(ratio => `<line x1="64" y1="${y(max * ratio)}" x2="708" y2="${y(max * ratio)}" class="series-grid"/><text x="56" y="${y(max * ratio) + 4}" text-anchor="end">${Math.round(max * ratio)}</text>`).join('')}
+        <text x="64" y="24">Kendaraan/jam · model sintetis</text><path d="${path}" class="series-line" fill="none"/>
+        ${[0, 4, 8, 12, 16, 20, 23].map(hour => `<text x="${x(hour)}" y="248" text-anchor="middle">${String(hour).padStart(2, '0')}:00</text>`).join('')}
+        ${series.points.map(point => `<circle cx="${x(point.hour)}" cy="${y(point.volume)}" r="${point.hour === this.currentHour ? 6 : 4}" class="series-point"><title>${point.hour}:00 WIB · ${point.volume} kendaraan/jam · ${point.speed} km/jam · indeks ${point.risk}/100</title></circle>`).join('')}`;
+    }
+    let detail = root.querySelector('#analyticsSeriesDetail');
+    if (!detail) {
+      detail = document.createElement('details'); detail.id = 'analyticsSeriesDetail'; detail.className = 'series-detail';
+      svg?.parentElement?.appendChild(detail);
+    }
+    if (detail) detail.innerHTML = `<summary>Data per jam: ${escapeHtml(series.corridor.name)}</summary><p>${String(this.currentHour).padStart(2,'0')}:00 WIB: ${selected.volume.toLocaleString('id-ID')} kendaraan/jam; ${selected.speed} km/jam. Total merupakan penjumlahan 24 interval satu jam, bukan histori lapangan.</p><div class="table-scroll"><table><thead><tr><th>Jam WIB</th><th>Kendaraan/jam</th><th>Kecepatan</th><th>Indeks risiko</th></tr></thead><tbody>${series.points.map(point => `<tr><td>${String(point.hour).padStart(2,'0')}:00</td><td>${point.volume}</td><td>${point.speed} km/jam</td><td>${point.risk}/100</td></tr>`).join('')}</tbody></table></div>`;
+    set('analyticsHourBadge', `${series.corridor.name} · ${String(this.currentHour).padStart(2,'0')}:00 WIB`);
   }
 
   _bindEsgTargetConfig() {
     const form = document.getElementById("esgConfigForm");
     const input = document.getElementById("esgCo2TargetInput");
+    try { const saved = localStorage.getItem("omnitraf.esgTarget"); if (input && saved) input.value = saved; } catch (_) {}
     const progressFill = document.getElementById("esgProgressFill");
     const progressText = document.getElementById("esgProgressText");
 
@@ -546,8 +504,11 @@ export class AnalyticsController {
 
     this.disposer.addEventListener(form, "submit", (e) => {
       e.preventDefault();
-      const targetVal = Math.max(500, parseInt(input?.value, 10) || 2000);
-      const currentSavedCo2 = Number(stateStore.getState().telemetry?.co2SavedKg);
+      const targetVal = Number(input?.value);
+      if (!Number.isFinite(targetVal) || targetVal < 500) { input?.reportValidity(); return; }
+      try { localStorage.setItem("omnitraf.esgTarget", String(targetVal)); } catch (_) {}
+      const rawCo2 = stateStore.getState().telemetry?.co2SavedKg;
+      const currentSavedCo2 = rawCo2 == null ? NaN : Number(rawCo2);
       if (!Number.isFinite(currentSavedCo2)) {
         if (typeof window.showToast === 'function') window.showToast('Data estimasi CO₂ simulator belum tersedia.', 'warning');
         return;
@@ -606,7 +567,7 @@ export class AnalyticsController {
         runnerBtn.id = "btnRunForecastTestSuite";
         runnerBtn.className = "btn btn-ghost compact";
         runnerBtn.style.cssText = "margin-top: 6px;";
-        runnerBtn.innerHTML = "🧪 Jalankan Test Suite Model (15 Scenarios)";
+        runnerBtn.innerHTML = "🧪 Evaluasi 15 skenario model";
         parentHead.appendChild(runnerBtn);
       }
     }
@@ -629,13 +590,13 @@ export class AnalyticsController {
 
           soundManager.play("success");
           if (typeof window.showToast === "function") {
-            window.showToast(`✅ Model Verification Suite Complete: ${report.passedCount}/${report.totalTests} Scenarios Passed!`, "success");
+            window.showToast(`✅ Evaluasi model selesai: ${report.passedCount}/${report.totalTests} skenario sesuai.`, "success");
           }
         } catch (err) {
           console.error("Test Suite Error:", err);
         } finally {
           runnerBtn.disabled = false;
-          runnerBtn.innerHTML = "🧪 Jalankan Test Suite Model (15 Scenarios)";
+          runnerBtn.innerHTML = "🧪 Evaluasi 15 skenario model";
         }
       });
     }

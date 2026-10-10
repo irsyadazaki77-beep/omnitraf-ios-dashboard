@@ -17,6 +17,7 @@ import { soundManager } from '../core/soundManager.js';
 import { socketClient } from '../core/socketClient.js';
 import { commandLayer } from '../core/commandLayer.js';
 import { authManager } from '../core/authManager.js';
+import { generateForecastSnapshot } from './forecastEngine.js';
 import { SeededRandom } from '../../shared/seededRandom.js';
 
 export class TrafficEngine {
@@ -153,13 +154,62 @@ export class TrafficEngine {
     const isChaos = !!state.isChaosMode;
     const chaosLevel = state.chaosLevel || 0;
     const isGreenWave = !!state.greenWaveActive;
-    const emergencies = state.activeEmergencies || [];
+    const emergencies = (state.activeEmergencies || []).filter(e => (e.vehicleId || e.id) && !['ARRIVED', 'COMPLETED', 'CANCELLED', 'TERMINAL_ARCHIVED'].includes(String(e.status).toUpperCase()));
 
     this._renderHeaderAndBriefing(state, telemetry, emergencies);
     this._renderApillTimers(intersections, isGreenWave);
     this._renderChaosUI(isChaos, chaosLevel);
     this._renderKpiMetrics(telemetry, state);
     this._renderEmergencyList(emergencies);
+    this._renderCorridorRanking(state);
+    this._renderIncidentTimeline(state.incidents || []);
+    this._renderNotifications(state.incidents || []);
+    document.getElementById('emergencyGreenWaveHud')?.classList.toggle('is-hidden', !state.greenWaveActive);
+    const recommendation = document.getElementById("widgetAiRec");
+    if (recommendation) recommendation.hidden = Boolean(state.dismissedRecommendation);
+  }
+
+  _renderNotifications(incidents) {
+    const container = document.getElementById('notifListContainer');
+    if (!container) return;
+    const signature = JSON.stringify(incidents);
+    if (container.dataset.snapshot === signature) return;
+    container.dataset.snapshot = signature;
+    const cards = incidents.map(incident => {
+      const card = document.createElement('article'); card.className = 'notif-item-card glass-soft';
+      const title = document.createElement('strong'); title.textContent = incident.title || 'Insiden simulasi';
+      const detail = document.createElement('p'); detail.textContent = `${incident.location || 'Lokasi tidak tersedia'} · ${incident.status || 'Status tidak tersedia'}`;
+      const note = document.createElement('p'); note.textContent = incident.notes || incident.description || 'Skenario pada simulator.';
+      const link = document.createElement('a'); link.href = '#incidents'; link.className = 'btn btn-ghost compact'; link.textContent = 'Buka daftar insiden';
+      link.addEventListener('click', () => document.getElementById('closeNotifDrawer')?.click());
+      card.appendChild(title); card.appendChild(detail); card.appendChild(note); card.appendChild(link); return card;
+    });
+    if (!cards.length) { const empty = document.createElement('p'); empty.textContent = 'Belum ada insiden dalam sesi ini.'; cards.push(empty); }
+    container.replaceChildren(...cards);
+  }
+
+  _renderIncidentTimeline(incidents) {
+    const timeline = document.querySelector('#card-incidents .timeline');
+    if (!timeline) return;
+    const signature = JSON.stringify(incidents);
+    if (timeline.dataset.snapshot === signature) return;
+    timeline.dataset.snapshot = signature;
+    const badge = document.querySelector('#card-incidents .pill');
+    if (badge) badge.textContent = `${incidents.filter(item => !['RESOLVED', 'ARCHIVED'].includes(String(item.status).toUpperCase())).length} aktif`;
+    const rows = incidents.slice(0, 3).map(incident => {
+      const li = document.createElement('li');
+      const dot = document.createElement('span');
+      dot.className = 'timeline-dot ' + (['RESOLVED', 'ARCHIVED'].includes(String(incident.status).toUpperCase()) ? 'success' : 'warning');
+      const copy = document.createElement('div');
+      const title = document.createElement('strong'); title.textContent = incident.title || 'Insiden simulasi';
+      const detail = document.createElement('small');
+      const date = new Date(incident.reportedAt || incident.createdAt || NaN);
+      const time = Number.isNaN(date.getTime()) ? 'Waktu tidak tersedia' : date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' }) + ' WIB';
+      detail.textContent = `${incident.location || 'Lokasi tidak tersedia'} · ${time} · ${incident.status || 'Status tidak tersedia'}`;
+      copy.appendChild(title); copy.appendChild(detail); li.appendChild(dot); li.appendChild(copy); return li;
+    });
+    if (!rows.length) { const empty = document.createElement('li'); empty.textContent = 'Belum ada insiden dalam sesi ini.'; rows.push(empty); }
+    timeline.replaceChildren(...rows);
   }
 
   /**
@@ -178,7 +228,7 @@ export class TrafficEngine {
     const load = hasLoad ? Number(rawLoad) : 0;
     // System health reports connectivity and network load only. Incident severity is
     // surfaced separately in the priority strip so an incident cannot mask a degraded stream.
-    const systemStatus = ['offline', 'fallback', 'degraded', 'auth_failed'].includes(state.connectionStatus) ? 'DEGRADED'
+    const systemStatus = state.connectionStatus === 'auth_failed' ? 'DEMO' : ['offline', 'fallback', 'degraded', 'auth_failed'].includes(state.connectionStatus) ? 'DEGRADED'
       : (!hasLoad || state.isStaleData || ['connecting', 'reconnecting', 'resyncing'].includes(state.connectionStatus)) ? 'WARNING'
         : load >= 75 ? 'ADVISORY' : 'NORMAL';
     this._smartUpdateDOM('dashSystemState', systemStatus, `system-state-text status-${systemStatus.toLowerCase()}`);
@@ -193,10 +243,14 @@ export class TrafficEngine {
     this._smartUpdateDOM('briefingProvenance', isConnected ? 'SIMULASI SERVER' : 'SIMULASI LOKAL', provClass);
     const freshness = document.getElementById('dashDataFreshness');
     if (freshness) {
-      const freshnessLabel = state.isStaleData ? 'STALE · SIM' : isConnected ? 'LIVE · SIM' : 'OFFLINE · SIM';
+      const freshnessLabel = state.connectionStatus === 'auth_failed' ? 'DEMO LOKAL · MASUK UNTUK STREAM' : state.isStaleData
+        ? (isConnected ? 'STREAM SIMULATOR · DATA LAMA' : 'SERVER TERPUTUS · SIMULASI LOKAL')
+        : isConnected ? 'STREAM SIMULATOR TERHUBUNG' : 'SIMULASI LOKAL';
       freshness.textContent = freshnessLabel;
       freshness.className = `data-freshness-pill ${state.isStaleData ? 'is-stale' : isConnected ? 'is-live' : 'is-offline'}`;
-      freshness.setAttribute('aria-label', state.isStaleData ? 'Data simulasi tertahan' : isConnected ? 'Stream simulasi diperbarui' : 'Stream simulasi offline');
+      freshness.setAttribute('aria-label', state.connectionStatus === 'auth_failed' ? 'Demo lokal berjalan; masuk untuk menggunakan stream server' : state.isStaleData
+        ? (isConnected ? 'Stream server simulasi tersambung, tetapi data yang diterima sudah lama' : 'Server simulasi terputus; tampilan menggunakan simulasi lokal')
+        : isConnected ? 'Stream server simulasi tersambung dan data diperbarui' : 'Simulasi lokal berjalan tanpa koneksi server');
       const lastUpdate = state.lastTelemetryTime;
       if (lastUpdate) {
         const parsed = new Date(lastUpdate);
@@ -218,13 +272,31 @@ export class TrafficEngine {
     this._smartUpdateDOM('dashCongestionValue', congestion === null ? '—' : String(congestion));
     this._smartUpdateDOM('dashCongestionGauge', congestion === null ? '—' : `${congestion}%`);
     const gaugeRing = document.querySelector('#bentoCardCongestion .gauge-fill-ring');
-    if (gaugeRing && congestion !== null) gaugeRing.style.strokeDashoffset = String(238.76 * (1 - Math.max(0, Math.min(100, congestion)) / 100));
+    if (gaugeRing) gaugeRing.style.strokeDashoffset = String(congestion === null
+      ? 238.76
+      : 238.76 * (1 - Math.max(0, Math.min(100, congestion)) / 100));
     this._smartUpdateDOM('networkLoad', telemetry.networkLoad ?? (congestion === null ? '—' : `${congestion}%`));
     this._smartUpdateDOM('dashWaitValue', String(telemetry.avgWaitTime ?? '--'));
     this._smartUpdateDOM('dashIntersectionCount', String((state.intersections || []).length));
     this._smartUpdateDOM('dashEmergencyCount', String(emergencies?.length || 0));
-    this._smartUpdateDOM('briefingCorridorsVal', `${(state.intersections || []).length} intersections in model`);
-    this._smartUpdateDOM('briefingCorridorsSub', `${activeIncidents.length} active incident${activeIncidents.length === 1 ? '' : 's'}`);
+    this._smartUpdateDOM('briefingCorridorsVal', `${(state.intersections || []).length} simpang dalam model`);
+    this._smartUpdateDOM('briefingCorridorsSub', `${activeIncidents.length} insiden aktif`);
+
+    // Show infrastructure health only when a value has an explicit source.
+    // Former demo literals looked like measured uptime, camera counts and latency.
+    const setMetric = (id, value) => this._smartUpdateDOM(id, value === null || value === undefined ? '—' : String(value));
+    setMetric('sitsUptimeVal', null);
+    const cameraMetrics = state.cctvCamerasMetrics;
+    const measuredCameraCount = cameraMetrics && typeof cameraMetrics === 'object' ? Object.keys(cameraMetrics).length : 0;
+    const cameraCount = measuredCameraCount > 0 ? measuredCameraCount : null;
+    setMetric('sitsCctvCount', cameraCount);
+    const devices = Array.isArray(state.devices) ? state.devices : [];
+    setMetric('sitsIotCount', devices.length || null);
+    const apiLatency = telemetry.apiLatencyMs ?? telemetry.latencyMs;
+    setMetric('latencyVal', apiLatency !== null && apiLatency !== undefined && Number.isFinite(Number(apiLatency))
+      ? `${Math.round(Number(apiLatency))} ms · sim` : null);
+    const latencyPath = document.getElementById('latencyPath');
+    if (latencyPath) latencyPath.hidden = true;
 
     if (Array.isArray(emergencies) && emergencies.length > 0) {
       const firstEmg = emergencies[0];
@@ -232,7 +304,7 @@ export class TrafficEngine {
       this._smartUpdateDOM('briefingAlertSub', firstEmg.ETA ? `Model ETA ${firstEmg.ETA}` : 'Route status shown in emergency workflow');
     } else {
       this._smartUpdateDOM('briefingAlertVal', 'Kondisi Koridor Normal');
-      this._smartUpdateDOM('briefingAlertSub', 'Sistem Siaga Dispatch 112');
+      this._smartUpdateDOM('briefingAlertSub', 'Simulator siap untuk skenario demonstrasi');
     }
   }
 
@@ -279,6 +351,13 @@ export class TrafficEngine {
     // Simpang Wonokromo
     const nodeW = intersections.find(n => n.id === "node-wonokromo") || intersections[0];
     if (nodeW) {
+      const slider = document.getElementById('greenRange');
+      const scheduled = nodeW.pendingGreenSplit ?? nodeW.greenSplit;
+      if (slider && document.activeElement !== slider && scheduled != null) {
+        slider.value = String(scheduled);
+        slider.dataset.acknowledgedValue = String(scheduled);
+      }
+      this._smartUpdateDOM('greenValue', nodeW.pendingGreenSplit == null ? `${nodeW.greenSplit} dtk` : `${nodeW.greenSplit} dtk · berikutnya ${nodeW.pendingGreenSplit} dtk`);
       if (isGreenWave) {
         this._smartUpdateDOM("wonokromoBadge", "GREEN WAVE (HIJAU)", "status-badge green");
         this._smartUpdateDOM("wonokromoGreenTime", "∞");
@@ -383,35 +462,59 @@ export class TrafficEngine {
    * 3. Render Metric KPI Dashboard
    */
   _renderKpiMetrics(telemetry, state) {
-    const avgWaitTime = telemetry.avgWaitTime ?? 42;
-    const networkLoad = telemetry.networkLoad ?? 72;
-    const co2SavedKg = telemetry.co2SavedKg ?? 1420;
-    const sitsSignal = telemetry.sitsSignal ?? 94;
+    const validMetric = (value) => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
+    const avgWaitTime = validMetric(telemetry.avgWaitTime) ? Number(telemetry.avgWaitTime) : null;
+    const networkLoad = validMetric(telemetry.networkLoad) ? Number(telemetry.networkLoad) : null;
+    const co2SavedKg = validMetric(telemetry.co2SavedKg) ? Number(telemetry.co2SavedKg) : null;
+    const sitsSignal = validMetric(telemetry.sitsSignal) ? Number(telemetry.sitsSignal) : null;
 
     const avgWaitCard = this._findKpiCard("Rata-rata Waktu Tunggu");
     if (avgWaitCard) {
       const counter = avgWaitCard.querySelector(".counter-val") || avgWaitCard.querySelector("h2");
-      if (counter) this._smartUpdateDOM(counter, String(avgWaitTime));
+      if (counter) this._smartUpdateDOM(counter, avgWaitTime === null ? '—' : String(avgWaitTime));
     }
 
     const netLoadCard = this._findKpiCard("Beban Jaringan");
     if (netLoadCard) {
       const counter = netLoadCard.querySelector(".counter-val") || netLoadCard.querySelector("h2");
-      if (counter) this._smartUpdateDOM(counter, `${networkLoad}%`);
+      if (counter) this._smartUpdateDOM(counter, networkLoad === null ? '—' : `${networkLoad}%`);
     }
 
     const co2Card = this._findKpiCard("Reduksi Emisi");
     if (co2Card) {
       const counter = co2Card.querySelector(".counter-val") || co2Card.querySelector("h2");
-      if (counter) this._smartUpdateDOM(counter, `${Math.round(co2SavedKg).toLocaleString('id-ID')} kg`);
+      if (counter) this._smartUpdateDOM(counter, co2SavedKg === null ? '—' : `${Math.round(co2SavedKg).toLocaleString('id-ID')} kg`);
+      const ring = co2Card.querySelector('.gauge-fill-ring');
+      if (ring) ring.style.strokeDashoffset = co2SavedKg === null ? '238.76' : String(238.76 * (1 - Math.max(0, Math.min(100, co2SavedKg)) / 100));
     }
 
     const sitsSignalEl = document.getElementById("sitsStatusText");
     if (sitsSignalEl) {
-      if (state.connectionStatus === 'connected') {
-        this._smartUpdateDOM(sitsSignalEl, `${sitsSignal}%`);
-      }
+      this._smartUpdateDOM(sitsSignalEl, state.connectionStatus === 'connected' && sitsSignal !== null ? `${sitsSignal}%` : '—');
     }
+  }
+
+  _renderCorridorRanking(state) {
+    if (!document.getElementById('widgetLeaderboard')) return;
+    const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', hour: '2-digit', hourCycle: 'h23' }).format(new Date()));
+    const ranked = generateForecastSnapshot(hour, state).corridorBreakdown
+      .map(row => ({ ...row, risk: Math.min(100, Math.round(row.volume / row.capacity * 100)) }))
+      .sort((a, b) => b.risk - a.risk);
+    ranked.slice(0, 5).forEach((row, index) => {
+      const el = document.getElementById(`leadRoad-${index}`);
+      if (!el) return;
+      const label = el.querySelector('span');
+      const value = el.querySelector('strong');
+      if (label) label.textContent = `${index + 1}. ${row.name}`;
+      if (value) value.textContent = `${row.risk}/100`;
+    });
+    document.querySelectorAll('.corridor-list > div').forEach((el, index) => {
+      const row = ranked[index];
+      if (!row) return;
+      el.querySelector('span').textContent = row.name;
+      el.querySelector('strong').textContent = `${row.risk}/100`;
+      el.querySelector('i').style.setProperty('--value', `${row.risk}%`);
+    });
   }
 
   _findKpiCard(titleKeyword) {
@@ -446,9 +549,11 @@ export class TrafficEngine {
       if (emergencies.length > 0) {
         const emg = emergencies[0];
         const isFinished = ["ARRIVED", "COMPLETED", "CANCELLED"].includes(emg.status);
-        this._smartUpdateDOM(titleEl, `Skenario demo: ${emg.vehicleId || 'Ambulans'} (${emg.vehicleType || '112'})`);
-        if (etaEl) this._smartUpdateDOM(etaEl, isFinished ? `Status simulasi: ${emg.status}` : `ETA simulasi ${emg.ETA || '1m 45s'} • Kecepatan model: ${emg.speed || 60} km/j`);
-        if (routeEl) this._smartUpdateDOM(routeEl, `Rute contoh: ${emg.routeId ? emg.routeId.replace('route-', '').toUpperCase() : 'Jl. Raya Darmo → RSU Dr. Soetomo'}`);
+        this._smartUpdateDOM(titleEl, `Skenario demo: ${emg.vehicleId || 'ID simulasi belum tersedia'}${emg.vehicleType ? ` (${emg.vehicleType})` : ''}`);
+        const eta = emg.ETA !== undefined && emg.ETA !== null && emg.ETA !== '' ? `ETA model ${emg.ETA}` : 'ETA model belum tersedia';
+        const speed = emg.speed !== undefined && emg.speed !== null && Number.isFinite(Number(emg.speed)) ? ` • Kecepatan model: ${emg.speed} km/j` : '';
+        if (etaEl) this._smartUpdateDOM(etaEl, isFinished ? `Status simulasi: ${emg.status}` : `${eta}${speed}`);
+        if (routeEl) this._smartUpdateDOM(routeEl, emg.routeId ? `Rute simulasi: ${emg.routeId.replace('route-', '').toUpperCase()}` : 'Rute simulasi belum tersedia');
         if (badgeEl) this._smartUpdateDOM(badgeEl, 'SIMULASI', 'pill pill-ai');
         if (iconEl) iconEl.className = isFinished ? 'emergency-icon' : 'emergency-icon pulse-red';
       } else {
@@ -564,9 +669,9 @@ export class TrafficEngine {
 
       const curTel = curState.telemetry || {};
       this.localSimTimeMs += 1000;
-      const newVehicles = (curTel.vehiclesToday || 128540) + this.localSimRandom.rangeInt(1, 4);
-      const newCo2 = (curTel.co2SavedKg || 1420) + 0.2;
-      const newFuel = (curTel.fuelSavedLiters || 580) + 0.08;
+      const newVehicles = (Number.isFinite(Number(curTel.vehiclesToday)) ? Number(curTel.vehiclesToday) : 0) + this.localSimRandom.rangeInt(1, 4);
+      const newCo2 = (Number.isFinite(Number(curTel.co2SavedKg)) ? Number(curTel.co2SavedKg) : 0) + 0.2;
+      const newFuel = (Number.isFinite(Number(curTel.fuelSavedLiters)) ? Number(curTel.fuelSavedLiters) : 0) + 0.08;
       const timeStr = new Date(this.localSimTimeMs).toLocaleTimeString('id-ID') + ' WIB';
 
       const nowLocal = this.localSimTimeMs;
@@ -693,7 +798,105 @@ export class TrafficEngine {
     this._bindGreenWaveToggle();
     this._bindChaosMode();
     this._bindSignalModal();
-    this._bindAiRecommendationButtons();
+    this._bindSimulationSpeedControl();
+    this._bindDashboardRefresh();
+  }
+
+  _bindDashboardRefresh() {
+    document.addEventListener('click', async (event) => {
+      const button = event.target?.closest('#view-dashboard [data-action="refresh"]');
+      if (!button || button.disabled) return;
+      event.preventDefault();
+      const previousText = button.textContent;
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      button.textContent = 'Refreshing…';
+      try {
+        const result = await socketClient.requestResync();
+        if (result?.status !== 'SUCCESS') throw new Error(result?.error || 'Snapshot simulator belum berhasil disinkronkan.');
+        if (typeof window.showToast === 'function') window.showToast('Data simulator berhasil disinkronkan.');
+      } catch (error) {
+        if (typeof window.showToast === 'function') window.showToast(`Refresh gagal: ${error.message}`, 'danger');
+      } finally {
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+        button.textContent = previousText;
+      }
+    });
+  }
+
+  _bindSimulationSpeedControl() {
+    // The dashboard is mounted lazily, so delegate from document instead of
+    // binding to a node that may not exist during TrafficEngine.init().
+    const speedSteps = [0.5, 1, 1.5, 2, 4];
+    const nearestStep = (multiplier) => speedSteps.reduce((best, value, index) =>
+      Math.abs(value - multiplier) < Math.abs(speedSteps[best] - multiplier) ? index : best, 0);
+    const label = (index) => `${speedSteps[index]}x`;
+    const getControls = () => ({
+      input: document.getElementById('simulationSpeedRange'),
+      output: document.getElementById('simSpeedVal')
+    });
+
+    const initial = Number(stateStore.getState().speedMultiplier ?? stateStore.getState().simConfig?.speedMultiplier);
+    this._acknowledgedSpeedIndex = Number.isFinite(initial) && initial > 0 ? nearestStep(initial) : 1;
+
+    document.addEventListener('input', (event) => {
+      if (event.target?.id !== 'simulationSpeedRange') return;
+      const index = Number(event.target.value);
+      const controls = getControls();
+      if (controls.output && Number.isInteger(index) && speedSteps[index] !== undefined) controls.output.textContent = label(index);
+    });
+
+    document.addEventListener('change', async (event) => {
+      const input = event.target;
+      if (input?.id !== 'simulationSpeedRange') return;
+      const index = Number(input.value);
+      const controls = getControls();
+      if (!Number.isInteger(index) || speedSteps[index] === undefined) {
+        input.value = String(this._acknowledgedSpeedIndex);
+        if (controls.output) controls.output.textContent = label(this._acknowledgedSpeedIndex);
+        return;
+      }
+      if (this._simulationSpeedPending) {
+        input.value = String(this._acknowledgedSpeedIndex);
+        if (controls.output) controls.output.textContent = label(this._acknowledgedSpeedIndex);
+        return;
+      }
+      if (!authManager.hasRole(['OPERATOR', 'ADMIN'])) {
+        input.value = String(this._acknowledgedSpeedIndex);
+        if (controls.output) controls.output.textContent = label(this._acknowledgedSpeedIndex);
+        if (typeof window.showToast === 'function') window.showToast('Kontrol kecepatan hanya tersedia untuk Operator dan Admin.', 'warning');
+        return;
+      }
+
+      const requestedIndex = index;
+      this._simulationSpeedPending = true;
+      input.disabled = true;
+      input.setAttribute('aria-busy', 'true');
+      try {
+        const result = await commandLayer.dispatchCommand({
+          action: 'simulation:control',
+          targetType: 'simulation-runtime-identifier',
+          targetId: 'simulation-runtime',
+          payload: { operation: 'set_speed', speedMultiplier: speedSteps[requestedIndex] }
+        });
+        const durableMultiplier = Number(result?.data?.speedMultiplier ?? speedSteps[requestedIndex]);
+        this._acknowledgedSpeedIndex = Number.isFinite(durableMultiplier) && durableMultiplier > 0
+          ? nearestStep(durableMultiplier)
+          : requestedIndex;
+        input.value = String(this._acknowledgedSpeedIndex);
+        if (controls.output) controls.output.textContent = label(this._acknowledgedSpeedIndex);
+        if (typeof window.showToast === 'function') window.showToast(`Kecepatan simulasi diperbarui: ${label(this._acknowledgedSpeedIndex)}.`);
+      } catch (error) {
+        input.value = String(this._acknowledgedSpeedIndex);
+        if (controls.output) controls.output.textContent = label(this._acknowledgedSpeedIndex);
+        if (typeof window.showToast === 'function') window.showToast(`Kecepatan simulasi tidak berubah: ${error.message}`, 'danger');
+      } finally {
+        this._simulationSpeedPending = false;
+        input.disabled = false;
+        input.removeAttribute('aria-busy');
+      }
+    });
   }
 
   _bindGreenWaveToggle() {
@@ -758,19 +961,6 @@ export class TrafficEngine {
         soundManager.play('click');
       });
     }
-  }
-
-  _bindAiRecommendationButtons() {
-    const buttons = document.querySelectorAll('button[data-action="apply-ai"], .btn-apply-ai, #btnApplyAiRec');
-    buttons.forEach(btn => {
-      btn.addEventListener("click", () => {
-        import('../controllers/signalsController.js').then(({ signalsController }) => {
-          signalsController.openAiRecommendationModal('node-wonokromo', 'Simpang Wonokromo (A. Yani)');
-        }).catch(err => {
-          console.warn('[TrafficEngine] Failed to load signalsController for modal:', err);
-        });
-      });
-    });
   }
 
   _bindSignalModal() {

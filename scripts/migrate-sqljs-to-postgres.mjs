@@ -10,8 +10,13 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sourcePathArg = process.argv.find((arg) => arg.startsWith('--source='))?.slice('--source='.length);
 const sourcePath = path.resolve(root, sourcePathArg || process.env.DB_PATH || './data/omnitraf.sqlite');
 const dryRun = process.argv.includes('--dry-run');
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  console.log('Usage: npm run db:migrate:sqljs-to-postgres [-- --source=path/to/omnitraf.sqlite] [--dry-run]');
+  console.log('Set DATABASE_URL for an import. --dry-run only reads and counts the source database.');
+  process.exit(0);
+}
 const connectionString = process.env.DATABASE_URL;
-if (!connectionString) throw new Error('Set DATABASE_URL to the destination PostgreSQL database.');
+if (!dryRun && !connectionString) throw new Error('Set DATABASE_URL to the destination PostgreSQL database.');
 
 const SQL = await initSqlJs();
 const sourceBuffer = await fs.readFile(sourcePath);

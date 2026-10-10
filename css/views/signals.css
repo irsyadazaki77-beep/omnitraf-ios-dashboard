@@ -55,7 +55,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  backdrop-filter: blur(12px);
+  backdrop-filter: none;
   transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
 }
 
@@ -108,18 +108,17 @@
   background: var(--panel-glass);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
-  padding: 20px 22px;
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(12px);
+  padding: var(--space-4);
+  box-shadow: none;
+  backdrop-filter: none;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
+  gap: var(--space-3);
+  transition: border-color var(--duration-fast) var(--ease);
 }
 
 .signals-intersection-card:hover {
   border-color: var(--border-emphasis);
-  box-shadow: var(--shadow-md);
 }
 
 .signals-card-header {
@@ -192,7 +191,7 @@
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--surface-interactive);
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
 }
@@ -343,7 +342,7 @@
   height: 6px;
   border-radius: var(--radius-full);
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--surface-base);
   margin: 6px 0 0 0;
   position: relative;
   border: 1px solid var(--border);
@@ -376,8 +375,7 @@
   top: -2px;
   bottom: -2px;
   width: 2px;
-  background: #ffffff;
-  box-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+  background: var(--text-primary);
   border-radius: 1px;
   left: 0;
 }
@@ -475,148 +473,52 @@
 
 /* Operator Confirmation Modal Guard */
 #operatorConfirmModal .modal-content {
-  background: var(--panel-glass) !important;
-  backdrop-filter: blur(16px) !important;
-  border: 1px solid var(--border-emphasis) !important;
-  border-radius: var(--radius-xl) !important;
-  box-shadow: var(--shadow-modal) !important;
-  padding: 24px !important;
-  max-width: 480px !important;
+  max-width: 480px;
+  padding: 24px;
 }
 
 #operatorConfirmModal #confirmModalTitle {
-  font-family: var(--font-sans) !important;
-  letter-spacing: -0.01em !important;
-  font-size: 16px !important;
-  font-weight: 700 !important;
-  color: #ffffff !important;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 700;
 }
 
 #operatorConfirmModal #confirmModalLevel {
-  font-family: var(--font-sans) !important;
-  font-size: 10.5px !important;
-  letter-spacing: 0.06em !important;
-  color: var(--danger) !important;
+  color: var(--danger);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
 }
 
 #operatorConfirmModal #btnConfirmProceed {
-  background: var(--danger) !important;
-  border-color: var(--danger) !important;
-  color: #ffffff !important;
-  font-family: var(--font-sans) !important;
-  font-weight: 600 !important;
-  font-size: 12.5px !important;
-  border-radius: var(--radius-md) !important;
-  padding: 8px 18px !important;
-  transition: all var(--duration-fast) var(--ease) !important;
+  border-color: var(--danger);
+  color: var(--text-inverse);
+  background: var(--danger);
+  font-weight: 600;
+  font-size: 12.5px;
+  border-radius: var(--radius-md);
+  padding: 8px 18px;
+  transition: background-color var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease);
 }
 
 #operatorConfirmModal #btnConfirmProceed:hover {
-  background: var(--danger-hover) !important;
-  border-color: var(--danger-hover) !important;
+  background: var(--danger-hover);
+  border-color: var(--danger-hover);
 }
 
 #operatorConfirmModal #btnConfirmCancel {
-  background: var(--panel-elevated) !important;
-  border: 1px solid var(--border) !important;
-  color: var(--text) !important;
-  font-family: var(--font-sans) !important;
-  font-weight: 600 !important;
-  font-size: 12.5px !important;
-  border-radius: var(--radius-md) !important;
-  padding: 8px 16px !important;
-  transition: all var(--duration-fast) var(--ease) !important;
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  background: var(--surface-interactive);
+  font-weight: 600;
+  font-size: 12.5px;
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  transition: background-color var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease);
 }
 
 #operatorConfirmModal #btnConfirmCancel:hover {
-  background: var(--panel-soft) !important;
-  border-color: var(--border-emphasis) !important;
-}
-
-/* Light Theme Optical Refinements for Signals */
-body.theme-light .signals-apill-geometric,
-[data-theme="light"] .signals-apill-geometric {
-  background: rgba(0, 0, 0, 0.06);
-  border-color: rgba(0, 0, 0, 0.08);
-}
-
-body.theme-light .phase-timeline-bar,
-[data-theme="light"] .phase-timeline-bar {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-body.theme-light .phase-indicator,
-[data-theme="light"] .phase-indicator {
-  background: #0f172a;
-  box-shadow: 0 0 3px rgba(0, 0, 0, 0.4);
-}
-
-body.theme-light .signals-workspace-header .signals-summary-item,
-[data-theme="light"] .signals-workspace-header .signals-summary-item {
-  background: #ffffff;
-  border-color: var(--border);
-  box-shadow: var(--shadow-xs);
-}
-
-body.theme-light .signals-intersection-card,
-[data-theme="light"] .signals-intersection-card {
-  background: #ffffff;
-  border-color: var(--border);
-  box-shadow: var(--shadow-xs);
-}
-
-body.theme-light .signal-active-panel,
-[data-theme="light"] .signal-active-panel {
-  background: var(--panel-inset);
-  border-color: var(--border-subtle);
-}
-
-body.theme-light .signal-cycle-indicator,
-[data-theme="light"] .signal-cycle-indicator {
-  background: #ffffff;
-  border-color: var(--border);
-}
-
-body.theme-light .phase-row strong,
-[data-theme="light"] .phase-row strong {
-  background: #ffffff;
-  border-color: var(--border);
-}
-
-body.theme-light .force-override-btn,
-[data-theme="light"] .force-override-btn {
-  background: #f8fafc;
-  border-color: var(--border);
-  color: var(--text);
-}
-
-body.theme-light .force-override-btn:hover,
-[data-theme="light"] .force-override-btn:hover {
-  background: #f1f5f9;
-  border-color: var(--primary-border);
-  color: var(--primary);
-}
-
-body.theme-light .table-panel,
-[data-theme="light"] .table-panel {
-  background: #ffffff;
-  border-color: var(--border);
-}
-
-body.theme-light thead th,
-[data-theme="light"] thead th {
-  background: #f8fafc;
-}
-
-body.theme-light #operatorConfirmModal .modal-content,
-[data-theme="light"] #operatorConfirmModal .modal-content {
-  background: #ffffff !important;
-  color: var(--text) !important;
-}
-
-body.theme-light #operatorConfirmModal #confirmModalTitle,
-[data-theme="light"] #operatorConfirmModal #confirmModalTitle {
-  color: #0f172a !important;
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
 }
 
 /* Responsive Viewport Optimizations for Signals */
@@ -645,29 +547,15 @@ body.theme-light #operatorConfirmModal #confirmModalTitle,
 }
 
 /* Signals Responsive */
-/* View 4: Signals APILL */
-  .signals-console-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-
-  .apill-card {
-    padding: 14px;
-  }
-
-  .apill-timer-hero {
-    font-size: 32px;
-  }
-
-.signals-console-grid { gap: var(--space-3); }
-.signals-intersection-card { padding: var(--space-4); border: 1px solid var(--border-subtle); box-shadow: none; }
-.signals-intersection-card .section-head { padding-bottom: var(--space-3); border-bottom: 1px solid var(--border-subtle); }
-.signals-card-meta { color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.force-override-btn { min-height: var(--control-height-md); }
 #intersectionTable th { position: sticky; top: 0; z-index: 2; background: var(--surface-raised); }
 #intersectionTable td, #intersectionTable th { font-variant-numeric: tabular-nums; }
 #intersectionTable tbody tr[role="button"] { cursor: pointer; }
 #intersectionTable tbody tr[role="button"]:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
-@media (min-width: 1200px) {
-  .signals-console-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 900px) {
+  .signals-console-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .apill-card { padding: var(--space-3); }
+  .apill-timer-hero { font-size: 32px; }
 }

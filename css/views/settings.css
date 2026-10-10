@@ -1,0 +1,80 @@
+#view-settings:not(.active) { display: none; }
+
+#view-settings .settings-card,
+#view-settings .settings-expanded-card {
+  min-width: 0;
+  padding: var(--space-5);
+  border-color: var(--border-subtle);
+  box-shadow: none;
+}
+
+#view-settings .settings-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+#view-settings .settings-card h2,
+#view-settings .settings-expanded-card > h2 {
+  margin: 0 0 var(--space-2);
+  color: var(--text-primary);
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-tight);
+}
+
+#view-settings .settings-card p,
+#view-settings .settings-expanded-card > p,
+#view-settings .opt-row p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-body);
+}
+
+#view-settings .settings-expanded-card > h2 { font-size: var(--font-size-section); }
+#view-settings .settings-options-list { display: flex; flex-direction: column; }
+
+#view-settings .settings-group-heading {
+  margin: var(--space-4) 0 0;
+  padding: var(--space-3) 0 var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: var(--font-size-label);
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+#view-settings .settings-group-heading:first-child { margin-top: 0; }
+
+#view-settings .opt-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+#view-settings .opt-row:last-child { border-bottom: 0; }
+#view-settings .opt-row > div:first-child { min-width: 0; }
+#view-settings .opt-row strong { display: block; margin-bottom: 4px; color: var(--text-primary); font-size: var(--font-size-small); }
+#view-settings .settings-desc { color: var(--text-tertiary); font-size: var(--font-size-label); line-height: var(--line-height-body); }
+#view-settings .settings-volume-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
+#view-settings .settings-vol-label { color: var(--text-secondary); font-size: var(--font-size-label); }
+#view-settings .settings-vol-range { width: min(180px, 100%); accent-color: var(--primary); }
+#view-settings .settings-select-sm { min-height: 34px; }
+#view-settings .settings-chk-label { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text-secondary); }
+#view-settings .density-mode-control { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+#view-settings [data-density-choice][aria-pressed="true"] { border-color: var(--border-focus); color: var(--text-primary); background: var(--surface-overlay); }
+#view-settings :is(button, input, select):focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+@media (max-width: 760px) {
+  #view-settings .settings-card,
+  #view-settings .settings-expanded-card { padding: var(--space-4); }
+  #view-settings .opt-row { align-items: flex-start; flex-direction: column; gap: var(--space-2); }
+  #view-settings .settings-volume-row { width: 100%; }
+  #view-settings .settings-vol-range { flex: 1; }
+}

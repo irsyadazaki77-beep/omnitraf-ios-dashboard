@@ -32,6 +32,7 @@ export class SignalsViewAdapter {
     if (dashboardSlider && parseInt(dashboardSlider.value, 10) !== value) {
       dashboardSlider.value = value;
     }
+    if (dashboardSlider?.dataset) dashboardSlider.dataset.acknowledgedValue = String(value);
 
     const tooltip = this.getSliderTooltip();
     if (tooltip) tooltip.textContent = `${value}s`;

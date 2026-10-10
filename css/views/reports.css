@@ -7,7 +7,7 @@
 .report-timestamp { color: var(--text-secondary); }
 .reports-manager-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--space-4); }
 .report-card, .reports-generator, .reports-enterprise { box-shadow: none; border-color: var(--border-subtle); }
-.reports-generator { grid-column: 1 / -1; }
+.reports-generator { grid-column: auto; }
 .reports-enterprise, .reports-history { grid-column: 1 / -1; }
 .report-card, .reports-generator, .reports-enterprise, .reports-history {
   min-width: 0;
@@ -64,6 +64,7 @@
   .reports-manager-grid,
   .reports-generator,
   .reports-enterprise,
+  .reports-history,
   .report-card,
   .workspace-header {
     display: none;

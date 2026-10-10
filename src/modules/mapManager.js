@@ -13,8 +13,7 @@ import {
   SURABAYA_DISTRICTS_GEOJSON,
   SURABAYA_INCIDENTS_GEOJSON,
   SURABAYA_LANDMARKS_GEOJSON,
-  SITS_CCTV_CAMERAS_GEOJSON,
-  EMERGENCY_PATHS_GEOJSON
+  SITS_CCTV_CAMERAS_GEOJSON
 } from '../config/surabayaCoords.js';
 import { stateStore } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
@@ -94,8 +93,6 @@ export class MapManager {
     /** @type {Map<string, L.Map>} Map instance storage keyed by container ID */
     this.maps = new Map();
     this.tileLayers = new Map();
-    this.animFrameId = null;
-    this.lastAnimTime = 0;
     this.isActive = false;
     this._invalidateTimer = null;
     this.disposer = new Disposer('MapManager');
@@ -104,9 +101,7 @@ export class MapManager {
     /** Store references to corridor GeoJSON layers across map instances */
     this.corridorGeoJsonLayers = [];
 
-    /** Emergency responder markers for each map instance */
-    this.emergencyMarkers = [];
-    this.emergencySpeedMultiplier = 1.0;
+    this.activeEmergencyMarkers = new Map();
 
     this.layerGroupsMap = new Map();
     this.intersectionMarkersMap = new Map();
@@ -196,16 +191,7 @@ export class MapManager {
     });
 
     this.disposer.addEventListener(document, 'visibilitychange', () => {
-      if (document.hidden) {
-        if (this.animFrameId) {
-          cancelAnimationFrame(this.animFrameId);
-          this.animFrameId = null;
-        }
-      } else {
-        if (this.isActive && !this.animFrameId) {
-          this.startEmergencyVehicleAnimation();
-        }
-      }
+      if (!document.hidden) this.debouncedInvalidateSize(200);
     });
   }
 
@@ -245,17 +231,10 @@ export class MapManager {
       this.invalidateSize();
     }, 150);
 
-    if (typeof document !== 'undefined' && !document.hidden && !this.animFrameId) {
-      this.startEmergencyVehicleAnimation();
-    }
   }
 
   deactivate() {
     this.isActive = false;
-    if (this.animFrameId) {
-      cancelAnimationFrame(this.animFrameId);
-      this.animFrameId = null;
-    }
     if (this._invalidateTimer) {
       clearTimeout(this._invalidateTimer);
       this._invalidateTimer = null;
@@ -384,17 +363,12 @@ export class MapManager {
     this.drawLandmarksAndCctv(map, layerGroups['landmark-group'], masterCluster);
     this.drawIntersections(map, layerGroups['signal-points'], masterCluster);
     this.drawDensityHeatmap(map, layerGroups['density-heat']);
-    this.setupEmergencyVehicleMarkers(map);
     this.createMapLayerSwitcher(map, containerId);
     this.createWeatherWidget(map, containerId);
 
     // Record diagnostics
     let totalLayers = Object.keys(layerGroups).length;
     diagnostics.recordMapLayersCount(totalLayers);
-
-    if (!this.animFrameId && !document.hidden) {
-      this.startEmergencyVehicleAnimation();
-    }
 
     setTimeout(() => map.invalidateSize(), 250);
   }
@@ -613,153 +587,7 @@ export class MapManager {
     });
   }
 
-  setupEmergencyVehicleMarkers(map) {
-    const ambCoords = EMERGENCY_PATHS_GEOJSON.ambulance.geometry.coordinates;
-    const fireCoords = EMERGENCY_PATHS_GEOJSON.fire.geometry.coordinates;
-
-    const ambIcon = L.divIcon({
-      className: 'custom-veh-div-icon',
-      html: `<div class="leaflet-vehicle-pill ambulance"><span class="v-icon">🚑</span><span>Ambulans 02</span><span class="v-speed-badge">62 km/j</span></div>`,
-      iconSize: [120, 26],
-      iconAnchor: [60, 13]
-    });
-
-    const ambMarker = L.marker([ambCoords[0][1], ambCoords[0][0]], { icon: ambIcon, zIndexOffset: 1000 }).addTo(map);
-    ambMarker.bindPopup(`
-      <div class="ios-popup-card vehicle-popup">
-        <div class="ios-popup-header">
-          <span class="cctv-live-tag" style="background: rgba(239, 68, 68, 0.2); color: #ef4444;"><span class="live-dot" style="background:#ef4444;"></span> DARURAT 112</span>
-          <span class="ios-popup-subtitle">KORIDOR PRIORITAS</span>
-        </div>
-        <h4 class="ios-popup-title">🚑 Ambulans 02 RSU Dr. Soetomo</h4>
-        <div class="ios-popup-info-grid">
-          <div class="ios-info-row">
-            <span class="ios-info-label">Kecepatan Real-time:</span>
-            <span class="ios-info-value speed-val" style="color:#ef4444; font-weight:800;">62 km/jam</span>
-          </div>
-          <div class="ios-info-row">
-            <span class="ios-info-label">Status Preemption:</span>
-            <span class="ios-info-value">Sinyal Hijau Otomatis Aktif</span>
-          </div>
-        </div>
-      </div>
-    `, { maxWidth: 300 });
-
-    const fireIcon = L.divIcon({
-      className: 'custom-veh-div-icon',
-      html: `<div class="leaflet-vehicle-pill fire"><span class="v-icon">🚒</span><span>Pemadam 04</span><span class="v-speed-badge">55 km/j</span></div>`,
-      iconSize: [120, 26],
-      iconAnchor: [60, 13]
-    });
-
-    const fireMarker = L.marker([fireCoords[0][1], fireCoords[0][0]], { icon: fireIcon, zIndexOffset: 1000 }).addTo(map);
-    fireMarker.bindPopup(`
-      <div class="ios-popup-card vehicle-popup">
-        <div class="ios-popup-header">
-          <span class="cctv-live-tag" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;"><span class="live-dot" style="background:#f59e0b;"></span> SIAGA DARURAT</span>
-          <span class="ios-popup-subtitle">DISPOSISI PMK</span>
-        </div>
-        <h4 class="ios-popup-title">🚒 Pemadam 04 Kota Surabaya</h4>
-        <div class="ios-popup-info-grid">
-          <div class="ios-info-row">
-            <span class="ios-info-label">Kecepatan Real-time:</span>
-            <span class="ios-info-value speed-val" style="color:#f59e0b; font-weight:800;">55 km/jam</span>
-          </div>
-          <div class="ios-info-row">
-            <span class="ios-info-label">Koridor Tujuan:</span>
-            <span class="ios-info-value">Mayjen Sungkono - HR Muhammad</span>
-          </div>
-        </div>
-      </div>
-    `, { maxWidth: 300 });
-
-    this.emergencyMarkers.push({
-      map,
-      ambulance: ambMarker,
-      fire: fireMarker,
-      ambSeg: 0,
-      ambProgress: 0,
-      fireSeg: 0,
-      fireProgress: 0
-    });
-  }
-
-  startEmergencyVehicleAnimation() {
-    if (this.animFrameId) {
-      cancelAnimationFrame(this.animFrameId);
-      this.animFrameId = null;
-    }
-
-    const ambCoords = EMERGENCY_PATHS_GEOJSON.ambulance.geometry.coordinates;
-    const fireCoords = EMERGENCY_PATHS_GEOJSON.fire.geometry.coordinates;
-
-    const animateStep = (timestamp) => {
-      if (!this.isActive || (typeof document !== 'undefined' && document.hidden) || !this.emergencyMarkers || this.emergencyMarkers.length === 0) {
-        this.animFrameId = null;
-        return;
-      }
-
-      if (!this.lastAnimTime) this.lastAnimTime = timestamp;
-      const dt = Math.min(0.1, Math.max(0.001, (timestamp - this.lastAnimTime) / 1000));
-      this.lastAnimTime = timestamp;
-
-      const mult = this.emergencySpeedMultiplier || 1.0;
-      const ambLinearSpeed = 0.0036 * mult;
-      const fireLinearSpeed = 0.0028 * mult;
-
-      this.emergencyMarkers.forEach(group => {
-        let p1Amb = ambCoords[group.ambSeg];
-        let p2Amb = ambCoords[group.ambSeg + 1] || ambCoords[0];
-        let distAmb = calculateDistance(p1Amb, p2Amb);
-
-        group.ambProgress += (dt * ambLinearSpeed) / distAmb;
-
-        while (group.ambProgress >= 1) {
-          group.ambProgress -= 1;
-          group.ambSeg = (group.ambSeg + 1) % (ambCoords.length - 1);
-          p1Amb = ambCoords[group.ambSeg];
-          p2Amb = ambCoords[group.ambSeg + 1] || ambCoords[0];
-          distAmb = calculateDistance(p1Amb, p2Amb);
-        }
-
-        const lngAmb = p1Amb[0] + (p2Amb[0] - p1Amb[0]) * group.ambProgress;
-        const latAmb = p1Amb[1] + (p2Amb[1] - p1Amb[1]) * group.ambProgress;
-
-        if (group.ambulance) {
-          group.ambulance.setLatLng([latAmb, lngAmb]);
-        }
-
-        let p1Fire = fireCoords[group.fireSeg];
-        let p2Fire = fireCoords[group.fireSeg + 1] || fireCoords[0];
-        let distFire = calculateDistance(p1Fire, p2Fire);
-
-        group.fireProgress += (dt * fireLinearSpeed) / distFire;
-
-        while (group.fireProgress >= 1) {
-          group.fireProgress -= 1;
-          group.fireSeg = (group.fireSeg + 1) % (fireCoords.length - 1);
-          p1Fire = fireCoords[group.fireSeg];
-          p2Fire = fireCoords[group.fireSeg + 1] || fireCoords[0];
-          distFire = calculateDistance(p1Fire, p2Fire);
-        }
-
-        const lngFire = p1Fire[0] + (p2Fire[0] - p1Fire[0]) * group.fireProgress;
-        const latFire = p1Fire[1] + (p2Fire[1] - p1Fire[1]) * group.fireProgress;
-
-        if (group.fire) {
-          group.fire.setLatLng([latFire, lngFire]);
-        }
-      });
-
-      this.animFrameId = requestAnimationFrame(animateStep);
-    };
-
-    this.animFrameId = requestAnimationFrame(animateStep);
-  }
-
   updateGreenWaveVisuals(active) {
-    this.emergencySpeedMultiplier = active ? 2.5 : 1.0;
-
     this.corridorGeoJsonLayers.forEach(({ glow, core }) => {
       if (active) {
         core.setStyle((feature) => {
@@ -991,6 +819,8 @@ export class MapManager {
 
     const existing = container.querySelector('.map-layer-mode-switcher');
     if (existing) existing.remove();
+    // The full map already owns a toolbar with zoom, layers and fullscreen.
+    if (containerId === 'map-surabaya') return;
 
     const switcher = document.createElement('div');
     switcher.className = 'map-layer-mode-switcher glass-panel';
@@ -1036,19 +866,19 @@ export class MapManager {
         <div class="mww-weather-col">
           <span class="mww-icon">${isWet ? '🌧️' : '🌤️'}</span>
           <div>
-            <strong class="mww-temp">${isWet ? '28°C' : '31°C'}</strong>
-            <small class="mww-hum">RH ${isWet ? '88%' : '76%'}</small>
+            <strong class="mww-temp">${isWet ? 'Basah' : 'Kering'}</strong>
+            <small class="mww-hum">Kondisi simulasi</small>
           </div>
         </div>
         <div class="mww-condition-col">
-          <button class="mww-cond-toggle ${isWet ? 'wet-active' : 'dry-active'}" id="btnToggleRoadCond-${containerId}" type="button" title="Klik untuk simulasi cuaca hujan/kering">
-            <span class="road-dot"></span> Aspal ${isWet ? 'Basah (Hujan)' : 'Kering'}
+          <button class="mww-cond-toggle ${isWet ? 'wet-active' : 'dry-active'}" id="btnToggleRoadCond-${containerId}" type="button" title="Ganti kondisi skenario simulasi" aria-label="Ganti kondisi skenario simulasi">
+            <span class="road-dot"></span> ${isWet ? 'Hujan' : 'Kering'}
           </button>
         </div>
       </div>
       <div class="mww-bottom">
         <small class="mww-impact-text">
-          ${isWet ? '⚠️ Kompensasi AI: Waktu Kuning +1.5s • All-Red +1.0s (Jarak Aman Pengereman)' : '✓ Koefisien Gesek: 1.0x (Optimal) • Waktu Siklus Standar'}
+          ${isWet ? 'Perubahan waktu fase model untuk skenario jalan basah.' : 'Kondisi model standar untuk skenario jalan kering.'}
         </small>
       </div>
     `;
@@ -1078,13 +908,6 @@ export class MapManager {
     this.maps.forEach((map, containerId) => {
       this.createWeatherWidget(map, containerId);
     });
-
-    if (typeof document !== 'undefined') {
-      const wTemp = document.getElementById("weatherTemp");
-      const wIcon = document.getElementById("weatherIcon");
-      if (wTemp) wTemp.textContent = isWet ? "28°C (Hujan)" : "31°C";
-      if (wIcon) wIcon.textContent = isWet ? "🌧" : "☀";
-    }
 
     stateStore.setState({ roadCondition: condition, isRainMode: isWet });
 

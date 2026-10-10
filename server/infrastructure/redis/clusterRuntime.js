@@ -11,6 +11,9 @@ export class ClusterRuntime {
     this.eventBus = eventBus;
     this.commandTimeoutMs = commandTimeoutMs;
     this.pendingCommands = new Map();
+    this.forwardedCommands = 0;
+    this.forwardTimeouts = 0;
+    this.idempotentReplayCount = 0;
     this.executeOnLeader = null;
     this.unsubscribeRequest = null;
     this.unsubscribeReply = null;
@@ -62,10 +65,12 @@ export class ClusterRuntime {
       const error = new Error('Distributed command queue is full.'); error.code = 'COMMAND_QUEUE_FULL'; error.statusCode = 503; throw error;
     }
     const requestId = randomUUID();
+    this.forwardedCommands++;
     const replyChannel = `omnitraf:commands:reply:${this.instanceId}`;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pendingCommands.delete(requestId);
+        this.forwardTimeouts++;
         const error = new Error('Timed out waiting for authoritative command execution.');
         error.code = 'COMMAND_LEADER_TIMEOUT'; error.statusCode = 503; reject(error);
       }, this.commandTimeoutMs);
@@ -94,10 +99,14 @@ export class ClusterRuntime {
         if (existing.fingerprint && existing.fingerprint !== fingerprint) {
           const error = new Error('Idempotency key was reused for a different command.'); error.code = 'IDEMPOTENCY_CONFLICT'; error.statusCode = 409; throw error;
         }
-        if (existing.status === 'SUCCEEDED') return { ...existing.result, isIdempotentReplay: true };
-        if (existing.status === 'FAILED') {
-          const error = new Error(existing.error.message); error.code = existing.error.code; error.statusCode = existing.error.statusCode; throw error;
+        if (existing.status === 'SUCCEEDED') { this.idempotentReplayCount++; return { ...existing.result, isIdempotentReplay: true }; }
+        if (existing.status === 'PROCESSING') {
+          // A PROCESSING marker can outlive a crashed leader. The durable
+          // command receipt is the serialization point: a concurrent claim
+          // blocks on PostgreSQL's unique key and then replays or executes.
+          return execute();
         }
+        if (existing.status === 'FAILED') return execute();
       }
       if (await this.redis.get(key) === null) return this.executeIdempotently(idempotencyKey, fingerprint, execute, metadata);
       const error = new Error('Command with this idempotency key is already processing.'); error.code = 'COMMAND_IN_PROGRESS'; error.statusCode = 409; throw error;
@@ -108,8 +117,11 @@ export class ClusterRuntime {
       await this.redis.eval(complete, [key], [processing, JSON.stringify({ status: 'SUCCEEDED', fingerprint, actorId: metadata.actorId || null, result }), '86400']);
       return result;
     } catch (error) {
-      const fail = "if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('SET',KEYS[1],ARGV[2],'EX',ARGV[3]) else return 0 end";
-      await this.redis.eval(fail, [key], [processing, JSON.stringify({ status: 'FAILED', fingerprint, actorId: metadata.actorId || null, error: { message: error.message, code: error.code, statusCode: error.statusCode } }), '300']);
+      // The PostgreSQL receipt is authoritative. Keeping a Redis FAILED result
+      // could mask a commit whose acknowledgement was lost; release only our
+      // reservation so a retry can resolve against the durable receipt.
+      const release = "if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) else return 0 end";
+      await this.redis.eval(release, [key], [processing]);
       throw error;
     }
   }
@@ -122,6 +134,8 @@ export class ClusterRuntime {
   }
 
   getDiagnostics() {
-    return { mode: this.mode, pendingCommands: this.pendingCommands.size, ...(this.eventBus?.getMetrics() || {}) };
+    return { mode: this.mode, pendingCommands: this.pendingCommands.size, forwardedCommands: this.forwardedCommands,
+      commandForwardTimeoutCount: this.forwardTimeouts, idempotentReplayCount: this.idempotentReplayCount,
+      ...(this.eventBus?.getMetrics() || {}) };
   }
 }

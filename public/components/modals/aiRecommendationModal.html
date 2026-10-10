@@ -4,12 +4,12 @@
     
     <div class="modal-header" style="border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px;">
       <div class="modal-kicker-row" style="display: flex; align-items: center; gap: 8px;">
-        <span class="pill pill-ai" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">Rekomendasi Model Webster</span>
+        <span class="pill pill-ai" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">Skenario alokasi hijau</span>
         <span class="unboxed-meta-sep" style="color: var(--text-muted);">·</span>
         <span class="cctv-live-tag">MODEL SIMULASI</span>
       </div>
-      <h2 id="aiRecModalTitle" style="margin: 8px 0 4px 0; font-size: 18px; font-weight: 700; color: var(--text);">Konfirmasi Optimasi Webster: Simpang Wonokromo</h2>
-      <p style="margin: 0; font-size: 12.5px; color: var(--text-muted);">Hasil komputasi volume arus (q) & rekomendasi alokasi waktu hijau (Green Split) adaptif.</p>
+      <h2 id="aiRecModalTitle" style="margin: 8px 0 4px 0; font-size: 18px; font-weight: 700; color: var(--text);">Pratinjau skenario green split</h2>
+      <p style="margin: 0; font-size: 12.5px; color: var(--text-muted);">Pratinjau perubahan green split dalam simulator. Arus jenuh dan dampak waktu tunggu belum tersedia; hasil bukan optimasi Webster terkalibrasi.</p>
     </div>
 
     <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px;">
@@ -17,34 +17,34 @@
       <div class="glass-soft" style="padding: 14px; border-radius: 12px; border: 1px solid var(--border); background: rgba(255, 255, 255, 0.03);">
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
           
-          <div style="background: rgba(15, 23, 42, 0.6); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);">
+          <div style="background: var(--panel-soft); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);">
             <span style="font-size: 11px; color: var(--text-muted); display: block;">Volume Kepadatan Arus (q)</span>
             <strong id="aiRecVolumeQ" style="font-size: 16px; color: var(--cyan); font-family: var(--font-mono, monospace);">2,450 smp/jam</strong>
-            <small style="display: block; font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">Rasio Saturasi (q/s): <span id="aiRecFlowRatio">0.72</span></small>
+            <small style="display: block; font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">Rasio Saturasi (q/s): <span id="aiRecFlowRatio">belum diukur</span></small>
           </div>
 
-          <div style="background: rgba(15, 23, 42, 0.6); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);">
+          <div style="background: var(--panel-soft); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);">
             <span style="font-size: 11px; color: var(--text-muted); display: block;">Estimasi Hemat Waktu Tunggu</span>
-            <strong id="aiRecDelaySaved" style="font-size: 16px; color: var(--success); font-family: var(--font-mono, monospace);">-12.4 dtk/kend</strong>
+            <strong id="aiRecDelaySaved" style="font-size: 16px; color: var(--success); font-family: var(--font-mono, monospace);">Belum dievaluasi</strong>
             <small style="display: block; font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">Reduksi Tunda Rata-rata</small>
           </div>
 
         </div>
 
-        <div style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+        <div style="background: var(--panel-soft); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-            <span style="font-size: 11.5px; color: var(--text-muted);">Rasio Hijau Awal vs Webster:</span>
-            <strong id="aiRecSplitDiff" style="font-size: 12.5px; color: var(--primary-2);">35s ➔ 48s (+13s)</strong>
+            <span style="font-size: 11.5px; color: var(--text-muted);">Durasi terjadwal vs skenario:</span>
+            <strong id="aiRecSplitDiff" style="font-size: 12.5px; color: var(--primary-2);">Belum tersedia</strong>
           </div>
           
           <!-- Visual Split Comparison Bar -->
           <div style="height: 8px; width: 100%; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; display: flex; margin-top: 6px;">
             <div id="aiRecBarOld" style="width: 38.8%; background: var(--amber); height: 100%; transition: width 0.3s;" title="Split Awal"></div>
-            <div id="aiRecBarNew" style="width: 14.5%; background: var(--success); height: 100%; transition: width 0.3s;" title="Penambahan Webster"></div>
+            <div id="aiRecBarNew" style="width: 0%; background: var(--success); height: 100%; transition: width 0.3s;" title="Penambahan green split dalam simulasi"></div>
           </div>
           <div style="display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-muted); margin-top: 4px;">
-            <span>Awal: <strong id="aiRecOldText" style="color: var(--amber);">35s (38.8%)</strong></span>
-            <span>Webster: <strong id="aiRecNewText" style="color: var(--success);">48s (53.3%)</strong></span>
+            <span>Awal: <strong id="aiRecOldText" style="color: var(--amber);">—</strong></span>
+            <span>Skenario: <strong id="aiRecNewText" style="color: var(--success);">—</strong></span>
           </div>
         </div>
       </div>
@@ -53,7 +53,7 @@
       <div style="padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.08); display: flex; gap: 10px; align-items: flex-start;">
         <span style="font-size: 16px;">🔄</span>
         <p style="margin: 0; font-size: 11.5px; color: var(--text-muted); line-height: 1.45;">
-          <strong style="color: var(--text);">Smooth Cycle Transition:</strong> Perubahan durasi hijau disinkronkan secara gradual pada awal siklus berikutnya. Fase hijau berjalan saat ini tidak dipotong mendadak.
+          <strong style="color: var(--text);">Perubahan lokal simulasi:</strong> Nilai kandidat hanya memperbarui state demo setelah dikonfirmasi; tidak ada komunikasi ke APILL fisik.
         </p>
       </div>
     </div>

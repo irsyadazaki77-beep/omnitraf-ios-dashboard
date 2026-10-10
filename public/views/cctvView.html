@@ -2,11 +2,18 @@
         <section class="cctv-dashboard">
           <!-- Multi-Camera Fast Switcher Tabs -->
           <div class="cctv-cam-switcher-bar">
-            <button class="cctv-cam-tab active" data-cam="cctvCanvas1" data-title="Simpang Wonokromo (Frontage A. Yani)">Cam 01: Simpang Wonokromo</button>
-            <button class="cctv-cam-tab" data-cam="cctvCanvas2" data-title="Koridor Raya Darmo">Cam 02: Koridor Raya Darmo</button>
-            <button class="cctv-cam-tab" data-cam="cctvCanvas3" data-title="Bundaran Waru (Gerbang Kota)">Cam 03: Bundaran Waru</button>
-            <button class="cctv-cam-tab" data-cam="cctvCanvas4" data-title="Simpang Jemursari">Cam 04: Simpang Jemursari</button>
+            <label class="cctv-camera-search" for="cctvCameraSearch">
+              <span aria-hidden="true">⌕</span>
+              <input id="cctvCameraSearch" type="search" aria-label="Cari kamera berdasarkan nama atau lokasi" placeholder="Cari kamera atau lokasi…" autocomplete="off" />
+            </label>
+            <div class="cctv-camera-tab-list" role="group" aria-label="Pilih kamera simulasi">
+              <button class="cctv-cam-tab active" data-cam="cctvCanvas1" data-title="Simpang Wonokromo (Frontage A. Yani)" aria-pressed="true">Cam 01: Simpang Wonokromo</button>
+              <button class="cctv-cam-tab" data-cam="cctvCanvas2" data-title="Koridor Raya Darmo" aria-pressed="false">Cam 02: Koridor Raya Darmo</button>
+              <button class="cctv-cam-tab" data-cam="cctvCanvas3" data-title="Bundaran Waru (Gerbang Kota)" aria-pressed="false">Cam 03: Bundaran Waru</button>
+              <button class="cctv-cam-tab" data-cam="cctvCanvas4" data-title="Simpang Jemursari" aria-pressed="false">Cam 04: Simpang Jemursari</button>
+            </div>
           </div>
+          <p class="cctv-camera-empty" id="cctvCameraSearchEmpty" role="status" hidden>Tidak ada kamera yang cocok dengan pencarian.</p>
 
           <!-- Unified CCTV Control Bar -->
           <div class="cctv-unified-toolbar glass-panel">
@@ -14,7 +21,7 @@
               <!-- Matrix View Selector -->
               <div class="ios-segmented-control matrix-selector" role="group" aria-label="Layout Grid Kamera">
                 <button class="matrix-btn" data-grid="grid-2x2" title="Grid 2x2" aria-pressed="false">⊞ Grid</button>
-                <button class="matrix-btn" data-grid="grid-1x3" title="Kolom 1x3" aria-pressed="false">☰ Stack</button>
+                <button class="matrix-btn" data-grid="grid-1x3" title="Kolom 1x3" aria-pressed="false">☰ Bertumpuk</button>
                 <button class="matrix-btn active" data-grid="grid-focus" title="Fokus Utama" aria-pressed="true">🔍 Fokus</button>
               </div>
               
@@ -27,13 +34,17 @@
               <button class="cctv-toolbar-btn btn-primary" id="btnCaptureSnapshot" title="Simpan cuplikan visual simulasi; bukan bukti ETLE">
                 <span class="btn-icon">📸</span> Cuplikan demo
               </button>
+
+              <button class="cctv-toolbar-btn" id="btnCctvZoom" type="button" title="Perbesar pratinjau kamera simulasi">
+                <span class="btn-icon" aria-hidden="true">⤢</span> Perbesar
+              </button>
               
               <!-- Color Filter Selectors -->
-              <div class="ios-segmented-control cctv-filter-selector" role="group" aria-label="Filter Mode">
-                <button class="filter-mode-btn active" data-filter="none">Default</button>
-                <button class="filter-mode-btn" data-filter="mono">Mono</button>
-                <button class="filter-mode-btn" data-filter="night">Night</button>
-                <button class="filter-mode-btn" data-filter="thermal">Thermal</button>
+              <div class="ios-segmented-control cctv-filter-selector" role="group" aria-label="Filter tampilan kamera simulasi">
+                <button class="filter-mode-btn active" data-filter="none">Standar</button>
+                <button class="filter-mode-btn" data-filter="mono">Efek monokrom</button>
+                <button class="filter-mode-btn" data-filter="night">Malam</button>
+                <button class="filter-mode-btn" data-filter="thermal">Efek termal</button>
               </div>
             </div>
 
@@ -41,15 +52,15 @@
               <!-- Confidence Score Threshold Slider -->
               <div class="cctv-threshold-pill" title="Ambang batas deteksi Computer Vision">
                 <label for="cctvThresholdRange" class="threshold-label">
-                  <span class="threshold-tag">Threshold:</span>
+                  <span class="threshold-tag">Ambang:</span>
                   <strong id="thresholdVal">85%</strong>
                 </label>
                 <input id="cctvThresholdRange" class="cctv-range-slider" type="range" min="50" max="95" value="85" />
               </div>
               
               <!-- Toggle Bounding Box Button -->
-              <button class="cctv-toolbar-btn" id="btnToggleCVBoxes" title="Toggle Visual Bounding Box AI">
-                <span class="btn-icon">▣</span> Overlay AI
+              <button class="cctv-toolbar-btn" id="btnToggleCVBoxes" title="Tampilkan atau sembunyikan kotak deteksi AI">
+                <span class="btn-icon">▣</span> Lapisan AI
               </button>
             </div>
           </div>
@@ -76,7 +87,7 @@
 
                 <!-- Glitch Overlay -->
                 <div class="cctv-glitch-overlay" id="cctvGlitch1">
-                  <div class="glitch-text">HOST NOT REACHABLE (504)</div>
+                  <div class="glitch-text">Menyiapkan kamera sintetis…</div>
                 </div>
 
                 <!-- HUD Bottom: Real-time Performance Metrics -->
@@ -168,7 +179,7 @@
 
                 <!-- Glitch Overlay -->
                 <div class="cctv-glitch-overlay" id="cctvGlitch3">
-                  <div class="glitch-text">BUFFER ERROR (999ms)</div>
+                  <div class="glitch-text">Menyiapkan kamera sintetis…</div>
                 </div>
 
                 <!-- HUD Bottom: Real-time Performance Metrics -->
@@ -214,7 +225,7 @@
 
                 <!-- Glitch Overlay -->
                 <div class="cctv-glitch-overlay" id="cctvGlitch4">
-                  <div class="glitch-text">HOST NOT REACHABLE</div>
+                  <div class="glitch-text">Menyiapkan kamera sintetis…</div>
                 </div>
 
                 <!-- HUD Bottom: Real-time Performance Metrics -->

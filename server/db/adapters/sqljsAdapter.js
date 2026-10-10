@@ -77,7 +77,7 @@ export class SqlJsAdapter {
     this._transactionContext = new AsyncLocalStorage();
     this._metrics = { flushCount: 0, failedFlushCount: 0, totalFlushDurationMs: 0, lastFlushDurationMs: null, lastFlushAt: null, lastError: null };
     this._initPromise = null;
-    this.schemaVersion = 19;
+    this.schemaVersion = 20;
   }
 
   /**
@@ -187,19 +187,36 @@ export class SqlJsAdapter {
     return { rows: [], rowCount };
   }
 
-  async transaction(callback) {
+  async transaction(callback, { leadershipFence = null } = {}) {
     if (!this.db || !this.isInitialized) throw new Error('DATABASE_UNAVAILABLE');
+    if (leadershipFence) throw Object.assign(new Error('LEADERSHIP_FENCING_REQUIRES_POSTGRES'), { code: 'LEADERSHIP_FENCING_REQUIRES_POSTGRES', statusCode: 503 });
     if (this._transactionContext.getStore()) return callback(this);
     const run = () => this._transactionContext.run(true, async () => {
+      const beforeTransaction = Buffer.from(this.db.export());
+      const beforeDirty = this.dirty;
       this.db.run('BEGIN');
       this._transactionDepth++;
       try {
         const result = await callback(this);
         this.db.run('COMMIT');
         this.markDirty();
+        if (!await this.flush()) throw new Error(`DATABASE_DURABILITY_FAILED: ${this._metrics.lastError || 'unknown error'}`);
         return result;
       } catch (error) {
         try { this.db.run('ROLLBACK'); } catch (_) {}
+        // A flush failure can happen after SQLite accepted COMMIT in memory.
+        // Reopen the pre-transaction image so failed commands cannot remain visible.
+        try {
+          this.db.close();
+          this.db = new this.SQL.Database(beforeTransaction);
+          if (this._saveTimer) clearTimeout(this._saveTimer);
+          this._saveTimer = null;
+          this.dirty = beforeDirty;
+          this.flushScheduled = beforeDirty;
+          if (beforeDirty) this.scheduleFlush(1000);
+        } catch (restoreError) {
+          throw new AggregateError([error, restoreError], 'DATABASE_TRANSACTION_ROLLBACK_AND_RESTORE_FAILED');
+        }
         throw error;
       } finally { this._transactionDepth--; }
     });
@@ -383,12 +400,19 @@ export class SqlJsAdapter {
       if (!this.setMetadata(key, value)) throw new Error(`DATABASE_METADATA_MIGRATION_FAILED: ${key}`);
     }, this.schemaVersion);
     this.db.run(`CREATE TABLE IF NOT EXISTS audit_deduplication_keys (dedupe_key TEXT PRIMARY KEY, created_at TEXT NOT NULL);`);
+    this.db.run(`CREATE TABLE IF NOT EXISTS command_receipts (
+      actor_id TEXT NOT NULL, idempotency_key TEXT PRIMARY KEY, fingerprint TEXT NOT NULL,
+      command_id TEXT NOT NULL, correlation_id TEXT NOT NULL, action TEXT NOT NULL,
+      status TEXT NOT NULL, result_json TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at TEXT
+    );`);
+    this.db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_command_receipts_command ON command_receipts(command_id);');
     this.db.run("INSERT OR IGNORE INTO audit_deduplication_keys(dedupe_key,created_at) SELECT DISTINCT 'corr:' || correlation_id, datetime('now') FROM audit_logs WHERE correlation_id IS NOT NULL;");
     this.db.run("INSERT OR IGNORE INTO audit_deduplication_keys(dedupe_key,created_at) SELECT DISTINCT 'idem:' || idempotency_key, datetime('now') FROM audit_logs WHERE idempotency_key IS NOT NULL;");
     const applied = this.db.exec('SELECT version FROM schema_migrations;');
     const versions = new Set(applied[0]?.values.map(([version]) => Number(version)) || []);
     const migration = this.db.prepare('INSERT INTO schema_migrations(version,name,applied_at) VALUES(?,?,?);');
-    for (const [version, name] of [[18, 'legacy_schema_upgrade_and_indexes'], [19, 'durable_audit_deduplication']]) {
+    for (const [version, name] of [[18, 'legacy_schema_upgrade_and_indexes'], [19, 'durable_audit_deduplication'], [20, 'durable_command_receipts']]) {
       if (!versions.has(version)) migration.run([version, name, new Date().toISOString()]);
     }
     migration.free();
@@ -641,24 +665,26 @@ export class SqlJsAdapter {
     }
   }
 
-  insertAuditLog({ operator, action, entity, result, timestamp, correlationId, commandId, idempotencyKey, actorRole, sourceInstanceId, leaderInstanceId, details }, flushImmediate = false) {
+  insertAuditLog({ operator, action, entity, result, timestamp, correlationId, commandId, idempotencyKey, actorRole, sourceInstanceId, leaderInstanceId, details }, flushImmediate = false, tx = null) {
     if (!this.db || !this.isInitialized) {
       console.warn("⚠️ [Database] insertAuditLog skipped: DB belum siap.");
       return false;
     }
 
+    const savepoint = 'audit_insert_atomic';
     try {
+      this.db.run(`SAVEPOINT ${savepoint}`);
       const corrId = correlationId || commandId || null;
 
-      // Stable Identifier Deduplication: If correlationId exists and was logged in the last 100 entries, skip insert
-      if (corrId) {
-        const checkStmt = this.db.prepare("SELECT id FROM audit_logs WHERE correlation_id = ? LIMIT 1;");
-        checkStmt.bind([corrId]);
-        const exists = checkStmt.step();
-        checkStmt.free();
-        if (exists) {
-          return true; // Already safely stored, idempotent no-op
-        }
+      const actionName = String(action || 'ACTION');
+      const dedupeKey = idempotencyKey ? `audit-event:${actionName}:idem:${idempotencyKey}`
+        : (corrId ? `audit-event:${actionName}:corr:${corrId}` : null);
+      if (dedupeKey) {
+        const claim = this.db.prepare('INSERT OR IGNORE INTO audit_deduplication_keys(dedupe_key,created_at) VALUES(?,?)');
+        claim.run([dedupeKey, new Date().toISOString()]);
+        const claimed = this.db.getRowsModified() > 0;
+        claim.free();
+        if (!claimed) return false;
       }
 
       const ts = timestamp || new Date().toISOString();
@@ -682,26 +708,19 @@ export class SqlJsAdapter {
         ts
       ]);
       stmt.free();
+      this.db.run(`RELEASE SAVEPOINT ${savepoint}`);
 
-      // Bounded retention cleanup: keep last 500 audit logs to prevent SQLite file bloat
-      try {
-        this.db.run(`
-          DELETE FROM audit_logs WHERE id NOT IN (
-            SELECT id FROM audit_logs ORDER BY id DESC LIMIT 500
-          );
-        `);
-      } catch (_) {}
-
-      if (flushImmediate) {
+      if (flushImmediate && !tx) {
         this.saveToDisk(true);
-      } else {
+      } else if (!tx) {
         this.debounceSave();
       }
 
       return true;
     } catch (err) {
+      try { this.db.run(`ROLLBACK TO SAVEPOINT ${savepoint}`); this.db.run(`RELEASE SAVEPOINT ${savepoint}`); } catch (_) {}
       console.error('❌ [Database] insertAuditLog error:', err);
-      return false;
+      throw err;
     }
   }
 

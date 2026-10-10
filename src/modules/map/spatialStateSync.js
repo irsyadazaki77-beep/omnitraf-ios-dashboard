@@ -60,6 +60,13 @@ export class SpatialStateSync {
       return;
     }
 
+    const activeIds = new Set(activeEmergencies.map(emergency => String(emergency.id || emergency.vehicleId || '')).filter(Boolean));
+    activeEmergencyMarkers?.forEach((markerInfo, markerId) => {
+      if (activeIds.has(String(markerId))) return;
+      markerInfo.markers?.forEach(({ marker }) => marker.remove());
+      activeEmergencyMarkers.delete(markerId);
+    });
+
     activeEmergencies.forEach(rawEmg => {
       const emg = toEmergencyVehicleProjection(rawEmg);
       const routePoints = ROUTES_DB_CLIENT[emg.routeId] || ROUTES_DB_CLIENT["route-soetomo"];
@@ -94,6 +101,12 @@ export class SpatialStateSync {
       const markerId = emg.id;
       let existingMarkerInfo = activeEmergencyMarkers.get(markerId);
       const isPmk = emg.vehicleType === "PMK";
+
+      if (!emg.position) {
+        existingMarkerInfo?.markers?.forEach(({ marker }) => marker.remove());
+        activeEmergencyMarkers.delete(markerId);
+        return;
+      }
 
       const iconHtml = `
         <div style="position: relative; width: 44px; height: 28px;">
@@ -144,8 +157,9 @@ export class SpatialStateSync {
   syncIncidents(layerGroupsMap, incidents) {
     if (!Array.isArray(incidents)) return;
 
+    const terminalStatuses = new Set(['RESOLVED', 'ARCHIVED', 'CLOSED', 'CANCELLED']);
     const projectedIncidents = incidents
-      .filter(inc => inc.status !== "ARCHIVED")
+      .filter(inc => !terminalStatuses.has(String(inc.status || '').toUpperCase()))
       .map(toIncidentMarkerProjection);
 
     layerGroupsMap.forEach((groups) => {

@@ -9,15 +9,30 @@ export class SoundManager {
     this.audioCtx = null;
     this.isMuted = false;
     this.volume = 0.5;
+    this.feedbackTone = 'click';
+    this.ambientVolume = 0.3;
+    this.ambientEnabled = false;
+    this.ambientSource = null;
+    this.ambientGain = null;
+    this.ambientFilter = null;
+    this.muteListeners = new Set();
+    this._isInitialized = false;
   }
 
   init() {
+    if (this._isInitialized) return;
+    this._isInitialized = true;
+    try {
+      this.isMuted = window.localStorage.getItem('omnitraf.audio.enabled') === 'false';
+    } catch (_) {}
+
     // Unlock AudioContext on first user interaction to comply with browser autoplay policy
     const unlock = () => {
       this._ensureContext();
       window.removeEventListener('click', unlock);
       window.removeEventListener('keydown', unlock);
       window.removeEventListener('touchstart', unlock);
+      if (this.ambientEnabled) this._startAmbient();
     };
     window.addEventListener('click', unlock, { once: true });
     window.addEventListener('keydown', unlock, { once: true });
@@ -27,21 +42,11 @@ export class SoundManager {
                     document.getElementById("btnToggleAudio") || 
                     document.getElementById("soundToggle");
     if (muteBtn) {
-      const updateVisual = (unmuted) => {
-        muteBtn.classList.toggle("muted", !unmuted);
-        const icon = muteBtn.querySelector(".audio-icon, .squircle-btn-icon");
-        if (icon) {
-          icon.textContent = unmuted ? "🔊" : "🔇";
-        }
-        muteBtn.setAttribute("aria-label", unmuted ? "Nonaktifkan suara" : "Aktifkan suara");
-        muteBtn.setAttribute("title", unmuted ? "Audio Aktif (Klik untuk Mute)" : "Audio Nonaktif (Klik untuk Unmute)");
-      };
-
-      updateVisual(!this.isMuted);
+      this.muteButton = muteBtn;
+      this._syncMuteButton();
 
       muteBtn.addEventListener("click", () => {
         const isUnmuted = this.toggleMute();
-        updateVisual(isUnmuted);
         if (isUnmuted) {
           this.play('click');
         }
@@ -53,29 +58,150 @@ export class SoundManager {
   }
 
   _ensureContext() {
-    if (!this.audioCtx) {
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (AudioContextClass) {
-        this.audioCtx = new AudioContextClass();
+    try {
+      if (!this.audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          this.audioCtx = new AudioContextClass();
+        }
       }
+      if (this.audioCtx && this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume()?.catch?.(() => {});
+      }
+      return this.audioCtx;
+    } catch (_) {
+      return null;
     }
-    if (this.audioCtx && this.audioCtx.state === 'suspended') {
-      this.audioCtx.resume();
-    }
-    return this.audioCtx;
   }
 
   toggleMute() {
-    this.isMuted = !this.isMuted;
-    return !this.isMuted;
+    return !this.setMuted(!this.isMuted);
+  }
+
+  setMuted(muted) {
+    this.isMuted = Boolean(muted);
+    this._syncMuteButton();
+    this._syncAmbientGain();
+    if (this.isMuted) {
+      for (const listener of this.muteListeners) {
+        try { listener(true); } catch (_) {}
+      }
+    }
+    try { window.localStorage.setItem('omnitraf.audio.enabled', String(!this.isMuted)); } catch (_) {}
+    return this.isMuted;
+  }
+
+  onMuteChange(listener) {
+    if (typeof listener !== 'function') return () => {};
+    this.muteListeners.add(listener);
+    return () => this.muteListeners.delete(listener);
+  }
+
+  _syncMuteButton() {
+    const muteBtn = this.muteButton;
+    if (!muteBtn) return;
+    const enabled = !this.isMuted;
+    muteBtn.classList.toggle('muted', !enabled);
+    const icon = muteBtn.querySelector('.audio-icon, .squircle-btn-icon');
+    if (icon) icon.textContent = enabled ? '🔊' : '🔇';
+    muteBtn.setAttribute('aria-pressed', String(!enabled));
+    muteBtn.setAttribute('aria-label', enabled ? 'Nonaktifkan suara' : 'Aktifkan suara');
+    muteBtn.setAttribute('title', enabled ? 'Audio Aktif (Klik untuk Mute)' : 'Audio Nonaktif (Klik untuk Unmute)');
   }
 
   setVolume(vol) {
-    this.volume = Math.max(0, Math.min(1, Number(vol) || 0.5));
+    const value = Number(vol);
+    if (!Number.isFinite(value)) return this.volume;
+    this.volume = Math.max(0, Math.min(1, value));
+    return this.volume;
+  }
+
+  setFeedbackTone(tone) {
+    if (!['click', 'cyber', 'retro'].includes(tone)) return false;
+    this.feedbackTone = tone;
+    return true;
+  }
+
+  async setAmbientEnabled(enabled) {
+    this.ambientEnabled = Boolean(enabled);
+    if (!this.ambientEnabled) {
+      this._stopAmbient();
+      return true;
+    }
+    const context = this._ensureContext();
+    if (!context) return false;
+    try {
+      if (context.state === 'suspended') await context.resume();
+      return this._startAmbient();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  setAmbientVolume(value) {
+    const volume = Number(value);
+    if (!Number.isFinite(volume)) return this.ambientVolume;
+    this.ambientVolume = Math.max(0, Math.min(1, volume));
+    this._syncAmbientGain();
+    return this.ambientVolume;
+  }
+
+  _startAmbient() {
+    if (!this.ambientEnabled || this.ambientSource) return Boolean(this.ambientSource);
+    const context = this._ensureContext();
+    if (!context?.createBuffer || !context.createBufferSource) return false;
+    try {
+      const sampleRate = context.sampleRate || 44100;
+      const buffer = context.createBuffer(1, sampleRate * 2, sampleRate);
+      const samples = buffer.getChannelData(0);
+      for (let i = 0; i < samples.length; i += 1) samples[i] = (Math.random() * 2 - 1) * 0.035;
+
+      const source = context.createBufferSource();
+      const filter = context.createBiquadFilter();
+      const gain = context.createGain();
+      source.buffer = buffer;
+      source.loop = true;
+      filter.type = 'lowpass';
+      filter.frequency.value = 420;
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(context.destination);
+      this.ambientSource = source;
+      this.ambientGain = gain;
+      this.ambientFilter = filter;
+      this._syncAmbientGain();
+      source.start();
+      return true;
+    } catch (_) {
+      this._stopAmbient();
+      return false;
+    }
+  }
+
+  _stopAmbient() {
+    const source = this.ambientSource;
+    const filter = this.ambientFilter;
+    const gain = this.ambientGain;
+    this.ambientSource = null;
+    this.ambientGain = null;
+    this.ambientFilter = null;
+    if (!source) return;
+    try { source.stop(); } catch (_) {}
+    try { source.disconnect(); } catch (_) {}
+    try { filter?.disconnect(); } catch (_) {}
+    try { gain?.disconnect(); } catch (_) {}
+  }
+
+  _syncAmbientGain() {
+    if (!this.ambientGain || !this.audioCtx) return;
+    const value = this.isMuted ? 0 : 0.12 * this.ambientVolume;
+    try { this.ambientGain.gain.setTargetAtTime(value, this.audioCtx.currentTime, 0.04); }
+    catch (_) { this.ambientGain.gain.value = value; }
   }
 
   play(type = 'click') {
-    if (this.isMuted) return;
+    if (this.isMuted || this.volume === 0) return;
+    const soundType = type === 'click' ? this.feedbackTone : type;
 
     try {
       const ctx = this._ensureContext();
@@ -88,7 +214,7 @@ export class SoundManager {
       osc.connect(gain);
       gain.connect(ctx.destination);
 
-      if (type === 'click') {
+      if (soundType === 'click') {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(600, now);
         osc.frequency.exponentialRampToValueAtTime(150, now + 0.04);
@@ -96,7 +222,7 @@ export class SoundManager {
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
         osc.start(now);
         osc.stop(now + 0.04);
-      } else if (type === 'cyber') {
+      } else if (soundType === 'cyber') {
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(800, now);
         osc.frequency.exponentialRampToValueAtTime(1600, now + 0.06);
@@ -105,7 +231,7 @@ export class SoundManager {
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
         osc.start(now);
         osc.stop(now + 0.15);
-      } else if (type === 'retro') {
+      } else if (soundType === 'retro') {
         osc.type = 'square';
         osc.frequency.setValueAtTime(440, now);
         osc.frequency.setValueAtTime(880, now + 0.05);
@@ -157,7 +283,7 @@ export class SoundManager {
   }
 
   playSiren(durationSec = 2) {
-    if (this.isMuted) return;
+    if (this.isMuted || this.volume === 0) return;
     try {
       const ctx = this._ensureContext();
       if (!ctx) return;

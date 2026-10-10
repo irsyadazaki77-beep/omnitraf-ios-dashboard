@@ -44,6 +44,40 @@ export const POSTGRES_MIGRATIONS = [
       SELECT DISTINCT 'idem:' || idempotency_key FROM audit_logs WHERE idempotency_key IS NOT NULL
       ON CONFLICT(dedupe_key) DO NOTHING;
     `
+  },
+  {
+    version: 3,
+    name: 'durable_command_receipts',
+    sql: `
+      CREATE TABLE IF NOT EXISTS command_receipts (
+        actor_id TEXT NOT NULL,
+        idempotency_key TEXT PRIMARY KEY,
+        fingerprint TEXT NOT NULL,
+        command_id TEXT NOT NULL,
+        correlation_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        status TEXT NOT NULL,
+        result_json TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        completed_at TIMESTAMPTZ
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_command_receipts_command ON command_receipts(command_id);
+      CREATE INDEX IF NOT EXISTS idx_command_receipts_created ON command_receipts(created_at DESC);
+    `
+  },
+  {
+    version: 4,
+    name: 'postgres_leadership_fencing',
+    sql: `
+      CREATE TABLE IF NOT EXISTS cluster_leadership_fence (
+        scope TEXT PRIMARY KEY,
+        epoch BIGINT NOT NULL,
+        leader_instance_id TEXT NOT NULL,
+        lease_expires_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+      );
+      CREATE INDEX IF NOT EXISTS idx_cluster_leadership_fence_expiry ON cluster_leadership_fence(lease_expires_at);
+    `
   }
 ];
 

@@ -231,18 +231,33 @@ export class MapControls {
     const toggleLayerBtn = document.getElementById('btnToggleFullMapLayers');
     const closeLayerBtn = document.getElementById('btnCloseFullMapLayers');
     const layerDeck = document.getElementById('fullMapLayerDeck');
+    const setDeckOpen = (open) => {
+      if (!layerDeck) return;
+      layerDeck.classList.toggle('open', open);
+      layerDeck.inert = !open;
+      layerDeck.setAttribute('aria-hidden', String(!open));
+      toggleLayerBtn?.setAttribute('aria-expanded', String(open));
+      if (open) closeLayerBtn?.focus();
+      else toggleLayerBtn?.focus();
+    };
+    if (layerDeck) {
+      layerDeck.inert = !layerDeck.classList.contains('open');
+      disposer.addEventListener(layerDeck, 'keydown', (event) => {
+        if (event.key === 'Escape') { event.preventDefault(); setDeckOpen(false); }
+      });
+    }
 
     if (toggleLayerBtn && layerDeck) {
       disposer.addEventListener(toggleLayerBtn, 'click', (e) => {
         e.stopPropagation();
-        layerDeck.classList.toggle('open');
+        setDeckOpen(!layerDeck.classList.contains('open'));
         soundManager.play('click');
       });
     }
 
     if (closeLayerBtn && layerDeck) {
       disposer.addEventListener(closeLayerBtn, 'click', () => {
-        layerDeck.classList.remove('open');
+        setDeckOpen(false);
         soundManager.play('click');
       });
     }
@@ -283,18 +298,22 @@ export class MapControls {
     // Custom Context Menu Actions
     const contextMenu = document.getElementById('mapContextMenu');
     if (contextMenu) {
+      const closeContextMenu = () => {
+        contextMenu.style.display = 'none';
+        contextMenu.setAttribute('aria-hidden', 'true');
+      };
       contextMenu.querySelectorAll('.context-menu-item').forEach(item => {
-        disposer.addEventListener(item, 'click', (e) => {
+        disposer.addEventListener(item, 'click', async (e) => {
           e.stopPropagation();
           const action = item.dataset.action;
-          contextMenu.style.display = 'none';
+          closeContextMenu();
 
           if (action === 'center-here' && this._lastRightClickLatLng) {
             maps.forEach(map => map.flyTo(this._lastRightClickLatLng, 16));
             if (typeof window.showToast === 'function') window.showToast('📍 Tampilan dipusatkan.');
           } else if (action === 'filter-incidents' && this._lastRightClickLatLng) {
             layerManager.setMode(maps, 'all');
-            if (typeof window.showToast === 'function') window.showToast('⚠️ Menampilkan insiden di area ini.');
+            if (typeof window.showToast === 'function') window.showToast('Semua lapisan simulasi ditampilkan. Filter insiden per area belum tersedia.');
           } else if (action === 'filter-cctv' && this._lastRightClickLatLng) {
             layerManager.setMode(maps, 'nodes');
             if (typeof window.showToast === 'function') window.showToast('📷 Menampilkan node CCTV SITS.');
@@ -302,17 +321,20 @@ export class MapControls {
             if (typeof startEmergency112SimFn === 'function') startEmergency112SimFn();
           } else if (action === 'copy-coords' && this._lastRightClickLatLng) {
             const str = `${this._lastRightClickLatLng.lat.toFixed(5)}, ${this._lastRightClickLatLng.lng.toFixed(5)}`;
-            if (navigator.clipboard) {
-              navigator.clipboard.writeText(str);
+            try {
+              if (!navigator.clipboard?.writeText) throw new Error('Clipboard tidak tersedia.');
+              await navigator.clipboard.writeText(str);
+              if (typeof window.showToast === 'function') window.showToast(`Koordinat simulasi disalin: ${str}`);
+            } catch (error) {
+              if (typeof window.showToast === 'function') window.showToast(`Gagal menyalin koordinat: ${error.message}`, 'danger');
             }
-            if (typeof window.showToast === 'function') window.showToast(`📋 Koordinat disalin: ${str}`);
           }
           soundManager.play('click');
         });
       });
 
       disposer.addEventListener(document, 'click', () => {
-        contextMenu.style.display = 'none';
+        closeContextMenu();
       });
     }
   }
