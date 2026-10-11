@@ -528,6 +528,28 @@
   }
 }
 
+/* Signal monitoring is primary; tuning controls stay behind a disclosure. */
+.signals-workspace-toolbar { display:flex; align-items:center; gap:8px; margin:0 0 12px; padding:8px; border:1px solid var(--border-default); border-radius:var(--radius-md); background:var(--surface); }
+.signals-workspace-toolbar label { color:var(--text-secondary); font-size:12px; font-weight:600; }
+.signals-workspace-toolbar input { flex:1; min-width:120px; min-height:38px; padding:0 10px; border:1px solid var(--border-default); border-radius:var(--radius-sm); background:var(--surface-raised); color:var(--text-primary); }
+.signals-toolbar-note { color:var(--text-tertiary); font-size:11px; }
+#intersections { margin:0 0 12px; padding:14px; border:1px solid var(--border-default); border-radius:var(--radius-md); background:var(--surface); }
+#intersections .section-head { margin-bottom:10px; }
+.signals-controls-details { margin-top:12px; border:1px solid var(--border-default); border-radius:var(--radius-md); background:var(--surface); }
+.signals-controls-details > summary { min-height:44px; padding:13px 15px; color:var(--text-primary); cursor:pointer; font-size:13px; font-weight:650; }
+.signals-controls-details[open] > summary { border-bottom:1px solid var(--border-subtle); }
+.signals-console-grid { gap:10px; margin:0; padding:12px; grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr)); }
+.signals-intersection-card { border-radius:var(--radius-sm); padding:14px; }
+.signals-card-header h2 { font-size:15px; }
+.signals-card-meta { font-size:11px; }
+.signal-active-panel { gap:14px; }
+.signal-cycle-indicator { gap:14px; }
+.force-override-btn { align-self:flex-start; }
+#intersectionTable tr[role="button"] { cursor:pointer; }
+#intersectionTable tr.is-selected { background:var(--surface-selected); }
+#intersectionTable tr:focus-visible { outline:2px solid var(--border-focus); outline-offset:-2px; }
+@media (max-width:700px) { .signals-workspace-toolbar { flex-wrap:wrap; } .signals-workspace-toolbar label { flex-basis:100%; } .signals-toolbar-note { flex-basis:100%; } #intersections { padding:10px; } #intersectionTable { min-width:650px; } }
+
 @media (max-width: 640px) {
   .signals-header-summary-strip {
     grid-template-columns: 1fr;

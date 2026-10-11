@@ -1,507 +1,155 @@
 <div class="view-pane active" id="view-dashboard">
-        <!-- Dashboard Executive Command Header -->
-        <header class="dash-hero-header">
-          <div class="dash-hero-title-group">
-            <span class="eyebrow">OMNITRAF • PROTOTIPE SIMULASI</span>
-            <h1 class="dash-hero-title">Pusat Kendali Lalu Lintas</h1>
-            <p class="dash-hero-subtitle">Surabaya · ringkasan operasional simulasi</p>
-          </div>
-          <div class="dash-hero-status-strip">
-            <div class="dash-status-item">
-              <span class="provenance-badge simulated" id="dashHeaderProv">SIMULASI • STREAM SERVER</span>
-            </div>
-            <div class="dash-status-item" aria-live="polite">
-              <span class="dash-status-label">Kondisi sistem</span>
-              <strong class="system-state-text" id="dashSystemState" title="Kesehatan koneksi simulator dan beban jaringan">NORMAL</strong>
-            </div>
-            <span class="data-freshness-pill" id="dashDataFreshness" role="status">OFFLINE · SIM</span>
-          </div>
-        </header>
-
-        <!-- Executive Traffic Briefing Container -->
-        <article class="traffic-briefing-card glass-panel reveal-card" id="dashTrafficBriefing" aria-label="Briefing Operasional Lalu Lintas">
-          <div class="briefing-header">
-            <div class="briefing-title-group">
-              <span class="briefing-pulse-dot" id="briefingStatusDot"></span>
-              <h2 class="briefing-title">Status jaringan simulasi</h2>
-              <span class="provenance-badge simulated" id="briefingProvenance">SIMULASI SERVER</span>
-            </div>
-            <div class="briefing-timestamp" id="briefingTimestamp">Snapshot simulasi</div>
-          </div>
-          <div class="briefing-grid">
-            <div class="briefing-item briefing-severity-moderate" id="briefingCongestionState">
-              <small class="briefing-label">Status Beban Kota</small>
-              <strong class="briefing-value" id="briefingCongestionVal">--</strong>
-              <span class="briefing-sub" id="briefingCongestionSub">Telemetri simulasi</span>
-            </div>
-            <div class="briefing-item" id="briefingAffectedCorridors">
-              <small class="briefing-label">Koridor Terdampak Utama</small>
-              <strong class="briefing-value text-amber" id="briefingCorridorsVal">--</strong>
-              <span class="briefing-sub" id="briefingCorridorsSub">Simpang aktif dalam model</span>
-            </div>
-            <div class="briefing-item" id="briefingSignalCondition">
-              <small class="briefing-label">Sistem Kontrol APILL</small>
-              <strong class="briefing-value text-cyan" id="briefingSignalVal">Kontrol simulasi</strong>
-              <span class="briefing-sub" id="briefingSignalSub">Tidak terhubung ke APILL fisik</span>
-            </div>
-            <div class="briefing-item" id="briefingActiveAlert">
-              <small class="briefing-label">Intervensi / Peringatan Aktif</small>
-              <strong class="briefing-value text-emerald" id="briefingAlertVal">Tidak ada prioritas aktif</strong>
-              <span class="briefing-sub" id="briefingAlertSub">Status simulasi</span>
-            </div>
-          </div>
-        </article>
-
-        <section id="criticalIncidentStrip" class="critical-incident-strip" aria-label="Insiden prioritas" role="status" aria-live="polite" hidden>
-          <div class="critical-strip-heading"><span class="critical-mark" aria-hidden="true"></span><strong>INSIDEN PRIORITAS</strong><span id="criticalIncidentCount" class="critical-count"></span></div>
-          <div id="criticalIncidentList" class="critical-incident-list" role="list"></div>
-        </section>
-
-        <section class="control-strip glass-panel" aria-label="Kontrol cepat">
-          <div class="control-group-left">
-            <div class="search-box-wrapper search-box-wrapper-inner">
-              <div class="search-box">
-                <span>⌕</span>
-                <input id="intersectionSearch" type="search" placeholder="Cari simpang Surabaya..." autocomplete="off" />
-              </div>
-              <!-- Search Autocomplete Suggestions Dropdown -->
-              <div class="search-suggestions glass-panel is-hidden" id="searchSuggestions"></div>
-            </div>
-
-            <div class="filter-group filter-chips ios-segmented-control" role="group" aria-label="Filter kepadatan">
-              <button class="filter-chip active" type="button" data-filter="all">Semua</button>
-              <button class="filter-chip" type="button" data-filter="high">Tinggi</button>
-              <button class="filter-chip" type="button" data-filter="moderate">Sedang</button>
-              <button class="filter-chip" type="button" data-filter="low">Rendah</button>
-            </div>
-          </div>
-
-          <div class="control-group-right quick-actions">
-            <button class="btn btn-ghost" type="button" data-capability="simulation:control" data-action="simulate">Simulasi AI</button>
-            <button class="btn btn-ghost" type="button" data-view="reports">Buka laporan</button>
-            <button class="btn btn-primary compact" type="button" data-action="refresh">Perbarui data</button>
-          </div>
-          <details class="dashboard-simulation-tools" id="dashboardSimulationTools" data-capability="simulation:control">
-            <summary>Kontrol simulasi</summary>
-            <div class="dashboard-simulation-tools-body">
-              <div class="sim-speed-box glass-soft">
-                <label for="simulationSpeedRange" class="sim-speed-label">Kecepatan simulasi: <span id="simSpeedVal">1x</span></label>
-                <input id="simulationSpeedRange" type="range" min="0" max="4" value="1" step="1" class="sim-speed-input" data-capability="simulation:control" aria-label="Kecepatan simulasi saja" aria-describedby="simulationSpeedHelp" />
-                <small id="simulationSpeedHelp">Berlaku setelah server simulasi mengonfirmasi. Tidak mengubah perangkat lapangan.</small>
-              </div>
-              <button class="btn btn-chaos" type="button" id="btnToggleChaos" aria-label="Admin: chaos simulation mode" hidden>Admin · Chaos simulation</button>
-            </div>
-          </details>
-        </section>
-
-        <!-- Bento Grid Executive Telemetry (Operator-Focused Hierarchy) -->
-        <section class="stat-grid bento-telemetry-grid" aria-label="Key metrics">
-          <!-- Bento Hero 1: Indeks Kemacetan Kota -->
-          <article class="stat-card bento-card bento-hero glass-panel reveal-card" id="bentoCardCongestion">
-            <div class="bento-card-inner">
-              <div class="bento-content-wrap">
-                <div class="bento-header-badge">
-                  <span class="stat-icon amber-tone">↗</span>
-              <span class="bento-pill-tag">Model Koridor</span>
-                </div>
-                <div class="bento-meta-body">
-              <p title="Skor kemacetan yang dibangkitkan model, pada skala 0 sampai 100; bukan probabilitas.">Indeks kemacetan model</p>
-                  <h2><span class="counter-val" id="dashCongestionValue">--</span><span class="denom-val">/100</span></h2>
-                  <span class="metric-warn pill-trend">Skor model · bukan probabilitas</span>
-                </div>
-              </div>
-              <div class="bento-gauge-wrapper">
-                <svg class="radial-ring-gauge" viewBox="0 0 100 100" width="76" height="76">
-                  <circle class="gauge-track" cx="50" cy="50" r="38" fill="none" stroke-width="6" />
-                  <circle class="gauge-fill-ring amber-glow-ring" cx="50" cy="50" r="38" fill="none" stroke-width="6" stroke-dasharray="238.76" stroke-dashoffset="238.76" stroke-linecap="round" />
-                </svg>
-                <div class="gauge-center-text">
-                  <span class="gauge-center-val" id="dashCongestionGauge">--</span>
-                  <span class="gauge-center-sub">Beban</span>
-                </div>
-              </div>
-            </div>
-          </article>
-
-
-          <!-- Bento 3: Persimpangan Aktif -->
-          <article class="stat-card bento-card glass-panel reveal-card">
-            <div class="bento-card-header-row">
-              <div class="stat-icon blue-tone">⌁</div>
-                  <span class="pill pill-ai">Skenario</span>
-            </div>
-            <div>
-              <p>Simpang dalam model</p>
-              <h2 id="dashIntersectionCount">--</h2>
-              <span class="metric-up pill-trend">Simpang aktif · model</span>
-            </div>
-          </article>
-
-          <!-- Bento 4: Rata-rata Waktu Tunggu -->
-          <article class="stat-card bento-card glass-panel reveal-card">
-            <div class="bento-card-header-row">
-              <div class="stat-icon green-tone">⏱</div>
-              <span class="pill pill-ai">Estimasi model</span>
-            </div>
-            <div>
-                  <p title="Nilai waktu tunggu rata-rata dari skenario simulator; bukan hasil pengukuran lapangan.">Waktu tunggu model</p>
-                  <h2><span class="counter-val" id="dashWaitValue">--</span><span class="denom-val"> detik</span></h2>
-                  <span class="metric-up pill-trend">Interval saat ini · model</span>
-            </div>
-          </article>
-
-          <!-- Bento 5: Kendaraan Darurat Aktif -->
-          <article class="stat-card bento-card glass-panel reveal-card">
-            <div class="bento-card-header-row">
-              <div class="stat-icon red-tone">✚</div>
-              <span class="pill pill-danger">Prioritas 112</span>
-            </div>
-            <div>
-              <p>Skenario Darurat</p>
-              <h2 id="dashEmergencyCount">--</h2>
-              <span class="metric-down pill-trend">Permintaan aktif · model</span>
-            </div>
-          </article>
-
-        </section>
-
-        <section class="dashboard-grid">
-          <!-- Shared map panel -->
-          <article class="map-panel glass-panel">
-            <div class="section-head">
-              <div>
-                <h2>Peta operasi simulasi</h2>
-                <p>Peta area Surabaya; penanda dan kepadatan berasal dari model, bukan telemetri lapangan.</p>
-              </div>
-              <div class="map-head-actions" style="display: flex; align-items: center; gap: 8px;">
-                <span class="pill pill-ai">PETA DEMO</span>
-                <a href="#map" class="btn btn-primary compact" data-view="map" style="text-decoration: none;">Buka Peta Lengkap ↗</a>
-              </div>
-            </div>
-
-            <!-- Custom Surabaya Topography Map -->
-            <div class="map-box-container map-box-container-inner">
-              <!-- Zoom & Pan Controls overlay -->
-              <div class="map-zoom-controls glass-soft map-zoom-controls-overlay">
-                <button id="btnMapZoomIn" title="Perbesar Peta (+)" class="map-zoom-btn-item" aria-label="Zoom in">+</button>
-                <button id="btnMapZoomOut" title="Perkecil Peta (-)" class="map-zoom-btn-item" aria-label="Zoom out">-</button>
-                <button id="btnMapZoomReset" title="Pusatkan Surabaya" class="map-zoom-btn-reset" aria-label="Reset zoom">⟲</button>
-              </div>
-
-              <!-- Clean SITS Landmark & Node Detail Card -->
-              <div class="landmark-detail-card glass-panel landmark-detail-card-overlay is-hidden" id="landmarkDetailCard">
-                <div class="holo-hud-header">
-                  <div class="holo-scan-badge">
-                    <span class="holo-pulse-dot"></span>
-                    <span class="holo-badge-label">PETA DEMO SURABAYA</span>
-                  </div>
-                  <button class="close-landmark-card holo-close-btn" id="btnCloseLandmarkCard" type="button" aria-label="Tutup info node">&times;</button>
-                </div>
-                <div class="holo-hud-body">
-                  <div class="holo-title-row">
-                    <span class="holo-marker-icon">🏛️</span>
-                    <div>
-                      <h4 id="landmarkTitle" class="landmark-title-text">Landmark Kota</h4>
-                      <p id="landmarkDesc" class="landmark-desc-text">Deskripsi koridor landmark.</p>
-                    </div>
-                  </div>
-                  <div class="holo-stats-grid">
-                    <div class="holo-stat-item">
-                      <small>Kondisi Arteri</small>
-                      <strong id="landmarkStatus" class="text-muted">—</strong>
-                    </div>
-                    <div class="holo-stat-item">
-                      <small>Status Sensor</small>
-                      <strong class="text-muted">Telemetri tidak tersedia</strong>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="map-box" id="dashboardMapBox" data-density="all"></div>
-
-              <div class="map-overview glass-soft">
-                <h3 title="Persentase beban lalu lintas dalam state model. Nilainya terpisah dari skor kemacetan model.">Beban lalu lintas model</h3>
-                <strong id="networkLoad">--</strong>
-                <p id="mapNetworkContext">Persentase skenario model; bukan okupansi jaringan atau sensor lapangan.</p>
-              </div>
-
-              <div class="legend glass-soft">
-                <h3>Legenda Status</h3>
-                <span><i class="legend-line danger"></i>Macet (&lt;15 km/j)</span>
-                <span><i class="legend-line warning"></i>Padat (15-30 km/j)</span>
-                <span><i class="legend-line success"></i>Lancar (&gt;30 km/j)</span>
-                <span><i class="legend-line primary"></i>Normal</span>
-              </div>
-
-              <!-- Map Layer Controls -->
-              <div class="map-layer-deck glass-soft">
-                <h3>Lapisan Peta</h3>
-                <div class="layer-option-list">
-                  <label class="layer-item">
-                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="district-zones" />
-                    <span class="layer-label">Wilayah Kota</span>
-                  </label>
-                  <label class="layer-item">
-                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="map-river" />
-                    <span class="layer-label">Aliran Sungai</span>
-                  </label>
-                  <label class="layer-item">
-                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="road-glows" checked />
-                    <span class="layer-label">Efek Arus</span>
-                  </label>
-                  <label class="layer-item">
-                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="minor-roads" />
-                    <span class="layer-label">Jalan Sekunder</span>
-                  </label>
-                  <label class="layer-item">
-                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="warn-points" checked />
-                    <span class="layer-label">Titik Insiden</span>
-                  </label>
-                  <label class="layer-item">
-                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="landmark-group" />
-                    <span class="layer-label">Tempat Penting</span>
-                  </label>
-                  <label class="layer-item">
-                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="compass-rose" />
-                    <span class="layer-label">Kompas</span>
-                  </label>
-                  <label class="layer-item">
-                    <input type="checkbox" class="layer-toggle-checkbox" data-layer="map-heatmap" />
-                    <span class="layer-label">Heatmap Kepadatan</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </article>
-
-          <aside class="right-widgets" aria-label="Operational widgets">
-            <!-- 1. Live Camera Widget -->
-            <article class="widget glass-panel reveal-card" id="widgetLiveCamera">
-              <div class="section-head compact">
-                <div>
-                <h2 class="widget-title-sm">CCTV terpilih</h2>
-                  <p class="widget-subtitle-sm">Tampilan visi komputer sintetis.</p>
-                </div>
-                <div class="camera-head-actions">
-                  <!-- iOS Segmented Pill Bar Camera Switcher -->
-                  <div class="cctv-mini-switch ios-segmented-cctv-pill" id="dashCctvSwitcher" aria-label="Pilihan CCTV Simpang">
-                    <button class="cctv-mini-btn active" type="button" data-cam="1" data-name="Jl. Ahmad Yani (Wonokromo)" data-sub="Kamera sintetis • Simulasi OmniTRAF">CCTV-01</button>
-                    <button class="cctv-mini-btn" type="button" data-cam="2" data-name="Jl. Raya Darmo (Al-Falah)" data-sub="Kamera sintetis • Simulasi OmniTRAF">CCTV-02</button>
-                    <button class="cctv-mini-btn" type="button" data-cam="3" data-name="Jl. Tunjungan (Siola)" data-sub="Kamera sintetis • Simulasi OmniTRAF">CCTV-03</button>
-                  </div>
-                  <a href="#cctv" class="btn btn-ghost compact" data-view="cctv" style="text-decoration: none;">CCTV Full ↗</a>
-                </div>
-              </div>
-
-              <!-- 16:9 Aspect Ratio Camera Viewport with Crisp Overlays -->
-              <div class="camera-box tactical-camera-box" id="cameraBox">
-                <canvas class="cctv-canvas" id="dashCameraCanvas" width="640" height="360"></canvas>
-                <div class="camera-badge hud-pill">VISI SIMULASI</div>
-                <div class="camera-timestamp cctv-time hud-pill" id="cameraTime">--</div>
-
-                <!-- Glitch Overlay -->
-                <div class="cctv-glitch-overlay" id="dashCameraGlitch">
-                  <div class="glitch-static"></div>
-                  <div class="glitch-text">FEED BUFFERING</div>
-                </div>
-
-                <div class="camera-caption">
-                  <strong id="dashCamTitle">Jl. Ahmad Yani (Wonokromo)</strong>
-                  <small id="dashCamSub">Kamera sintetis • Simulasi OmniTRAF</small>
-                </div>
-              </div>
-            </article>
-
-            <!-- 2. AI Recommendation Widget -->
-            <article class="widget glass-panel reveal-card" id="widgetAiRec">
-              <div class="section-head compact">
-                <div>
-                  <h2 class="widget-title-sm">Rekomendasi Model</h2>
-                  <p class="widget-subtitle-sm">Eksperimen tambahan durasi hijau pada state simulasi.</p>
-                </div>
-                <span class="pill pill-ai">MODEL DEMO</span>
-              </div>
-
-              <div class="ai-rec-card-body">
-                <div class="ai-rec-badge-row">
-                  <span class="ai-rec-tag">
-                    <span class="pulse-dot-ai"></span> Rekomendasi model simulasi
-                  </span>
-                  <span class="ai-confidence-badge">Tingkat keyakinan belum tersedia</span>
-                </div>
-                <p class="ai-rec-text" id="aiRecText">
-                  Uji tambahan fase <strong>+8 detik</strong> pada durasi terjadwal Wonokromo. Dampak antrean dan penghematan belum diukur; perubahan hanya berlaku pada simulator.
-                  </p>
-                <div class="ai-rec-meta-row">
-                  <span>🎯 Dampak model: <strong class="text-success">contoh, belum diukur</strong></span>
-                  <span>⏱ Horizon: <strong>simulasi</strong></span>
-                  <span>⚡ Sinyal: <strong class="text-primary-2">tidak terhubung ke APILL</strong></span>
-                </div>
-              </div>
-
-              <div class="ai-rec-actions">
-                <button class="btn btn-ghost compact" type="button" id="btnDismissAiRec">Abaikan</button>
-                <button class="btn btn-primary compact" type="button" id="btnApplyAiRec" data-capability="simulation:control" data-action="apply-ai">Coba di Simulasi</button>
-              </div>
-            </article>
-          </aside>
-        </section>
-
-        <!-- Operations Grid -->
-        <section class="operations-grid">
-          <!-- Kontrol fase sinyal Widget -->
-          <article class="ops-card glass-panel reveal-card" id="card-signals">
-            <div class="section-head compact">
-              <div>
-                <h2>Kontrol fase sinyal</h2>
-                <p>Kontrol contoh pada state simulasi; bukan APILL fisik.</p>
-              </div>
-              <span class="pill pill-ai">DEMO</span>
-            </div>
-            <div class="phase-control">
-              <div class="phase-row">
-                <span>Green A. Yani (Utara)</span>
-                <strong id="greenValue">42 detik</strong>
-              </div>
-              <div class="range-container">
-                <input id="greenRange" data-capability="simulation:control" class="slider-glow" type="range" min="15" max="90" value="42" />
-                <span class="slider-tooltip" id="sliderTooltip">42s</span>
-              </div>
-              <!-- Linear Phase Timeline -->
-              <div class="phase-timeline-bar" id="dashboardPhaseTimeline">
-                <div class="phase-sec phase-red w-35p"></div>
-                <div class="phase-sec phase-yellow w-10p"></div>
-                <div class="phase-sec phase-green w-55p"></div>
-                <div class="phase-indicator pos-0p" id="dashboardPhaseIndicator"></div>
-              </div>
-              <div class="phase-bars">
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
-            </div>
-          </article>
-
-          <!-- District Congestion Leaderboard (Fitur 5) -->
-          <article class="ops-card glass-panel reveal-card" id="widgetLeaderboard">
-            <div class="section-head compact">
-              <div>
-                <h2>Indeks Kepadatan Koridor</h2>
-                <p>Peringkat indeks volume terhadap kapasitas pada jam model saat ini.</p>
-              </div>
-              <span class="pill pill-ai">MODEL DEMO</span>
-            </div>
-            <div class="leaderboard-container leaderboard-flex-col">
-              <div class="leaderboard-item leaderboard-row-item" id="leadRoad-0">
-                <span>1. Jl. Ahmad Yani</span>
-                <strong class="text-danger lead-val">83%</strong>
-              </div>
-              <div class="leaderboard-item leaderboard-row-item" id="leadRoad-1">
-                <span>2. Jl. Raya Darmo</span>
-                <strong class="text-warning lead-val">61%</strong>
-              </div>
-              <div class="leaderboard-item leaderboard-row-item" id="leadRoad-2">
-                <span>3. Jl. Tunjungan</span>
-                <strong class="text-muted lead-val">44%</strong>
-              </div>
-              <div class="leaderboard-item leaderboard-row-item" id="leadRoad-3">
-                <span>4. Jl. Kertajaya</span>
-                <strong class="text-success lead-val">22%</strong>
-              </div>
-              <div class="leaderboard-item leaderboard-row-item" id="leadRoad-4">
-                <span>5. MERR Ir. Soekarno</span>
-                <strong class="text-success lead-val">18%</strong>
-              </div>
-            </div>
-          </article>
-
-          <!-- Emergency Priority Widget -->
-          <article class="ops-card glass-panel reveal-card priority-alert-widget" id="dashEmergencyWidget">
-            <div class="section-head compact">
-              <div>
-                <h2>Prioritas darurat simulasi</h2>
-                <p>Contoh skenario; tidak ada kendaraan darurat yang terdeteksi atau diarahkan.</p>
-              </div>
-              <span class="pill pill-danger" id="dashEmergencyBadge">SKENARIO DEMO</span>
-            </div>
-            <div class="emergency-row" id="dashEmergencyRow">
-              <div class="emergency-icon-container">
-                <div class="emergency-icon pulse-red" id="dashEmergencyIcon">✚</div>
-              </div>
-              <div>
-                <strong id="dashEmergencyTitle">Contoh ambulans — simulasi</strong>
-                <p id="dashEmergencyEta">Estimasi tiba belum tersedia</p>
-            <small id="dashEmergencyRoute">Contoh rute: Jl. Raya Darmo → RSU Dr. Soetomo</small>
-              </div>
-            </div>
-          </article>
-
-          <article class="ops-card glass-panel reveal-card" id="card-incidents">
-            <div class="section-head compact">
-              <div>
-                <h2>Kronologi insiden</h2>
-                <p>Kronologi contoh dari skenario simulasi.</p>
-              </div>
-              <span class="pill pill-danger">—</span>
-            </div>
-            <div class="timeline-container">
-              <div class="timeline-line">
-                <div class="timeline-line-fill" id="timelineLineFill"></div>
-              </div>
-              <ol class="timeline"><li>Memuat insiden sesi…</li>
-              </ol>
-            </div>
-          </article>
-
-          <article class="ops-card glass-panel reveal-card">
-            <div class="section-head compact">
-              <div>
-                <h2>Kinerja koridor simulasi</h2>
-                <p>Indeks volume terhadap kapasitas pada jam model saat ini.</p>
-              </div>
-              <span class="pill pill-ai">MODEL DEMO</span>
-            </div>
-            <div class="corridor-list">
-              <div><span>Koridor A. Yani - Darmo</span><strong>83%</strong><i style="--value: 83%"></i></div>
-              <div><span>Basuki Rahmat - Tunjungan</span><strong>61%</strong><i style="--value: 61%"></i></div>
-              <div><span>Tol Dupak - Tanjung Perak</span><strong>74%</strong><i style="--value: 74%"></i></div>
-            </div>
-          </article>
-
-          <article class="ops-card glass-panel reveal-card">
-            <div class="section-head compact">
-              <div>
-                <h2>Kondisi Model</h2>
-                <p>Nilai contoh infrastruktur simulasi.</p>
-              </div>
-              <span class="pill pill-ai">SIMULASI</span>
-            </div>
-            <div class="health-grid">
-              <div class="health-item">
-                <strong id="sitsUptimeVal">—</strong>
-                <span>Uptime model</span>
-              </div>
-              <div class="health-item">
-                <strong id="sitsCctvCount">—</strong>
-                <span>Node kamera simulasi</span>
-              </div>
-              <div class="health-item">
-                <strong id="sitsIotCount">—</strong>
-                <span>Sensor simulasi</span>
-              </div>
-              <div class="health-item latency-health">
-                <div class="latency-meta">
-                  <strong id="latencyVal">—</strong>
-                  <span>Latency API</span>
-                </div>
-                <div class="latency-sparkline">
-                  <svg viewBox="0 0 100 30" width="100%" height="24">
-                    <path class="latency-path" id="latencyPath" hidden d="" fill="none" stroke="var(--primary-2)" stroke-width="2" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </article>
-        </section>
+  <header class="dashboard-heading">
+    <div>
+      <p class="eyebrow">OMNITRAF · SIMULASI</p>
+      <h1>Ikhtisar operasi</h1>
+      <p class="dashboard-description">Kondisi lalu lintas Surabaya dari model simulasi.</p>
+    </div>
+    <div class="dashboard-heading-tools">
+      <div class="dashboard-state" aria-label="Status model simulasi">
+        <span class="dashboard-state-dot" id="briefingStatusDot" aria-hidden="true"></span>
+        <span id="dashSystemState">Memuat status</span>
+        <span class="provenance-badge simulated" id="dashHeaderProv" hidden>SIMULASI</span>
+        <span class="data-freshness-pill" id="dashDataFreshness">Memuat data</span>
       </div>
+      <button class="btn btn-secondary compact" type="button" data-action="refresh">Segarkan data</button>
+    </div>
+  </header>
+
+  <section id="criticalIncidentStrip" class="critical-incident-strip" aria-label="Insiden prioritas" role="status" hidden>
+    <div class="critical-strip-heading"><span class="critical-mark" aria-hidden="true"></span><strong>Insiden prioritas</strong><span id="criticalIncidentCount" class="critical-count"></span></div>
+    <div id="criticalIncidentList" class="critical-incident-list" role="list"></div>
+  </section>
+
+  <section class="dashboard-kpi-strip" aria-label="Ringkasan kondisi model">
+    <article class="dashboard-kpi dashboard-kpi-primary">
+      <span class="dashboard-kpi-label">Indeks kemacetan model</span>
+      <strong><span id="dashCongestionValue">—</span><span class="dashboard-kpi-unit">/100</span></strong>
+      <span class="dashboard-kpi-note">Skor model, bukan probabilitas</span>
+    </article>
+    <article class="dashboard-kpi">
+      <span class="dashboard-kpi-label">Insiden aktif</span>
+      <strong id="dashIncidentCount">—</strong>
+      <span class="dashboard-kpi-note">Dalam sesi simulasi</span>
+    </article>
+    <article class="dashboard-kpi">
+      <span class="dashboard-kpi-label">Pengecualian sinyal</span>
+      <strong id="dashSignalExceptionCount">—</strong>
+      <span class="dashboard-kpi-note">Status simpang yang dilaporkan</span>
+    </article>
+    <article class="dashboard-kpi">
+      <span class="dashboard-kpi-label">Pengecualian perangkat</span>
+      <strong id="dashDeviceExceptionCount">—</strong>
+      <span class="dashboard-kpi-note">Status perangkat yang dilaporkan</span>
+    </article>
+  </section>
+
+  <section class="dashboard-workspace" aria-label="Peta dan antrean prioritas">
+    <article class="map-panel dashboard-map-panel">
+      <header class="dashboard-panel-heading">
+        <div>
+          <h2>Peta kota</h2>
+          <p>Penanda dan kepadatan berasal dari model, bukan telemetri lapangan.</p>
+        </div>
+        <a href="#map" class="btn btn-secondary compact" data-view="map">Buka peta lengkap</a>
+      </header>
+      <div class="map-box-container map-box-container-inner">
+        <div class="map-zoom-controls map-zoom-controls-overlay" aria-label="Kontrol peta">
+          <button id="btnMapZoomIn" title="Perbesar peta (+)" class="map-zoom-btn-item" type="button" aria-label="Perbesar peta">+</button>
+          <button id="btnMapZoomOut" title="Perkecil peta (-)" class="map-zoom-btn-item" type="button" aria-label="Perkecil peta">−</button>
+          <button id="btnMapZoomReset" title="Pusatkan Surabaya" class="map-zoom-btn-reset" type="button" aria-label="Reset tampilan peta">Reset</button>
+        </div>
+
+        <section class="landmark-detail-card landmark-detail-card-overlay is-hidden" id="landmarkDetailCard" role="region" aria-label="Detail simpang terpilih" tabindex="-1">
+          <div class="holo-hud-header">
+            <div class="holo-scan-badge"><span class="holo-pulse-dot" aria-hidden="true"></span><span class="holo-badge-label">Simpang terpilih · simulasi</span></div>
+            <button class="close-landmark-card holo-close-btn" id="btnCloseLandmarkCard" type="button" aria-label="Tutup detail simpang">×</button>
+          </div>
+          <div class="holo-hud-body">
+            <div class="holo-title-row"><div><h3 id="landmarkTitle" class="landmark-title-text">Simpang</h3><p id="landmarkDesc" class="landmark-desc-text">Pilih simpang pada peta untuk melihat konteks.</p></div></div>
+            <div class="holo-stats-grid"><div class="holo-stat-item"><small>Kondisi model</small><strong id="landmarkStatus">—</strong></div><div class="holo-stat-item"><small>Sumber</small><strong>Simulasi</strong></div></div>
+          </div>
+        </section>
+
+        <div class="map-box" id="dashboardMapBox" data-density="all" role="application" aria-label="Peta operasi simulasi Surabaya"></div>
+        <details class="map-layer-deck">
+          <summary>Lapisan dan legenda</summary>
+          <div class="layer-option-list">
+            <label class="layer-item"><input type="checkbox" class="layer-toggle-checkbox" data-layer="district-zones"><span class="layer-label">Wilayah kota</span></label>
+            <label class="layer-item"><input type="checkbox" class="layer-toggle-checkbox" data-layer="map-river"><span class="layer-label">Aliran sungai</span></label>
+            <label class="layer-item"><input type="checkbox" class="layer-toggle-checkbox" data-layer="road-glows" checked><span class="layer-label">Arus lalu lintas</span></label>
+            <label class="layer-item"><input type="checkbox" class="layer-toggle-checkbox" data-layer="minor-roads"><span class="layer-label">Jalan sekunder</span></label>
+            <label class="layer-item"><input type="checkbox" class="layer-toggle-checkbox" data-layer="warn-points" checked><span class="layer-label">Insiden</span></label>
+            <label class="layer-item"><input type="checkbox" class="layer-toggle-checkbox" data-layer="landmark-group"><span class="layer-label">Tempat penting</span></label>
+            <label class="layer-item"><input type="checkbox" class="layer-toggle-checkbox" data-layer="compass-rose"><span class="layer-label">Kompas</span></label>
+            <label class="layer-item"><input type="checkbox" class="layer-toggle-checkbox" data-layer="density-heat"><span class="layer-label">Heatmap kepadatan</span></label>
+          </div>
+          <div class="legend" aria-label="Legenda kondisi koridor"><span><i class="legend-line danger"></i>Macet · &lt;15 km/j</span><span><i class="legend-line warning"></i>Padat · 15–30 km/j</span><span><i class="legend-line success"></i>Lancar · &gt;30 km/j</span><span><i class="legend-line primary"></i>Normal</span></div>
+        </details>
+      </div>
+    </article>
+
+    <aside class="priority-panel" aria-labelledby="priorityPanelTitle">
+      <header class="dashboard-panel-heading">
+        <div><h2 id="priorityPanelTitle">Antrean prioritas</h2><p>Insiden, sinyal, perangkat, dan simulasi darurat.</p></div>
+        <span class="provenance-badge simulated">SIMULASI</span>
+      </header>
+      <div id="priorityOperationsList" class="priority-operations-list" role="list">
+        <p class="priority-empty-state">Memuat status operasi…</p>
+      </div>
+      <nav class="priority-links" aria-label="Halaman operasi terkait">
+        <a href="#incidents" data-view="incidents">Insiden</a>
+        <a href="#signals" data-view="signals">Sinyal</a>
+        <a href="#devices" data-view="devices">Perangkat</a>
+        <a href="#emergency" data-view="emergency">Darurat</a>
+      </nav>
+    </aside>
+  </section>
+
+  <section class="dashboard-lower-grid" aria-label="Aktivitas dan pencarian simpang">
+    <article class="dashboard-section-panel" id="card-incidents">
+      <header class="dashboard-panel-heading"><div><h2>Aktivitas terbaru</h2><p>Insiden dari sesi simulasi.</p></div><a href="#incidents" data-view="incidents">Lihat semua</a></header>
+      <div class="timeline-container"><ol class="timeline"><li>Belum ada aktivitas dalam sesi ini.</li></ol></div>
+    </article>
+    <article class="dashboard-section-panel dashboard-search-panel">
+      <header class="dashboard-panel-heading"><div><h2>Temukan simpang</h2><p>Cari atau filter penanda pada peta.</p></div></header>
+      <div class="search-box-wrapper search-box-wrapper-inner">
+        <label class="sr-only" for="intersectionSearch">Cari simpang Surabaya</label>
+        <div class="search-box"><span aria-hidden="true">⌕</span><input id="intersectionSearch" type="search" placeholder="Nama simpang atau koridor" autocomplete="off"></div>
+        <div class="search-suggestions is-hidden" id="searchSuggestions"></div>
+      </div>
+      <div class="filter-group filter-chips ios-segmented-control" role="group" aria-label="Filter kepadatan">
+        <button class="filter-chip active" type="button" data-filter="all">Semua</button>
+        <button class="filter-chip" type="button" data-filter="high">Tinggi</button>
+        <button class="filter-chip" type="button" data-filter="moderate">Sedang</button>
+        <button class="filter-chip" type="button" data-filter="low">Rendah</button>
+      </div>
+    </article>
+  </section>
+
+  <details class="dashboard-details" id="dashboardSimulationTools" data-capability="simulation:control">
+    <summary>Kontrol simulasi dan rekomendasi model</summary>
+    <div class="dashboard-details-content">
+      <div class="simulation-controls">
+        <label for="simulationSpeedRange">Kecepatan simulasi <strong id="simSpeedVal">1x</strong></label>
+        <input id="simulationSpeedRange" type="range" min="0" max="4" value="1" step="1" data-capability="simulation:control" aria-describedby="simulationSpeedHelp">
+        <small id="simulationSpeedHelp">Berlaku setelah server simulasi mengonfirmasi. Tidak mengubah perangkat lapangan.</small>
+        <div class="road-condition-control"><span>Kondisi jalan model</span><button id="btnToggleRoadCond-dashboardMapBox" class="btn btn-secondary" type="button" aria-label="Ubah kondisi jalan simulasi">Ganti ke hujan</button></div>
+        <button class="btn btn-secondary" type="button" data-capability="simulation:control" data-action="simulate">Jalankan simulasi AI</button>
+        <button class="btn btn-danger" type="button" id="btnToggleChaos" aria-label="Admin: chaos simulation mode" hidden>Mode chaos (admin)</button>
+      </div>
+      <article class="dashboard-context-block" id="card-signals">
+        <h3>Kontrol fase sinyal</h3><p>Kontrol contoh pada state simulasi; bukan APILL fisik.</p>
+        <label for="greenRange">Fase hijau A. Yani · Utara <strong id="greenValue">42 detik</strong></label>
+        <input id="greenRange" data-capability="simulation:control" type="range" min="15" max="90" value="42" aria-describedby="sliderTooltip">
+        <span id="sliderTooltip">42 detik</span>
+        <div class="phase-timeline-bar" id="dashboardPhaseTimeline"><div class="phase-sec phase-red w-35p"></div><div class="phase-sec phase-yellow w-10p"></div><div class="phase-sec phase-green w-55p"></div><div class="phase-indicator pos-0p" id="dashboardPhaseIndicator"></div></div>
+      </article>
+      <article class="dashboard-context-block" id="widgetAiRec">
+        <h3>Rekomendasi model</h3><p id="aiRecText">Belum ada rekomendasi terukur untuk sesi ini.</p>
+        <button class="btn btn-secondary" type="button" id="btnDismissAiRec">Abaikan</button>
+        <button class="btn btn-primary" type="button" id="btnApplyAiRec" data-capability="simulation:control" data-action="apply-ai">Coba di simulasi</button>
+      </article>
+    </div>
+  </details>
+</div>

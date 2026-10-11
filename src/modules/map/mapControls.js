@@ -128,12 +128,8 @@ export class MapControls {
    */
   flyToIncident(maps, layerGroupsMap, locationOrCoords, title = "Insiden Lalu Lintas") {
     // 1. Switch to Map tab
-    stateStore.setState({ currentView: 'map' });
-    const mapNav = document.querySelector('[data-view="map"]');
-    if (mapNav) {
-      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-      mapNav.classList.add('active');
-    }
+    if (window.location.hash !== '#map') window.location.hash = 'map';
+    else if (stateStore.getState().currentView !== 'map') stateStore.setState({ currentView: 'map' });
 
     // 2. Resolve target coordinate
     let latlng = [-7.2985, 112.7345];

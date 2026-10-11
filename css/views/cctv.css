@@ -523,3 +523,32 @@
     border-radius: var(--radius-lg);
   }
 }
+
+/* One selected simulated feed with a compact camera rail */
+.cctv-dashboard { gap:12px; }
+.cctv-workspace-toolbar { display:flex; align-items:center; gap:8px; padding:8px; border:1px solid var(--border-default); border-radius:var(--radius-md); background:var(--surface); }
+.cctv-workspace-toolbar .cctv-camera-search { flex:1 1 280px; max-width:none; }
+.cctv-view-options { position:relative; }
+.cctv-view-options > summary { display:flex; min-height:40px; align-items:center; padding:0 11px; border:1px solid var(--border-default); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; font-size:12px; font-weight:600; list-style:none; }
+.cctv-view-options > summary::-webkit-details-marker { display:none; }
+.cctv-options-content { position:absolute; z-index:1100; top:calc(100% + 6px); right:0; display:grid; gap:10px; width:min(340px,calc(100vw - 32px)); padding:12px; border:1px solid var(--border-default); border-radius:var(--radius-md); background:var(--surface); box-shadow:var(--shadow-sm); }
+.cctv-options-content .ios-segmented-control { display:flex; flex-wrap:wrap; gap:4px; }
+.cctv-options-content button { min-height:36px; }
+.cctv-options-content .cctv-threshold-pill { display:grid; grid-template-columns:1fr auto; gap:4px 10px; }
+.cctv-options-content .cctv-threshold-pill input { grid-column:1 / -1; width:100%; }
+.cctv-operational-workspace { display:grid; grid-template-columns:minmax(0,1fr) 250px; gap:12px; align-items:start; }
+.cctv-feed-grid.grid-focus { display:block; min-width:0; }
+.cctv-feed-grid.grid-focus .camera-card:not(.camera-card-spotlight) { display:none; }
+.camera-card-spotlight { min-width:0; border-radius:var(--radius-md); box-shadow:none; }
+.camera-card-spotlight .camera-box { aspect-ratio:16 / 9; min-height:0; }
+.camera-card-spotlight .camera-card-header { padding:12px 14px; }
+.camera-card-spotlight .camera-hud-bottom { opacity:.9; }
+.cctv-camera-rail { display:grid; gap:8px; padding:12px; border:1px solid var(--border-default); border-radius:var(--radius-md); background:var(--surface); }
+.cctv-camera-rail h2 { margin:0 0 2px; font-size:15px; }
+.cctv-camera-rail p { margin:4px 0 0; color:var(--text-tertiary); font-size:11px; line-height:1.4; }
+.cctv-camera-rail .cctv-camera-tab-list { display:grid; gap:4px; }
+.cctv-camera-rail .cctv-cam-tab { min-height:44px; justify-content:flex-start; padding:8px 10px; border-radius:var(--radius-sm); text-align:left; font-size:12px; }
+.cctv-camera-rail .cctv-cam-tab.active { border-color:var(--accent-primary); background:var(--surface-selected); color:var(--text-primary); }
+.cctv-camera-empty { margin:0; color:var(--text-secondary); }
+@media (max-width:900px) { .cctv-operational-workspace { grid-template-columns:minmax(0,1fr); } .cctv-camera-rail { order:2; } .cctv-camera-rail .cctv-camera-tab-list { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:600px) { .cctv-workspace-toolbar { flex-wrap:wrap; } .cctv-workspace-toolbar .cctv-camera-search { flex-basis:100%; } .cctv-workspace-toolbar > .cctv-toolbar-btn { flex:1; min-width:0; padding:0 8px; } .cctv-camera-rail .cctv-camera-tab-list { grid-template-columns:1fr; } .camera-card-spotlight .camera-card-header { align-items:flex-start; flex-wrap:wrap; } .camera-card-spotlight .camera-actions-wrap .btn-cam-snapshot { display:none; } }

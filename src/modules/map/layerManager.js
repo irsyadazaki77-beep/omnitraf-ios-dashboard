@@ -43,8 +43,7 @@ export function createCartoTileLayer(isDark) {
     updateWhenZooming: false,
     keepBuffer: 3
   };
-  // An explicit `undefined` overrides Leaflet's default `abc` subdomains and
-  // crashes tile URL generation. OSM uses a single host, so omit the option.
+  // An explicit `undefined` overrides Leaflet's default `abc` subdomains.
   if (cartoKey) layerOptions.subdomains = TILE_CONFIG.subdomains;
 
   const layer = L.tileLayer(tileUrl, layerOptions);
@@ -146,7 +145,7 @@ export class LayerManager {
     this.corridorGeoJsonLayers = [];
     this.currentMode = 'flow';
     this.visibility = {
-      'district-zones': true,
+      'district-zones': false,
       'map-river': true,
       'road-glows': true,
       'minor-roads': true,
@@ -163,7 +162,7 @@ export class LayerManager {
    */
   registerLayers(containerId, map, masterCluster) {
     const layers = {
-      'district-zones': L.layerGroup().addTo(map),
+      'district-zones': L.layerGroup(),
       'map-river': L.layerGroup().addTo(map),
       'road-glows': L.layerGroup().addTo(map),
       'minor-roads': L.layerGroup().addTo(map),

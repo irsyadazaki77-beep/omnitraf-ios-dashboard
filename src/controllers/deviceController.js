@@ -22,6 +22,7 @@ export class DeviceController {
     this.disposer = new Disposer('DeviceController');
     this.deviceAuditCache = new Map();
     this.deviceAuditInFlight = new Set();
+    this.deviceReturnFocus = null;
   }
 
   init() {
@@ -385,6 +386,8 @@ export class DeviceController {
 
   selectDevice(deviceId) {
     this.selectedDeviceId = deviceId;
+    const drawerBeforeOpen = document.getElementById("deviceDrawerConfig") || document.getElementById("deviceConfigDrawer");
+    if (!drawerBeforeOpen?.classList.contains('open') && document.activeElement instanceof HTMLElement) this.deviceReturnFocus = document.activeElement;
     
     // Highlight row active di tabel
     document.querySelectorAll(".device-row").forEach(row => {
@@ -401,6 +404,7 @@ export class DeviceController {
       drawer.classList.add("open");
       drawer.style.display = "flex";
       drawer.setAttribute('aria-hidden', 'false');
+      drawer.focus({ preventScroll: true });
     }
 
     // Force update detail drawer
@@ -683,6 +687,8 @@ export class DeviceController {
         drawer.setAttribute('aria-hidden', 'true');
         setTimeout(() => { drawer.style.display = "none"; }, 200);
       }
+      if (this.deviceReturnFocus?.isConnected) this.deviceReturnFocus.focus({ preventScroll: true });
+      this.deviceReturnFocus = null;
       soundManager.play('click');
     };
 
@@ -747,6 +753,20 @@ export class DeviceController {
 
     // Event delegation on drawer for fault injection clicks - absolutely 100% leak-proof!
     if (drawer) {
+      this.disposer.addEventListener(drawer, 'keydown', (event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeDrawer();
+          return;
+        }
+        if (event.key !== 'Tab') return;
+        const focusable = [...drawer.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])')]
+          .filter((item) => !item.hidden && item.getAttribute('aria-hidden') !== 'true');
+        if (!focusable.length) { event.preventDefault(); drawer.focus(); return; }
+        const first = focusable[0]; const last = focusable[focusable.length - 1];
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === drawer)) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      });
       this.disposer.addEventListener(drawer, "click", (e) => {
         const retryAuditBtn = e.target.closest('.btn-retry-device-audit');
         if (retryAuditBtn) {

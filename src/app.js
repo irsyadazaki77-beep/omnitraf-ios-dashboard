@@ -47,7 +47,7 @@ const controllerLoaders = {
   deviceController: async () => { if (isViteRuntime) await import('../css/views/devices.css'); return import('./controllers/deviceController.js'); },
   reportController: async () => { if (isViteRuntime) await import('../css/views/reports.css'); return import('./controllers/reportController.js'); },
   settingsController: async () => ({ settingsController }),
-  integrationController: async () => import('./controllers/integrationController.js')
+  integrationController: async () => { if (isViteRuntime) await import('../css/views/integration.css'); return import('./controllers/integrationController.js'); }
 };
 
 export class App {
@@ -213,6 +213,7 @@ export class App {
     const cleanView = (view || '').replace('#', '').replace('view-', '');
     if (cleanView === 'settings' && isViteRuntime) await import('../css/views/settings.css');
     if (cleanView === 'prediction' && isViteRuntime) await import('../css/views/prediction.css');
+    if (cleanView === 'integration' && isViteRuntime) await import('../css/views/integration.css');
 
     const viewControllers = {
       dashboard: ['cctvController', 'signalsController', 'incidentController', 'emergencyController'],

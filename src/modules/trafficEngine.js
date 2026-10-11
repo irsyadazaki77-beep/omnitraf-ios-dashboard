@@ -161,6 +161,7 @@ export class TrafficEngine {
     this._renderChaosUI(isChaos, chaosLevel);
     this._renderKpiMetrics(telemetry, state);
     this._renderEmergencyList(emergencies);
+    this._renderPriorityOperations(state, emergencies);
     this._renderCorridorRanking(state);
     this._renderIncidentTimeline(state.incidents || []);
     this._renderNotifications(state.incidents || []);
@@ -279,6 +280,16 @@ export class TrafficEngine {
     this._smartUpdateDOM('dashWaitValue', String(telemetry.avgWaitTime ?? '--'));
     this._smartUpdateDOM('dashIntersectionCount', String((state.intersections || []).length));
     this._smartUpdateDOM('dashEmergencyCount', String(emergencies?.length || 0));
+    const incidentCount = Array.isArray(state.incidents)
+      ? state.incidents.filter((incident) => !['RESOLVED', 'ARCHIVED'].includes(String(incident.status || '').toUpperCase())).length
+      : null;
+    this._smartUpdateDOM('dashIncidentCount', incidentCount === null ? '—' : String(incidentCount));
+    const intersections = Array.isArray(state.intersections) ? state.intersections : null;
+    const signalFaults = intersections?.filter((node) => ['FAULT', 'OFFLINE', 'DEGRADED', 'STALE', 'ERROR'].includes(String(node.healthLevel || node.status || '').toUpperCase())) || null;
+    this._smartUpdateDOM('dashSignalExceptionCount', signalFaults === null ? '—' : String(signalFaults.length));
+    const availableDevices = Array.isArray(state.devices) ? state.devices : null;
+    const deviceFaults = availableDevices?.filter((device) => ['OFFLINE', 'DEGRADED', 'STALE', 'FAULT', 'RECOVERING', 'MAINTENANCE'].includes(String(device.status === 'MAINTENANCE' ? device.status : device.healthLevel || '').toUpperCase())) || null;
+    this._smartUpdateDOM('dashDeviceExceptionCount', deviceFaults === null ? '—' : String(deviceFaults.length));
     this._smartUpdateDOM('briefingCorridorsVal', `${(state.intersections || []).length} simpang dalam model`);
     this._smartUpdateDOM('briefingCorridorsSub', `${activeIncidents.length} insiden aktif`);
 
@@ -340,6 +351,55 @@ export class TrafficEngine {
       item.append(details, inspect);
       list.appendChild(item);
     });
+  }
+
+  _renderPriorityOperations(state, emergencies) {
+    const container = document.getElementById('priorityOperationsList');
+    if (!container) return;
+    const incidents = Array.isArray(state.incidents) ? state.incidents.filter((incident) =>
+      !['RESOLVED', 'ARCHIVED'].includes(String(incident.status || '').toUpperCase()) &&
+      ['critical', 'danger', 'high'].includes(String(incident.severity || '').toLowerCase())
+    ) : [];
+    const signalFaults = Array.isArray(state.intersections) ? state.intersections.filter((node) =>
+      ['FAULT', 'OFFLINE', 'DEGRADED', 'STALE', 'ERROR'].includes(String(node.healthLevel || node.status || '').toUpperCase())
+    ) : [];
+    const deviceFaults = Array.isArray(state.devices) ? state.devices.filter((device) =>
+      ['OFFLINE', 'DEGRADED', 'STALE', 'FAULT', 'RECOVERING', 'MAINTENANCE'].includes(String(device.status === 'MAINTENANCE' ? device.status : device.healthLevel || '').toUpperCase())
+    ) : [];
+    const entries = [
+      ...incidents.map((item) => ({ title: item.title || 'Insiden prioritas', detail: `${item.location || 'Lokasi tidak tersedia'} · ${item.status || 'Aktif'}`, href: '#incidents', label: 'Insiden' })),
+      ...signalFaults.map((item) => ({ title: item.name || item.intersectionName || item.id || 'Simpang', detail: `Sinyal · ${item.healthLevel || item.status}`, href: '#signals', label: 'Sinyal' })),
+      ...deviceFaults.map((item) => ({ title: item.deviceName || item.deviceId || 'Perangkat', detail: `Perangkat · ${item.status === 'MAINTENANCE' ? item.status : item.healthLevel || 'Status tidak tersedia'}`, href: '#devices', label: 'Perangkat' })),
+      ...emergencies.map((item) => ({ title: item.vehicleId || item.vehicleType || 'Skenario darurat', detail: `Darurat · ${item.status || 'Aktif'}`, href: '#emergency', label: 'Darurat' }))
+    ];
+    const signature = JSON.stringify(entries);
+    if (container.dataset.snapshot === signature) return;
+    container.dataset.snapshot = signature;
+    if (!entries.length) {
+      const empty = document.createElement('p');
+      empty.className = 'priority-empty-state';
+      empty.textContent = 'Tidak ada insiden prioritas aktif.';
+      container.replaceChildren(empty);
+      return;
+    }
+    container.replaceChildren(...entries.slice(0, 8).map((entry) => {
+      const row = document.createElement('a');
+      row.className = 'priority-operation';
+      row.href = entry.href;
+      row.setAttribute('role', 'listitem');
+      const copy = document.createElement('span');
+      copy.className = 'priority-operation-copy';
+      const title = document.createElement('strong');
+      title.textContent = entry.title;
+      const detail = document.createElement('small');
+      detail.textContent = entry.detail;
+      const type = document.createElement('span');
+      type.className = 'priority-operation-type';
+      type.textContent = entry.label;
+      copy.append(title, detail);
+      row.append(copy, type);
+      return row;
+    }));
   }
 
   /**

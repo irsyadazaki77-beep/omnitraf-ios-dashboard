@@ -54,3 +54,22 @@
   .incident-meta { align-items: flex-start; flex-direction: column; }
   .inc-time { text-align: left; }
 }
+/* Task-oriented incident list and contextual inspector */
+.incidents-active { padding:14px; border:1px solid var(--border-default); border-radius:var(--radius-md); background:var(--surface); box-shadow:none; }
+.incidents-active > .section-head { margin-bottom:10px; }
+.incidents-active > .section-head p { margin:4px 0 0; color:var(--text-secondary); font-size:12px; }
+.incident-workspace-grid { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:12px; align-items:start; }
+.incident-workspace-grid:has(.incident-entity-inspector[hidden]) { grid-template-columns:minmax(0,1fr); }
+.incident-logs-list { display:grid; gap:6px; align-content:start; }
+.incident-log-item { min-width:0; padding:11px 12px; border:1px solid var(--border-subtle); border-radius:var(--radius-sm); background:var(--surface-raised); cursor:pointer; }
+.incident-log-item:hover,.incident-log-item.is-selected { border-color:var(--border-focus); background:var(--surface-selected); }
+.incident-log-item:focus-visible { outline:2px solid var(--border-focus); outline-offset:2px; }
+.incident-log-item .incident-notes,.incident-log-item .inc-meta-row { display:none; }
+.incident-log-item .inc-meta { margin-bottom:5px; }
+.incident-log-item .incident-title { margin:0; font-size:14px; }
+.incident-log-item .incident-location { margin:3px 0 0; color:var(--text-secondary); font-size:12px; }
+.incident-log-item .inc-actions { margin-top:8px; }
+.incident-entity-inspector { position:sticky; top:12px; }
+.entity-inspector-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+@media (max-width:900px) { .incident-workspace-grid,.incident-workspace-grid:has(.incident-entity-inspector[hidden]) { grid-template-columns:minmax(0,1fr); } .incident-entity-inspector { position:static; } }
+@media (max-width:600px) { .incidents-active { padding:10px; } .incident-log-item { padding:10px; } }

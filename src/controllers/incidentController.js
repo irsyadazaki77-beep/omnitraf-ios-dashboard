@@ -41,6 +41,7 @@ export class IncidentController {
 
     this._resetIncidentFilters();
     this._bindIncidentModal();
+    this._bindIncidentInspector();
     this._bindIncidentFilterChips();
     this._setupStoreListeners();
     this._registerGlobalHandlers();
@@ -424,7 +425,14 @@ export class IncidentController {
       return;
     }
 
-    list.forEach(inc => {
+    const prioritizedList = [...list].sort((a, b) => {
+      const unresolvedA = !TERMINAL_INCIDENT_STATUSES.has(String(a.status || '').toUpperCase());
+      const unresolvedB = !TERMINAL_INCIDENT_STATUSES.has(String(b.status || '').toUpperCase());
+      const criticalA = ['CRITICAL', 'DANGER', 'HIGH'].includes(String(a.severity || a.priority || '').toUpperCase());
+      const criticalB = ['CRITICAL', 'DANGER', 'HIGH'].includes(String(b.severity || b.priority || '').toUpperCase());
+      return Number(unresolvedB && criticalB) - Number(unresolvedA && criticalA);
+    });
+    prioritizedList.forEach(inc => {
       const isResolved = TERMINAL_INCIDENT_STATUSES.has(String(inc.status || '').toUpperCase());
       const workflowAction = this._incidentWorkflowAction(inc.status);
       
@@ -434,6 +442,7 @@ export class IncidentController {
       item.dataset.incidentCategory = String(inc.category || 'general').toLocaleLowerCase();
       item.dataset.incidentSeverity = String(inc.severity || 'info').toLocaleLowerCase();
       item.dataset.incidentStatus = String(inc.status || 'ACTIVE').toUpperCase();
+      item.setAttribute('role', 'listitem');
 
       const safeTitle = escapeHtml(inc.title || 'Insiden simulasi');
       const safeLocation = escapeHtml(inc.location || 'Lokasi belum tersedia');
@@ -501,11 +510,104 @@ export class IncidentController {
       item.querySelector('.btn-map-shortcut')?.addEventListener('click', () => window.mapManager?.flyToIncident(inc.location || '', inc.title || ''));
       item.querySelector('.dispatch-btn')?.addEventListener('click', () => this.dispatchIncident(inc.id));
       item.querySelector('.resolve-btn')?.addEventListener('click', () => this.resolveIncident(inc.id));
-      item.querySelector('.incident-detail-btn')?.addEventListener('click', () => this.openIncidentDetail(inc.id, inc.location || '', inc.reportedAt || '', inc.notes || ''));
+      item.querySelector('.incident-detail-btn')?.addEventListener('click', () => this._renderIncidentInspector(inc));
     });
 
     this._applyIncidentFilters();
+    if (this.selectedIncidentId) {
+      const selected = list.find((incident) => String(incident.id) === String(this.selectedIncidentId));
+      if (selected) this._renderIncidentInspector(selected);
+      else this._closeIncidentInspector(false);
+    }
     // Dashboard timeline is rendered by TrafficEngine from the same state snapshot.
+  }
+
+  _bindIncidentInspector() {
+    const list = document.getElementById('incidentLogsList');
+    const close = document.getElementById('btnCloseIncidentInspector');
+    const map = document.getElementById('btnIncidentOpenMap');
+    const cctv = document.getElementById('btnIncidentOpenCctv');
+    const action = document.getElementById('btnIncidentInspectorAction');
+    if (list) {
+      const selectFromEvent = (event) => {
+        if (event.target.closest('button,a,input,select')) return;
+        const item = event.target.closest('.incident-log-item');
+        if (!item) return;
+        const incident = (stateStore.getState().incidents || []).find((entry) => String(entry.id) === String(item.id.replace(/^incident-/, '')));
+        if (incident) this._renderIncidentInspector(incident);
+      };
+      this.disposer.addEventListener(list, 'click', selectFromEvent);
+    }
+    if (close) this.disposer.addEventListener(close, 'click', () => this._closeIncidentInspector(true));
+    if (map) this.disposer.addEventListener(map, 'click', () => {
+      const incident = (stateStore.getState().incidents || []).find((entry) => String(entry.id) === String(this.selectedIncidentId));
+      if (incident) window.mapManager?.flyToIncident(incident.location || '', incident.title || 'Insiden simulasi');
+    });
+    if (cctv) this.disposer.addEventListener(cctv, 'click', () => {
+      const incident = (stateStore.getState().incidents || []).find((entry) => String(entry.id) === String(this.selectedIncidentId));
+      const cameraId = incident?.cameraId || incident?.relatedCameraId;
+      if (!cameraId) return;
+      const focus = { kind: 'cctv', id: cameraId, route: 'cctv' };
+      stateStore.setState({ pendingEntityFocus: focus });
+      if (window.location.hash === '#cctv') {
+        window.dispatchEvent(new CustomEvent('omnitraf:entity-focus', { detail: focus }));
+        stateStore.setState({ pendingEntityFocus: null });
+      } else window.location.hash = 'cctv';
+    });
+    if (action) this.disposer.addEventListener(action, 'click', () => {
+      if (this.selectedIncidentId) this.dispatchIncident(this.selectedIncidentId);
+    });
+  }
+
+  _renderIncidentInspector(incident) {
+    const inspector = document.getElementById('incidentInspector');
+    const title = document.getElementById('incidentInspectorTitle');
+    const summary = document.getElementById('incidentInspectorSummary');
+    const properties = document.getElementById('incidentInspectorProperties');
+    const action = document.getElementById('btnIncidentInspectorAction');
+    const cctv = document.getElementById('btnIncidentOpenCctv');
+    if (!inspector || !title || !summary || !properties) return;
+    this.selectedIncidentId = incident.id;
+    title.textContent = incident.title || 'Insiden simulasi';
+    summary.textContent = incident.notes || incident.description || 'Detail skenario insiden simulasi.';
+    const values = [
+      ['Lokasi', incident.location || 'Belum tersedia'],
+      ['Keparahan', incident.severity || incident.priority || 'Belum tersedia'],
+      ['Status', incident.status || 'Belum tersedia'],
+      ['Waktu', incident.reportedAt && Number.isFinite(new Date(incident.reportedAt).getTime()) ? new Date(incident.reportedAt).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : 'Belum tersedia'],
+      ['Disposisi', incident.assignedUnit || 'Belum tersedia']
+    ];
+    properties.replaceChildren(...values.map(([label, value]) => {
+      const group = document.createElement('div');
+      const dt = document.createElement('dt'); dt.textContent = label;
+      const dd = document.createElement('dd'); dd.textContent = String(value);
+      group.append(dt, dd);
+      return group;
+    }));
+    if (action) {
+      const canAct = authManager.hasRole(['OPERATOR', 'ADMIN']) && !TERMINAL_INCIDENT_STATUSES.has(String(incident.status || '').toUpperCase());
+      action.hidden = !canAct;
+      action.textContent = this._incidentWorkflowAction(incident.status);
+    }
+    if (cctv) cctv.hidden = !(incident.cameraId || incident.relatedCameraId);
+    inspector.hidden = false;
+    document.querySelectorAll('#incidentLogsList .incident-log-item').forEach((item) => {
+      const selected = item.id === `incident-${incident.id}`;
+      item.classList.toggle('is-selected', selected);
+      item.querySelector('.incident-detail-btn')?.setAttribute('aria-pressed', String(selected));
+    });
+  }
+
+  _closeIncidentInspector(restoreFocus = true) {
+    const previousId = this.selectedIncidentId;
+    const inspector = document.getElementById('incidentInspector');
+    if (inspector) inspector.hidden = true;
+    this.selectedIncidentId = null;
+    document.querySelectorAll('#incidentLogsList .incident-log-item').forEach((item) => {
+      item.classList.remove('is-selected');
+      item.setAttribute('aria-pressed', 'false');
+    });
+    if (restoreFocus && previousId) document.querySelector(`#incident-${CSS.escape(String(previousId))} .incident-detail-btn`)?.focus();
   }
 
   _incidentWorkflowAction(status) {

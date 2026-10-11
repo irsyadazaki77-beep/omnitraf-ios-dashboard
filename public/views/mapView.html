@@ -1,129 +1,53 @@
 <div class="view-pane" id="view-map">
-        <article class="spatial-map-workspace">
-          <!-- Minimal Context Header Bar -->
-          <header class="map-workspace-header">
-            <div class="map-header-brand">
-              <span class="map-header-dot"></span>
-              <h1 class="map-header-title">Peta simulasi Surabaya</h1>
-              <span class="provenance-badge simulated" id="fullMapProvenance">PETA SIMULASI</span>
-            </div>
-            <div class="map-header-meta">
-              <span class="map-meta-item hide-mobile">Koridor Utama: <strong>A. Yani · Darmo · Tunjungan · Kertajaya · MERR</strong></span>
-              <span class="map-meta-divider hide-mobile">·</span>
-              <span class="map-event-chip" id="fullMapEventChip" title="Total insiden & darurat aktif di Surabaya">
-                <span class="event-chip-dot"></span>
-                <span id="fullMapEventText">3 Event Aktif</span>
-              </span>
-            </div>
-          </header>
+  <header class="workspace-page-header map-page-header">
+    <div>
+      <p class="eyebrow">OMNITRAF · SIMULASI</p>
+      <h1>Peta kota</h1>
+      <p class="workspace-page-description">Jelajahi simpang, koridor, dan kejadian pada model Surabaya.</p>
+    </div>
+    <div class="workspace-page-status"><span class="provenance-badge simulated" id="fullMapProvenance">PETA SIMULASI</span></div>
+  </header>
 
-          <!-- Main Map Viewport Canvas Wrapper -->
-          <div class="map-container-wrapper" id="fullMapContainerWrapper">
-            <!-- Leaflet Map Container -->
-            <div id="map-surabaya"></div>
+  <div class="map-workspace-toolbar" role="toolbar" aria-label="Pencarian dan kontrol peta">
+    <label class="map-search-control" for="mapIntersectionSearch"><span aria-hidden="true">⌕</span><input id="mapIntersectionSearch" type="search" placeholder="Cari simpang atau koridor" autocomplete="off"><button type="button" id="mapSearchClear" aria-label="Hapus pencarian" hidden>×</button></label>
+    <div class="map-toolbar-actions">
+      <button class="spatial-tool-btn" id="btnToggleFullMapLayers" type="button" aria-label="Buka kontrol lapisan" aria-controls="fullMapLayerDeck" aria-expanded="false">Lapisan</button>
+      <span class="map-toolbar-divider" aria-hidden="true"></span>
+      <button class="spatial-tool-btn" id="btnFullMapZoomIn" type="button" aria-label="Perbesar peta">+</button>
+      <button class="spatial-tool-btn" id="btnFullMapZoomOut" type="button" aria-label="Perkecil peta">−</button>
+      <button class="spatial-tool-btn" id="btnFullMapReset" type="button" aria-label="Reset tampilan peta">Reset</button>
+      <button class="spatial-tool-btn" id="btnFullMapFullscreen" type="button" aria-label="Layar penuh">⛶</button>
+    </div>
+  </div>
 
-            <!-- Floating Top Toolbar Group (Apple-like Spatial Control Bar) -->
-            <div class="map-spatial-toolbar" id="fullMapToolbar" role="toolbar" aria-label="Kontrol Utama Peta">
-              <!-- Navigation Controls Group -->
-              <div class="toolbar-button-group">
-                <button class="spatial-tool-btn" id="btnFullMapZoomIn" type="button" aria-label="Zoom in (+)" title="Perbesar Peta (+)">
-                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                </button>
-                <button class="spatial-tool-btn" id="btnFullMapZoomOut" type="button" aria-label="Zoom out (-)" title="Perkecil Peta (-)">
-                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                </button>
-                <button class="spatial-tool-btn" id="btnFullMapReset" type="button" aria-label="Reset view" title="Pusatkan Surabaya">
-                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"></circle><line x1="12" y1="2" x2="12" y2="5"></line><line x1="12" y1="19" x2="12" y2="22"></line><line x1="2" y1="12" x2="5" y2="12"></line><line x1="19" y1="12" x2="22" y2="12"></line></svg>
-                </button>
-              </div>
-
-              <div class="toolbar-divider"></div>
-
-              <!-- Mode / Layer Quick Toggles -->
-              <div class="toolbar-button-group">
-                <button class="spatial-tool-btn active" aria-label="Arus koridor" id="btnMapModeFlow" data-layer-mode="flow" type="button" title="Arus Koridor Lalu Lintas">
-                  <span class="tool-dot dot-flow"></span>
-                  <span class="tool-label hide-mobile">Arus</span>
-                </button>
-                <button class="spatial-tool-btn" aria-label="Heatmap kepadatan" id="btnMapModeHeat" data-layer-mode="heat" type="button" title="Heatmap Kepadatan Arus">
-                  <span class="tool-dot dot-heat"></span>
-                  <span class="tool-label hide-mobile">Heatmap</span>
-                </button>
-                <button class="spatial-tool-btn" aria-label="Simpang dan kamera" id="btnMapModeNodes" data-layer-mode="nodes" type="button" title="SITS Persimpangan & Node">
-                  <span class="tool-dot dot-node"></span>
-                  <span class="tool-label hide-mobile">Nodes</span>
-                </button>
-                <button class="spatial-tool-btn map-layer-toggle-btn" id="btnToggleFullMapLayers" type="button" aria-label="Buka Kontrol Lapisan" title="Kontrol Lapisan Detail">
-                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
-                  <span class="tool-label hide-mobile">Lapisan</span>
-                </button>
-              </div>
-
-              <div class="toolbar-divider"></div>
-
-              <!-- View Actions -->
-              <div class="toolbar-button-group">
-                <button class="spatial-tool-btn" id="btnFullMapFullscreen" type="button" aria-label="Layar penuh" title="Toggle Fullscreen Workspace">
-                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
-                </button>
-              </div>
-            </div>
-
-            <!-- Slide-in Layer Drawer Deck -->
-            <div class="map-layer-deck glass-panel" id="fullMapLayerDeck">
-              <div class="layer-deck-header">
-                <div class="layer-deck-title">
-                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
-                  <h3>Lapisan Spasial Detail</h3>
-                </div>
-                <button class="layer-deck-close-btn" id="btnCloseFullMapLayers" type="button" aria-label="Tutup panel lapisan">&times;</button>
-              </div>
-              <div class="layer-option-list">
-                <label class="layer-item">
-                  <input type="checkbox" class="layer-toggle-checkbox" data-layer="district-zones" checked />
-                  <span class="layer-label">Wilayah Kota Surabaya</span>
-                </label>
-                <label class="layer-item">
-                  <input type="checkbox" class="layer-toggle-checkbox" data-layer="map-river" checked />
-                  <span class="layer-label">Aliran Sungai Kalimas</span>
-                </label>
-                <label class="layer-item">
-                  <input type="checkbox" class="layer-toggle-checkbox" data-layer="road-glows" checked />
-                  <span class="layer-label">Efek Arus Arteri Utama</span>
-                </label>
-                <label class="layer-item">
-                  <input type="checkbox" class="layer-toggle-checkbox" data-layer="minor-roads" checked />
-                  <span class="layer-label">Jalan Sekunder</span>
-                </label>
-                <label class="layer-item">
-                  <input type="checkbox" class="layer-toggle-checkbox" data-layer="warn-points" checked />
-                  <span class="layer-label">Titik Insiden Lalu Lintas</span>
-                </label>
-                <label class="layer-item">
-                  <input type="checkbox" class="layer-toggle-checkbox" data-layer="landmark-group" checked />
-                  <span class="layer-label">CCTV & Landmark SITS</span>
-                </label>
-                <label class="layer-item">
-                  <input type="checkbox" class="layer-toggle-checkbox" data-layer="signal-points" checked />
-                  <span class="layer-label">Node APILL & Sinyal Adaptif</span>
-                </label>
-              </div>
-            </div>
-
-            <!-- Compact Minimalist Floating Legend (Bottom-Left) -->
-            <div class="map-floating-legend" id="fullMapLegend" aria-label="Legenda Status Lalu Lintas">
-              <div class="legend-items-row" id="legendItemsRow">
-                <span class="legend-chip"><span class="legend-dot dot-success"></span>Lancar (&gt;30 km/j)</span>
-                <span class="legend-chip"><span class="legend-dot dot-warning"></span>Padat (15-30 km/j)</span>
-                <span class="legend-chip"><span class="legend-dot dot-danger"></span>Macet (&lt;15 km/j)</span>
-                <span class="legend-chip"><span class="legend-symbol">⚠️</span>Insiden</span>
-                <span class="legend-chip"><span class="legend-symbol">🚑</span>Prioritas 112</span>
-              </div>
-              <button class="legend-toggle-btn" id="btnToggleLegendCollapse" type="button" aria-label="Sembunyikan/Tampilkan Legenda" title="Toggle Legenda">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-              </button>
-            </div>
-
-            </div>
-        </article>
-      </div>
+  <section class="map-entity-workspace" aria-label="Peta dan detail entity">
+    <div class="map-container-wrapper" id="fullMapContainerWrapper">
+      <div id="map-surabaya" role="application" aria-label="Peta simulasi kota Surabaya"></div>
+      <aside class="map-layer-deck" id="fullMapLayerDeck" aria-label="Kontrol lapisan peta" aria-hidden="true" inert>
+        <div class="layer-deck-header"><h2>Lapisan peta</h2><button class="layer-deck-close-btn" id="btnCloseFullMapLayers" type="button" aria-label="Tutup panel lapisan">×</button></div>
+        <div class="map-layer-modes" role="group" aria-label="Tampilan data peta"><button class="spatial-tool-btn active" aria-label="Arus koridor" id="btnMapModeFlow" data-layer-mode="flow" type="button">Arus koridor</button><button class="spatial-tool-btn" aria-label="Heatmap kepadatan" id="btnMapModeHeat" data-layer-mode="heat" type="button">Heatmap kepadatan</button><button class="spatial-tool-btn" aria-label="Simpang dan kamera" id="btnMapModeNodes" data-layer-mode="nodes" type="button">Simpang dan kamera</button></div>
+        <button id="btnToggleRoadCond-map-surabaya" class="btn btn-secondary compact map-road-condition-control" type="button" aria-label="Ubah kondisi jalan simulasi">Ganti kondisi jalan</button>
+        <div class="layer-option-list">
+          <label class="layer-item"><input type="checkbox" class="layer-toggle-checkbox" data-layer="district-zones"><span class="layer-label">Wilayah kota</span></label>
+          <label class="layer-item"><input type="checkbox" class="layer-toggle-checkbox" data-layer="map-river" checked><span class="layer-label">Sungai</span></label>
+          <label class="layer-item"><input type="checkbox" class="layer-toggle-checkbox" data-layer="road-glows" checked><span class="layer-label">Arus koridor</span></label>
+          <label class="layer-item"><input type="checkbox" class="layer-toggle-checkbox" data-layer="minor-roads" checked><span class="layer-label">Jalan sekunder</span></label>
+          <label class="layer-item"><input type="checkbox" class="layer-toggle-checkbox" data-layer="warn-points" checked><span class="layer-label">Insiden</span></label>
+          <label class="layer-item"><input type="checkbox" class="layer-toggle-checkbox" data-layer="landmark-group" checked><span class="layer-label">CCTV dan landmark</span></label>
+          <label class="layer-item"><input type="checkbox" class="layer-toggle-checkbox" data-layer="signal-points" checked><span class="layer-label">Simpang bersinyal</span></label>
+          <label class="layer-item"><input type="checkbox" class="layer-toggle-checkbox" data-layer="density-heat"><span class="layer-label">Heatmap</span></label>
+        </div>
+        <div class="legend-items-row" id="legendItemsRow"><span class="legend-chip">Lancar · &gt;30 km/j</span><span class="legend-chip">Padat · 15–30 km/j</span><span class="legend-chip">Macet · &lt;15 km/j</span><span class="legend-chip">Insiden</span><span class="legend-chip">Prioritas 112</span></div>
+      </aside>
+      <div class="map-floating-legend" id="fullMapLegend" aria-label="Legenda kondisi lalu lintas" hidden></div>
+    </div>
+    <aside class="entity-inspector map-entity-inspector" id="mapEntityInspector" aria-labelledby="mapInspectorTitle" hidden>
+      <header class="entity-inspector-header"><div><p class="eyebrow">ENTITY TERPILIH · SIMULASI</p><h2 id="mapInspectorTitle">Detail simpang</h2></div><button type="button" class="entity-inspector-close" id="btnCloseMapInspector" aria-label="Tutup detail dan kembalikan fokus ke peta">×</button></header>
+      <p class="entity-inspector-summary" id="mapInspectorSummary">Pilih simpang atau marker pada peta untuk melihat konteks.</p>
+      <dl class="entity-inspector-properties" id="mapInspectorProperties"></dl>
+      <nav class="entity-inspector-links" aria-label="Workspace terkait" id="mapInspectorLinks" hidden>
+        <a href="#signals" data-view="signals">Buka sinyal</a><a href="#incidents" data-view="incidents">Lihat insiden</a><a href="#cctv" data-view="cctv">Lihat CCTV</a>
+      </nav>
+    </aside>
+  </section>
+</div>

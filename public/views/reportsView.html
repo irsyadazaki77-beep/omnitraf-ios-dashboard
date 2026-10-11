@@ -1,174 +1,228 @@
 <div class="view-pane" id="view-reports">
-        <!-- Section Header / Operations Workspace Summary -->
-        <header class="workspace-header">
-          <div class="workspace-header-title-group">
-            <span class="workspace-header-kicker">OMNITRAF · LAPORAN DEMO SIMULASI</span>
-            <h1 class="workspace-header-title">Laporan Mobilitas Simulasi</h1>
-            <p class="workspace-header-desc">Kompilasi data sintetis untuk demonstrasi. Angka dan dokumen yang diekspor bukan hasil ukur lapangan maupun laporan resmi.</p>
-          </div>
-          <div class="workspace-header-summary-strip" aria-label="Ringkasan Status Laporan">
-            <div class="workspace-summary-item">
-              <span class="workspace-summary-label">Format Dokumen</span>
-              <div class="workspace-summary-val-row">
-                <span class="signals-status-dot dot-live"></span>
-                <strong class="tabular font-mono text-cyan">PDF · CSV · JSON</strong>
-                <span class="workspace-summary-sub">Format demo</span>
-              </div>
-            </div>
-            <div class="workspace-summary-item">
-              <span class="workspace-summary-label">Ekspor Lokal</span>
-              <div class="workspace-summary-val-row">
-                <strong class="text-success">PDF lokal tersedia</strong>
-                <span class="workspace-summary-sub">State simulator</span>
-              </div>
-            </div>
-            <div class="workspace-summary-item hide-mobile">
-                <span class="workspace-summary-label">Standar rujukan</span>
-              <div class="workspace-summary-val-row">
-                <strong class="tabular font-mono text-primary-2">Belum dinilai</strong>
-                <span class="workspace-summary-sub">Tidak tersertifikasi</span>
-              </div>
-            </div>
-            <div class="workspace-summary-item hide-mobile">
-                <span class="workspace-summary-label">Indeks SPM simulasi</span>
-              <div class="workspace-summary-val-row">
-                <strong class="tabular font-mono text-success">Contoh</strong>
-                <span class="workspace-summary-sub">Bukan evaluasi resmi</span>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <section class="reports-manager-grid">
-          <!-- Primary Daily Mobility Snapshot Card -->
-          <article class="report-card glass-panel reveal-card">
-            <div class="report-card-content">
-              <div class="report-kicker-row">
-                <span class="badge badge-primary-soft">PUSAT LAPORAN</span>
-                <span class="unboxed-meta-sep">·</span>
-                <span class="report-kicker-meta">Snapshot Sesi</span>
-              </div>
-              <h2 class="report-card-title">Snapshot mobilitas sesi</h2>
-              <p class="report-card-desc">Contoh ringkasan dari model lalu lintas OmniTRAF; tidak ditujukan untuk keputusan atau evaluasi operasional.</p>
-            </div>
-            <button class="btn btn-primary compact report-action-btn" type="button" data-action="download-report" data-report-type="Snapshot sesi">Buat snapshot sesi</button>
-          </article>
-
-          <!-- Reporting tools for the simulation prototype -->
-          <article class="reports-enterprise glass-panel">
-            <div class="section-head">
-              <div>
-                <h2>Ekspor Data Prototipe</h2>
-                <p>Ekspor insiden CSV atau snapshot sesi PDF/JSON. Buat pratinjau snapshot untuk menetapkan data dan waktu yang dipakai oleh semua format laporan.</p>
-              </div>
-              <span class="badge badge-simulated">SIMULASI</span>
-            </div>
-            
-            <div class="reports-enterprise-actions">
-              <button class="btn btn-primary" id="btnExportCsv" type="button">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                <span>Ekspor CSV insiden</span>
-              </button>
-              <button class="btn btn-outline" id="btnPrintExecutive" type="button">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-                <span>Buka dialog cetak</span>
-              </button>
-              <button class="btn btn-secondary" id="btnCopyTelemetryJson" type="button">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                <span>Salin snapshot (JSON)</span>
-              </button>
-            </div>
-          </article>
-          <article class="reports-history glass-panel">
-            <div class="section-head">
-              <div>
-                <h2>Riwayat berkas sesi ini</h2>
-                <p>Daftar hanya disimpan selama sesi browser saat ini.</p>
-              </div>
-            </div>
-            <div class="export-history-list export-history-scroll" id="exportHistoryList" aria-live="polite">
-              <p class="empty-history-text empty-history-notice">Belum ada berkas yang dibuat.</p>
-            </div>
-          </article>
-        </section>
-
-        <!-- Simulation report template (Rendered only on print / @media print) -->
-        <div id="executivePrintDoc" class="print-only-container">
-          <div class="print-letterhead">
-            <div class="print-logo-col">
-              <img src="/assets/omnitraf-logo-original.png" alt="Logo OmniTRAF" />
-            </div>
-            <div class="print-title-col">
-              <h1>OMNITRAF</h1>
-              <h2>PROTOTIPE SIMULASI MOBILITAS</h2>
-              <h3>DEMO NONRESMI • BUKAN SISTEM OPERASIONAL SITS</h3>
-            </div>
-          </div>
-
-          <div class="print-report-heading">
-            <h3 class="print-report-title">SNAPSHOT SESI MOBILITAS SIMULASI</h3>
-            <p class="print-meta-line">ID Demo: OMNITRAF-SIM &nbsp;|&nbsp; Waktu pembuatan: <span id="printDateStr">—</span></p>
-            <p class="print-safety-note">DATA SIMULASI • BUKAN DOKUMEN RESMI ATAU HASIL PENGUKURAN KOTA</p>
-          </div>
-
-          <h4 class="print-section-title">I. RINGKASAN KPI SIMULASI</h4>
-          <table class="print-summary-table">
-            <thead>
-              <tr>
-                <th>Indikator Performa Utama</th>
-                <th>Capaian Hari Ini</th>
-                <th>Pembanding model</th>
-                <th>Status Evaluasi</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Total Volume Kendaraan Terlayani</td>
-                <td id="printVolVal">—</td>
-                <td>Tidak tersedia</td>
-                <td>Belum dinilai</td>
-              </tr>
-              <tr>
-                <td>Rata-rata Waktu Tunggu Simpang (Wait Time)</td>
-                <td id="printWaitVal">—</td>
-                <td>Tidak tersedia</td>
-                <td>Belum dinilai</td>
-              </tr>
-              <tr>
-                <td>Reduksi Emisi Karbon Dioksida (CO₂)</td>
-                <td id="printCo2Val">—</td>
-                <td>Tidak tersedia</td>
-                <td>Belum dinilai</td>
-              </tr>
-              <tr>
-                <td>Jumlah contoh skenario insiden (bukan data SITS 112)</td>
-                <td id="printIncVal">—</td>
-                <td>Tidak tersedia</td>
-                <td>Belum dinilai</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <h4 class="print-section-title">II. STATUS OPERASIONAL KORIDOR UTAMA SURABAYA</h4>
-          <table class="print-corridor-table">
-            <thead>
-              <tr>
-                <th>Koridor Utama</th>
-                <th>Volume Arus</th>
-                <th>Kecepatan Rerata</th>
-                <th>Metode Sinyal</th>
-                <th>Status Terakhir</th>
-              </tr>
-            </thead>
-            <tbody id="printCorridorRows">
-              <tr>
-                <td colspan="5">Data koridor belum tersedia pada snapshot ini.</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <p class="print-final-notice">
-            SIMULASI • TIDAK DITANDATANGANI • BUKAN DOKUMEN PEMERINTAH
-          </p>
+  <!-- Unified Workspace Header -->
+  <header class="workspace-header">
+    <div class="workspace-header-title-group">
+      <span class="workspace-header-kicker">OMNITRAF · PUSAT EKSPOR &amp; DOKUMEN</span>
+      <h1 class="workspace-header-title">Laporan Mobilitas Simulasi</h1>
+      <p class="workspace-header-desc">Hasilkan ringkasan dokumen mobilitas dari state simulator saat ini. Dokumen ekspor menggunakan snapshot tunggal deterministik.</p>
+    </div>
+    <div class="workspace-header-summary-strip" aria-label="Ringkasan Status Ekspor">
+      <div class="workspace-summary-item">
+        <span class="workspace-summary-label">Format Dokumen</span>
+        <div class="workspace-summary-val-row">
+          <strong class="tabular font-mono text-cyan">PDF · CSV · JSON</strong>
+          <span class="workspace-summary-sub">Format ekspor</span>
         </div>
       </div>
+      <div class="workspace-summary-item">
+        <span class="workspace-summary-label">Mesin Ekspor</span>
+        <div class="workspace-summary-val-row">
+          <strong class="text-success">Client Snapshot V1</strong>
+          <span class="workspace-summary-sub">Konsisten &amp; deterministik</span>
+        </div>
+      </div>
+      <div class="workspace-summary-item hide-mobile">
+        <span class="workspace-summary-label">Klasifikasi Dokumen</span>
+        <div class="workspace-summary-val-row">
+          <strong class="tabular font-mono text-warning">SIMULASI SAJA</strong>
+          <span class="workspace-summary-sub">Non-operasional</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Configuration & Document Preview Workflow -->
+  <div class="reports-workflow-layout">
+    <!-- Left Panel: Configuration & Export Actions -->
+    <div class="reports-actions-column">
+      <!-- 1. Report Scope & Generation Card -->
+      <article class="reports-config-card glass-panel">
+        <div class="section-head compact">
+          <div>
+            <h2>Konfigurasi Dokumen</h2>
+            <p>Tetapkan snapshot dan buat berkas mobilitas.</p>
+          </div>
+          <span class="badge badge-simulated">SNAPSHOT SESI</span>
+        </div>
+        <p class="reports-scope-note">Snapshot mengambil volume lalu lintas, waktu tunggu, estimasi CO₂, dan daftar insiden aktif secara atomik.</p>
+        <button class="btn btn-primary report-action-btn" type="button" data-action="download-report" data-report-type="Snapshot sesi">
+          📄 Buat &amp; Unduh PDF Snapshot Sesi
+        </button>
+      </article>
+
+      <!-- 2. Export Actions Grid -->
+      <article class="reports-formats-card glass-panel">
+        <div class="section-head compact">
+          <div>
+            <h2>Format Ekspor Tambahan</h2>
+            <p>Unduh data tabular atau salin payload telemetry.</p>
+          </div>
+        </div>
+        <div class="reports-format-buttons">
+          <button class="btn btn-outline" id="btnExportCsv" type="button">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            <span>Unduh CSV Insiden</span>
+          </button>
+          <button class="btn btn-outline" id="btnPrintExecutive" type="button">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+            <span>Cetak / Cetak PDF Sistem</span>
+          </button>
+          <button class="btn btn-secondary" id="btnCopyTelemetryJson" type="button">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            <span>Salin JSON Telemetri</span>
+          </button>
+        </div>
+      </article>
+
+      <!-- 3. Export History Panel -->
+      <article class="reports-history-card glass-panel">
+        <div class="section-head compact">
+          <div>
+            <h2>Riwayat Unduhan Sesi</h2>
+            <p>Tercatat saat berkas berhasil dibuat di sesi browser saat ini.</p>
+          </div>
+        </div>
+        <div class="export-history-list export-history-scroll" id="exportHistoryList" aria-live="polite">
+          <p class="empty-history-text empty-history-notice">Belum ada berkas yang dibuat.</p>
+        </div>
+      </article>
+    </div>
+
+    <!-- Right Panel: Live Document Visual Preview -->
+    <div class="reports-preview-column">
+      <article class="reports-preview-card glass-panel">
+        <div class="preview-card-header">
+          <div>
+            <span class="preview-badge">PRATINJAU DOKUMEN</span>
+            <h2>Pratinjau Dokumen Eksekutif</h2>
+          </div>
+          <span class="preview-watermark-tag">SIMULASI</span>
+        </div>
+        
+        <div class="document-sheet-wrapper">
+          <div class="document-sheet">
+            <div class="doc-header">
+              <div class="doc-title-block">
+                <h3>OMNITRAF SURABAYA</h3>
+                <h4>SNAPSHOT MOBILITAS PERKOTAAN (SIMULASI)</h4>
+                <p class="doc-kicker">DEMO PROTOKOL SITS · BUKAN DOKUMEN RESMI PEMERINTAH</p>
+              </div>
+            </div>
+            <div class="doc-meta-strip">
+              <div><span>Status:</span> <strong>Sintetis</strong></div>
+              <div><span>Waktu Snapshot:</span> <strong id="docPreviewTime">Sesuai Jam Operasional</strong></div>
+              <div><span>Cakupan:</span> <strong>Koridor Utama</strong></div>
+            </div>
+            
+            <div class="doc-section">
+              <h5>I. RINGKASAN INDIKATOR UTAMA</h5>
+              <div class="doc-kpi-grid">
+                <div class="doc-kpi-item">
+                  <span class="kpi-label">Volume Terlayani</span>
+                  <strong class="kpi-val" id="docPreviewVolume">Model 24 Jam</strong>
+                </div>
+                <div class="doc-kpi-item">
+                  <span class="kpi-label">Waktu Tunggu Simpang</span>
+                  <strong class="kpi-val" id="docPreviewWait">Optimal Skenario</strong>
+                </div>
+                <div class="doc-kpi-item">
+                  <span class="kpi-label">Estimasi Reduksi CO₂</span>
+                  <strong class="kpi-val" id="docPreviewCo2">Model Dampak</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="doc-section">
+              <h5>II. KINERJA JARINGAN &amp; KORIDOR</h5>
+              <p class="doc-text">Dokumen lengkap memuat matriks volume, kecepatan rata-rata, panjang antrean, dan efisiensi koordinasi sinyal untuk Koridor A. Yani, Darmo, Jemursari, dan MERR Kertajaya.</p>
+            </div>
+
+            <div class="doc-footer">
+              <small>Dibuat secara otomatis oleh Kernel OmniTRAF Simulator. Informasi ini ditujukan semata-mata untuk pengujian teknis arsitektur antarmuka.</small>
+            </div>
+          </div>
+        </div>
+      </article>
+    </div>
+  </div>
+
+  <!-- Print Template (Used by window.print() / @media print) -->
+  <div id="executivePrintDoc" class="print-only-container">
+    <div class="print-letterhead">
+      <div class="print-logo-col">
+        <img src="/assets/omnitraf-logo-original.png" alt="Logo OmniTRAF" />
+      </div>
+      <div class="print-title-col">
+        <h1>OMNITRAF</h1>
+        <h2>PROTOTIPE SIMULASI MOBILITAS</h2>
+        <h3>DEMO NONRESMI • BUKAN SISTEM OPERASIONAL SITS</h3>
+      </div>
+    </div>
+
+    <div class="print-report-heading">
+      <h3 class="print-report-title">SNAPSHOT SESI MOBILITAS SIMULASI</h3>
+      <p class="print-meta-line">ID Demo: OMNITRAF-SIM &nbsp;|&nbsp; Waktu pembuatan: <span id="printDateStr">—</span></p>
+      <p class="print-safety-note">DATA SIMULASI • BUKAN DOKUMEN RESMI ATAU HASIL PENGUKURAN KOTA</p>
+    </div>
+
+    <h4 class="print-section-title">I. RINGKASAN KPI SIMULASI</h4>
+    <table class="print-summary-table">
+      <thead>
+        <tr>
+          <th>Indikator Performa Utama</th>
+          <th>Capaian Hari Ini</th>
+          <th>Pembanding model</th>
+          <th>Status Evaluasi</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Total Volume Kendaraan Terlayani</td>
+          <td id="printVolVal">—</td>
+          <td>Tidak tersedia</td>
+          <td>Belum dinilai</td>
+        </tr>
+        <tr>
+          <td>Rata-rata Waktu Tunggu Simpang (Wait Time)</td>
+          <td id="printWaitVal">—</td>
+          <td>Tidak tersedia</td>
+          <td>Belum dinilai</td>
+        </tr>
+        <tr>
+          <td>Reduksi Emisi Karbon Dioksida (CO₂)</td>
+          <td id="printCo2Val">—</td>
+          <td>Tidak tersedia</td>
+          <td>Belum dinilai</td>
+        </tr>
+        <tr>
+          <td>Jumlah contoh skenario insiden (bukan data SITS 112)</td>
+          <td id="printIncVal">—</td>
+          <td>Tidak tersedia</td>
+          <td>Belum dinilai</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h4 class="print-section-title">II. STATUS OPERASIONAL KORIDOR UTAMA SURABAYA</h4>
+    <table class="print-corridor-table">
+      <thead>
+        <tr>
+          <th>Koridor Utama</th>
+          <th>Volume Arus</th>
+          <th>Kecepatan Rerata</th>
+          <th>Metode Sinyal</th>
+          <th>Status Terakhir</th>
+        </tr>
+      </thead>
+      <tbody id="printCorridorRows">
+        <tr>
+          <td colspan="5">Data koridor belum tersedia pada snapshot ini.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="print-final-notice">
+      SIMULASI • TIDAK DITANDATANGANI • BUKAN DOKUMEN PEMERINTAH
+    </p>
+  </div>
+</div>

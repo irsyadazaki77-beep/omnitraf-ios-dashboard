@@ -237,11 +237,6 @@
   </section>
 </nav>
 
-      <!-- Diagnostic Performance Telemetry Pill Badge -->
-      <div class="telemetry-pill glass-soft" id="perfChip" aria-label="Status koneksi">
-        <span class="perf-dot"></span>
-        <span class="perf-text">Koneksi: MENGHUBUNGKAN</span>
-      </div>
     </aside>
 
     <main class="main-content" id="mainContent" tabindex="-1">
@@ -262,7 +257,7 @@
         </div>
       </div>
 
-      <header class="topbar glass-panel">
+      <header class="topbar glass-panel" aria-label="Navigasi halaman">
         <div class="topbar-left-mobile">
           <button class="menu-toggle glass-soft" id="menuToggle" aria-label="Buka menu" aria-controls="sidebar" aria-expanded="false" type="button">
             <span class="menu-line"></span>
@@ -275,29 +270,15 @@
           </div>
         </div>
 
-        <div class="topbar-actions" aria-label="Operational status">
+        <div class="topbar-actions" aria-label="Aksi utama">
           <button class="header-search-trigger" id="headerSearchButton" type="button" aria-haspopup="dialog" aria-controls="navigationPalette" aria-keyshortcuts="Control+K Meta+K">
             <span aria-hidden="true">⌕</span><span class="header-search-label">Cari</span><kbd>Ctrl K</kbd>
           </button>
-          <!-- Demo status capsule; no live SITS or weather integrations are connected. -->
           <div class="status-capsule glass-soft" id="statusCapsule" aria-label="Status prototipe OmniTRAF">
-            <!-- Hidden original elements kept for 100% JS compatibility -->
             <span id="clock" class="capsule-item clock-text">--.-- WIB</span>
-            <span class="capsule-divider">|</span>
             <span class="capsule-item gateway-status" id="sseStatusPill">
               <span class="capsule-live-dot" id="sseStatusDot"></span>
               <strong id="sseStatusText">Server simulasi</strong>
-            </span>
-            <span class="capsule-divider">|</span>
-            <span class="capsule-item weather-status" id="weatherWidget" title="Contoh cuaca; bukan data BMKG">
-              <span id="weatherIcon">☀</span> <span id="weatherTemp">Cuaca demo</span>
-            </span>
-            <span class="capsule-divider sits-heartbeat-sep">|</span>
-            <span class="capsule-item sits-signal-chip hide-mobile" title="Indikator demo; bukan kekuatan sinyal gateway">
-              <svg class="heartbeat-svg" viewBox="0 0 100 20" aria-hidden="true">
-                <path class="heartbeat-path" d="M0,10 L30,10 L35,2 L40,18 L45,10 L50,10 L55,5 L60,15 L65,10 L100,10" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-              <strong id="sitsStatusText" aria-live="polite">DEMO</strong>
             </span>
           </div>
 
@@ -312,31 +293,25 @@
             <button class="siren-mute-btn" id="btnMuteSiren" type="button" aria-label="Mute Siren" title="Mute/Unmute Sirine">🔊</button>
           </article>
 
-          <!-- Minimalist Squircle Action Bar -->
           <div class="topbar-action-buttons">
-            <button class="topbar-squircle-btn glass-soft" type="button" id="btnOpenEngineModal" aria-label="Algoritma & Arsitektur OmniTRAF" title="Algoritma demonstrasi (Webster; tanpa YOLOv8)">
-              <span class="squircle-btn-icon" aria-hidden="true">⚙️</span>
-            </button>
-  <button class="topbar-squircle-btn glass-soft" type="button" id="btnTopMobileChat" aria-label="Buka chat koordinasi simulasi" aria-controls="staffChatPanel" aria-expanded="false" title="Chat simulasi">
-              <span class="squircle-btn-icon" aria-hidden="true">💬</span>
-              <span class="chat-online-dot-mini"></span>
-            </button>
-            <button class="topbar-squircle-btn notif-toggle glass-soft" type="button" id="notifToggle" aria-label="Notifikasi Insiden" title="Notifikasi Insiden Lalu Lintas">
-              <span class="squircle-btn-icon notif-icon" aria-hidden="true">🔔</span>
-              <span class="notif-badge" id="notifBadgeCount" hidden></span>
-            </button>
-            <button class="topbar-squircle-btn help-toggle glass-soft" type="button" id="btnQuickTour" aria-label="Bantuan Tour SITS" title="Panduan & Bantuan SITS">
-              ?
-            </button>
-            <button class="topbar-squircle-btn audio-toggle glass-soft" type="button" id="audioToggle" aria-label="Aktifkan suara" title="Toggle Efek Suara">
-              <span class="squircle-btn-icon audio-icon" aria-hidden="true">🔇</span>
-            </button>
             <button class="topbar-squircle-btn theme-toggle glass-soft" type="button" id="themeToggle" aria-label="Ganti tema warna" title="Ganti Tema Dark/Light">
               <span class="squircle-btn-icon theme-icon" aria-hidden="true">☾</span>
             </button>
+            <button class="topbar-squircle-btn notif-toggle glass-soft" type="button" id="notifToggle" aria-label="Notifikasi insiden" title="Notifikasi insiden">
+              <span class="squircle-btn-icon notif-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg></span>
+              <span class="notif-badge" id="notifBadgeCount" hidden></span>
+            </button>
+            <details class="topbar-overflow">
+              <summary aria-label="Aksi lainnya" title="Aksi lainnya">···</summary>
+              <div class="topbar-overflow-menu">
+                <button type="button" id="btnOpenEngineModal">Arsitektur dan algoritma</button>
+                <button type="button" id="btnTopMobileChat" aria-controls="staffChatPanel" aria-expanded="false">Chat simulasi</button>
+                <button type="button" id="btnQuickTour">Panduan penggunaan</button>
+                <button type="button" id="audioToggle" aria-label="Aktifkan suara"><span class="audio-icon">🔇</span> Suara</button>
+              </div>
+            </details>
           </div>
 
-          <!-- Minimalist Operator Profile Squircle -->
           <div class="profile-squircle glass-soft" id="operatorProfile" aria-label="Profil sesi simulasi" title="Profil sesi saat ini">
             <div class="avatar-container">
               <div class="avatar" id="profileAvatar" aria-hidden="true">D</div>

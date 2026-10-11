@@ -1,127 +1,207 @@
 <div class="view-pane" id="view-settings">
-        <article class="settings-card glass-panel reveal-card" id="card-settings">
-          <div>
-            <p class="eyebrow">PREFERENSI TAMPILAN</p>
-            <h2>Tampilan &amp; aksesibilitas</h2>
-            <p>Atur kepadatan workspace di halaman ini. Tema warna tersedia di bawah dan di topbar dan motion mengikuti preferensi sistem.</p>
-          </div>
-          <span class="provenance-badge simulated">UI SETTINGS</span>
-        </article>
-        <article class="settings-expanded-card glass-panel">
-          <h2>Preferensi Command Center</h2>
-          <p>Pengaturan ini memengaruhi pengalaman antarmuka dan suara prototipe simulasi.</p>
-          <div class="settings-options-list">
-            <h3 class="settings-group-heading">Audio &amp; notifikasi</h3>
-            <div class="opt-row">
-              <div>
-                <strong>Suara interaksi</strong>
-                <p>Umpan balik audio sintetis saat berinteraksi dengan kontrol.</p>
-              </div>
-              <button class="btn btn-ghost" type="button" id="settingsMute" aria-pressed="false">Aktifkan suara</button>
-            </div>
-            
-            <!-- Volume Control & Alert Tone Selector -->
-            <div class="opt-row">
-              <div>
-                <strong>Volume & Tipe Audio Sintesis</strong>
-                <p>Sesuaikan volume umpan balik tombol dan pilih nada sintetis.</p>
-                <div class="settings-volume-row">
-                  <label class="settings-vol-label" for="audioVolumeRange">Volume: </label>
-                  <input id="audioVolumeRange" type="range" min="0" max="100" value="70" class="settings-vol-range" aria-describedby="audioPreferenceStatus" />
-                  <output id="audioVolumeOutput" for="audioVolumeRange">70%</output>
-                  <label class="settings-vol-label" for="audioToneSelector">Tipe nada:</label>
-                  <select id="audioToneSelector" class="selector settings-select-sm" aria-label="Tipe audio sintetis">
-                    <option value="click">Klik mekanis</option>
-                    <option value="cyber">Synthesizer digital</option>
-                    <option value="retro">Nada retro</option>
-                  </select>
-                  <button class="btn btn-ghost compact" type="button" id="previewAudioTone">Pratinjau nada</button>
-                </div>
-                <p id="audioPreferenceStatus" class="settings-desc" role="status">Pratinjau memakai nada dan volume yang dipilih.</p>
-              </div>
-            </div>
+  <!-- Settings Header Banner -->
+  <article class="settings-card glass-panel reveal-card" id="card-settings">
+    <div>
+      <p class="eyebrow">PREFERENSI WORKSPACE</p>
+      <h2>Pengaturan Antarmuka &amp; Sistem</h2>
+      <p>Kelola tema tampilan, profil audio interaktif, pintasan aksesibilitas, dan preferensi runtime.</p>
+    </div>
+    <span class="provenance-badge simulated">UI PREFERENCES</span>
+  </article>
 
-            <!-- Optional Ambient City Traffic Soundscape -->
-            <div class="opt-row">
-              <div>
-                <strong>Suasana lalu lintas</strong>
-                <p>Putar ambience simulasi secara opsional di latar belakang.</p>
-                <div class="settings-volume-row">
-                  <label class="settings-vol-label" for="ambientVolumeRange">Volume Ambient: </label>
-                  <input id="ambientVolumeRange" type="range" min="0" max="100" value="30" class="settings-vol-range" aria-describedby="ambientSoundscapeStatus" />
-                  <output id="ambientVolumeOutput" for="ambientVolumeRange">30%</output>
-                </div>
+  <!-- Modern Categorized Settings Layout -->
+  <div class="settings-workspace-layout">
+    <!-- Categories Navigation Sidebar -->
+    <nav class="settings-nav-sidebar" aria-label="Kategori Pengaturan">
+      <ul class="settings-nav-list" role="tablist">
+        <li>
+          <a href="#settings-cat-appearance" class="settings-nav-item active" role="tab" aria-selected="true">
+            <span class="nav-icon" aria-hidden="true">🎨</span>
+            <span>Tampilan</span>
+          </a>
+        </li>
+        <li>
+          <a href="#settings-cat-audio" class="settings-nav-item" role="tab" aria-selected="false">
+            <span class="nav-icon" aria-hidden="true">🔊</span>
+            <span>Audio &amp; Notifikasi</span>
+          </a>
+        </li>
+        <li>
+          <a href="#settings-cat-accessibility" class="settings-nav-item" role="tab" aria-selected="false">
+            <span class="nav-icon" aria-hidden="true">♿</span>
+            <span>Aksesibilitas</span>
+          </a>
+        </li>
+        <li>
+          <a href="#settings-cat-system" class="settings-nav-item" role="tab" aria-selected="false">
+            <span class="nav-icon" aria-hidden="true">⚙️</span>
+            <span>Sistem &amp; Reset</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Settings Content Panels -->
+    <div class="settings-content-column">
+      <!-- 1. APPEARANCE -->
+      <section class="settings-category-panel glass-panel" id="settings-cat-appearance">
+        <div class="category-header">
+          <h3>🎨 Tampilan &amp; Layout</h3>
+          <p>Konfigurasi tema warna dan tingkat kepadatan ruang kerja.</p>
+        </div>
+
+        <div class="settings-options-list">
+          <div class="opt-row">
+            <div>
+              <strong>Tema Visual</strong>
+              <p>Pilih mode kontras tinggi (Gelap) atau mode terang untuk ruang kontrol.</p>
+            </div>
+            <button class="btn btn-ghost" type="button" id="settingsTheme">Ganti tema terang atau gelap</button>
+          </div>
+
+          <div class="opt-row">
+            <div>
+              <strong>Kepadatan Antarmuka</strong>
+              <p>Sesuaikan jarak vertikal antarelemen (Rapat untuk monitor ringkas, Lapang untuk layar besar).</p>
+            </div>
+            <div class="density-mode-control" role="group" aria-label="Kepadatan antarmuka">
+              <button class="btn btn-ghost compact" type="button" data-density-choice="compact" aria-pressed="true">Rapat</button>
+              <button class="btn btn-ghost compact" type="button" data-density-choice="comfortable" aria-pressed="false">Lapang</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. AUDIO & NOTIFICATIONS -->
+      <section class="settings-category-panel glass-panel" id="settings-cat-audio">
+        <div class="category-header">
+          <h3>🔊 Audio &amp; Notifikasi Suara</h3>
+          <p>Umpan balik audio sintetis dan ambience kota Surabaya.</p>
+        </div>
+
+        <div class="settings-options-list">
+          <div class="opt-row">
+            <div>
+              <strong>Suara Interaksi</strong>
+              <p>Umpan balik audio sintetis saat menekan tombol dan filter.</p>
+            </div>
+            <button class="btn btn-ghost" type="button" id="settingsMute" aria-pressed="false">Aktifkan suara</button>
+          </div>
+
+          <div class="opt-row">
+            <div>
+              <strong>Volume &amp; Karakter Nada</strong>
+              <p>Atur tingkat desibel klik dan pilih karakteristik synthesizer.</p>
+              <div class="settings-volume-row">
+                <label class="settings-vol-label" for="audioVolumeRange">Volume: </label>
+                <input id="audioVolumeRange" type="range" min="0" max="100" value="70" class="settings-vol-range" aria-describedby="audioPreferenceStatus" />
+                <output id="audioVolumeOutput" for="audioVolumeRange">70%</output>
+                <label class="settings-vol-label" for="audioToneSelector">Nada:</label>
+                <select id="audioToneSelector" class="selector settings-select-sm" aria-label="Tipe audio sintetis">
+                  <option value="click">Klik mekanis</option>
+                  <option value="cyber">Synthesizer digital</option>
+                  <option value="retro">Nada retro</option>
+                </select>
+                <button class="btn btn-ghost compact" type="button" id="previewAudioTone">Pratinjau nada</button>
               </div>
+              <p id="audioPreferenceStatus" class="settings-desc" role="status">Pratinjau memakai nada dan volume yang dipilih.</p>
+            </div>
+          </div>
+
+          <div class="opt-row">
+            <div>
+              <strong>Ambience Lalu Lintas Kota</strong>
+              <p>Putar efek suara latar sintetis perkotaan Surabaya secara opsional.</p>
+              <div class="settings-volume-row">
+                <label class="settings-vol-label" for="ambientVolumeRange">Volume: </label>
+                <input id="ambientVolumeRange" type="range" min="0" max="100" value="30" class="settings-vol-range" aria-describedby="ambientSoundscapeStatus" />
+                <output id="ambientVolumeOutput" for="ambientVolumeRange">30%</output>
+              </div>
+            </div>
+            <div class="toggle-action-wrap">
               <label class="layer-item settings-chk-label">
                 <input type="checkbox" class="layer-toggle-checkbox" id="chkAmbientSoundscape" />
                 <span class="settings-chk-text">Mulai</span>
               </label>
               <span class="settings-desc" id="ambientSoundscapeStatus" role="status">Ambience berhenti sampai diaktifkan.</span>
             </div>
+          </div>
 
-            <!-- Voice Alert TTS (Fitur 2) -->
-            <div class="opt-row">
-              <div>
-                <strong>Pembacaan alert</strong>
-                <p>Membacakan notifikasi prototipe menggunakan sintesis suara.</p>
-              </div>
+          <div class="opt-row">
+            <div>
+              <strong>Pembacaan Notifikasi (TTS Voice)</strong>
+              <p>Sintesis suara browser untuk pemberitahuan insiden lalu lintas baru (Opt-in eksplisit).</p>
+            </div>
+            <div class="toggle-action-wrap">
               <label class="layer-item settings-chk-label">
                 <input type="checkbox" class="layer-toggle-checkbox" id="chkVoiceAlerts" />
                 <span class="settings-chk-text">Nonaktif</span>
               </label>
               <span class="settings-desc" id="voiceAlertStatus" role="status">Pembacaan alert nonaktif.</span>
             </div>
-
-            <!-- Keyboard shortcuts visual guide button -->
-            <h3 class="settings-group-heading">Preferensi penggunaan</h3><div class="opt-row"><strong>Tema warna</strong><button class="btn btn-ghost" type="button" id="settingsTheme">Ganti tema terang atau gelap</button></div>
-            <div class="opt-row">
-              <div>
-                <strong>Pintasan papan ketik</strong>
-                <p>Buka panduan tombol pintasan untuk ruang kendali.</p>
-              </div>
-              <button class="btn btn-primary compact" id="btnShowShortcuts" type="button">Tampilkan panduan pintasan</button>
-            </div>
-            <div class="opt-row">
-              <div>
-                <strong>Kepadatan antarmuka</strong>
-                <p>Pilih jarak antarelemen untuk pemantauan berjam-jam atau tampilan yang lebih lega.</p>
-              </div>
-              <div class="density-mode-control" role="group" aria-label="Kepadatan antarmuka">
-                <button class="btn btn-ghost compact" type="button" data-density-choice="compact" aria-pressed="true">Rapat</button>
-                <button class="btn btn-ghost compact" type="button" data-density-choice="comfortable" aria-pressed="false">Lapang</button>
-              </div>
-            </div>
-
-            <h3 class="settings-group-heading">Tampilan</h3>
-            <div class="opt-row">
-              <div>
-                <strong>Tema gelap adaptif</strong>
-                <p>Tema gelap kontras tinggi untuk kondisi ruang kendali dengan intensitas cahaya rendah.</p>
-              </div>
-              <span class="settings-desc">Status tema dikontrol melalui ikon kontras di topbar.</span>
-            </div>
-
-            <h3 class="settings-group-heading">Aksesibilitas</h3>
-            <div class="opt-row">
-              <div>
-                <strong>Keyboard dan motion</strong>
-                <p>Kontrol dapat dijangkau dengan keyboard. Animasi mengikuti preferensi Reduce Motion pada sistem operasi.</p>
-              </div>
-              <span class="settings-desc">Pintasan global: Ctrl/Cmd + K</span>
-            </div>
-
-            <h3 class="settings-group-heading">Sistem</h3>
-            <div class="opt-row">
-              <div>
-                <strong>Batas simulasi</strong>
-                <p>OmniTRAF pada lingkungan ini tidak mengendalikan APILL, CCTV, perangkat, atau layanan darurat fisik.</p>
-              </div>
-              <span class="provenance-badge simulated">SIMULASI SAJA</span>
-            </div>
           </div>
+        </div>
+      </section>
+
+      <!-- 3. ACCESSIBILITY -->
+      <section class="settings-category-panel glass-panel" id="settings-cat-accessibility">
+        <div class="category-header">
+          <h3>♿ Aksesibilitas &amp; Navigasi Keyboard</h3>
+          <p>Panduan pintasan cepat dan kompatibilitas sistem operasional.</p>
+        </div>
+
+        <div class="settings-options-list">
+          <div class="opt-row">
+            <div>
+              <strong>Pintasan Papan Ketik (Keyboard Shortcuts)</strong>
+              <p>Daftar kombinasi tombol pintas untuk operator ruang kendali.</p>
+            </div>
+            <button class="btn btn-primary compact" id="btnShowShortcuts" type="button">Tampilkan panduan pintasan</button>
+          </div>
+
+          <div class="opt-row">
+            <div>
+              <strong>Navigasi Cepat Global</strong>
+              <p>Buka Command Palette kapan saja dengan menekan tombol pintas:</p>
+            </div>
+            <kbd class="settings-kbd-shortcut">Ctrl / Cmd + K</kbd>
+          </div>
+
+          <div class="opt-row">
+            <div>
+              <strong>Pengurangan Gerak (Reduced Motion)</strong>
+              <p>Animasi antarmuka secara otomatis menghormati preferensi prefers-reduced-motion dari OS Anda.</p>
+            </div>
+            <span class="badge badge-success-soft">OTOMATIS (OS ALIGNED)</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. SYSTEM & RESET -->
+      <section class="settings-category-panel glass-panel" id="settings-cat-system">
+        <div class="category-header">
+          <h3>⚙️ Informasi Sistem &amp; Pemulihan</h3>
+          <p>Informasi batasan prototipe dan reset preferensi lokal.</p>
+        </div>
+
+        <div class="settings-options-list">
+          <div class="opt-row">
+            <div>
+              <strong>Batasan Lingkungan Demo</strong>
+              <p>OmniTRAF pada platform ini beroperasi dalam mode emulasi dan tidak terhubung ke APILL fisik Dishub.</p>
+            </div>
+            <span class="provenance-badge simulated">SIMULASI SAJA</span>
+          </div>
+
           <div class="settings-reset-row">
-            <p class="settings-desc">Pulihkan tema, kepadatan, sidebar, audio, ambience, dan pembacaan alert ke nilai awal.</p>
+            <div>
+              <strong>Pulihkan Preferensi Antarmuka</strong>
+              <p class="settings-desc">Kembalikan tema, kepadatan, volume, dan pengaturan suara ke nilai standar bawaan.</p>
+            </div>
             <button class="btn btn-ghost" type="button" id="resetUiPreferences">Pulihkan preferensi</button>
           </div>
-        </article>
-      </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>

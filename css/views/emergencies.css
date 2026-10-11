@@ -44,3 +44,19 @@
   .emergency-progress-step { padding: 5px 8px; border-top: 0; border-left: 2px solid var(--border); }
   .em-meta-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+/* Mission-first emergency workspace */
+.emergency-page-header { margin-bottom:10px; }
+.emergency-simulator-hero { padding:12px 14px; border:1px solid var(--border-default); border-radius:var(--radius-md); background:var(--surface); box-shadow:none; }
+.emergency-hero-flex { align-items:center; gap:12px; }
+.emergency-hero-title { font-size:15px; }
+.emergency-hero-desc { max-width:520px; margin:3px 0 0; font-size:12px; }
+.emergency-hero-actions { gap:6px; }
+.emergency-hero-actions .btn { min-height:38px; padding:0 11px; font-size:12px; }
+.emergency-dashboard { grid-template-columns:minmax(0,1.4fr) minmax(300px,.8fr); align-items:start; gap:12px; }
+.emergency-active-feed,.emergency-dispatcher { min-width:0; padding:14px; border:1px solid var(--border-default); border-radius:var(--radius-md); background:var(--surface); box-shadow:none; }
+.emergency-active-feed .section-head,.emergency-dispatcher .section-head { margin-bottom:10px; }
+.emergency-active-feed .section-head p,.emergency-dispatcher .section-head p { margin:4px 0 0; color:var(--text-secondary); font-size:12px; }
+.emergency-list-grid { display:grid; gap:8px; }
+.emergency-card-item { padding:12px; border:1px solid var(--border-subtle); border-radius:var(--radius-sm); background:var(--surface-raised); box-shadow:none; }
+@media (max-width:1000px) { .emergency-dashboard { grid-template-columns:minmax(0,1fr); } }
+@media (max-width:600px) { .emergency-simulator-hero { padding:10px; } .emergency-hero-flex { align-items:flex-start; flex-direction:column; } .emergency-hero-actions { width:100%; flex-wrap:wrap; } .emergency-hero-actions .btn { flex:1 1 auto; } .emergency-dashboard { gap:10px; } .emergency-active-feed,.emergency-dispatcher { padding:10px; } }

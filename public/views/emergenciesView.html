@@ -1,21 +1,14 @@
 <div class="view-pane" id="view-emergency">
-        <!-- Emergency Response 112 Mission Header / Simulator Hero -->
+        <header class="workspace-page-header emergency-page-header">
+          <div><p class="eyebrow">OMNITRAF · SIMULASI</p><h1>Prioritas darurat</h1><p class="workspace-page-description">Pantau misi preemption pada model; tidak ada armada atau APILL fisik yang terhubung.</p></div>
+          <span class="provenance-badge simulated">SIMULATION_ONLY</span>
+        </header>
+        <!-- Compact mission context and existing workflow actions -->
         <article class="emergency-simulator-hero glass-panel">
           <div class="emergency-hero-flex">
             <div class="emergency-hero-info">
-              <div class="emergency-kicker-row">
-                <span class="badge emergency-kicker-badge">
-                  <span class="signals-status-dot dot-live"></span> SIMULASI PREEMPTION DARURAT
-                </span>
-                <span class="unboxed-meta-sep">·</span>
-                <span class="emergency-kicker-sub">Command Center 112 Surabaya</span>
-              </div>
-              <h1 class="emergency-hero-title">
-                Simulasi prioritas darurat
-              </h1>
-              <p class="emergency-hero-desc">
-                Mendemonstrasikan aturan <strong>Green Wave Clearance</strong> pada state sintetis. Tidak ada GPS, armada, APILL, atau telemetri lapangan yang terhubung.
-              </p>
+              <strong class="emergency-hero-title">Misi dan jalur prioritas model</strong>
+              <p class="emergency-hero-desc">Progres mengikuti state simulator. Posisi dan ETA lapangan tidak tersedia.</p>
             </div>
             <div class="emergency-hero-actions">
               <button class="btn btn-danger btn-lg emergency-dispatch-btn" id="btnStart112Sim" type="button" data-capability="emergency:control">
@@ -31,6 +24,23 @@
         </article>
 
         <section class="emergency-dashboard">
+          <!-- Active Feed -->
+          <div class="emergency-active-feed glass-panel">
+            <div class="section-head">
+              <div>
+                <h2>Alur Prioritas Simulasi</h2>
+                <p>Status dan progres kendaraan berasal dari model; tidak ada integrasi GPS atau layanan 112.</p>
+              </div>
+              <span class="pill pill-danger" id="activePriorityCount">Memuat prioritas</span>
+            </div>
+
+            <div class="emergency-list-grid" id="emergencyListGrid">
+              <div class="glass-panel text-center emergency-empty-state">
+                <span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>
+                <span>Memuat armada simulasi...</span>
+              </div>
+            </div>
+          </div>
           <!-- Emergency Dispatcher Form -->
           <article class="emergency-dispatcher glass-panel">
             <div class="section-head">
@@ -79,22 +89,5 @@
             </form>
           </article>
 
-          <!-- Active Feed -->
-          <div class="emergency-active-feed glass-panel">
-            <div class="section-head">
-              <div>
-                <h2>Alur Prioritas Simulasi</h2>
-                <p>Status dan progres kendaraan berasal dari model; tidak ada integrasi GPS atau layanan 112.</p>
-              </div>
-              <span class="pill pill-danger" id="activePriorityCount">Memuat prioritas</span>
-            </div>
-
-            <div class="emergency-list-grid" id="emergencyListGrid">
-              <div class="glass-panel text-center emergency-empty-state">
-                <span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>
-                <span>Memuat armada simulasi...</span>
-              </div>
-            </div>
-          </div>
         </section>
       </div>

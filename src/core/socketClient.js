@@ -717,29 +717,6 @@ export class SocketClient {
       if (sitsStatusText) sitsStatusText.textContent = "DEMO";
     }
 
-    this._updatePerformanceChip();
-  }
-
-  _updatePerformanceChip() {
-    if (typeof document === 'undefined') return;
-    const perfChip = document.getElementById("perfChip");
-    if (!perfChip) return;
-
-    const perfText = perfChip.querySelector(".perf-text");
-    const perfDot = perfChip.querySelector(".perf-dot");
-    const state = stateStore.getState();
-
-    const status = state.connectionStatus;
-
-    if (perfText) {
-      perfText.textContent = status === 'auth_failed' ? 'Demo lokal · belum masuk' : `Koneksi: ${({ connected: 'tersambung', reconnecting: 'menghubungkan ulang', connecting: 'menghubungkan', offline: 'terputus', resyncing: 'sinkronisasi' })[status] || status}`;
-    }
-
-    if (perfDot) {
-      if (status === 'connected') perfDot.style.background = "var(--success)";
-      else if (status === 'reconnecting' || status === 'resyncing') perfDot.style.background = "var(--warning)";
-      else perfDot.style.background = "var(--danger)";
-    }
   }
 
   destroy() {

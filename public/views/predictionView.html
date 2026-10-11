@@ -1,53 +1,80 @@
 <div class="view-pane" id="view-prediction">
-        <article class="prediction-panel glass-panel">
-          <div class="section-head">
-            <div>
-              <div class="analytics-provenance-row">
-                <span class="provenance-badge simulated">SIMULASI · MODEL · ASUMSI</span>
-              </div>
-              <h2>Prakiraan kepadatan per jam</h2>
-              <p>Proyeksi model untuk koridor Surabaya selama 24 jam. Skenario rekomendasi tidak dikirim ke APILL atau perangkat lapangan.</p>
-            </div>
-            <div class="prediction-status-badge">Kondisi pada jam model: <strong id="predTomorrowStatus">Sedang</strong></div>
-          </div>
-
-          <div class="prediction-slider-box">
-            <div class="time-label-row">
-              <span id="sliderTimeLabel">08:00 WIB</span>
-              <span class="risk-label" id="sliderRiskLabel">Status: Risiko macet tinggi</span>
-            </div>
-            <div class="forecast-waveform-wrapper">
-              <svg class="forecast-waveform-svg" viewBox="0 0 100 20" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="waveformGrad" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stop-color="var(--primary-2)" stop-opacity="0.15" />
-                    <stop offset="100%" stop-color="var(--primary-2)" stop-opacity="0" />
-                  </linearGradient>
-                </defs>
-                <path d="M0,18 Q15,18 25,12 T33,3 T40,16 T50,15 T62,10 T70,3 T80,14 T100,18" fill="none" stroke="rgba(0, 229, 255, 0.25)" stroke-width="1.5" />
-                <path d="M0,18 Q15,18 25,12 T33,3 T40,16 T50,15 T62,10 T70,3 T80,14 T100,18 L100,20 L0,20 Z" fill="url(#waveformGrad)" />
-              </svg>
-              <input class="slider-glow" id="predictionTimeSlider" type="range" min="0" max="23" value="8" />
-            </div>
-            <div class="timeline-ticks">
-              <span>00:00</span><span>04:00</span><span>08:00</span><span>12:00</span><span>16:00</span><span>20:00</span><span>23:00</span>
-            </div>
-          </div>
-
-          <!-- Live AI Prediction Metrics Row -->
-          <div class="prediction-metrics-grid">
-            <div class="prediction-metric-card speed">
-              <div class="prediction-metric-label">Estimasi Kecepatan Arteri</div>
-              <div id="predictSpeedVal" class="prediction-metric-value">14 km/jam</div>
-            </div>
-            <div class="prediction-metric-card risk">
-              <div class="prediction-metric-label">Indeks risiko model</div>
-              <div id="predictProbVal" class="prediction-metric-value">—/100</div>
-            </div>
-            <div class="prediction-metric-card recommendation">
-              <div class="prediction-metric-label">Skenario rekomendasi model (simulasi)</div>
-              <div id="predictRecText" class="prediction-metric-value">Aktifkan Koridor Hijau A. Yani - Wonokromo & Alihkan beban lalu lintas ke MERR.</div>
-            </div>
-          </div>
-        </article>
+  <article class="prediction-panel glass-panel" id="card-prediction">
+    <div class="section-head prediction-section-head">
+      <div>
+        <div class="analytics-provenance-row">
+          <span class="provenance-badge simulated">SIMULASI · MODEL DETERMINISTIK</span>
+          <span class="analytics-units-label">Horizon prakiraan 24 jam · bukan probabilitas terkalibrasi</span>
+        </div>
+        <h2>Prakiraan Kepadatan dan Horizon Model</h2>
+        <p>Proyeksi kondisi koridor Surabaya per jam berdasarkan parameter model sintetis. Nilai risiko tidak dikirim ke APILL atau sistem kendali lapangan.</p>
       </div>
+      <div class="prediction-header-actions">
+        <div class="prediction-status-badge">Kondisi pada jam model: <strong id="predTomorrowStatus">Sedang</strong></div>
+        <button id="btnRunForecastTestSuite" class="btn btn-ghost compact" type="button">🧪 Evaluasi 15 skenario model</button>
+      </div>
+    </div>
+
+    <!-- Time Selection Slider -->
+    <div class="prediction-slider-box">
+      <div class="time-label-row">
+        <div class="time-label-group">
+          <span class="time-label-prefix">Horizon Waktu:</span>
+          <span id="sliderTimeLabel" class="time-label-val">08:00 WIB</span>
+        </div>
+        <span class="risk-label" id="sliderRiskLabel">Status: Risiko macet tinggi</span>
+      </div>
+      <div class="forecast-waveform-wrapper">
+        <svg class="forecast-waveform-svg" viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="waveformGrad" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="var(--chart-primary)" stop-opacity="0.18" />
+              <stop offset="100%" stop-color="var(--chart-primary)" stop-opacity="0" />
+            </linearGradient>
+          </defs>
+          <path d="M0,18 Q15,18 25,12 T33,3 T40,16 T50,15 T62,10 T70,3 T80,14 T100,18" fill="none" stroke="var(--chart-primary)" stroke-width="1.5" />
+          <path d="M0,18 Q15,18 25,12 T33,3 T40,16 T50,15 T62,10 T70,3 T80,14 T100,18 L100,20 L0,20 Z" fill="url(#waveformGrad)" />
+        </svg>
+        <input class="slider-glow" id="predictionTimeSlider" type="range" min="0" max="23" value="8" aria-label="Pilih jam prakiraan model" />
+      </div>
+      <div class="timeline-ticks">
+        <span>00:00</span><span>04:00</span><span>08:00</span><span>12:00</span><span>16:00</span><span>20:00</span><span>23:00</span>
+      </div>
+    </div>
+
+    <!-- Estimated Traffic State & Recommendation Row -->
+    <div class="prediction-metrics-grid">
+      <div class="prediction-metric-card speed">
+        <div class="prediction-metric-label">Estimasi Kecepatan Arteri</div>
+        <div id="predictSpeedVal" class="prediction-metric-value">14 km/jam</div>
+        <small class="prediction-metric-note">Model kecepatan agregat</small>
+      </div>
+      <div class="prediction-metric-card risk">
+        <div class="prediction-metric-label">Indeks Risiko Model</div>
+        <div id="predictProbVal" class="prediction-metric-value">—/100</div>
+        <small class="prediction-metric-note">Indeks relatif (0–100); bukan probabilitas empiris</small>
+      </div>
+      <div class="prediction-metric-card recommendation">
+        <div class="prediction-metric-label">Skenario Rekomendasi Model (Simulasi)</div>
+        <div id="predictRecText" class="prediction-metric-value">Aktifkan Koridor Hijau A. Yani - Wonokromo &amp; Alihkan beban lalu lintas ke MERR.</div>
+      </div>
+    </div>
+
+    <!-- Model Assumptions & Data Provenance Disclosure -->
+    <details class="prediction-assumptions-disclosure" open>
+      <summary class="prediction-disclosure-summary">ℹ️ Asumsi Model, Keterbatasan &amp; Asal Data</summary>
+      <div class="prediction-disclosure-content">
+        <div class="disclosure-grid">
+          <div>
+            <strong>Batasan Interpretasi</strong>
+            <p>Indeks risiko merupakan skor heuristik berbasis rasio volume/kapasitas koridor sintetis dan fluktuasi waktu tunggu. Nilai ini tidak mewakili probabilitas terkalibrasi statistik dan tidak terhubung ke APILL Dishub.</p>
+          </div>
+          <div>
+            <strong>Sumber Masukan</strong>
+            <p>Data jam dihitung menggunakan kurva diurnal Surabaya standar dengan faktor puncak pagi (07:00–09:00 WIB) dan sore (16:30–18:30 WIB). Seluruh rekomendasi skenario bersifat hipotetis.</p>
+          </div>
+        </div>
+      </div>
+    </details>
+  </article>
+</div>

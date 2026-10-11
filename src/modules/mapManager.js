@@ -19,6 +19,7 @@ import { stateStore } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
 import { Disposer } from '../core/disposer.js';
 import { diagnostics } from '../core/diagnostics.js';
+import { CAMERA_DEFINITIONS } from './cctv/cameraRegistry.js';
 
 import { createCartoTileLayer, getBasemapTileUrl, safeAddLayers, createClusterGroup, layerManager } from './map/layerManager.js';
 import { markerManager } from './map/markerManager.js';
@@ -220,6 +221,7 @@ export class MapManager {
     this.initAllMaps();
     this._bindZoomControls();
     this._bindLandmarkHUDClose();
+    this.activationDisposer.addEventListener(window, 'omnitraf:entity-focus', (event) => this._handleEntityFocus(event.detail));
     this.mapControls.bindToolbarAndDrawer(
       this.activationDisposer,
       this.maps,
@@ -273,6 +275,101 @@ export class MapManager {
         }
       });
     });
+
+    const search = document.getElementById('mapIntersectionSearch');
+    const clearSearch = document.getElementById('mapSearchClear');
+    if (search) {
+      this.activationDisposer.addEventListener(search, 'keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        const query = search.value.trim().toLocaleLowerCase();
+        if (!query) return;
+        const match = (stateStore.getState().intersections || []).find((node) =>
+          `${node.name || ''} ${node.id || ''}`.toLocaleLowerCase().includes(query)
+        );
+        if (match) this.flyToIntersection(match.id || match.name);
+        else if (typeof window.showToast === 'function') window.showToast('Simpang tidak ditemukan pada model.', 'warning');
+      });
+      this.activationDisposer.addEventListener(search, 'input', () => {
+        if (clearSearch) clearSearch.hidden = !search.value;
+      });
+    }
+    if (clearSearch && search) this.activationDisposer.addEventListener(clearSearch, 'click', () => {
+      search.value = '';
+      clearSearch.hidden = true;
+      search.focus();
+    });
+
+    const inspector = document.getElementById('mapEntityInspector');
+    const closeInspector = document.getElementById('btnCloseMapInspector');
+    if (closeInspector && inspector) this.activationDisposer.addEventListener(closeInspector, 'click', () => {
+      inspector.hidden = true;
+      document.getElementById('mapIntersectionSearch')?.focus({ preventScroll: true });
+    });
+    const inspectorLinks = document.getElementById('mapInspectorLinks');
+    if (inspectorLinks) this.activationDisposer.addEventListener(inspectorLinks, 'click', (event) => {
+      const link = event.target.closest('a[data-view]');
+      if (!link || !this.selectedMapEntity) return;
+      const route = link.dataset.view;
+      const kind = route === 'cctv' ? 'cctv' : this.selectedMapEntity.kind;
+      const id = route === 'cctv' ? this.selectedMapEntity.cameraId : this.selectedMapEntity.id;
+      if (!id) return;
+      const focus = { kind, id, route };
+      stateStore.setState({ pendingEntityFocus: focus });
+      if (window.location.hash === `#${route}`) {
+        event.preventDefault();
+        window.dispatchEvent(new CustomEvent('omnitraf:entity-focus', { detail: focus }));
+        stateStore.setState({ pendingEntityFocus: null });
+      }
+    });
+
+    const roadConditionToggles = document.querySelectorAll(
+      '#btnToggleRoadCond-dashboardMapBox, #btnToggleRoadCond-map-surabaya'
+    );
+    roadConditionToggles.forEach((roadConditionToggle) => {
+      const syncLabel = () => {
+        const isWet = this.currentRoadCondition === 'wet';
+        roadConditionToggle.textContent = isWet ? 'Ganti ke kering' : 'Ganti ke hujan';
+        roadConditionToggle.setAttribute('aria-label', `Ganti kondisi jalan simulasi saat ini ${isWet ? 'basah' : 'kering'}`);
+      };
+      syncLabel();
+      this.activationDisposer.addEventListener(roadConditionToggle, 'click', (event) => {
+        event.stopPropagation();
+        this.toggleRoadCondition();
+        soundManager.play('click');
+      });
+    });
+  }
+
+  _handleEntityFocus(request) {
+    if (!request || request.route !== 'map') return;
+    let target = null;
+    if (request.kind === 'intersection') target = this.intersectionMarkersMap.get(String(request.id))?.marker;
+    if (request.kind === 'incident') {
+      for (const groups of this.layerGroupsMap.values()) {
+        target = groups['warn-points']?._omniIncidentMarkers?.get(String(request.id))?.marker;
+        if (target) break;
+      }
+    }
+    if (request.kind === 'cctv') {
+      for (const groups of this.layerGroupsMap.values()) {
+        groups['landmark-group']?.eachLayer((layer) => {
+          if (layer._omniCameraId === String(request.id)) target = layer;
+        });
+        if (target) break;
+      }
+    }
+    if (!target) {
+      if (typeof window.showToast === 'function') window.showToast('Entity tidak tersedia pada peta yang dimuat.', 'warning');
+      return;
+    }
+    const map = this.maps.get('map-surabaya');
+    if (!map) return;
+    const open = () => target.openPopup?.();
+    const latlng = target.getLatLng?.();
+    if (latlng) map.flyTo(latlng, 17, { duration: .8 });
+    const cluster = this.layerGroupsMap.get('map-surabaya')?.['master-cluster'];
+    if (cluster?.zoomToShowLayer) cluster.zoomToShowLayer(target, open);
+    else setTimeout(open, 500);
   }
 
   _bindLandmarkHUDClose() {
@@ -454,10 +551,10 @@ export class MapManager {
     const districtGeoJson = L.geoJSON(SURABAYA_DISTRICTS_GEOJSON, {
       style: (feature) => ({
         color: feature.properties.color || '#38bdf8',
-        weight: 1,
-        dashArray: '4, 4',
+        weight: 1.5,
+        opacity: 0.45,
         fillColor: feature.properties.color || '#38bdf8',
-        fillOpacity: 0.05
+        fillOpacity: 0.04
       }),
       onEachFeature: (feature, layer) => {
         layer.bindTooltip(`📍 Wilayah: ${feature.properties.name}`, { sticky: true });
@@ -504,6 +601,8 @@ export class MapManager {
         const marker = L.marker(latlng, { icon: cctvIcon });
         marker._omniMarkerType = 'cctv';
         marker._omniEntityId = p.id;
+        marker._omniCameraId = CAMERA_DEFINITIONS.find((camera) => camera.name.toLocaleLowerCase().split(/[^a-z0-9]+/).filter((part) => part.length > 4).some((part) => p.name.toLocaleLowerCase().includes(part)))?.id || null;
+        marker.feature = feature;
         return marker;
       },
       onEachFeature: (feature, layer) => {
@@ -819,34 +918,7 @@ export class MapManager {
 
     const existing = container.querySelector('.map-layer-mode-switcher');
     if (existing) existing.remove();
-    // The full map already owns a toolbar with zoom, layers and fullscreen.
-    if (containerId === 'map-surabaya') return;
-
-    const switcher = document.createElement('div');
-    switcher.className = 'map-layer-mode-switcher glass-panel';
-    switcher.innerHTML = `
-      <span class="mlm-label hide-mobile">LAPISAN:</span>
-      <button class="map-layer-pill-btn active" data-layer-mode="flow" type="button" title="Arus Koridor Lalu Lintas">
-        <span class="pill-dot" style="background:#00e5ff;"></span> Arus Koridor
-      </button>
-      <button class="map-layer-pill-btn" data-layer-mode="heat" type="button" title="Heatmap Kepadatan Kendaraan">
-        <span class="pill-dot" style="background:#ef4444;"></span> Heatmap
-      </button>
-      <button class="map-layer-pill-btn" data-layer-mode="nodes" type="button" title="Marker Persimpangan & Kamera SITS">
-        <span class="pill-dot" style="background:#22c55e;"></span> Node SITS
-      </button>
-    `;
-
-    switcher.querySelectorAll('.map-layer-pill-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const mode = btn.dataset.layerMode;
-        this.setMapLayerMode(mode);
-        soundManager.play('click');
-      });
-    });
-
-    container.appendChild(switcher);
+    // Layer presets are owned by the map workspace disclosure in the view.
   }
 
   createWeatherWidget(map, containerId) {
@@ -856,44 +928,7 @@ export class MapManager {
 
     const existing = container.querySelector('.map-weather-micro-widget');
     if (existing) existing.remove();
-
-    const isWet = this.currentRoadCondition === 'wet';
-
-    const widget = document.createElement('div');
-    widget.className = 'map-weather-micro-widget glass-panel';
-    widget.innerHTML = `
-      <div class="mww-top">
-        <div class="mww-weather-col">
-          <span class="mww-icon">${isWet ? '🌧️' : '🌤️'}</span>
-          <div>
-            <strong class="mww-temp">${isWet ? 'Basah' : 'Kering'}</strong>
-            <small class="mww-hum">Kondisi simulasi</small>
-          </div>
-        </div>
-        <div class="mww-condition-col">
-          <button class="mww-cond-toggle ${isWet ? 'wet-active' : 'dry-active'}" id="btnToggleRoadCond-${containerId}" type="button" title="Ganti kondisi skenario simulasi" aria-label="Ganti kondisi skenario simulasi">
-            <span class="road-dot"></span> ${isWet ? 'Hujan' : 'Kering'}
-          </button>
-        </div>
-      </div>
-      <div class="mww-bottom">
-        <small class="mww-impact-text">
-          ${isWet ? 'Perubahan waktu fase model untuk skenario jalan basah.' : 'Kondisi model standar untuk skenario jalan kering.'}
-        </small>
-      </div>
-    `;
-
-    const btn = widget.querySelector(`#btnToggleRoadCond-${containerId}`);
-    if (btn) {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.toggleRoadCondition();
-        soundManager.play('click');
-      });
-    }
-
-    container.appendChild(widget);
-    this.weatherWidgets.set(containerId, widget);
+    this.weatherWidgets.delete(containerId);
   }
 
   toggleRoadCondition() {
@@ -907,6 +942,10 @@ export class MapManager {
 
     this.maps.forEach((map, containerId) => {
       this.createWeatherWidget(map, containerId);
+    });
+    document.querySelectorAll('#btnToggleRoadCond-dashboardMapBox, #btnToggleRoadCond-map-surabaya').forEach((toggle) => {
+      toggle.textContent = isWet ? 'Ganti ke kering' : 'Ganti ke hujan';
+      toggle.setAttribute('aria-label', `Ganti kondisi jalan simulasi saat ini ${isWet ? 'basah' : 'kering'}`);
     });
 
     stateStore.setState({ roadCondition: condition, isRainMode: isWet });
@@ -986,10 +1025,77 @@ export class MapManager {
   _handlePopupOpen(e, containerId) {
     this.popupManager.bindCorridorActions(e.popup);
     this.popupManager.bindCctvLiveSync(e.popup);
+    if (containerId !== 'map-surabaya') return;
+    const marker = e.popup?._source;
+    if (!marker?._omniMarkerType) return;
+    marker.getElement?.()?.classList.add('leaflet-marker-selected');
+    this._renderMapInspector(marker);
   }
 
   _handlePopupClose(e, containerId) {
     this.popupManager.unbindCctvLiveSync(e.popup);
+    if (containerId !== 'map-surabaya') return;
+    e.popup?._source?.getElement?.()?.classList.remove('leaflet-marker-selected');
+    const inspector = document.getElementById('mapEntityInspector');
+    if (inspector) inspector.hidden = true;
+  }
+
+  _renderMapInspector(marker) {
+    const inspector = document.getElementById('mapEntityInspector');
+    const title = document.getElementById('mapInspectorTitle');
+    const summary = document.getElementById('mapInspectorSummary');
+    const properties = document.getElementById('mapInspectorProperties');
+    const links = document.getElementById('mapInspectorLinks');
+    if (!inspector || !title || !summary || !properties) return;
+    const state = stateStore.getState();
+    const kind = marker._omniMarkerType;
+    const id = marker._omniEntityId;
+    let entity = null;
+    let name = marker.getPopup?.()?.getContent?.()?.toString?.() || '';
+    let rows = [];
+    if (kind === 'signal') {
+      entity = (state.intersections || []).find((item) => item.id === id) || {};
+      name = entity.name || id || 'Simpang';
+      rows = [['Fase', entity.state || 'Belum tersedia'], ['Sisa fase', entity.timer == null ? 'Belum tersedia' : String(entity.timer) + ' dtk'], ['Waktu tunggu', entity.waitTime == null ? 'Belum tersedia' : String(entity.waitTime) + ' dtk'], ['Green split', entity.greenSplit == null ? 'Belum tersedia' : String(entity.greenSplit) + ' dtk']];
+      summary.textContent = 'Kondisi simpang dari state simulasi.';
+    } else if (kind === 'incident') {
+      entity = (state.incidents || []).find((item) => String(item.id) === String(id)) || marker.data || {};
+      name = entity.title || 'Insiden simulasi';
+      rows = [['Status', entity.status || 'Belum tersedia'], ['Keparahan', entity.severity || 'Belum tersedia'], ['Lokasi', entity.location || 'Belum tersedia']];
+      summary.textContent = entity.notes || 'Detail insiden pada model simulasi.';
+    } else if (kind === 'cctv') {
+      name = marker.feature?.properties?.name || 'Kamera simulasi';
+      rows = [['Status', 'Feed sintetis'], ['Sumber', 'Simulasi lokal']];
+      summary.textContent = 'Visual dan deteksi kamera berasal dari simulator, bukan CCTV lapangan.';
+    } else {
+      name = marker.feature?.properties?.name || 'Entity peta';
+      rows = [['Sumber', 'Model simulasi']];
+      summary.textContent = 'Entity pada peta simulasi.';
+    }
+    const cameraName = marker.feature?.properties?.name || '';
+    const relatedCamera = kind === 'cctv'
+      ? CAMERA_DEFINITIONS.find((camera) => camera.name.toLocaleLowerCase().split(/[^a-z0-9]+/).filter((part) => part.length > 4).some((part) => cameraName.toLocaleLowerCase().includes(part)))?.id
+      : CAMERA_DEFINITIONS.find((camera) => camera.nodeId === id)?.id
+        || Object.entries(state.cctvCamerasMetrics || {}).find(([, camera]) => String(camera.nodeId || camera.intersectionId || '') === String(id))?.[0];
+    this.selectedMapEntity = { kind: kind === 'incident' ? 'incident' : 'intersection', id, cameraId: relatedCamera };
+    title.textContent = name;
+    properties.replaceChildren(...rows.flatMap(([label, value]) => {
+      const group = document.createElement('div');
+      const dt = document.createElement('dt'); dt.textContent = label;
+      const dd = document.createElement('dd'); dd.textContent = String(value);
+      group.append(dt, dd);
+      return [group];
+    }));
+    if (links) {
+      links.hidden = false;
+      const signalLink = links.querySelector('[data-view="signals"]');
+      const incidentLink = links.querySelector('[data-view="incidents"]');
+      const cameraLink = links.querySelector('[data-view="cctv"]');
+      if (signalLink) signalLink.hidden = kind !== 'signal';
+      if (incidentLink) incidentLink.hidden = kind !== 'incident';
+      if (cameraLink) cameraLink.hidden = !relatedCamera;
+    }
+    inspector.hidden = false;
   }
 
   destroy() {

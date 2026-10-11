@@ -1,45 +1,22 @@
 <div class="view-pane" id="view-signals">
-        <!-- Section Header / Operations Workspace Summary -->
-        <header class="signals-workspace-header">
-          <div class="signals-header-title-group">
-            <span class="signals-header-kicker">OMNITRAF · KONTROL SINYAL SIMULASI</span>
-            <h1 class="signals-header-title">Model Sinyal Lalu Lintas</h1>
-            <p class="signals-header-desc">Eksplorasi siklus dan Green Split. Perubahan hanya terjadi di prototipe dan tidak mengendalikan APILL.</p>
-          </div>
-          <div class="signals-header-summary-strip" aria-label="Ringkasan Status Sinyal">
-            <div class="signals-summary-item">
-              <span class="signals-summary-label">Simpang contoh</span>
-              <div class="signals-summary-val-row">
-                <span class="signals-status-dot dot-live"></span>
-                <strong class="tabular font-mono">5</strong>
-                <span class="signals-summary-sub">Model simulasi</span>
-              </div>
-            </div>
-            <div class="signals-summary-item">
-              <span class="signals-summary-label">Mode Kontrol</span>
-              <div class="signals-summary-val-row">
-                <strong class="text-primary-2">Model adaptif</strong>
-                <span class="signals-summary-sub">Webster C₀ · simulasi</span>
-              </div>
-            </div>
-            <div class="signals-summary-item hide-mobile">
-              <span class="signals-summary-label">Manual Override</span>
-              <div class="signals-summary-val-row">
-                <strong class="text-success tabular font-mono">0 Aktif</strong>
-                <span class="signals-summary-sub">Siaga</span>
-              </div>
-            </div>
-            <div class="signals-summary-item hide-mobile">
-              <span class="signals-summary-label">Stream demo</span>
-              <div class="signals-summary-val-row">
-                <strong class="tabular font-mono text-cyan">SIM</strong>
-                <span class="signals-summary-sub">Latensi tidak diukur</span>
-              </div>
-            </div>
-          </div>
+        <header class="workspace-page-header">
+          <div><p class="eyebrow">OMNITRAF · SIMULASI</p><h1>Sinyal lalu lintas</h1><p class="workspace-page-description">Pantau fase simpang dan sesuaikan parameter model jika diizinkan.</p></div>
+          <span class="provenance-badge simulated">SIMULATION_ONLY · TIDAK MENGENDALIKAN APILL</span>
         </header>
 
-        <!-- Primary Intersection Cards Console Grid -->
+        <div class="signals-workspace-toolbar">
+          <label for="signalsIntersectionSearch">Cari simpang</label><input id="signalsIntersectionSearch" type="search" placeholder="Nama simpang atau koridor" autocomplete="off">
+          <span class="signals-toolbar-note">Status dan waktu berasal dari state simulator.</span>
+        </div>
+
+        <!-- Monitoring list is the primary workspace; configuration remains contextual. -->
+        <article class="table-panel glass-panel" id="intersections">
+          <div class="section-head"><div><h2>Simpang dalam model</h2><p>Pilih simpang untuk memusatkan peta. State berasal dari simulator.</p></div><span id="signalsResultCount" class="text-muted"></span></div>
+          <div class="table-wrap"><table><thead><tr><th>Persimpangan</th><th>Fase</th><th>Kepadatan</th><th>Waktu tunggu</th><th>Pembaruan</th></tr></thead><tbody id="intersectionTable"></tbody></table></div>
+          <div class="empty-search-state is-hidden" id="emptyState"><h3>Simpang tidak ditemukan</h3><p>Tidak ada data yang sesuai pencarian.</p></div>
+        </article>
+
+        <details class="signals-controls-details"><summary>Konfigurasi dan override simulasi</summary>
         <section class="signals-console-grid">
           <!-- Card 1: Simpang Wonokromo -->
           <article class="widget glass-panel signals-intersection-card" data-intersection-id="node-wonokromo">
@@ -145,74 +122,5 @@
             <button class="btn btn-primary compact force-override-btn" type="button" data-capability="signal:control">Terapkan Override Simulasi</button>
           </article>
         </section>
-
-        <!-- Simpang dalam model Table & Grid Workspace -->
-        <article class="table-panel glass-panel" id="intersections">
-          <div class="section-head">
-            <div>
-              <h2>Simpang dalam model</h2>
-              <p>State contoh simpang dan waktu tunggu dari simulator.</p>
-            </div>
-            <div class="header-actions-flex">
-              <button class="btn btn-ghost compact" id="btnToggleIntersectionsLayout" type="button">Grid/Tabel</button>
-              <a href="#reports" class="text-link">Lihat Laporan ↗</a>
-            </div>
-          </div>
-
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Persimpangan</th>
-                  <th>Status</th>
-                  <th>Kepadatan</th>
-                  <th>Waktu Tunggu</th>
-                  <th>Pembaruan</th>
-                </tr>
-              </thead>
-              <tbody id="intersectionTable">
-                <tr data-density="high">
-                  <td>Simpang Wonokromo (A. Yani)</td>
-                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Simulasi</td>
-                  <td><span class="tag tag-high">Tinggi</span></td>
-                  <td>54 detik</td>
-                  <td><span class="spark spark-danger"></span></td>
-                </tr>
-                <tr data-density="moderate">
-                  <td>Simpang Darmo (Polisi Istimewa)</td>
-                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Simulasi</td>
-                  <td><span class="tag tag-moderate">Sedang</span></td>
-                  <td>38 detik</td>
-                  <td><span class="spark spark-warning"></span></td>
-                </tr>
-                <tr data-density="low">
-                  <td>Simpang Kertajaya (Dharmawangsa)</td>
-                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Simulasi</td>
-                  <td><span class="tag tag-low">Rendah</span></td>
-                  <td>22 detik</td>
-                  <td><span class="spark spark-success"></span></td>
-                </tr>
-                <tr data-density="moderate">
-                  <td>Simpang Tunjungan (Gedung Siola)</td>
-                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Simulasi</td>
-                  <td><span class="tag tag-moderate">Sedang</span></td>
-                  <td>31 detik</td>
-                  <td><span class="spark spark-warning"></span></td>
-                </tr>
-                <tr data-density="high">
-                  <td>Simpang Jemursari (A. Yani)</td>
-                  <td><span class="status-dot-wrapper"><span class="pulse-ring-outer"></span><span class="pulse-ring-inner"></span></span>Simulasi</td>
-                  <td><span class="tag tag-high">Tinggi</span></td>
-                  <td>59 detik</td>
-                  <td><span class="spark spark-danger"></span></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="empty-search-state is-hidden" id="emptyState">
-            <div class="empty-icon">🔍</div>
-            <h3>Pencarian Tidak Ditemukan</h3>
-            <p>Tidak ada data persimpangan yang sesuai dengan parameter pencarian.</p>
-          </div>
-        </article>
+        </details>
       </div>

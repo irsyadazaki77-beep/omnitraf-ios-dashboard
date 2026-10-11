@@ -26,6 +26,7 @@ export class NavigationController {
     this._initSidebarCollapse();
     this._initMobileNav();
     this._initCommandPalette();
+    this._initShellOverflow();
     this._initShellProfile();
     this._initNotificationCount();
     this._initThemeToggle();
@@ -125,6 +126,24 @@ export class NavigationController {
     if (initialHash !== "about-engine") {
       switchView(initialHash);
     }
+  }
+
+  _initShellOverflow() {
+    const overflow = document.querySelector('.topbar-overflow');
+    const summary = overflow?.querySelector(':scope > summary');
+    if (!overflow || !summary) return;
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape' || !overflow.open) return;
+      overflow.open = false;
+      summary.focus();
+      event.stopPropagation();
+    });
+    document.addEventListener('click', (event) => {
+      if (!overflow.open) return;
+      if (!overflow.contains(event.target) || event.target.closest('.topbar-overflow-menu button')) {
+        overflow.open = false;
+      }
+    });
   }
 
   _initSidebarCollapse() {

@@ -1,0 +1,345 @@
+/* ==========================================================================
+   OmniTRAF V3 - Smart City Integration Sandbox Styles (css/views/integration.css)
+   Clean, developer-friendly 2-column API Explorer & Activity Log Sandbox
+   ========================================================================== */
+
+#view-integration:not(.active) {
+  display: none;
+}
+
+.integration-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 1440px;
+}
+
+/* 1. Status Overview Header Cards */
+.integration-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-3);
+}
+
+.integration-status-card {
+  padding: 14px 18px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.integration-status-card .status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.integration-status-card h3 {
+  margin: 0;
+  font-size: var(--font-size-small);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.integration-status-card p {
+  margin: 2px 0 0;
+  font-size: var(--font-size-body);
+  color: var(--text-secondary);
+}
+
+.integration-status-card small {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
+/* 2. API Playground & Request Builder (Primary Hero Area) */
+.api-playground-card {
+  padding: var(--space-5);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+}
+
+.api-playground-card .section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.api-playground-card .section-head h2 {
+  margin: 0 0 4px;
+  font-size: var(--font-size-section);
+  color: var(--text-primary);
+}
+
+.api-playground-card .section-head p {
+  margin: 0;
+  font-size: var(--font-size-small);
+  color: var(--text-secondary);
+}
+
+.api-explorer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.api-form-panel,
+.api-response-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.api-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 28px;
+}
+
+.api-panel-header label,
+.api-panel-header .form-label-muted {
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.api-method-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--info-soft);
+  color: var(--chart-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.api-endpoint-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.api-endpoint-select {
+  flex: 1;
+  min-height: 38px;
+  padding: 6px 12px;
+  background: var(--surface-base);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
+.api-endpoint-select:focus {
+  outline: 2px solid var(--border-focus);
+}
+
+.api-json-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  background: var(--surface-base);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.api-json-tag[data-state="valid"] {
+  background: var(--success-soft);
+  color: var(--status-success);
+  border-color: var(--success-border);
+}
+
+.api-json-tag[data-state="invalid"] {
+  background: var(--danger-soft);
+  color: var(--status-danger);
+  border-color: var(--danger-border);
+}
+
+.api-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  background: var(--surface-base);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.api-status-badge[data-state="success"] {
+  background: var(--success-soft);
+  color: var(--status-success);
+  border-color: var(--success-border);
+}
+
+.api-status-badge[data-state="error"] {
+  background: var(--danger-soft);
+  color: var(--status-danger);
+  border-color: var(--danger-border);
+}
+
+.api-status-badge[data-state="running"] {
+  background: var(--warning-soft);
+  color: var(--status-warning);
+  border-color: var(--warning-border);
+}
+
+.api-textarea,
+.api-pre-content {
+  min-width: 0;
+  width: 100%;
+  height: 220px;
+  background: var(--surface-base);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  line-height: 1.5;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.api-textarea:focus {
+  outline: 2px solid var(--border-focus);
+}
+
+.api-pre-content {
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--chart-primary);
+}
+
+.btn-api-send {
+  align-self: flex-start;
+  min-height: 38px;
+  padding: 0 16px;
+  font-weight: 600;
+}
+
+/* 3. Terminal & Activity Logs (Secondary Sandbox Area) */
+.terminal-logs-card {
+  padding: var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+}
+
+.terminal-logs-card .section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+
+.terminal-logs-card .section-head h2 {
+  margin: 0;
+  font-size: var(--font-size-card);
+  color: var(--text-primary);
+}
+
+.terminal-logs-card .section-head p {
+  margin: 2px 0 0;
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+.terminal-body-wrapper {
+  background: color-mix(in srgb, var(--surface-base) 90%, black);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.terminal-body {
+  height: 180px;
+  padding: 12px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--chart-primary);
+}
+
+.terminal-line {
+  margin-bottom: 4px;
+}
+
+.terminal-line.is-info {
+  color: var(--chart-primary);
+}
+
+.terminal-line.is-success {
+  color: var(--status-success);
+}
+
+.terminal-line.is-warning {
+  color: var(--status-warning);
+}
+
+.terminal-line.is-neutral {
+  color: var(--text-secondary);
+}
+
+.terminal-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--surface-base);
+  border-top: 1px solid var(--border-default);
+}
+
+.terminal-prompt-text {
+  color: var(--status-success);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.terminal-input-field {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.terminal-input-field::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .api-explorer-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

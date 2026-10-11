@@ -9,6 +9,20 @@
 
 [hidden] { display: none !important; }
 
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+textarea {
+  color: var(--text-primary);
+  border-color: var(--border-default);
+  background-color: var(--surface-base);
+}
+input::placeholder,
+textarea::placeholder { color: var(--text-tertiary); opacity: 1; }
+input[type="range"] { accent-color: var(--primary); }
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
 html {
   font-family: var(--font-sans);
   font-size: 14px;
@@ -277,8 +291,14 @@ body.theme-light .system-marquee {
    22. Accessibility, Focus Ring & Motion Governance (WCAG 2.1 AA)
    -------------------------------------------------------------------------- */
 :focus-visible {
-  outline: 2px solid var(--border-focus) !important;
-  outline-offset: 2px !important;
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea { font-size: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

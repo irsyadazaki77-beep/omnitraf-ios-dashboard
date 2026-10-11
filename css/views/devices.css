@@ -1,4 +1,9 @@
 /* Static demo meter values mirror their adjacent labels until live simulation updates them. */
+.device-permission-note { margin: 0; padding: 9px 10px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); color: var(--text-secondary); background: var(--surface-base); font-size: var(--font-size-small); }
+.fault-injection-container { display: grid; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-default); }
+.fault-injection-container > .cfg-label { color: var(--text-secondary); }
+.fault-injection-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.fault-injection-actions .btn { min-height: 38px; }
 .devices-table tr[data-device="NODE-EDGE-01"] .diag-bar-fill { width: 48%; }
 .devices-table tr[data-device="NODE-EDGE-01"] .diag-temp-fill { width: 42%; }
 .devices-table tr[data-device="NODE-EDGE-02"] .diag-bar-fill { width: 52%; }
@@ -101,3 +106,17 @@
   .devices-table tbody tr { grid-template-columns: minmax(0, 1fr); }
   .devices-table tbody td { grid-column: 1 / -1; }
 }
+/* Compact device monitoring workspace */
+.device-health-summary { color:var(--text-secondary); font-size:12px; font-weight:600; }
+.device-management-layout { grid-template-columns:minmax(0,1fr); gap:12px; }
+.devices-list-panel { min-width:0; padding:14px; border:1px solid var(--border-default); border-radius:var(--radius-md); background:var(--surface); box-shadow:none; }
+.devices-list-panel > .section-head { margin-bottom:10px; }
+.devices-list-panel > .section-head p { margin:4px 0 0; color:var(--text-secondary); font-size:12px; }
+.device-filter-toolbar { display:grid; grid-template-columns:auto minmax(180px,1fr) auto minmax(170px,.6fr) auto; align-items:center; gap:8px; margin-bottom:10px; }
+.device-filter-toolbar label { color:var(--text-secondary); font-size:12px; }
+.devices-table { min-width:980px; }
+.devices-table th { position:sticky; top:0; z-index:2; background:var(--surface-raised); }
+.devices-table td,.devices-table th { padding:10px 9px; }
+.device-config-drawer { border-radius:var(--radius-md); }
+@media (max-width:900px) { .device-filter-toolbar { grid-template-columns:auto minmax(0,1fr); } .device-filter-toolbar label:nth-of-type(2) { grid-column:1; } .device-filter-toolbar select { grid-column:2; } }
+@media (max-width:600px) { .devices-list-panel { padding:10px; } .device-filter-toolbar { grid-template-columns:minmax(0,1fr); } .device-filter-toolbar label:nth-of-type(2),.device-filter-toolbar select { grid-column:1; } .device-filter-toolbar input,.device-filter-toolbar select { width:100%; } }

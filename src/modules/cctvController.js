@@ -450,9 +450,7 @@ export class CctvController {
             cam.metrics.aiConfidence = device.healthScore;
           }
 
-          if (cam.status !== previousStatus) {
-            this._updateCameraDomHUD(id, cam);
-          }
+          if (cam.status !== previousStatus) this._updateCameraDomHUD(id, cam);
         } else {
           const age = now - cam.lastFrameAt;
           if (age > 10000) {
@@ -467,6 +465,7 @@ export class CctvController {
             }
           }
         }
+        this._updateCameraDomHUD(id, cam);
       });
     }, 2000);
   }
@@ -492,12 +491,14 @@ export class CctvController {
     }
 
     // Update bottom HUD stats text elements
-    const hudValElements = card.querySelectorAll('.hud-metric-val');
-    if (hudValElements.length >= 3) {
-      hudValElements[0].textContent = camState.status === 'OFFLINE' ? '0.0' : camState.diagnostics.averageLatencyMs > 25 ? '15.0' : '30.0';
-      hudValElements[1].textContent = `${camState.diagnostics.averageLatencyMs}ms`;
-      hudValElements[2].textContent = camState.status === 'OFFLINE' ? '0MB' : camState.status === 'DEGRADED' ? '280MB' : '415MB';
-    }
+    const hud = (metric) => card.querySelector(`[data-hud-metric="${metric}"]`);
+    const metricNumber = (value) => value === null || value === undefined || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
+    const fps = metricNumber(camState.metrics?.fps ?? camState.diagnostics?.fps);
+    const latency = metricNumber(camState.diagnostics?.averageLatencyMs);
+    const confidence = metricNumber(camState.metrics?.aiConfidence);
+    if (hud('fps')) hud('fps').textContent = camState.status === 'OFFLINE' || !Number.isFinite(fps) ? 'Tidak tersedia' : `${fps.toFixed(0)} fps`;
+    if (hud('latency')) hud('latency').textContent = Number.isFinite(latency) && camState.status !== 'OFFLINE' ? `${Math.round(latency)} ms model` : 'Tidak tersedia';
+    if (hud('confidence')) hud('confidence').textContent = Number.isFinite(confidence) ? `${Math.round(confidence)}% model` : 'Tidak tersedia';
 
     // Dynamic glitch overlay panel
     const glitchOverlay = document.getElementById(`cctvGlitch${camId.replace('cctvCanvas', '')}`);

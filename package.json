@@ -18,7 +18,12 @@
     "test:cluster": "node --test test/cluster/leadership_failover.test.js",
     "backup:postgres": "node scripts/backup-postgres.mjs",
     "verify:postgres-backup": "node scripts/verify-postgres-backup.mjs",
-    "db:migrate:sqljs-to-postgres": "node scripts/migrate-sqljs-to-postgres.mjs"
+    "db:migrate:sqljs-to-postgres": "node scripts/migrate-sqljs-to-postgres.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:smoke": "playwright test tests/e2e/smoke.spec.js",
+    "test:e2e:visual": "playwright test tests/e2e/visual.spec.js",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
     "@socket.io/redis-adapter": "^8.3.0",
@@ -36,6 +41,8 @@
     "sql.js": "^1.14.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.64.0",
     "esbuild": "^0.28.2",
     "postcss": "^8.5.29",
     "vite": "^8.3.3"

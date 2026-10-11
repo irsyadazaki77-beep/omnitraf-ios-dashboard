@@ -106,6 +106,14 @@
   background: var(--surface-hover);
   outline: none;
 }
+.navigation-palette-link[aria-selected="true"],
+.navigation-palette-link.is-keyboard-active { outline: 2px solid var(--border-focus); outline-offset: -2px; background: var(--surface-selected); }
+.navigation-palette-results { display: flex; flex-direction: column; }
+.navigation-palette-results [data-palette-group="Operations"] { order: 1; }
+.navigation-palette-results [data-palette-group="Monitoring"] { order: 2; }
+.navigation-palette-results [data-palette-group="Intelligence"] { order: 3; }
+.navigation-palette-results [data-palette-group="System"] { order: 4; }
+.navigation-palette-results [data-palette-group="Entities"] { order: 5; }
 
 .navigation-palette-empty {
   padding: var(--space-4);

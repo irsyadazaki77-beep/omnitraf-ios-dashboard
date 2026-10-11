@@ -1,11 +1,10 @@
 /* Monitored Intersections Table & Grid */
 .table-panel {
-  background: var(--panel-glass);
-  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-xl);
   padding: 20px 22px;
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-xs);
   margin-top: 22px;
 }
 
@@ -29,6 +28,7 @@ table {
   border-collapse: collapse;
   text-align: left;
   font-size: 12px;
+  border-color: var(--border-default);
 }
 
 thead th {
@@ -37,9 +37,9 @@ thead th {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-dim);
-  border-bottom: 1px solid var(--border);
-  background: var(--panel-glass);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-base);
   white-space: nowrap;
 }
 

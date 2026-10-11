@@ -1,38 +1,176 @@
-/* Forecast metrics use the same operational surfaces as other view summaries. */
-#view-prediction:not(.active) { display: none; }
+/* ==========================================================================
+   OmniTRAF V3 - Forecast & AI Prediction Workspace (css/views/prediction.css)
+   Model Provenance, Clear Time-Horizon Slider, and Honest Disclosures
+   ========================================================================== */
 
-.prediction-panel { max-width: 1480px; padding: var(--space-5); }
-.prediction-panel .section-head { align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
-.prediction-panel .section-head h2 { margin: var(--space-2) 0; color: var(--text-primary); font-size: var(--font-size-section); }
-.prediction-panel .section-head p { margin: 0; color: var(--text-secondary); font-size: var(--font-size-small); line-height: var(--line-height-body); }
-.prediction-status-badge { flex: 0 0 auto; padding: 8px 10px; border: 1px solid var(--warning-border); border-radius: var(--radius-md); color: var(--text-secondary); background: var(--warning-soft); font-size: var(--font-size-caption); }
-.prediction-status-badge strong { color: var(--status-warning); }
-.risk-label { color: var(--status-danger); font-size: var(--font-size-small); font-weight: 700; }
-.timeline-ticks { font-variant-numeric: tabular-nums; }
+#view-prediction:not(.active) {
+  display: none;
+}
 
+.prediction-panel {
+  max-width: 1440px;
+  padding: var(--space-5);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+}
+
+.prediction-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.prediction-section-head h2 {
+  margin: var(--space-1) 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-section);
+}
+
+.prediction-section-head p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-body);
+}
+
+.prediction-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.prediction-status-badge {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  background: var(--warning-soft);
+  font-size: var(--font-size-caption);
+}
+
+.prediction-status-badge strong {
+  color: var(--status-warning);
+}
+
+/* Time-Horizon Slider Box */
+.prediction-slider-box {
+  background: var(--surface-base);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  margin: var(--space-4) 0;
+}
+
+.time-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.time-label-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.time-label-prefix {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.time-label-val {
+  font-size: 18px;
+  font-family: var(--font-mono);
+  color: var(--chart-primary);
+}
+
+.risk-label {
+  color: var(--status-danger);
+  font-size: var(--font-size-small);
+  font-weight: 700;
+}
+
+.forecast-waveform-wrapper {
+  position: relative;
+  height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.forecast-waveform-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.85;
+}
+
+.slider-glow {
+  position: relative;
+  z-index: 5;
+  width: 100%;
+  cursor: pointer;
+  accent-color: var(--chart-primary);
+}
+
+.timeline-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  margin-top: 8px;
+}
+
+/* Metrics Grid */
 .prediction-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: 220px 220px 1fr;
   gap: var(--space-3);
   margin: var(--space-4) 0;
 }
 
 .prediction-metric-card {
   min-width: 0;
-  padding: var(--space-3) 14px;
+  padding: 14px 16px;
   border: 1px solid var(--border-subtle);
-  border-left: 3px solid var(--primary-2);
+  border-left: 3px solid var(--chart-primary);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--surface-raised) 76%, transparent);
+  background: var(--surface-base);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
-.prediction-metric-card.risk { border-left-color: var(--status-danger); }
-.prediction-metric-card.recommendation { grid-column: span 2; border-left-color: var(--status-success); }
+.prediction-metric-card.speed {
+  border-left-color: var(--chart-primary);
+}
+
+.prediction-metric-card.risk {
+  border-left-color: var(--status-danger);
+}
+
+.prediction-metric-card.recommendation {
+  border-left-color: var(--status-success);
+}
 
 .prediction-metric-label {
   color: var(--text-secondary);
-  font-size: var(--font-size-caption);
+  font-size: 11px;
   text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .prediction-metric-value {
@@ -41,24 +179,99 @@
   color: var(--text-primary);
   font-size: 22px;
   font-weight: 800;
-  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
 }
 
-.prediction-metric-card.risk .prediction-metric-value { color: var(--status-danger); }
+.prediction-metric-card.risk .prediction-metric-value {
+  color: var(--status-danger);
+}
+
 .prediction-metric-card.recommendation .prediction-metric-value {
+  color: var(--text-primary);
+  font-size: var(--font-size-small);
+  font-weight: 500;
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
+.prediction-metric-note {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+  display: block;
+}
+
+/* Assumptions & Data Provenance Disclosure */
+.prediction-assumptions-disclosure {
+  margin-top: var(--space-4);
+  padding: 14px 16px;
+  background: var(--surface-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.prediction-disclosure-summary {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.prediction-disclosure-summary:hover {
   color: var(--chart-primary);
-  font-size: var(--font-size-body);
-  font-weight: 600;
 }
 
-@media (max-width: 760px) {
-  .prediction-panel { padding: var(--space-4); }
-  .prediction-panel .section-head { flex-direction: column; }
-  .prediction-status-badge { align-self: flex-start; }
-  .prediction-metric-card.recommendation { grid-column: 1 / -1; }
+.prediction-disclosure-content {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
 }
 
-@media (max-width: 640px) {
-  .prediction-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .prediction-metric-card.recommendation { grid-column: 1 / -1; }
+.disclosure-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+
+.disclosure-grid strong {
+  display: block;
+  font-size: 12px;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.disclosure-grid p {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* Light Theme Overrides */
+body.theme-light .prediction-panel,
+[data-theme="light"] .prediction-panel {
+  background: #ffffff;
+  border-color: var(--border-default);
+}
+
+body.theme-light .prediction-slider-box,
+body.theme-light .prediction-metric-card,
+body.theme-light .prediction-assumptions-disclosure,
+[data-theme="light"] .prediction-slider-box,
+[data-theme="light"] .prediction-metric-card,
+[data-theme="light"] .prediction-assumptions-disclosure {
+  background: #f8fafc;
+  border-color: var(--border-subtle);
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .prediction-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+  .prediction-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
 }

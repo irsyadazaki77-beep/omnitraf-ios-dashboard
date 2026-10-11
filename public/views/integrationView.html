@@ -1,93 +1,97 @@
 <div class="view-pane" id="view-integration">
-        <section class="integration-board">
-          <div class="integration-status-grid">
-            <article class="widget glass-panel">
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
-                <h3>Simulator Protokol Kamera</h3>
-                <span class="provenance-badge simulated">SIMULATED / MOCK</span>
-              </div>
-              <p>Status: <strong class="text-warning">LOCAL EMULATION</strong></p>
-              <small>Panel ini mendemonstrasikan alur kamera sintetis. Belum terhubung ke RTSP atau perangkat Dishub.</small>
-            </article>
-            <article class="widget glass-panel">
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
-                <h3>Mock REST Gateway</h3>
-                <span class="provenance-badge simulated">SIMULASI</span>
-              </div>
-              <p>Status: <strong class="text-primary-2">SANDBOX GATEWAY</strong></p>
-              <small>Endpoint demo lokal; tidak terhubung ke Smart City Hub atau layanan Pemerintah Kota Surabaya.</small>
-            </article>
+  <section class="integration-board">
+    <!-- Header / Integration Status Cards -->
+    <div class="integration-status-grid">
+      <article class="integration-status-card">
+        <div class="status-header">
+          <h3>Simulator Protokol Kamera</h3>
+          <span class="provenance-badge simulated">SIMULATED / MOCK</span>
+        </div>
+        <p>Status: <strong class="text-warning">LOCAL EMULATION</strong></p>
+        <small>Mendemonstrasikan alur kamera sintetis lokal. Tidak terhubung ke RTSP atau APILL Dishub.</small>
+      </article>
+
+      <article class="integration-status-card">
+        <div class="status-header">
+          <h3>REST Gateway Sandbox</h3>
+          <span class="provenance-badge simulated">SANDBOX LOKAL</span>
+        </div>
+        <p>Status: <strong class="text-primary-2">SANDBOX GATEWAY</strong></p>
+        <small>Endpoint demo terkontrol; tidak ada permintaan dikirim ke layanan eksternal Pemerintah.</small>
+      </article>
+    </div>
+
+    <!-- Primary Developer Workspace: 2-Column API Request Builder & Response Viewer -->
+    <article class="api-playground-card glass-panel" id="card-integration-playground">
+      <div class="section-head">
+        <div>
+          <h2>REST API Gateway Explorer &amp; Sandbox</h2>
+          <p>Uji endpoint simulasi lokal. Semua data respons dihasilkan secara deterministik dari state runtime.</p>
+        </div>
+        <span class="provenance-badge simulated">ALLOWLISTED API</span>
+      </div>
+
+      <div class="api-explorer-grid">
+        <!-- Left Column: Request Builder -->
+        <div class="api-form-panel">
+          <div class="api-panel-header">
+            <label for="apiEndpoint">Metode &amp; Endpoint</label>
+            <span class="api-method-badge" id="apiMethod">GET / POST</span>
           </div>
 
-          <!-- Simulated integration activity log -->
-          <article class="terminal-logs-card glass-panel">
-            <div class="section-head compact">
-              <div>
-                <h2>Log Aktivitas Integrasi</h2>
-                <p>Contoh payload dan log lokal untuk demonstrasi; tidak ada webhook atau integrasi eksternal yang aktif.</p>
-              </div>
-              <span class="provenance-badge simulated">LOG SIMULASI</span>
-            </div>
-            <div class="terminal-body-wrapper">
-              <div class="terminal-scanline"></div>
-              <div class="terminal-body" id="terminalLogs" role="log" aria-live="polite" aria-label="Log perintah sandbox lokal">
-                <div class="terminal-line">[DEMO] Tidak ada webhook eksternal yang dikirim.</div>
-                <div class="terminal-line">[DEMO] Deteksi kendaraan berasal dari generator visual sintetis.</div>
-                <div class="terminal-line">[DEMO] Perubahan fase hanya memperbarui state simulator.</div>
-              </div>
-              <!-- Local demo command input -->
-              <div class="terminal-input-bar terminal-input-bar-wrap">
-                <label class="form-label-muted" for="terminalCommandInput">Perintah demo</label>
-                <input type="text" id="terminalCommandInput" class="terminal-input-field" placeholder="/help, /clear, /ping, /status" autocomplete="off" aria-keyshortcuts="Enter" />
-              </div>
-            </div>
-          </article>
+          <div class="api-endpoint-row">
+            <select id="apiEndpoint" class="selector api-endpoint-select" aria-label="Pilih Endpoint API Demo">
+              <option value="/sits/api/v1/telemetry">/sits/api/v1/telemetry (Telemetri Jaringan)</option>
+              <option value="/sits/api/v1/incidents">/sits/api/v1/incidents (Daftar Insiden Aktif)</option>
+              <option value="/sits/api/v1/preemption">/sits/api/v1/preemption (Status Preemption Prioritas)</option>
+            </select>
+          </div>
 
-          <!-- REST API Gateway Explorer Playground -->
-          <article class="api-playground-card glass-panel api-card-top-margin">
-            <div class="section-head compact">
-              <div>
-                <h2>REST API Gateway Sandbox</h2>
-                <p>Jalankan contoh permintaan terhadap endpoint sandbox lokal, bukan API SITS Dishub.</p>
-              </div>
-              <span class="provenance-badge simulated">SANDBOX</span>
-            </div>
-            
-            <div class="api-explorer-layout api-explorer-grid">
-              <div class="api-form-panel">
-                <div class="form-group api-form-mb">
-                  <label class="form-label-muted" for="apiEndpoint">HTTP method &amp; endpoint</label>
-                  <div class="header-actions-flex">
-                    <span class="api-method-badge" id="apiMethod">CONTOH</span>
-                    <select id="apiEndpoint" class="selector api-endpoint-select">
-                      <option value="/sits/api/v1/telemetry">/sits/api/v1/telemetry</option>
-                      <option value="/sits/api/v1/incidents">/sits/api/v1/incidents</option>
-                      <option value="/sits/api/v1/preemption">/sits/api/v1/preemption</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="api-request-preview api-form-mb">
-                  <div class="notif-card-header">
-                    <label class="form-label-muted" for="apiPayloadEditor">Request payload (JSON)</label>
-                    <span id="apiJsonValidateTag" class="api-json-tag" data-state="valid" role="status">JSON VALID</span>
-                  </div>
-                  <div class="payload-box api-payload-box">
-                    <textarea id="apiPayloadEditor" class="api-textarea" spellcheck="false" maxlength="8192" aria-describedby="apiJsonValidateTag">{}</textarea>
-                  </div>
-                </div>
-                <button class="btn btn-primary btn-api-send" id="btnSendApiRequest" type="button">Jalankan contoh lokal</button>
-              </div>
-              
-              <div class="api-response-panel api-response-panel-wrap">
-                <div class="notif-card-header">
-                  <label class="form-label-muted">Response Payload (JSON)</label>
-                  <span id="apiStatusBadge" class="api-status-badge" data-state="idle" role="status" aria-live="polite">BELUM DIJALANKAN</span>
-                </div>
-                <div class="api-response-body api-response-box">
-                  <pre id="apiResponseContent" class="api-pre-content" aria-live="polite">Belum ada permintaan. Respons akan berasal dari state simulator lokal.</pre>
-                </div>
-              </div>
-            </div>
-          </article>
-        </section>
+          <div class="api-panel-header">
+            <label for="apiPayloadEditor">Request Payload (JSON)</label>
+            <span id="apiJsonValidateTag" class="api-json-tag" data-state="valid" role="status">JSON VALID</span>
+          </div>
+
+          <textarea id="apiPayloadEditor" class="api-textarea" spellcheck="false" maxlength="8192" aria-describedby="apiJsonValidateTag" aria-label="Editor Payload JSON">{}</textarea>
+
+          <button class="btn btn-primary btn-api-send" id="btnSendApiRequest" type="button">
+            🚀 Jalankan Permintaan Sandbox
+          </button>
+        </div>
+
+        <!-- Right Column: Response Viewer -->
+        <div class="api-response-panel">
+          <div class="api-panel-header">
+            <label for="apiResponseContent">Respons Simulator (JSON)</label>
+            <span id="apiStatusBadge" class="api-status-badge" data-state="idle" role="status" aria-live="polite">BELUM DIJALANKAN</span>
+          </div>
+
+          <pre id="apiResponseContent" class="api-pre-content" aria-live="polite" role="region" aria-label="Viewer Respons API">Belum ada permintaan. Pilih endpoint dan klik 'Jalankan Permintaan Sandbox' untuk menerima data simulator.</pre>
+        </div>
       </div>
+    </article>
+
+    <!-- Secondary Panel: Local Diagnostic Activity Log & Command Terminal -->
+    <article class="terminal-logs-card glass-panel" id="card-integration-terminal">
+      <div class="section-head">
+        <div>
+          <h2>Terminal Diagnostik Sandbox Lokal</h2>
+          <p>Catatan aktivitas lokal dan verifikasi respons server internal (/help, /ping, /status, /clear).</p>
+        </div>
+        <span class="provenance-badge simulated">DIAGNOSTIK LOKAL</span>
+      </div>
+
+      <div class="terminal-body-wrapper">
+        <div class="terminal-body" id="terminalLogs" role="log" aria-live="polite" aria-label="Log perintah sandbox lokal">
+          <div class="terminal-line is-neutral">[SANDBOX] Tidak ada koneksi eksternal yang aktif. Semua panggilan bersifat lokal.</div>
+          <div class="terminal-line is-info">[SANDBOX] Ketik /ping untuk menguji latensi endpoint snapshot simulator lokal.</div>
+        </div>
+
+        <div class="terminal-input-bar">
+          <span class="terminal-prompt-text" aria-hidden="true">&gt;</span>
+          <input type="text" id="terminalCommandInput" class="terminal-input-field" placeholder="Ketik perintah lokal: /help, /ping, /status, /clear..." autocomplete="off" aria-label="Baris perintah terminal sandbox" />
+        </div>
+      </div>
+    </article>
+  </section>
+</div>

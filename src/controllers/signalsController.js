@@ -17,6 +17,7 @@ import { authManager } from '../core/authManager.js';
 export class SignalsController {
   constructor() {
     this.isGridView = false;
+    this.selectedIntersectionId = 'node-wonokromo';
     this._isInitialized = false;
     this._currentTargetNode = 'node-wonokromo';
     this.disposer = new Disposer('SignalsController');
@@ -167,9 +168,8 @@ export class SignalsController {
     if (!table || typeof table.replaceChildren !== 'function' || intersections.length === 0) return;
     table.replaceChildren(...intersections.map((node) => {
       const row = document.createElement('tr');
-
-
-      row.setAttribute('aria-label', `Fokus peta ke ${node.name || node.id}`);
+      row.dataset.intersectionId = String(node.id || '');
+      row.classList.toggle('is-selected', node.id === this.selectedIntersectionId);
       const density = densityName(node);
       row.dataset.density = density;
       [node.name || node.id, `${phaseName(node.state)} · simulasi`, node.status || '—', node.waitTime === undefined ? '—' : `${node.waitTime} dtk`, updatedAt].forEach((value, index) => {
@@ -184,12 +184,14 @@ export class SignalsController {
           button.type = 'button'; button.className = 'btn btn-ghost compact';
           button.textContent = String(value);
           button.setAttribute('aria-label', `Fokus peta ke ${value}`);
+          if (node.id === this.selectedIntersectionId) button.setAttribute('aria-current', 'location');
           cell.appendChild(button);
         } else cell.textContent = String(value);
         row.appendChild(cell);
       });
       return row;
     }));
+    this._applyIntersectionSearch();
   }
 
   _updateActiveOverrideBadges() {
@@ -736,22 +738,45 @@ export class SignalsController {
    */
   _bindTableSearchAndClick() {
     const table = document.getElementById('intersectionTable');
+    const search = document.getElementById('signalsIntersectionSearch');
+    if (search) this.disposer.addEventListener(search, 'input', () => this._applyIntersectionSearch());
     if (!table) return;
     this.disposer.addEventListener(table, 'click', (event) => {
       const row = event.target.closest('tr');
       if (!row || !table.contains(row)) return;
-      const name = row.cells[0]?.textContent.trim() || row.textContent.trim();
+      this.selectedIntersectionId = row.dataset.intersectionId || this.selectedIntersectionId;
+      table.querySelectorAll('tr').forEach((item) => {
+        const selected = item === row;
+        item.classList.toggle('is-selected', selected);
+        const button = item.querySelector('td:first-child button');
+        if (selected) button?.setAttribute('aria-current', 'location');
+        else button?.removeAttribute('aria-current');
+      });
       soundManager.play('click');
-      window.mapManager?.flyToIntersection(name);
+      const focus = { kind: 'intersection', id: this.selectedIntersectionId, route: 'map' };
+      stateStore.setState({ pendingEntityFocus: focus });
+      if (window.location.hash === '#map') {
+        window.dispatchEvent(new CustomEvent('omnitraf:entity-focus', { detail: focus }));
+        stateStore.setState({ pendingEntityFocus: null });
+      } else window.location.hash = 'map';
     });
-    this.disposer.addEventListener(table, 'keydown', (event) => {
-      if (!['Enter', ' '].includes(event.key)) return;
-      const row = event.target.closest('tr[role="button"]');
-      if (!row || !table.contains(row)) return;
-      event.preventDefault();
-      const name = row.cells[0]?.textContent.trim() || row.textContent.trim();
-      window.mapManager?.flyToIntersection(name);
+  }
+
+  _applyIntersectionSearch() {
+    const search = document.getElementById('signalsIntersectionSearch');
+    const table = document.getElementById('intersectionTable');
+    if (!table) return;
+    const query = (search?.value || '').trim().toLocaleLowerCase();
+    let shown = 0;
+    table.querySelectorAll('tr').forEach((row) => {
+      const matches = !query || row.textContent.toLocaleLowerCase().includes(query);
+      row.hidden = !matches;
+      if (matches) shown += 1;
     });
+    const count = document.getElementById('signalsResultCount');
+    if (count) count.textContent = `${shown} simpang`;
+    const empty = document.getElementById('emptyState');
+    if (empty) empty.classList.toggle('is-hidden', shown > 0);
   }
 
   /**
