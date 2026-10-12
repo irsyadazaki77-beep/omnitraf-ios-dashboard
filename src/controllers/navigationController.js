@@ -113,10 +113,21 @@ export class NavigationController {
 
       if (target && viewLoader.viewMap[target.replace('view-', '')]) {
         e.preventDefault();
-        if (window.location.hash !== `#${target}`) {
-          window.location.hash = target;
+        const cleanTarget = target.replace('view-', '').replace('emergencies', 'emergency');
+        const entityKind = link.dataset.entityKind;
+        const entityId = link.dataset.entityId;
+        if (entityKind && entityId) {
+          stateStore.setState({ pendingEntityFocus: { kind: entityKind, id: entityId, route: cleanTarget } });
         }
-        switchView(target);
+        if (window.location.hash !== `#${target}`) {
+          // hashchange is the single route transition source when navigating
+          // between views; issuing switchView here as well races the entity
+          // focus request against a second transition that can steal focus.
+          window.location.hash = target;
+        } else {
+          // Same-route entity links still need to deliver a fresh focus request.
+          switchView(target);
+        }
         soundManager.play('click');
       }
     });
@@ -243,6 +254,7 @@ export class NavigationController {
           button.dataset.entityKind = entity.kind;
           button.dataset.entityId = String(entity.id);
           button.dataset.entityRoute = entity.route;
+          button.dataset.search = entity.query || `${entity.name} ${entity.detail || ''}`;
           button.textContent = `${entity.label} · ${entity.name}${entity.detail ? ` — ${entity.detail}` : ''}`;
           entityLinks.appendChild(button);
         });

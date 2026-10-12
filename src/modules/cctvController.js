@@ -199,6 +199,7 @@ export class CctvController {
       cancelAnimationFrame(this.animFrameId);
       this.animFrameId = null;
     }
+    this.renderers.forEach(renderer => renderer.clear());
     this.realtimeAdapter.disconnect();
     this.disposer.clear();
   }
@@ -240,10 +241,12 @@ export class CctvController {
         const activeThreshold = stateStore.getState().cctvConfidenceThreshold || 85;
         const acceptedDetections = detectionFilter.filter(validatedDetections, activeThreshold);
 
-        // 3. Update Tracking Engine & Renderer target coordinates
-        const renderer = this.renderers.get(camId);
-        if (renderer) {
-          renderer.updateBoxes(acceptedDetections);
+        // 3. Update Tracking Engine & Renderer target coordinates (if active)
+        if (this.isActive) {
+          const renderer = this.renderers.get(camId);
+          if (renderer) {
+            renderer.updateBoxes(acceptedDetections);
+          }
         }
 
         // 4. Calculate Derived Intelligence Telemetry (TelemetryBuilder)
@@ -278,8 +281,10 @@ export class CctvController {
           sequence: Number.isSafeInteger(frameSequence) ? frameSequence : null
         });
 
-        // 7. Sync Camera HUD to DOM
-        this._updateCameraDomHUD(camId, camRuntime);
+        // 7. Sync Camera HUD to DOM (only if active view)
+        if (this.isActive) {
+          this._updateCameraDomHUD(camId, camRuntime);
+        }
       } catch (camErr) {
         console.warn(`⚠️ [CctvController] Isolasi error kamera ${camId}:`, camErr);
       }

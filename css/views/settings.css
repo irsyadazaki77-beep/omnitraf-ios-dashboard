@@ -78,8 +78,7 @@
   color: var(--text-primary);
 }
 
-.settings-nav-item.active,
-.settings-nav-item[aria-selected="true"] {
+.settings-nav-item.active {
   background: var(--surface-base);
   color: var(--chart-primary);
   box-shadow: var(--shadow-xs);

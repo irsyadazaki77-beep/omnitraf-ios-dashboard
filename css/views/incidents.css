@@ -3,6 +3,8 @@
   box-shadow: 0 0 6px var(--status-danger);
 }
 
+#incidentDetailDesc { white-space: pre-line; }
+
 .incident-empty-state { padding: var(--space-6); color: var(--text-tertiary); }
 .incident-log-item { border-color: var(--border-subtle); box-shadow: none; }
 .incident-log-item:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }

@@ -145,7 +145,7 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
   if (probabilityValue >= 75) {
     riskLevel = "HIGH";
     riskText = "Indeks risiko model tinggi";
-    riskColor = "var(--danger)";
+    riskColor = "var(--status-danger)";
     trafficStatus = "Jam puncak / kepadatan tinggi";
     tomorrowStatus = "Tinggi";
   } else if (probabilityValue >= 48) {

@@ -217,7 +217,10 @@ app.get('/ready', requireCapability('diagnostics:read'), async (req, res) => {
   });
 });
 
-app.use(rateLimiter({ windowMs: 15000, max: 200, keyPrefix: 'api-global' }));
+// Browser E2E sessions boot a fresh app per test and load many static shell templates.
+// Keep those isolated test assets below the guardrail without changing dev/production limits.
+const globalRateLimit = process.env.E2E_TEST_RUN === 'true' ? 5000 : 200;
+app.use(rateLimiter({ windowMs: 15000, max: globalRateLimit, keyPrefix: 'api-global' }));
 app.use(express.json({ limit: '1mb' }));
 
 // Reject browser-originated unsafe requests from origins outside the CORS allowlist.

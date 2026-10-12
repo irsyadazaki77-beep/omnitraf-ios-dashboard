@@ -7,6 +7,8 @@
   display: none;
 }
 
+body.theme-light #timeTravelTimeVal { color: #1d4ed8; }
+
 .prediction-panel {
   max-width: 1440px;
   padding: var(--space-5);

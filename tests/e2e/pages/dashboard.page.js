@@ -7,9 +7,15 @@ export class DashboardPage {
   constructor(page) {
     this.page = page;
     this.viewContainer = page.locator('#view-dashboard');
-    this.kpiCards = page.locator('#view-dashboard .metric-card, #view-dashboard .kpi-card');
-    this.incidentFeed = page.locator('#view-dashboard .incident-feed, #view-dashboard #dashboardIncidents');
-    this.quickActions = page.locator('#view-dashboard .quick-actions, #view-dashboard [data-action]');
+    this.kpiCards = page.locator('#view-dashboard .dashboard-kpi');
+    this.status = page.locator('#dashSystemState');
+    this.map = page.locator('#dashboardMapBox');
+    this.priorityPanel = page.locator('#priorityOperationsList');
+    this.criticalStrip = page.locator('#criticalIncidentStrip');
+    this.searchDisclosure = page.locator('.dashboard-map-search');
+    this.searchInput = page.locator('#intersectionSearch');
+    this.advancedControls = page.locator('#dashboardSimulationTools');
+    this.refreshButton = page.locator('#view-dashboard [data-action="refresh"]');
   }
 
   async waitForReady() {
@@ -18,5 +24,23 @@ export class DashboardPage {
 
   async getKpiCount() {
     return this.kpiCards.count();
+  }
+
+  async searchIntersection(query) {
+    const isOpen = await this.searchDisclosure.evaluate((details) => details.open);
+    if (!isOpen) {
+      await this.searchDisclosure.locator('summary').click();
+    }
+    await this.searchInput.fill(query);
+  }
+
+  async openAdvancedControls() {
+    if (!(await this.advancedControls.getAttribute('open'))) {
+      await this.advancedControls.locator('summary').click();
+    }
+  }
+
+  async refresh() {
+    await this.refreshButton.click();
   }
 }

@@ -71,6 +71,8 @@
   font-family: var(--font-mono);
 }
 
+body.theme-light #analyticsHourBadge { color: #1d4ed8; }
+
 .time-range-segmented {
   display: inline-flex;
   align-items: center;
@@ -316,6 +318,7 @@
 
 .table-scroll {
   overflow-x: auto;
+  max-width: 100%;
   max-height: 240px;
   margin-top: 6px;
 }

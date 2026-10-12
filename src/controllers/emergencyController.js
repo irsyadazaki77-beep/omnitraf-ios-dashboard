@@ -36,6 +36,20 @@ export class EmergencyController {
     this._setupStoreListeners();
     this._syncRoleCapabilities();
     this.disposer.add(authManager.onAuthChange(() => this._syncRoleCapabilities()));
+    this.disposer.addEventListener(window, 'omnitraf:entity-focus', (event) => {
+      if (event.detail?.kind !== 'emergency') return;
+      const id = String(event.detail.id);
+      const exists = (stateStore.getState().activeEmergencies || []).some((item) => String(item.vehicleId || item.id) === id);
+      const card = [...document.querySelectorAll('#emergencyListGrid [data-emergency-id]')]
+        .find((item) => item.dataset.emergencyId === id);
+      if (!exists || !card) {
+        window.showToast?.('Skenario darurat tidak lagi tersedia pada sesi ini.', 'warning');
+        return;
+      }
+      card.setAttribute('aria-current', 'location');
+      card.focus({ preventScroll: true });
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
 
     // Initial sync / render immediately on activation
     const state = stateStore.getState();
@@ -410,6 +424,8 @@ export class EmergencyController {
       }).join('');
 
       card.className = `emergency-card-item ${isFinished ? 'is-finished' : ''}`;
+      card.dataset.emergencyId = String(emg.vehicleId || emg.id);
+      card.tabIndex = -1;
       card.innerHTML = `
         <div class="em-header">
           <span class="badge-em ${isPmk ? 'amber' : 'red'}">${safeVehicleId} · ${safeVehicleType}</span>

@@ -204,7 +204,7 @@
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  color: #64748b;
+  color: #475569;
 }
 
 .doc-meta-strip {
@@ -255,7 +255,7 @@
 .kpi-label {
   display: block;
   font-size: 10px;
-  color: #64748b;
+  color: #475569;
   text-transform: uppercase;
 }
 
@@ -279,7 +279,7 @@
   padding-top: 12px;
   border-top: 1px solid #cbd5e1;
   font-size: 9.5px;
-  color: #64748b;
+  color: #475569;
   line-height: 1.4;
 }
 

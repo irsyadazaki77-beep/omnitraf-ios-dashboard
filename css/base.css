@@ -8,6 +8,7 @@
 }
 
 [hidden] { display: none !important; }
+.view-pane[aria-busy="true"] { visibility: hidden; }
 
 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 select,
@@ -67,6 +68,8 @@ body {
   background-color: var(--bg-base);
   color: var(--text);
 }
+
+body:not(.theme-light) .omni-osm-tile { filter: invert(.9) hue-rotate(180deg) saturate(.55) brightness(.9); }
 
 .skip-link {
   position: fixed;

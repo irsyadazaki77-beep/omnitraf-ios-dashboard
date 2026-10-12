@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = process.env.E2E_PORT || 3100;
+const PORT = process.env.E2E_PORT || 4178;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 export default defineConfig({
@@ -78,9 +78,12 @@ export default defineConfig({
   ],
   webServer: {
     command: 'node scripts/start-e2e-server.mjs',
-    url: `${BASE_URL}/api/traffic`,
+    // /api/traffic is not a route; readiness should use the app's liveness-independent probe.
+    url: `${BASE_URL}/readyz`,
     timeout: 30000,
-    reuseExistingServer: !process.env.CI,
+    // Never attach to an arbitrary dev server: E2E must use the temporary DB
+    // and test-only auth/rate-limit boundary from start-e2e-server.mjs.
+    reuseExistingServer: false,
     env: {
       NODE_ENV: 'test',
       PORT: String(PORT),

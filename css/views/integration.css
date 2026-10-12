@@ -11,17 +11,21 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  width: 100%;
+  min-width: 0;
   max-width: 1440px;
 }
 
 /* 1. Status Overview Header Cards */
 .integration-status-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: var(--space-3);
+  min-width: 0;
 }
 
 .integration-status-card {
+  min-width: 0;
   padding: 14px 18px;
   background: var(--surface-raised);
   border: 1px solid var(--border-default);
@@ -36,6 +40,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .integration-status-card h3 {
@@ -59,6 +64,7 @@
 
 /* 2. API Playground & Request Builder (Primary Hero Area) */
 .api-playground-card {
+  min-width: 0;
   padding: var(--space-5);
   background: var(--surface-raised);
   border: 1px solid var(--border-default);
@@ -70,6 +76,7 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: var(--space-4);
+  flex-wrap: wrap;
   margin-bottom: var(--space-4);
 }
 
@@ -89,7 +96,10 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--space-4);
+  min-width: 0;
 }
+
+.api-playground-card .section-head > div { min-width: 0; }
 
 .api-form-panel,
 .api-response-panel {
@@ -132,10 +142,13 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .api-endpoint-select {
   flex: 1;
+  min-width: 0;
+  width: 100%;
   min-height: 38px;
   padding: 6px 12px;
   background: var(--surface-base);

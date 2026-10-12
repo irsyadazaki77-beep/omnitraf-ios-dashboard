@@ -46,9 +46,10 @@ export class SessionController {
     logout.type = 'button'; logout.id = 'sessionLogout'; logout.className = 'btn btn-ghost compact'; logout.textContent = 'Keluar'; logout.hidden = true;
     profile?.parentElement?.appendChild(logout);
     logout.addEventListener('click', async () => { logout.disabled = true; try { await authManager.logout(); window.showToast?.('Sesi berakhir. Demo lokal tersedia.', 'info'); } catch (error) { window.showToast?.(error.message || 'Gagal mengakhiri sesi server.', 'danger'); } finally { logout.disabled = false; } });
+    document.getElementById('btnMobileLogout')?.addEventListener('click', () => logout.click());
     const sync = (user) => {
       logout.hidden = !user;
-      profile?.setAttribute('aria-label', user ? `Sesi ${user.name || user.username}. Keluar tersedia di tombol sebelah.` : 'Masuk ke simulator');
+      profile?.setAttribute('aria-label', user ? `Sesi ${user.name || user.username}. Kontrol keluar tersedia di navigasi.` : 'Masuk ke simulator');
       const login = document.querySelector('[data-open-session]'); if (login) login.hidden = Boolean(user);
     };
     authManager.onAuthChange(sync); sync(authManager.getUser());

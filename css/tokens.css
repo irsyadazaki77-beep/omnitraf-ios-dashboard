@@ -33,18 +33,18 @@
   /* Typography & High-Contrast Hierarchy (WCAG 2.1 AA Compliant) */
   --text: #f2f5fa;
   --text-muted: #a0aec1;
-  --text-dim: #718198;
+  --text-dim: #8292a8;
   --text-inverse: #080c14;
 
   /* 10% Intent-Driven Accent Palette (Cobalt, Cyan & Azure) */
-  --primary: #528bff;
-  --primary-hover: #3978e8;
-  --primary-active: #2864cf;
+  --primary: #2864cf;
+  --primary-hover: #1f56b5;
+  --primary-active: #194793;
   --primary-soft: rgba(82, 139, 255, 0.12);
   --primary-border: rgba(82, 139, 255, 0.28);
 
-  --primary-2: #0284c7;
-  --primary-2-hover: #0369a1;
+  --primary-2: #38bdf8;
+  --primary-2-hover: #0ea5e9;
   --primary-2-soft: rgba(2, 132, 199, 0.12);
   --primary-2-border: rgba(2, 132, 199, 0.28);
 
@@ -63,12 +63,12 @@
   --warning-soft: rgba(229, 180, 81, 0.13);
   --warning-border: rgba(229, 180, 81, 0.28);
 
-  --danger: #e16b75;
-  --danger-hover: #cc4c59;
-  --danger-soft: rgba(225, 107, 117, 0.13);
-  --danger-border: rgba(225, 107, 117, 0.28);
+  --danger: #b83c4a;
+  --danger-hover: #a12f3d;
+  --danger-soft: rgba(184, 60, 74, 0.13);
+  --danger-border: rgba(184, 60, 74, 0.28);
 
-  --info: #3b82f6;
+  --info: #60a5fa;
   --info-soft: rgba(59, 130, 246, 0.12);
   --info-border: rgba(59, 130, 246, 0.25);
 
@@ -84,6 +84,8 @@
   --surface-hover: rgba(148, 163, 184, 0.1);
   --surface-selected: var(--primary-soft);
   --accent-primary: var(--primary);
+  /* Links need text contrast; reserve --primary for fills and data accents. */
+  --text-link: #79a8ff;
   --text-primary: var(--text);
   --text-secondary: var(--text-muted);
   --text-tertiary: var(--text-dim);
@@ -92,7 +94,7 @@
   --border-strong: var(--border-emphasis);
   --status-success: var(--success);
   --status-warning: var(--warning);
-  --status-danger: var(--danger);
+  --status-danger: #f8717d;
   --status-info: var(--info);
   --status-neutral: var(--stale);
   --status-user-action: #c084fc;
@@ -216,17 +218,17 @@ body.theme-light,
 
   --text: #1a2535;
   /* Keep secondary and tertiary copy readable on the light canvas at small sizes. */
-  --text-muted: #617187;
-  --text-dim: #8290a2;
+  --text-muted: #4b5a70;
+  --text-dim: #59697f;
   --text-inverse: #ffffff;
 
-  --primary: #286cf0;
-  --primary-hover: #1f5ed8;
-  --primary-active: #184eb8;
+  --primary: #1f5ed8;
+  --primary-hover: #184eb8;
+  --primary-active: #153f96;
   --primary-soft: rgba(40, 108, 240, 0.09);
   --primary-border: rgba(40, 108, 240, 0.22);
 
-  --primary-2: #0284c7;
+  --primary-2: #0369a1;
   --primary-2-hover: #0369a1;
   --primary-2-soft: rgba(2, 132, 199, 0.08);
   --primary-2-border: rgba(2, 132, 199, 0.2);
@@ -245,22 +247,39 @@ body.theme-light,
   --surface-hover: rgba(15, 23, 42, 0.06);
   --surface-selected: var(--primary-soft);
   --accent-primary: var(--primary);
+  --text-link: #1f5ed8;
   --text-primary: var(--text);
   --text-secondary: var(--text-muted);
   --text-tertiary: var(--text-dim);
   --text-disabled: rgba(71, 85, 105, 0.55);
   --border-default: var(--border);
   --border-strong: var(--border-emphasis);
-  --success: #148765;
-  --success-hover: #0f7455;
-  --success-soft: rgba(20, 135, 101, 0.09);
-  --success-border: rgba(20, 135, 101, 0.2);
-  --warning: #9a6400;
-  --warning-hover: #805300;
-  --warning-soft: rgba(154, 100, 0, 0.09);
-  --warning-border: rgba(154, 100, 0, 0.2);
-  --danger: #b83848;
-  --danger-hover: #a52e3e;
-  --danger-soft: rgba(184, 56, 72, 0.08);
-  --danger-border: rgba(184, 56, 72, 0.2);
+  --success: #0b684c;
+  --success-hover: #09583f;
+  --success-soft: rgba(11, 104, 76, 0.09);
+  --success-border: rgba(11, 104, 76, 0.2);
+  --warning: #765000;
+  --warning-hover: #634200;
+  --warning-soft: rgba(118, 80, 0, 0.09);
+  --warning-border: rgba(118, 80, 0, 0.2);
+  --danger: #ad2e40;
+  --danger-hover: #922337;
+  --danger-soft: rgba(173, 46, 64, 0.08);
+  --danger-border: rgba(173, 46, 64, 0.2);
+  --stale: #526176;
+  --info: #1d4ed8;
+  --chart-primary: #07546f;
+
+  /* Rebind semantic aliases after light-mode palette overrides. */
+  --status-success: var(--success);
+  --status-warning: var(--warning);
+  --status-danger: var(--danger);
+  --status-info: var(--info);
+  --status-neutral: var(--stale);
+  --provenance-live: var(--status-success);
+  --provenance-derived: var(--status-info);
+  --provenance-simulated: var(--status-warning);
+  --provenance-stale: var(--status-neutral);
+  --provenance-offline: var(--status-danger);
+  --chart-savings: var(--success);
 }

@@ -158,6 +158,12 @@ export class ViewLoader {
         tempDiv.innerHTML = html.trim();
         const node = tempDiv.firstElementChild;
         if (node) {
+          // A lazily-mounted pane must never inherit an active state from its
+          // template while its request is racing a newer navigation.
+          node.classList.remove('active');
+          node.hidden = true;
+          node.inert = true;
+          node.setAttribute('aria-hidden', 'true');
           container.appendChild(node);
           viewElement = node;
           this.mountedViews.add(cleanKey);
@@ -170,16 +176,15 @@ export class ViewLoader {
 
     if (!shouldActivate()) return { success: true, isFirstMount, element: viewElement };
 
-    // Toggle active classes & visibility across view panes
+    // Keep visibility in the DOM contract; CSS owns the display mode for each
+    // active pane (Dashboard uses Grid, other workspaces may use Flex/Grid).
     const allPanes = document.querySelectorAll('.view-pane');
     allPanes.forEach(pane => {
-      if (pane.id === targetId) {
-        pane.classList.add('active');
-        pane.style.display = 'block';
-      } else {
-        pane.classList.remove('active');
-        pane.style.display = 'none';
-      }
+      const isActive = pane.id === targetId;
+      pane.classList.toggle('active', isActive);
+      pane.hidden = !isActive;
+      pane.inert = !isActive;
+      pane.setAttribute('aria-hidden', String(!isActive));
     });
 
     // Update navigation active states

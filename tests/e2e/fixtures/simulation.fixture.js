@@ -1,7 +1,8 @@
 /**
  * Deterministic Simulation Fixture:
  * Freezes time, disables non-essential animations, waits for lazy views & fonts,
- * and sets up deterministic visual state.
+ * and waits for application-specific readiness without requiring the realtime
+ * socket to become idle.
  */
 
 /**
@@ -34,9 +35,40 @@ export async function stabilizeVisualState(page) {
     }
   });
 
-  // 3. Wait until no active pending network requests or DOM insertions
-  await page.waitForLoadState('networkidle');
+  // Let style recalculation, canvas paint, and any queued DOM writes settle.
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
+
+/**
+ * Pin Leaflet to the documented simulation viewport before visual capture.
+ * Dashboard routes can inherit a fly-to from earlier operator actions while
+ * the map instance remains mounted; resetting the instance keeps screenshots
+ * independent from the previous browser interaction.
+ * @param {import('@playwright/test').Page} page
+ * @param {string} viewId
+ */
+export async function stabilizeMapViewport(page, viewId) {
+  const containerId = viewId === 'view-dashboard' ? 'dashboardMapBox' : 'map-surabaya';
+  await page.waitForFunction((id) => window.mapManager?.maps?.has(id), containerId, { timeout: 10000 });
+  await page.evaluate((id) => {
+    const map = window.mapManager?.maps?.get(id);
+    if (!map) return;
+    map.stop();
+    map.closePopup();
+    map.invalidateSize(false);
+    map.setView([-7.2756, 112.7424], 13, { animate: false });
+  }, containerId);
+  await page.waitForFunction((id) => {
+    const map = window.mapManager?.maps?.get(id);
+    if (!map) return false;
+    const center = map.getCenter();
+    return Math.abs(center.lat + 7.2756) < 0.0001
+      && Math.abs(center.lng - 112.7424) < 0.0001
+      && map.getZoom() === 13;
+  }, containerId);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
 
 /**
  * Wait for a view element to be mounted and visible
@@ -44,17 +76,22 @@ export async function stabilizeVisualState(page) {
  * @param {string} viewId e.g. 'view-dashboard'
  */
 export async function waitForViewReady(page, viewId) {
-  const viewLocator = page.locator(`#${viewId}`);
-  await viewLocator.waitFor({ state: 'visible', timeout: 15000 });
-  // Wait for child content to have rendered
-  await page.waitForFunction(
+  const result = await page.waitForFunction(
     (id) => {
       const el = document.getElementById(id);
-      return el && el.childElementCount > 0 && !el.classList.contains('hidden');
+      const error = document.getElementById('viewLoadError');
+      if (error && !error.hidden) return `error: ${error.innerText}`;
+      const ready = el && el.childElementCount > 0 && el.classList.contains('active')
+        && !el.hidden && !el.inert && !el.classList.contains('hidden')
+        && getComputedStyle(el).display !== 'none'
+        && !el.hasAttribute('aria-busy');
+      return ready ? 'ready' : false;
     },
     viewId,
     { timeout: 15000 }
   );
+  const status = await result.jsonValue();
+  if (status !== 'ready') throw new Error(`View ${viewId} failed to load: ${status}`);
 }
 
 /**

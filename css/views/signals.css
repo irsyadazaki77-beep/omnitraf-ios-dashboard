@@ -569,6 +569,8 @@
 }
 
 /* Signals Responsive */
+.signals-intersection-card [data-signal-command-status] { font-size: 12px; line-height: 1.5; margin: 12px 0; }
+.signals-console-grid { align-items: start; }
 #intersectionTable th { position: sticky; top: 0; z-index: 2; background: var(--surface-raised); }
 #intersectionTable td, #intersectionTable th { font-variant-numeric: tabular-nums; }
 #intersectionTable tbody tr[role="button"] { cursor: pointer; }

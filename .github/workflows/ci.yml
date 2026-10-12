@@ -50,6 +50,9 @@ jobs:
       - name: Code Quality Lint Check
         run: npm run lint
 
+      - name: Stylesheet Lint Check
+        run: npm run lint:css
+
       - name: Build Production Frontend
         run: npm run build
 
@@ -72,3 +75,43 @@ jobs:
           REDIS_URL: redis://localhost:6379
           REQUIRE_CLUSTER_TESTS: 'true'
         run: npm run test:cluster
+
+  browser-tests:
+    name: Browser Smoke, Interaction, Visual, and Accessibility Tests
+    # Snapshot names include the host platform. Keep Chromium capture and
+    # review on Windows, where the checked-in baselines were created.
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Production Frontend
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+
+      - name: Run Browser Quality Gate with Isolated SQL.js Backend
+        env:
+          CI: 'true'
+          E2E_PORT: '4178'
+        run: npm run test:e2e -- --project=Desktop-Dark
+
+      - name: Upload Browser Failure Traces and Screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: omnitraf-playwright-failures
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: warn

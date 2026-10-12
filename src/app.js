@@ -80,7 +80,7 @@ export class App {
       : requestedHash && requestedHash !== 'about-engine' ? requestedHash
         : (stateStore.getState().currentView || 'dashboard');
     await Promise.all([
-      viewLoader.mountView(initialView),
+      viewLoader.mountView(initialView, { shouldActivate: () => false }),
       viewLoader.mountShellComponents()
     ]);
 
@@ -119,6 +119,8 @@ export class App {
    */
   async _handleViewTransition(newView, oldView) {
     const navigationId = ++this.navigationId;
+    const previouslyFocusedPane = document.querySelector('.view-pane.active');
+    const shouldRestoreViewFocus = Boolean(previouslyFocusedPane?.contains(document.activeElement));
     this.currentView = newView;
     if (String(newView).replace('#', '').replace('view-', '') !== 'dashboard') {
       this.mapObserver?.disconnect();
@@ -134,6 +136,14 @@ export class App {
 
     // Lazy load & mount HTML partial into DOM
     this._showViewLoading(newView);
+    try {
+      await this._loadViewStyles(newView);
+    } catch (error) {
+      if (navigationId === this.navigationId) this._showViewLoadError(newView, () => this._handleViewTransition(newView, oldView));
+      console.error(`[App] Unable to load styles for ${newView}:`, error);
+      return;
+    }
+    if (navigationId !== this.navigationId) return;
     const { isFirstMount, success, element } = await viewLoader.mountView(newView, {
       shouldActivate: () => navigationId === this.navigationId
     });
@@ -173,6 +183,43 @@ export class App {
     if (cleanId === 'map' || cleanId === 'dashboard') {
       this.controllerModules.get('mapManager')?.debouncedInvalidateSize?.(120);
     }
+
+    // A contextual link can be inside the pane that was just hidden. Move focus
+    // to the new workspace heading only for that case; shell navigation keeps
+    // focus on the selected navigation control.
+    if (shouldRestoreViewFocus && !pendingEntityFocus && navigationId === this.navigationId) {
+      const heading = element?.querySelector('h1, [data-view-heading]');
+      if (heading) {
+        if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+        heading.focus({ preventScroll: true });
+      }
+    }
+  }
+
+  async _loadViewStyles(view) {
+    if (!isViteRuntime) return;
+    const cleanView = String(view || 'dashboard').replace('#', '').replace('view-', '');
+    const styles = {
+      dashboard: () => import('../css/views/dashboard.css'),
+      map: async () => {
+        await import('../css/views/map.css');
+        await import('leaflet/dist/leaflet.css');
+        await import('leaflet.markercluster/dist/MarkerCluster.css');
+        await import('leaflet.markercluster/dist/MarkerCluster.Default.css');
+      },
+      cctv: () => import('../css/views/cctv.css'),
+      signals: async () => { await import('../css/views/signals.css'); await import('../css/views/map.css'); },
+      incidents: async () => { await import('../css/views/incidents.css'); await import('../css/views/map.css'); },
+      emergency: () => import('../css/views/emergencies.css'),
+      emergencies: () => import('../css/views/emergencies.css'),
+      analytics: () => import('../css/views/analytics.css'),
+      prediction: () => import('../css/views/prediction.css'),
+      reports: () => import('../css/views/reports.css'),
+      devices: () => import('../css/views/devices.css'),
+      integration: () => import('../css/views/integration.css'),
+      settings: () => import('../css/views/settings.css')
+    };
+    await (styles[cleanView] || styles.dashboard)();
   }
 
   _manageSocketChannelSubscriptions(newView, oldView) {
@@ -575,7 +622,6 @@ export class App {
     };
 
     const isDialogVisible = (dialog) => {
-      if (dialog.getAttribute('aria-hidden') === 'true') return false;
       if (dialog.id === 'notifDrawer') return dialog.classList.contains('open');
       return dialog.classList.contains('show') || dialog.classList.contains('open') ||
         dialog.classList.contains('active') || (dialog.style.display !== 'none' &&

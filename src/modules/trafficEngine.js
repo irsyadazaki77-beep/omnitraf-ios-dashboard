@@ -348,6 +348,8 @@ export class TrafficEngine {
       inspect.className = 'btn btn-ghost compact';
       inspect.textContent = 'Inspect';
       inspect.setAttribute('aria-label', `Inspect incident ${incident.title || incident.id || ''}`);
+      inspect.dataset.entityKind = 'incident';
+      inspect.dataset.entityId = String(incident.id);
       item.append(details, inspect);
       list.appendChild(item);
     });
@@ -367,10 +369,10 @@ export class TrafficEngine {
       ['OFFLINE', 'DEGRADED', 'STALE', 'FAULT', 'RECOVERING', 'MAINTENANCE'].includes(String(device.status === 'MAINTENANCE' ? device.status : device.healthLevel || '').toUpperCase())
     ) : [];
     const entries = [
-      ...incidents.map((item) => ({ title: item.title || 'Insiden prioritas', detail: `${item.location || 'Lokasi tidak tersedia'} · ${item.status || 'Aktif'}`, href: '#incidents', label: 'Insiden' })),
-      ...signalFaults.map((item) => ({ title: item.name || item.intersectionName || item.id || 'Simpang', detail: `Sinyal · ${item.healthLevel || item.status}`, href: '#signals', label: 'Sinyal' })),
-      ...deviceFaults.map((item) => ({ title: item.deviceName || item.deviceId || 'Perangkat', detail: `Perangkat · ${item.status === 'MAINTENANCE' ? item.status : item.healthLevel || 'Status tidak tersedia'}`, href: '#devices', label: 'Perangkat' })),
-      ...emergencies.map((item) => ({ title: item.vehicleId || item.vehicleType || 'Skenario darurat', detail: `Darurat · ${item.status || 'Aktif'}`, href: '#emergency', label: 'Darurat' }))
+      ...incidents.map((item) => ({ title: item.title || 'Insiden prioritas', detail: `${item.location || 'Lokasi tidak tersedia'} · ${item.status || 'Aktif'}`, href: '#incidents', label: 'Insiden', kind: 'incident', id: item.id })),
+      ...signalFaults.map((item) => ({ title: item.name || item.intersectionName || item.id || 'Simpang', detail: `Sinyal · ${item.healthLevel || item.status}`, href: '#signals', label: 'Sinyal', kind: 'intersection', id: item.id })),
+      ...deviceFaults.map((item) => ({ title: item.deviceName || item.deviceId || 'Perangkat', detail: `Perangkat · ${item.status === 'MAINTENANCE' ? item.status : item.healthLevel || 'Status tidak tersedia'}`, href: '#devices', label: 'Perangkat', kind: 'device', id: item.deviceId })),
+      ...emergencies.map((item) => ({ title: item.vehicleId || item.vehicleType || 'Skenario darurat', detail: `Darurat · ${item.status || 'Aktif'}`, href: '#emergency', label: 'Darurat', kind: 'emergency', id: item.vehicleId || item.id }))
     ];
     const signature = JSON.stringify(entries);
     if (container.dataset.snapshot === signature) return;
@@ -387,6 +389,10 @@ export class TrafficEngine {
       row.className = 'priority-operation';
       row.href = entry.href;
       row.setAttribute('role', 'listitem');
+      if (entry.kind && entry.id != null) {
+        row.dataset.entityKind = entry.kind;
+        row.dataset.entityId = String(entry.id);
+      }
       const copy = document.createElement('span');
       copy.className = 'priority-operation-copy';
       const title = document.createElement('strong');

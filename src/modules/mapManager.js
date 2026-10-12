@@ -207,6 +207,7 @@ export class MapManager {
   }
 
   updateDeviceMapVisuals(devices) {
+    if (!this.isActive) return;
     this.spatialStateSync.syncDeviceVisuals(devices);
   }
 
@@ -668,7 +669,7 @@ export class MapManager {
         const projection = toSignalMarkerProjection(feature, liveStateNode);
 
         const nodeIcon = this.markerManager.createSignalIcon(projection.id, projection.stateColor);
-        const marker = L.marker(latlng, { icon: nodeIcon });
+        const marker = L.marker(latlng, { icon: nodeIcon, title: projection.name });
         marker._omniMarkerType = 'signal';
         marker._omniEntityId = projection.id;
 
@@ -687,6 +688,7 @@ export class MapManager {
   }
 
   updateGreenWaveVisuals(active) {
+    if (!this.isActive) return;
     this.corridorGeoJsonLayers.forEach(({ glow, core }) => {
       if (active) {
         core.setStyle((feature) => {
@@ -717,6 +719,7 @@ export class MapManager {
   }
 
   updateChaosVisuals(isChaos) {
+    if (!this.isActive) return;
     this.corridorGeoJsonLayers.forEach(({ glow, core }) => {
       if (isChaos) {
         core.setStyle({ color: '#ef4444', weight: 7 });
@@ -972,6 +975,7 @@ export class MapManager {
   }
 
   syncActiveEmergenciesFromState(activeEmergencies) {
+    if (!this.isActive) return;
     this.spatialStateSync.syncActiveEmergencies(
       this.layerGroupsMap,
       this.maps,
@@ -981,10 +985,12 @@ export class MapManager {
   }
 
   updateIncidentsOnMap(incidents) {
+    if (!this.isActive) return;
     this.spatialStateSync.syncIncidents(this.layerGroupsMap, incidents);
   }
 
   syncIntersectionsFromState(intersections) {
+    if (!this.isActive) return;
     this.spatialStateSync.syncIntersections(this.intersectionMarkersMap, intersections);
   }
 

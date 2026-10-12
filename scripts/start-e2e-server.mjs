@@ -18,6 +18,7 @@ const child = spawn(process.execPath, ['server.js'], {
     NODE_ENV: 'test',
     PORT: String(port),
     HOST: '127.0.0.1',
+    ALLOWED_ORIGINS: `http://127.0.0.1:${port}`,
     DB_PATH: testDbPath,
     TEST_DATA_DIR: tempDir,
     DEV_AUTO_LOGIN: 'false',

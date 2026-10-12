@@ -32,6 +32,13 @@
 
 .modal-content :where(h2, h3, h4) { color: var(--text-primary); line-height: var(--line-height-tight); }
 .modal-content :where(p, small) { color: var(--text-secondary); line-height: var(--line-height-body); }
+.session-dialog { width: min(460px, calc(100vw - 32px)); padding: 28px; background: var(--surface-raised); color: var(--text-primary); border: 1px solid var(--border-default); border-radius: var(--radius-lg); }
+.session-dialog::backdrop { background: rgb(0 0 0 / 65%); }
+.session-dialog form { display: grid; gap: var(--space-3); }
+.session-dialog input { width: 100%; min-height: 44px; padding: 10px; background: var(--surface-base); color: var(--text-primary); border: 1px solid var(--border-default); border-radius: var(--radius-sm); }
+.session-dialog p { color: var(--text-secondary); line-height: var(--line-height-body); }
+.session-dialog #sessionError { color: var(--status-danger); }
+.session-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-3); }
 .modal-content .modal-header {
   display: flex;
   align-items: flex-start;
@@ -316,6 +323,8 @@
   gap: 10px;
   animation: toastSlideUp var(--duration-fast) var(--ease);
 }
+.toast-item[data-tone="error"] { border-left: 4px solid var(--status-danger) !important; }
+.toast-item[data-tone="success"] { border-left: 4px solid var(--status-success) !important; }
 
 @keyframes toastSlideUp {
   from { opacity: 0; transform: translateY(8px); }

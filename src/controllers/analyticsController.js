@@ -284,7 +284,7 @@ export class AnalyticsController {
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 12px;">
           <div style="background: var(--panel-soft); padding: 14px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08);">
-            <div style="font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px;">📊 KONDISI DASAR SIMULASI</div>
+            <div style="font-size: 11px; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px;">📊 KONDISI DASAR SIMULASI</div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
               <span>Waktu Tunggu:</span><strong>${escapeHtml(sc.baseline.waitTimeSec)} detik</strong>
             </div>
@@ -302,10 +302,10 @@ export class AnalyticsController {
           <div style="background: var(--panel-soft); padding: 14px; border-radius: 10px; border: 1px solid rgba(0, 229, 255, 0.3);">
             <div style="font-size: 11px; font-weight: 800; color: var(--primary-2); text-transform: uppercase; margin-bottom: 8px;">✨ SKENARIO SPLIT KANDIDAT</div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Waktu Tunggu:</span><strong style="color: #10b981;">${escapeHtml(sc.optimized.waitTimeSec)} detik (-${escapeHtml(sc.delta.waitTimeReductionPct)}%)</strong>
+              <span>Waktu Tunggu:</span><strong style="color: var(--status-success);">${escapeHtml(sc.optimized.waitTimeSec)} detik (-${escapeHtml(sc.delta.waitTimeReductionPct)}%)</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Panjang Antrean:</span><strong style="color: #10b981;">${escapeHtml(sc.optimized.queueMeters)} m (-${escapeHtml(sc.delta.queueReductionPct)}%)</strong>
+              <span>Panjang Antrean:</span><strong style="color: var(--status-success);">${escapeHtml(sc.optimized.queueMeters)} m (-${escapeHtml(sc.delta.queueReductionPct)}%)</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
               <span>Kecepatan Rerata:</span><strong style="color: var(--primary-2);">${escapeHtml(sc.optimized.speedKmh)} km/jam (+${escapeHtml(sc.delta.speedGainPct)}%)</strong>
@@ -316,15 +316,15 @@ export class AnalyticsController {
           </div>
 
           <div style="background: var(--panel-soft); padding: 14px; border-radius: 10px; border: 1px solid rgba(16, 185, 129, 0.3);">
-            <div style="font-size: 11px; font-weight: 800; color: #10b981; text-transform: uppercase; margin-bottom: 8px;">🌱 DAMPAK TURUNAN SIMULASI</div>
+            <div style="font-size: 11px; font-weight: 800; color: var(--status-success); text-transform: uppercase; margin-bottom: 8px;">🌱 DAMPAK TURUNAN SIMULASI</div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>BBM model:</span><strong style="color: #10b981;">${escapeHtml(sc.delta.fuelSavedLiters)} liter</strong>
+              <span>BBM model:</span><strong style="color: var(--status-success);">${escapeHtml(sc.delta.fuelSavedLiters)} liter</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>CO₂ model:</span><strong style="color: #34d399;">${escapeHtml(sc.delta.co2SavedKg)} kg</strong>
+              <span>CO₂ model:</span><strong style="color: var(--status-success);">${escapeHtml(sc.delta.co2SavedKg)} kg</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Nilai biaya model:</span><strong style="color: #f59e0b;">Rp ${Number(sc.delta.monetarySavedRp || 0).toLocaleString('id-ID')}</strong>
+              <span>Nilai biaya model:</span><strong style="color: var(--status-warning);">Rp ${Number(sc.delta.monetarySavedRp || 0).toLocaleString('id-ID')}</strong>
             </div>
             <small style="color: var(--text-muted); font-size: 10px; display: block; margin-top: 6px;">${escapeHtml(sc.assumptions.responseModel)} Faktor BBM, emisi, dan harga juga merupakan asumsi; bukan hasil ukur.</small>
           </div>
@@ -375,7 +375,7 @@ export class AnalyticsController {
             </thead>
             <tbody>
               ${list.map(c => {
-                const riskBadge = c.riskLevel === 'CRITICAL' ? '<span style="color:#ef4444; font-weight:800;">🔴 KRITIS</span>' : c.riskLevel === 'WARNING' ? '<span style="color:#f59e0b; font-weight:800;">🟡 WASPADA</span>' : '<span style="color:#10b981; font-weight:800;">🟢 NORMAL</span>';
+                const riskBadge = c.riskLevel === 'CRITICAL' ? '<span style="color:var(--status-danger); font-weight:800;">🔴 KRITIS</span>' : c.riskLevel === 'WARNING' ? '<span style="color:var(--status-warning); font-weight:800;">🟡 WASPADA</span>' : '<span style="color:var(--status-success); font-weight:800;">🟢 NORMAL</span>';
                 return `
                   <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
                     <td style="padding: 10px 8px; font-weight: 700; color: var(--text);">${escapeHtml(c.name)}</td>
@@ -384,7 +384,7 @@ export class AnalyticsController {
                     <td style="padding: 10px 8px;">${escapeHtml(c.density)} veh/km</td>
                     <td style="padding: 10px 8px;">${escapeHtml(c.queueMeters)} m</td>
                     <td style="padding: 10px 8px;">${escapeHtml(c.delaySec)}s</td>
-                    <td style="padding: 10px 8px; color: #10b981; font-weight: 700;">${escapeHtml(c.signalEfficiencyPct)}%</td>
+                    <td style="padding: 10px 8px; color: var(--status-success); font-weight: 700;">${escapeHtml(c.signalEfficiencyPct)}%</td>
                     <td style="padding: 10px 8px;">${riskBadge}</td>
                   </tr>
                 `;
