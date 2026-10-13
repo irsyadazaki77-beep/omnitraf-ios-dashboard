@@ -1,0 +1,54 @@
+{
+  "singleView": [
+    {
+      "camera": "cctvCanvas1",
+      "fps": 56,
+      "backingWidth": 862,
+      "backingHeight": 484
+    },
+    {
+      "camera": "cctvCanvas2",
+      "fps": 61,
+      "backingWidth": 862,
+      "backingHeight": 484
+    },
+    {
+      "camera": "cctvCanvas3",
+      "fps": 61,
+      "backingWidth": 862,
+      "backingHeight": 484
+    },
+    {
+      "camera": "cctvCanvas4",
+      "fps": 61,
+      "backingWidth": 862,
+      "backingHeight": 484
+    }
+  ],
+  "grid2x2": [
+    {
+      "camera": "cctvCanvas1",
+      "fps": 60,
+      "backingWidth": 409,
+      "backingHeight": 229
+    },
+    {
+      "camera": "cctvCanvas2",
+      "fps": 60,
+      "backingWidth": 409,
+      "backingHeight": 229
+    },
+    {
+      "camera": "cctvCanvas3",
+      "fps": 61,
+      "backingWidth": 409,
+      "backingHeight": 229
+    },
+    {
+      "camera": "cctvCanvas4",
+      "fps": 60,
+      "backingWidth": 409,
+      "backingHeight": 229
+    }
+  ]
+}

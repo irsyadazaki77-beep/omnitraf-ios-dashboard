@@ -3,6 +3,9 @@ import { ALLOW_TEST_QUERY_TOKEN_AUTH, JWT_ALGORITHM, JWT_AUDIENCE, JWT_ISSUER, J
 import { ROLES } from '../config/constants.js';
 import { getRequiredRoles, isPublicCapability } from '../config/capabilities.js';
 import { createApiErrorResponse } from './errorHandler.js';
+import { tokenRevocationService } from '../services/tokenRevocationService.js';
+
+import { randomUUID } from 'crypto';
 
 export const ALLOWED_JWT_ALGORITHMS = Object.freeze([JWT_ALGORITHM]);
 
@@ -18,7 +21,8 @@ export function generateToken(user) {
     expiresIn: '24h',
     issuer: JWT_ISSUER,
     audience: JWT_AUDIENCE,
-    subject: user.id
+    subject: user.id,
+    jwtid: randomUUID()
   });
 }
 
@@ -73,13 +77,23 @@ export function requireAuth(requiredRoles = [], options = {}) {
     const principal = verifyToken(token);
     if (!principal) return sendAuthError(res, 401, 'INVALID_TOKEN', 'Token autentikasi tidak valid atau telah kedaluwarsa.');
 
-    if (roles.length && !roles.includes(principal.role)) {
-      return sendAuthError(res, 403, 'FORBIDDEN',
-        `Akses ditolak: Endpoint ini memerlukan role [${roles.join(', ')}], sedangkan role akun Anda adalah '${principal.role}'.`,
-        { requiredRoles: roles, currentRole: principal.role });
-    }
-    req.user = principal;
-    return next();
+    // Check server-side session revocation
+    tokenRevocationService.isTokenRevoked(token, principal).then((isRevoked) => {
+      if (isRevoked) {
+        return sendAuthError(res, 401, 'REVOKED_TOKEN', 'Sesi telah dicabut atau diakhiri (logout). Silakan login kembali.');
+      }
+
+      if (roles.length && !roles.includes(principal.role)) {
+        return sendAuthError(res, 403, 'FORBIDDEN',
+          `Akses ditolak: Endpoint ini memerlukan role [${roles.join(', ')}], sedangkan role akun Anda adalah '${principal.role}'.`,
+          { requiredRoles: roles, currentRole: principal.role });
+      }
+      req.user = principal;
+      return next();
+    }).catch((err) => {
+      console.error('[Auth Middleware] Error checking token revocation:', err);
+      return sendAuthError(res, 500, 'AUTH_INTERNAL_ERROR', 'Terjadi kesalahan saat memverifikasi sesi.');
+    });
   };
 }
 

@@ -18,6 +18,7 @@ import { socketClient } from '../core/socketClient.js';
 import { commandLayer } from '../core/commandLayer.js';
 import { authManager } from '../core/authManager.js';
 import { generateForecastSnapshot } from './forecastEngine.js';
+import { simulateTrafficNetwork } from './trafficModel.js';
 import { SeededRandom } from '../../shared/seededRandom.js';
 
 export class TrafficEngine {
@@ -735,14 +736,30 @@ export class TrafficEngine {
 
       const curTel = curState.telemetry || {};
       this.localSimTimeMs += 1000;
-      const newVehicles = (Number.isFinite(Number(curTel.vehiclesToday)) ? Number(curTel.vehiclesToday) : 0) + this.localSimRandom.rangeInt(1, 4);
-      const newCo2 = (Number.isFinite(Number(curTel.co2SavedKg)) ? Number(curTel.co2SavedKg) : 0) + 0.2;
-      const newFuel = (Number.isFinite(Number(curTel.fuelSavedLiters)) ? Number(curTel.fuelSavedLiters) : 0) + 0.08;
-      const timeStr = new Date(this.localSimTimeMs).toLocaleTimeString('id-ID') + ' WIB';
+      const timeStr = new Date(this.localSimTimeMs).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB';
+      const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', hour: '2-digit', hourCycle: 'h23' }).format(new Date(this.localSimTimeMs)));
+      const trafficModel = simulateTrafficNetwork(curState, {
+        hour,
+        seed: curState.simulation?.seed ?? 42,
+        horizonMinutes: 15,
+        rushHour: !!curState.isChaosMode,
+        rain: !!(curState.isRainMode || curState.roadCondition === 'wet'),
+        greenWave: !!curState.greenWaveActive,
+        initialQueues: {}
+      });
+      const newVehicles = (Number.isFinite(Number(curTel.vehiclesToday)) ? Number(curTel.vehiclesToday) : 0) + trafficModel.throughputVehPerHour / 3600;
 
       const nowLocal = this.localSimTimeMs;
       const updatedIntersections = (curState.intersections || []).map(node => {
         const nextNode = { ...node };
+        const modeled = trafficModel.corridors.find(item => item.intersectionId === node.id);
+        if (modeled) {
+          nextNode.vehicleDemandVehPerHour = modeled.demandVehPerHour;
+          nextNode.queueVehicles = modeled.queueVehicles;
+          nextNode.queueMeters = modeled.queueMeters;
+          nextNode.waitTime = Math.round(modeled.queueVehicles / Math.max(1, modeled.throughputVehPerHour) * 3600);
+          nextNode.status = modeled.congestionIndex >= 70 ? 'Padat' : modeled.congestionIndex >= 45 ? 'Normal' : 'Lancar';
+        }
 
         if (curState.greenWaveActive && (nextNode.id === "node-wonokromo" || nextNode.id === "node-jemursari" || nextNode.id === "node-darmo")) {
           nextNode.state = "green";
@@ -829,12 +846,11 @@ export class TrafficEngine {
         isChaosMode: nextIsChaos,
         chaosLevel: nextChaosLevel,
         intersections: updatedIntersections,
-        networkLoad: nextIsChaos ? this.localSimRandom.rangeInt(90, 97) : this.localSimRandom.rangeInt(65, 72),
-        avgWaitTime: nextIsChaos ? this.localSimRandom.rangeInt(100, 114) : this.localSimRandom.rangeInt(38, 43),
-        congestionIndex: nextIsChaos ? this.localSimRandom.rangeInt(88, 95) : this.localSimRandom.rangeInt(58, 63),
+        trafficModel,
+        networkLoad: Math.min(99, Math.round(trafficModel.demandVehPerHour / Math.max(1, trafficModel.throughputVehPerHour) * 70)),
+        avgWaitTime: Math.round(trafficModel.queueVehicles / Math.max(1, trafficModel.throughputVehPerHour) * 3600),
+        congestionIndex: trafficModel.congestionIndex,
         vehiclesToday: newVehicles,
-        co2SavedKg: Math.round(newCo2),
-        fuelSavedLiters: Math.round(newFuel),
         timestamp: timeStr,
         timestampMs: nowLocal
       }, 'local-simulator');

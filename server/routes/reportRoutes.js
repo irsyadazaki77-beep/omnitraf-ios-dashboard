@@ -4,6 +4,7 @@ import { requireCapability } from '../middlewares/auth.js';
 import {
   downloadPdfReport,
   getForecast,
+  getScenarioComparison,
   getForecastTestCases
 } from '../controllers/reportController.js';
 
@@ -11,6 +12,7 @@ const router = Router();
 
 router.get('/reports/download', requireCapability('reports:read'), reportRateLimiter, downloadPdfReport);
 router.get('/prediction/v1/forecast', requireCapability('forecast:read'), getForecast);
+router.get('/prediction/v1/scenario-comparison', requireCapability('forecast:read'), getScenarioComparison);
 router.get('/prediction/v1/test-cases', requireCapability('diagnostics:read'), getForecastTestCases);
 
 export default router;

@@ -80,8 +80,12 @@ export class App {
       : requestedHash && requestedHash !== 'about-engine' ? requestedHash
         : (stateStore.getState().currentView || 'dashboard');
     await Promise.all([
-      viewLoader.mountView(initialView, { shouldActivate: () => false }),
-      viewLoader.mountShellComponents()
+      viewLoader.mountView(initialView, { shouldActivate: () => false }).catch((err) => {
+        console.warn(`[App] Initial view ${initialView} mount deferred:`, err.message);
+      }),
+      viewLoader.mountShellComponents().catch((err) => {
+        console.warn('[App] Shell components mount deferred (will retry when needed):', err.message);
+      })
     ]);
 
     // 2. Core Network & Socket Infrastructure

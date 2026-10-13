@@ -116,6 +116,8 @@ export const INITIAL_STATE = {
   chaosLevel: 0,
   greenWaveActive: false,
   greenSplitWonokromo: TRAFFIC_LIMITS.DEFAULT_GREEN_SPLIT || 35,
+  simulation: null,
+  trafficModel: null,
   emergency112Active: false,
   isRainMode: false,
   roadCondition: "dry", // 'dry' | 'wet'
@@ -327,7 +329,7 @@ export const INITIAL_STATE = {
 const STATE_DOMAINS = {
   ui: ['currentView', 'theme', 'isSirenMuted', 'activeIncidentFilter', 'cctvPaused', 'cctvBoxesVisible', 'activeCamId'],
   connection: ['sseConnected', 'connectionStatus', 'lastConnectedAt', 'lastDisconnectedAt', 'connectionAttemptCount', 'isStaleData'],
-  traffic: ['telemetry', 'isChaosMode', 'chaosLevel', 'greenWaveActive', 'greenSplitWonokromo', 'isRainMode', 'roadCondition'],
+  traffic: ['telemetry', 'isChaosMode', 'chaosLevel', 'greenWaveActive', 'greenSplitWonokromo', 'isRainMode', 'roadCondition', 'simulation', 'trafficModel'],
   intersections: ['intersections'], incidents: ['incidents'], emergencies: ['activeEmergencies', 'emergency112Active'],
   devices: ['devices'], signals: ['lastReceivedSignalSequence'], cctv: ['cctvVisionData', 'lastReceivedCctvSequence'],
   analytics: [], simulation: [], diagnostics: []
@@ -635,7 +637,7 @@ export class StateStore {
 
   updateDomain(domain, partial, options = {}) {
     const domainKeys = {
-      traffic: ['telemetry', 'intersections', 'activeEmergencies', 'isChaosMode', 'chaosLevel', 'greenWaveActive', 'greenSplitWonokromo', 'lastTelemetryAt', 'lastTelemetryTime', 'lastTelemetrySource', 'lastReceivedSequence', 'isStaleData', 'canonical'],
+      traffic: ['telemetry', 'intersections', 'activeEmergencies', 'isChaosMode', 'chaosLevel', 'greenWaveActive', 'greenSplitWonokromo', 'lastTelemetryAt', 'lastTelemetryTime', 'lastTelemetrySource', 'lastReceivedSequence', 'isStaleData', 'simulation', 'trafficModel', 'canonical'],
       intersections: ['intersections', 'canonical'], incidents: ['incidents', 'canonical', 'lastReceivedIncidentSequence'],
       emergencies: ['activeEmergencies', 'emergency112Active', 'greenWaveActive', 'canonical', 'lastReceivedEmergencySequence'],
       devices: ['devices', 'canonical', 'lastReceivedDeviceSequence'], signals: ['intersections', 'canonical', 'lastReceivedSignalSequence'],
@@ -857,6 +859,10 @@ export function applyServerSnapshot(serverState, source = 'server') {
     chaosLevel: rawState.chaosLevel || 0,
     greenWaveActive: !!rawState.greenWaveActive,
     greenSplitWonokromo: rawState.greenSplitWonokromo || 35,
+    isRainMode: !!rawState.isRainMode,
+    roadCondition: rawState.roadCondition === 'wet' ? 'wet' : 'dry',
+    simulation: rawState.simulation || currentStore.simulation,
+    trafficModel: rawState.trafficModel || currentStore.trafficModel,
     isStaleData: false,
     serverSessionId: serverSessionId || currentStore.serverSessionId,
     lastReceivedSequence: seq,
@@ -1046,6 +1052,10 @@ export function updateTrafficState(payload, source = 'server') {
   if ('chaosLevel' in payload) updates.chaosLevel = payload.chaosLevel;
   if ('greenWaveActive' in payload) updates.greenWaveActive = payload.greenWaveActive;
   if ('greenSplitWonokromo' in payload) updates.greenSplitWonokromo = payload.greenSplitWonokromo;
+  if ('isRainMode' in payload) updates.isRainMode = !!payload.isRainMode;
+  if ('roadCondition' in payload) updates.roadCondition = payload.roadCondition === 'wet' ? 'wet' : 'dry';
+  if ('simulation' in payload) updates.simulation = payload.simulation;
+  if ('trafficModel' in payload) updates.trafficModel = payload.trafficModel;
   if ('intersections' in payload && Array.isArray(payload.intersections)) updates.intersections = reuseEntityArray(currentState.intersections, payload.intersections.map(item => ({ ...item })), 'id');
   if ('activeEmergencies' in payload && Array.isArray(payload.activeEmergencies)) updates.activeEmergencies = reuseEntityArray(currentState.activeEmergencies, payload.activeEmergencies.map(item => ({ ...item })), 'id');
 

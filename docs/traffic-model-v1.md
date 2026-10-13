@@ -1,0 +1,9 @@
+# Aggregate traffic model v1
+
+This is a deterministic synthetic corridor model. It is a simulator decision-support component, not a field-calibrated or validated representation of Surabaya traffic.
+
+For each corridor, demand is `capacity × clamp(0.78 × diurnalIntensity + 0.12, 0.08, 0.98) × seededVariation × rushMultiplier`. Per-corridor variation is stable for a given seed and corridor. Rush-hour multiplier is 1.45. Normalized flow is demand divided by effective capacity. Effective capacity applies the signal factor `clamp(0.82 + (greenSeconds - 35) × 0.003, 0.72, 1.12)`, a 0.78 multiplier in rain, matched incident capacity losses (12%, 25%, 42%, or 58% by severity), and a 1.04 relief factor on modeled emergency green-wave corridors.
+
+Over a horizon from 1 to 120 minutes, arrivals equal demand times horizon. Throughput is bounded by arrivals plus starting queue and available capacity. Ending queue equals starting queue plus arrivals minus throughput, so the model exposes a conservation residual for verification. Queue length uses an assumed 7.5 meters per queued vehicle. Speed is free-flow speed multiplied by `1 - 0.62 × min(V/C, 1.5)^2`, with a 6 km/h floor and a 0.82 rain speed multiplier.
+
+Adaptive green split nudges the current green by `50 × (demandShare − 0.5) + 8 × (pressure − 0.5)` seconds. Directional demand share is clamped to 30–70%; split bounds also keep each phase at least a 30% share of green plus configured clearance. It clamps green to 15–90 seconds; pending timing is applied by the existing signal-cycle transition, leaving yellow and red clearance unchanged. The model does not represent lanes, turn movements, pedestrian phases, spillback, driver behavior, or calibrated saturation flow. Scenario deltas are model outputs only; no confidence or accuracy claim is emitted.

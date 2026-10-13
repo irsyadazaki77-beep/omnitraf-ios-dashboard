@@ -33,6 +33,7 @@ import { UnifiedClock, SIMULATION_MODES, systemClock } from './unifiedClock.js';
 import { SAFETY_BOUNDARY } from '../config/safetyBoundary.js';
 import { DeterministicRandomRegistry } from './seededRandom.js';
 import { DeterministicSimulationEngine } from './simulationEngine.js';
+import { simulateTrafficNetwork, recommendAdaptiveSignal } from '../../src/modules/trafficModel.js';
 import { validateDomainCommand, ContractValidationError } from '../config/contracts.js';
 import {
   normalizeCanonicalTelemetry,
@@ -228,6 +229,7 @@ export class BackendStateManager {
       networkLoad: 72,
       avgWaitTime: 42,
       congestionIndex: 62,
+      trafficModel: null,
       co2SavedKg: this.co2SavedKg,
       fuelSavedLiters: this.fuelSavedLiters,
       vehiclesToday: this.vehiclesCountToday,
@@ -243,6 +245,8 @@ export class BackendStateManager {
       chaosLevel: 0,
       greenWaveActive: false,
       greenSplitWonokromo: 35,
+      isRainMode: false,
+      roadCondition: 'dry',
       
       // Simulation metadata exposed in state
       simulation: {
@@ -1024,9 +1028,33 @@ export class BackendStateManager {
     const offlineCount = this.devicesRegistry.filter(d => d.healthLevel === "OFFLINE" || d.healthLevel === "STALE").length;
     const degradedCount = this.devicesRegistry.filter(d => d.healthLevel === "DEGRADED").length;
 
-    // Increment metrics naturally using deterministic domain PRNG
+    // Keep cumulative counters tied to modeled throughput, not an unrelated random walk.
     const effectiveDeltaSec = Math.max(0.1, deltaMs / 1000);
-    this.vehiclesCountToday += (Math.floor(trafficPrng.nextFloat() * 5) + 1) * effectiveDeltaSec;
+    const wibHour = Number(String(this.state.timestamp || '08:00').slice(0, 2)) || 0;
+    const trafficModel = simulateTrafficNetwork(this.state, {
+      hour: wibHour,
+      seed: this.simConfig.seed,
+      horizonMinutes: 15,
+      rushHour: !!this.state.isChaosMode,
+      rain: !!(this.state.isRainMode || this.state.roadCondition === 'wet'),
+      greenWave: !!this.state.greenWaveActive,
+      initialQueues: {}
+    });
+    this.state.trafficModel = trafficModel;
+    this.state.congestionIndex = trafficModel.congestionIndex;
+    this.state.avgWaitTime = Math.round(trafficModel.queueVehicles / Math.max(1, trafficModel.throughputVehPerHour) * 3600);
+    this.state.networkLoad = Math.min(99, Math.round(trafficModel.demandVehPerHour / Math.max(1, trafficModel.throughputVehPerHour) * 70));
+    this.vehiclesCountToday += trafficModel.throughputVehPerHour * effectiveDeltaSec / 3600;
+    for (const modeled of trafficModel.corridors) {
+      const node = this.state.intersections.find(item => item.id === modeled.intersectionId);
+      if (!node) continue;
+      node.vehicleDemandVehPerHour = modeled.demandVehPerHour;
+      node.queueVehicles = modeled.queueVehicles;
+      node.queueMeters = modeled.queueMeters;
+      node.opposingDemandShare = 0.3 + ((modeled.demandVehPerHour % 400) / 400) * 0.4;
+      node.waitTime = Math.round(node.queueVehicles / Math.max(1, modeled.throughputVehPerHour) * 3600);
+      node.status = modeled.congestionIndex >= 70 ? 'Padat' : modeled.congestionIndex >= 45 ? 'Normal' : 'Lancar';
+    }
     this.co2SavedKg += Number((trafficPrng.nextFloat() * 0.2).toFixed(2)) * effectiveDeltaSec;
     this.fuelSavedLiters += Number((trafficPrng.nextFloat() * 0.1).toFixed(2)) * effectiveDeltaSec;
 
@@ -1034,11 +1062,8 @@ export class BackendStateManager {
     this.state.co2SavedKg = Math.round(this.co2SavedKg);
     this.state.fuelSavedLiters = Math.round(this.fuelSavedLiters);
 
-    // Chaos mode impact calculations using seeded PRNG
+    // Operational health follows device state; traffic KPIs above come from the flow model.
     if (this.state.isChaosMode) {
-      this.state.networkLoad = Math.min(99, Math.max(88, Math.floor(94 + (chaosPrng.nextFloat() * 6 - 3))));
-      this.state.avgWaitTime = Math.min(130, Math.max(95, Math.floor(118 + (chaosPrng.nextFloat() * 10 - 5))));
-      this.state.congestionIndex = Math.min(98, Math.max(85, Math.floor(92 + (chaosPrng.nextFloat() * 6 - 3))));
       this.state.sitsUptime = 42.5;
       this.state.cctvOnline = 72;
       this.state.iotOnline = 142;
@@ -1046,9 +1071,6 @@ export class BackendStateManager {
       this.state.aiScore = 34;
       this.state.aiConfidence = Math.min(60, Math.max(35, Math.floor(45 + (chaosPrng.nextFloat() * 8 - 4))));
     } else {
-      this.state.networkLoad = Math.min(92, Math.max(55, Math.floor(68 + (trafficPrng.nextFloat() * 8 - 4))));
-      this.state.avgWaitTime = Math.min(65, Math.max(28, Math.floor(41 + (trafficPrng.nextFloat() * 6 - 3))));
-      this.state.congestionIndex = Math.min(88, Math.max(45, Math.floor(60 + (trafficPrng.nextFloat() * 6 - 3))));
       this.state.sitsUptime = 99.4;
       this.state.cctvOnline = Math.max(120, 184 - (offlineCount * 12));
       this.state.iotOnline = Math.max(200, 312 - (offlineCount * 25));
@@ -1447,16 +1469,13 @@ export class BackendStateManager {
     this.lastUpdated = this.clock.now();
     this.state.seq = this.sequence;
     this.state.timestampMs = this.lastUpdated;
-    const aiPrng = this.randomRegistry.getStream('prediction');
-    const optimizedSplit = input.targetSplit ?? Math.floor(42 + aiPrng.nextFloat() * 8);
+    const recommendation = recommendAdaptiveSignal(node, this.state);
+    const optimizedSplit = input.targetSplit ?? recommendation.targetGreenSec;
     
     // Smooth Cycle Transition: set pendingGreenSplit to apply cleanly on next cycle!
     node.pendingGreenSplit = optimizedSplit;
 
-    this.state.aiScore = Math.min(99, this.state.aiScore + 2);
-    this.state.avgWaitTime = Math.max(22, this.state.avgWaitTime - 4);
-
-    return { state: this.state, optimizedSplit, nodeName: node.name, smoothTransitionScheduled: true };
+    return { state: this.state, optimizedSplit, nodeName: node.name, smoothTransitionScheduled: true, recommendation };
   }
 
   async signalOverride(intersectionId, duration) {

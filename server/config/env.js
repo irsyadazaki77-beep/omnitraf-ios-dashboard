@@ -9,11 +9,42 @@ export const PORT = process.env.PORT !== undefined ? parseInt(process.env.PORT, 
 // containers can accept the standard all-interface binding unless overridden.
 export const HOST = process.env.HOST || (IS_PRODUCTION ? '0.0.0.0' : '127.0.0.1');
 
+// Validasi nilai NODE_ENV yang diizinkan
+const VALID_NODE_ENVS = ['development', 'test', 'production'];
+if (!VALID_NODE_ENVS.includes(NODE_ENV)) {
+  console.error(`FATAL: Invalid NODE_ENV "${NODE_ENV}". Must be one of: ${VALID_NODE_ENVS.join(', ')}.`);
+  process.exit(1);
+}
+
 // Fail-safe JWT Secret: Production MUST supply a strong custom secret via process.env.JWT_SECRET
 const defaultDevSecret = 'omnitraf-surabaya-jwt-secret-key-2026-secure';
 if (IS_PRODUCTION) {
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET === defaultDevSecret || process.env.JWT_SECRET.trim().length < 32) {
     console.error('FATAL: JWT_SECRET environment variable is missing, using default development secret, or is too short (min 32 chars) in production mode.');
+    process.exit(1);
+  }
+
+  // E2E_TEST_RUN DILARANG keras aktif pada environment produksi
+  if (process.env.E2E_TEST_RUN === 'true' || process.env.E2E_TEST_RUN === '1') {
+    console.error('FATAL: E2E_TEST_RUN is restricted strictly to isolated test environments and must not be enabled in production.');
+    process.exit(1);
+  }
+
+  // Mode cluster di production wajib menyertakan REDIS_URL dan DB_DRIVER=postgres
+  if (process.env.OMNITRAF_RUNTIME_MODE === 'cluster') {
+    if (!process.env.REDIS_URL) {
+      console.error('FATAL: OMNITRAF_RUNTIME_MODE=cluster requires REDIS_URL in production mode.');
+      process.exit(1);
+    }
+    if (process.env.DB_DRIVER !== 'postgres') {
+      console.error('FATAL: OMNITRAF_RUNTIME_MODE=cluster requires DB_DRIVER=postgres in production mode.');
+      process.exit(1);
+    }
+  }
+
+  // Jika DB_DRIVER=postgres, DATABASE_URL wajib disertakan
+  if (process.env.DB_DRIVER === 'postgres' && !process.env.DATABASE_URL) {
+    console.error('FATAL: DB_DRIVER=postgres requires DATABASE_URL in production mode.');
     process.exit(1);
   }
 }
@@ -43,16 +74,22 @@ export const TRUSTED_PROXY_IPS = new Set((process.env.TRUSTED_PROXY_IPS || '')
   .filter(Boolean));
 
 
-// Origin configuration: default strictly to localhost in non-production. Production rejects '*' wildcard.
+// Origin configuration: default strictly to localhost in non-production. Production rejects '*' wildcard and empty allowlist.
 export const rawAllowedOrigins = process.env.ALLOWED_ORIGINS || (IS_PRODUCTION ? '' : 'http://localhost:3000,http://127.0.0.1:3000');
 export const allowedOrigins = rawAllowedOrigins
   .split(',')
   .map(origin => origin.trim())
   .filter(Boolean);
 
-if (IS_PRODUCTION && allowedOrigins.includes('*')) {
-  console.error('FATAL: Wildcard origin (*) is strictly forbidden in production mode.');
-  process.exit(1);
+if (IS_PRODUCTION) {
+  if (allowedOrigins.length === 0) {
+    console.error('FATAL: ALLOWED_ORIGINS is required and must contain explicit allowed origins in production mode.');
+    process.exit(1);
+  }
+  if (allowedOrigins.includes('*')) {
+    console.error('FATAL: Wildcard origin (*) is strictly forbidden in production mode.');
+    process.exit(1);
+  }
 }
 
 export const isOriginAllowed = (origin) => {

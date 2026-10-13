@@ -211,9 +211,16 @@ describe('Phase 16: Performance, Memory & Runtime Stability Hardening', () => {
     const mockCtx = {
       clearRect() {},
       fillRect() {},
+      drawImage() {},
       beginPath() {},
       moveTo() {},
       lineTo() {},
+      quadraticCurveTo() {},
+      ellipse() {},
+      translate() {},
+      rotate() {},
+      setLineDash() {},
+      strokeRect() {},
       arc() {},
       closePath() {},
       stroke() {},
@@ -227,28 +234,36 @@ describe('Phase 16: Performance, Memory & Runtime Stability Hardening', () => {
       createLinearGradient() {
         this.gradientCount++;
         return { addColorStop() {} };
+      },
+      createRadialGradient() {
+        this.gradientCount++;
+        return { addColorStop() {} };
       }
     };
 
     const renderer = new CctvCanvasRenderer('testCanvas', 'TEST_CAMERA');
     renderer.ctx = mockCtx;
     renderer.canvas = { width: 800, height: 450 };
+    const originalCreateElement = document.createElement;
+    document.createElement = (tag) => ({ tagName: tag, width: 0, height: 0, getContext: () => mockCtx });
 
     // Initial render creates cached gradients
-    renderer.render({ detectedObjects: [] });
-    const initialGradients = mockCtx.gradientCount;
-    assert.ok(initialGradients > 0, 'Should create gradients on initial render');
+    try {
+      renderer.render(false, false, false);
+      const initialGradients = mockCtx.gradientCount;
+      assert.ok(initialGradients > 0, 'Should create gradients on initial render');
 
-    // Subsequent 10 renders at same dimensions should reuse cached gradients without new allocation
-    for (let i = 0; i < 10; i++) {
-      renderer.render({ detectedObjects: [] });
+      // Subsequent 10 renders at same dimensions should reuse cached gradients without new allocation
+      for (let i = 0; i < 10; i++) renderer.render(false, false, false);
+      assert.strictEqual(mockCtx.gradientCount, initialGradients, 'Gradients must be reused across frames');
+
+      // Resize invalidates cache safely
+      renderer.canvas = { width: 1024, height: 768 };
+      renderer.render(false, false, false);
+      assert.ok(mockCtx.gradientCount > initialGradients, 'New gradients created upon dimension change');
+    } finally {
+      document.createElement = originalCreateElement;
     }
-    assert.strictEqual(mockCtx.gradientCount, initialGradients, 'Gradients must be reused across frames');
-
-    // Resize invalidates cache safely
-    renderer.canvas = { width: 1024, height: 768 };
-    renderer.render({ detectedObjects: [] });
-    assert.ok(mockCtx.gradientCount > initialGradients, 'New gradients created upon dimension change');
   });
 
   test('4. MapManager Emergency Animation Lifecycle: Idle RAF loops are shut down when no emergency simulation is active', () => {

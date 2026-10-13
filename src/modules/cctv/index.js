@@ -10,7 +10,7 @@ export { TrackingEngine } from './trackingEngine.js';
 export { SmoothingEngine } from './smoothingEngine.js';
 export { TelemetryBuilder } from './telemetryBuilder.js';
 export { SnapshotService } from './snapshotService.js';
-export { CctvCanvasRenderer, CLASS_COLORS } from './canvasRenderer.js';
+export { CctvCanvasRenderer, CLASS_COLORS, getCameraScene } from './canvasRenderer.js';
 export { CctvRealtimeAdapter } from './cctvRealtimeAdapter.js';
 export { cctvStateAdapter, CctvStateAdapter } from './cctvStateAdapter.js';
 export { cctvTelemetry, CctvTelemetry } from './cctvTelemetry.js';

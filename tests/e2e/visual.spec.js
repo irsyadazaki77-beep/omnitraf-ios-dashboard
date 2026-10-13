@@ -1,4 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { test, expect } from '@playwright/test';
 import { authenticateAs } from './fixtures/auth.fixture.js';
 import { ROUTES } from './fixtures/test-data.js';
@@ -25,13 +26,15 @@ test.describe('Phase 5 visual audit baseline and responsive contracts', () => {
     await waitForViewReady(page, 'view-dashboard');
     const simulationPaused = await setSimulationControl(page, { action: 'pause' });
     expect(simulationPaused, 'Visual fixture must pause the isolated simulation').toBe(true);
-    // This suite represents the explicitly paused operator state. Waiting for
-    // its freshness notice makes the same meaningful state visible on every
-    // route instead of letting a timer race alter page geometry mid-capture.
-    await expect(page.locator('#offlineNotificationBanner')).toBeVisible({ timeout: 10000 });
+    // A paused simulation is still connected. Do not infer an offline/stale
+    // transport state from the simulation clock control.
     const stage = process.env.PHASE5_CAPTURE_STAGE || 'after';
     const artifactDir = testInfo.outputPath(`phase5-${stage}`);
+    const screenshotDir = process.env.PHASE9_CAPTURE_DIR
+      ? path.resolve(process.env.PHASE9_CAPTURE_DIR, stage)
+      : artifactDir;
     await mkdir(artifactDir, { recursive: true });
+    await mkdir(screenshotDir, { recursive: true });
     const measurements = [];
     const pageErrors = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
@@ -48,6 +51,11 @@ test.describe('Phase 5 visual audit baseline and responsive contracts', () => {
       await expect(page.locator('#viewContainer').locator(`#${route.id}`)).toBeVisible();
 
       for (const theme of ['dark', 'light']) {
+        const screenshotMask = route.id === 'view-dashboard'
+          ? [page.locator('#dashboardMapBox .leaflet-tile-pane')]
+          : route.id === 'view-map'
+            ? [page.locator('#map-surabaya .leaflet-tile-pane')]
+            : [];
         await page.setViewportSize({ width: 1440, height: 900 });
         const isLight = await page.locator('body').evaluate((body) => body.classList.contains('theme-light'));
         if ((theme === 'light') !== isLight) {
@@ -56,7 +64,13 @@ test.describe('Phase 5 visual audit baseline and responsive contracts', () => {
           await page.locator('#toastStack .toast-item').evaluateAll((items) => items.forEach((item) => item.remove()));
         }
         await expect(page).toHaveScreenshot(`${route.id}-${theme}-desktop.png`, {
-          animations: 'disabled'
+          animations: 'disabled',
+          mask: screenshotMask
+        });
+        await page.screenshot({
+          path: path.join(screenshotDir, `${route.id}-${theme}-desktop.png`),
+          animations: 'disabled',
+          mask: screenshotMask
         });
 
         if (theme === 'dark') {
@@ -66,7 +80,13 @@ test.describe('Phase 5 visual audit baseline and responsive contracts', () => {
             await stabilizeMapViewport(page, route.id);
           }
           await expect(page).toHaveScreenshot(`${route.id}-dark-mobile.png`, {
-            animations: 'disabled'
+            animations: 'disabled',
+            mask: screenshotMask
+          });
+          await page.screenshot({
+            path: path.join(screenshotDir, `${route.id}-dark-mobile.png`),
+            animations: 'disabled',
+            mask: screenshotMask
           });
           await page.setViewportSize({ width: 1440, height: 900 });
           if (route.id === 'view-dashboard' || route.id === 'view-map') {
@@ -137,12 +157,23 @@ test.describe('Phase 5 visual audit baseline and responsive contracts', () => {
                   containsFocus: element.contains(document.activeElement),
                   bounds: { left: Math.round(rect.left), top: Math.round(rect.top), width: Math.round(rect.width), height: Math.round(rect.height) }
                 };
-              })
+              }),
+              clippedControls: [...document.querySelectorAll('button, a[href], input, select, textarea, [tabindex]')]
+                .filter((element) => {
+                  const style = getComputedStyle(element);
+                  if (!element.getClientRects().length || element.disabled || style.display === 'none' || style.visibility === 'hidden') return false;
+                  if (element.closest('[hidden], [inert], [aria-hidden="true"], details:not([open])')) return false;
+                  if (element.closest('.table-scroll, .settings-nav-list, [aria-label*="gulir horizontal"]')) return false;
+                  const rect = element.getBoundingClientRect();
+                  return rect.left < -1 || rect.right > viewport.width + 1;
+                })
+                .map((element) => ({ id: element.id, tag: element.tagName, className: element.className, text: element.textContent?.trim().slice(0, 60), left: Math.round(element.getBoundingClientRect().left), right: Math.round(element.getBoundingClientRect().right) }))
             };
           }, { routeId: route.id, viewport });
           measurements.push(metrics);
           expect(metrics.documentWidth, `${route.label} ${theme} ${viewport.width}x${viewport.height} document overflow`).toBeLessThanOrEqual(viewport.width + 1);
           expect(metrics.shell?.right ?? 0, `${route.label} ${theme} ${viewport.width}x${viewport.height} shell outside viewport`).toBeLessThanOrEqual(viewport.width + 1);
+          expect(metrics.clippedControls, `${route.label} ${theme} ${viewport.width}x${viewport.height} controls clipped horizontally`).toEqual([]);
           expect(metrics.inlineViewDisplay, `${route.label} stale inline display`).toEqual([]);
           if (route.id === 'view-dashboard') expect(metrics.dashboardDisplay, 'Dashboard uses its authored grid layout').toBe('grid');
           if (route.id === 'view-dashboard') {

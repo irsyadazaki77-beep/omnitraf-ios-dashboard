@@ -40,6 +40,15 @@ export async function generateReportPdf(snapshot) {
   line(`Estimasi reduksi emisi simulator: ${metric(m.co2Saved, ' kg CO2')}`);
   line(`Estimasi BBM dihemat: ${metric(m.fuelSaved, ' liter')}`);
   line(`Insiden selesai dalam snapshot: ${m.incidents}`);
+  const traffic = snapshot.trafficModel;
+  y -= 12; line('METRIK MODEL AGREGAT', { heading: true, size: 13 });
+  line(`Model: ${traffic?.modelVersion || 'Tidak tersedia'} | Horizon: ${metric(traffic?.horizonMinutes, ' menit')} | Seed: ${metric(traffic?.seed)}`);
+  line(`Travel time: ${metric(traffic?.averageTravelTimeMinutes, ' menit')} | Antrean: ${metric(traffic?.queueMeters, ' m')} | Congestion: ${metric(traffic?.congestionIndex)} | Throughput: ${metric(traffic?.throughputVehPerHour, ' kendaraan/jam')}`);
+  y -= 8; line('PERBANDINGAN SKENARIO', { heading: true, size: 13 });
+  const scenarioLabels = { normal: 'Normal', rushHour: 'Rush hour', heavyRain: 'Hujan lebat', majorIncident: 'Insiden besar', adaptiveSignals: 'Sinyal adaptif', emergencyGreenWave: 'Emergency green wave' };
+  for (const [key, scenario] of Object.entries(snapshot.scenarioComparison || {})) {
+    line(`${scenarioLabels[key] || key}: travel ${metric(scenario.averageTravelTimeMinutes, ' menit')}; antrean ${metric(scenario.queueMeters, ' m')}; congestion ${metric(scenario.congestionIndex)}; throughput ${metric(scenario.throughputVehPerHour, ' kendaraan/jam')}`, { size: 9 });
+  }
   y -= 12; line('SIMPANG DALAM MODEL', { heading: true, size: 13 });
   if (!snapshot.intersections.length) line('Belum ada simpang pada snapshot ini.');
   snapshot.intersections.forEach(item => {

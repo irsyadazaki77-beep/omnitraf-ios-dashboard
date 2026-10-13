@@ -13,6 +13,7 @@ import { commandLayer } from '../core/commandLayer.js';
 import { Disposer } from '../core/disposer.js';
 import { signalsView } from '../ui/adapters/signalsView.js';
 import { authManager } from '../core/authManager.js';
+import { recommendAdaptiveSignal } from '../modules/trafficModel.js';
 
 export class SignalsController {
   constructor() {
@@ -594,15 +595,17 @@ export class SignalsController {
 
     const node = (stateStore.getState().intersections || []).find(item => item.id === nodeId);
     if (!node) { window.showToast?.('Simpang tidak tersedia. Muat ulang data.', 'warning'); return; }
-    const current = Number(node.pendingGreenSplit ?? node.greenSplit ?? 35);
-    const target = Math.max(10, Math.min(90, current + 8));
+    const recommendation = recommendAdaptiveSignal(node, stateStore.getState());
+    const current = recommendation.currentGreenSec;
+    const target = recommendation.targetGreenSec;
     this._recommendedSplit = target;
     const cycle = target + Number(node.redDuration ?? 25) + Number(node.yellowDuration ?? 3);
     if (title) title.textContent = `Pratinjau skenario: ${node.name || nodeName}`;
-    if (volQ) volQ.textContent = 'Tidak tersedia';
-    if (flowRatio) flowRatio.textContent = 'belum diukur';
-    if (delaySaved) delaySaved.textContent = 'Belum dievaluasi';
-    if (splitDiff) splitDiff.textContent = `${current} dtk → ${target} dtk (+${target - current})`;
+    const corridor = stateStore.getState().trafficModel?.corridors?.find(item => item.intersectionId === nodeId);
+    if (volQ) volQ.textContent = `${Math.round(corridor?.demandVehPerHour ?? recommendation.demandVehPerHour)} kend/jam · antrean ${Math.round(node.queueVehicles ?? recommendation.queueVehicles)} kend`;
+    if (flowRatio) flowRatio.textContent = recommendation.reason;
+    if (delaySaved) delaySaved.textContent = 'Perlu diuji pada perbandingan skenario';
+    if (splitDiff) splitDiff.textContent = `${current} dtk → ${target} dtk (${target - current >= 0 ? '+' : ''}${target - current})`;
     const update = (id, text) => { const element = document.getElementById(id); if (element) element.textContent = text; };
     update('aiRecOldText', `${current} dtk`);
     update('aiRecNewText', `${target} dtk`);

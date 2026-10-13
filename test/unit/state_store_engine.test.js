@@ -42,6 +42,17 @@ test('nested selectors skip sibling changes inside a shared legacy domain object
   assert.equal(networkLoadCalls, 1);
 });
 
+test('traffic realtime domain accepts simulation clock and model payload fields', () => {
+  const store = new StateStore();
+  const simulation = { status: 'PAUSED', simulationTimeMs: 1234 };
+  const trafficModel = { seed: 412, congestionIndex: 54 };
+
+  store.updateTraffic({ simulation, trafficModel }, { emitGeneric: false });
+
+  assert.deepEqual(store.getState().simulation, simulation);
+  assert.deepEqual(store.getState().trafficModel, trafficModel);
+});
+
 test('batch sends one selector callback for a logical multi-domain update', () => {
   const store = new StateStore();
   let calls = 0;

@@ -11,6 +11,7 @@ services:
     env_file:
       - .env
     environment:
+      - NODE_ENV=${NODE_ENV:-production}
       - PORT=3000
       - DB_PATH=/usr/src/app/data/omnitraf.sqlite
     volumes:

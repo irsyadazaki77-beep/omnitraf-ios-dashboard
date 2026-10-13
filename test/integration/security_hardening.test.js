@@ -567,7 +567,7 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
     const meBody = await meRes.json();
     assert.strictEqual(meBody.data.user.username, 'operator');
 
-    // 16c. Logout endpoint clears cookie
+    // 16c. Logout endpoint clears cookie and revokes session
     const logoutRes = await fetch(`${baseUrl}/api/auth/logout`, {
       method: 'POST',
       headers: { 'Cookie': sessionCookie }
@@ -576,6 +576,14 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
     const logoutCookie = logoutRes.headers.get('set-cookie');
     assert.ok(logoutCookie, 'Set-Cookie header must be present on logout');
     assert.ok(logoutCookie.includes('omnitraf_session=;'), 'Session cookie must be cleared on logout');
+
+    // 16d. Server-side session revocation: Reusing revoked cookie or Bearer token is rejected
+    const reuseRes = await fetch(`${baseUrl}/api/auth/me`, {
+      headers: { 'Cookie': sessionCookie }
+    });
+    assert.strictEqual(reuseRes.status, 401, 'Reused session cookie must return 401');
+    const reuseBody = await reuseRes.json();
+    assert.strictEqual(reuseBody.code, 'REVOKED_TOKEN', 'Reused session cookie must be rejected with REVOKED_TOKEN');
   });
 
   // 17. Path Traversal & Double-Encoding Protection
@@ -595,6 +603,14 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
 
   // 18. Audit Trail Log Injection Defense
   test('18. Log Injection Defense: Control characters and newlines are sanitized in audit trails', async () => {
+    // Login fresh operator to ensure active unrevoked session
+    const opLoginRes = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'operator', password: 'operator123' })
+    });
+    const opCookie = opLoginRes.headers.get('set-cookie')?.split(';')[0];
+
     const maliciousIncident = {
       title: 'Valid Title\r\nINJECTED_LOG_ENTRY: ADMIN GRANTED\r\n',
       location: 'Jl. Pemuda'
@@ -604,7 +620,7 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Cookie': `omnitraf_session=${operatorToken}`
+        'Cookie': opCookie
       },
       body: JSON.stringify(maliciousIncident)
     });

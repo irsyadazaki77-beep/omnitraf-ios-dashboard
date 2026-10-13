@@ -46,22 +46,38 @@ export class ViewLoader {
     this.templateCache = new Map();
     this.mountedViews = new Set();
     this.isComponentsMounted = false;
+    this._shellMountPromise = null;
+    this._viewMountPromises = new Map();
   }
 
   /**
-   * Fetch template HTML dengan in-memory cache
+   * Fetch template HTML dengan in-memory cache dan controlled retry
    * @param {string} url 
+   * @param {number} [retries=2]
    * @returns {Promise<string>}
    */
-  async fetchTemplate(url) {
+  async fetchTemplate(url, retries = 2) {
     if (this.templateCache.has(url)) {
       return this.templateCache.get(url);
     }
-    try {
-      const pending = fetch(url).then(async (res) => {
+
+    const executeFetch = async (attempt = 0) => {
+      try {
+        const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status} when fetching ${url}`);
-        return res.text();
-      });
+        return await res.text();
+      } catch (err) {
+        if (attempt < retries) {
+          const delay = Math.min(200 * Math.pow(2, attempt), 1000);
+          await new Promise(r => setTimeout(r, delay));
+          return executeFetch(attempt + 1);
+        }
+        throw err;
+      }
+    };
+
+    try {
+      const pending = executeFetch();
       this.templateCache.set(url, pending);
       const html = await pending;
       this.templateCache.set(url, html);
@@ -89,45 +105,54 @@ export class ViewLoader {
   }
 
   /**
-   * Mount shell components & modals sekali saat app boot
+   * Mount shell components & modals sekali saat app boot dengan shared loading promise
    */
-  async mountShellComponents() {
-    if (this.isComponentsMounted) return;
-    this.isComponentsMounted = true;
+  mountShellComponents() {
+    if (this.isComponentsMounted) return Promise.resolve();
+    if (this._shellMountPromise) return this._shellMountPromise;
 
-    try {
-      // Fetch independent shell templates concurrently, then preserve DOM order.
-      const { marqueeHtml, notifHtml, modalHtmls } = await this._fetchShellTemplates();
+    this._shellMountPromise = (async () => {
+      try {
+        // Fetch independent shell templates concurrently, then preserve DOM order.
+        const { marqueeHtml, notifHtml, modalHtmls } = await this._fetchShellTemplates();
 
-      // 1. Mount Marquee
-      const marqueeTarget = document.getElementById(this.componentMap.marquee.targetId) || document.body;
-      const marqueeWrap = document.createElement('div');
-      marqueeWrap.innerHTML = marqueeHtml.trim();
-      if (marqueeTarget.id === this.componentMap.marquee.targetId) {
-        marqueeTarget.replaceWith(...marqueeWrap.childNodes);
-      } else {
-        document.body.prepend(...marqueeWrap.childNodes);
+        // 1. Mount Marquee
+        const marqueeTarget = document.getElementById(this.componentMap.marquee.targetId) || document.body;
+        const marqueeWrap = document.createElement('div');
+        marqueeWrap.innerHTML = marqueeHtml.trim();
+        if (marqueeTarget.id === this.componentMap.marquee.targetId) {
+          marqueeTarget.replaceWith(...marqueeWrap.childNodes);
+        } else {
+          document.body.prepend(...marqueeWrap.childNodes);
+        }
+
+        // 2. Mount Notif Drawer
+        const drawersTarget = document.getElementById(this.componentMap.notifDrawer.targetId) || document.body;
+        const notifWrap = document.createElement('div');
+        notifWrap.innerHTML = notifHtml.trim();
+        drawersTarget.append(...notifWrap.childNodes);
+
+        // 3. Mount Modals & Floating Shell Overlays
+        const modalsTarget = document.getElementById('modalsContainer') || document.body;
+        for (const mHtml of modalHtmls) {
+          if (!mHtml) continue;
+          const mWrap = document.createElement('div');
+          mWrap.innerHTML = mHtml.trim();
+          modalsTarget.append(...mWrap.childNodes);
+        }
+
+        this.isComponentsMounted = true;
+        console.info("✓ [ViewLoader] Shell components & modals mounted successfully.");
+      } catch (err) {
+        this.isComponentsMounted = false;
+        console.error("[ViewLoader] Error mounting shell components:", err);
+        throw err;
+      } finally {
+        this._shellMountPromise = null;
       }
+    })();
 
-      // 2. Mount Notif Drawer
-      const drawersTarget = document.getElementById(this.componentMap.notifDrawer.targetId) || document.body;
-      const notifWrap = document.createElement('div');
-      notifWrap.innerHTML = notifHtml.trim();
-      drawersTarget.append(...notifWrap.childNodes);
-
-      // 3. Mount Modals & Floating Shell Overlays
-      const modalsTarget = document.getElementById('modalsContainer') || document.body;
-      for (const mHtml of modalHtmls) {
-        if (!mHtml) continue;
-        const mWrap = document.createElement('div');
-        mWrap.innerHTML = mHtml.trim();
-        modalsTarget.append(...mWrap.childNodes);
-      }
-
-      console.info("✓ [ViewLoader] Shell components & modals mounted successfully.");
-    } catch (err) {
-      console.error("[ViewLoader] Error mounting shell components:", err);
-    }
+    return this._shellMountPromise;
   }
 
   /**
@@ -150,23 +175,38 @@ export class ViewLoader {
     let isFirstMount = false;
 
     if (!viewElement) {
-      // Lazy Fetch & Inject HTML Partial
+      // Lazy Fetch & Inject HTML Partial with in-flight deduplication
       isFirstMount = true;
+      if (!this._viewMountPromises.has(cleanKey)) {
+        const mountPromise = (async () => {
+          try {
+            const html = await this.fetchTemplate(config.file);
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html.trim();
+            const node = tempDiv.firstElementChild;
+            if (node) {
+              // A lazily-mounted pane must never inherit an active state from its
+              // template while its request is racing a newer navigation.
+              node.classList.remove('active');
+              node.hidden = true;
+              node.inert = true;
+              node.setAttribute('aria-hidden', 'true');
+              container.appendChild(node);
+              this.mountedViews.add(cleanKey);
+              return node;
+            }
+            return null;
+          } finally {
+            this._viewMountPromises.delete(cleanKey);
+          }
+        })();
+        this._viewMountPromises.set(cleanKey, mountPromise);
+      }
+
       try {
-        const html = await this.fetchTemplate(config.file);
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = html.trim();
-        const node = tempDiv.firstElementChild;
-        if (node) {
-          // A lazily-mounted pane must never inherit an active state from its
-          // template while its request is racing a newer navigation.
-          node.classList.remove('active');
-          node.hidden = true;
-          node.inert = true;
-          node.setAttribute('aria-hidden', 'true');
-          container.appendChild(node);
-          viewElement = node;
-          this.mountedViews.add(cleanKey);
+        viewElement = await this._viewMountPromises.get(cleanKey);
+        if (!viewElement) {
+          viewElement = document.getElementById(targetId);
         }
       } catch (err) {
         console.error(`[ViewLoader] Failed to mount view "${cleanKey}":`, err);

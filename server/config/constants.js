@@ -37,17 +37,76 @@ const DEV_USERS = [
   }
 ];
 
-export const USERS_DB = IS_PRODUCTION
-  ? (process.env.ADMIN_PASSWORD_HASH ? [
-      {
-        id: 'usr-admin-prod',
-        username: process.env.ADMIN_USERNAME || 'admin',
-        passwordHash: process.env.ADMIN_PASSWORD_HASH,
-        role: ROLES.ADMIN,
-        name: 'Production Administrator',
-        email: null
+function loadProductionUsers() {
+  const users = [];
+
+  // 1. Production Admin
+  if (process.env.ADMIN_PASSWORD_HASH) {
+    users.push({
+      id: 'usr-admin-prod',
+      username: process.env.ADMIN_USERNAME || 'admin_sits_surabaya',
+      passwordHash: process.env.ADMIN_PASSWORD_HASH,
+      role: ROLES.ADMIN,
+      name: 'Production Administrator',
+      email: null
+    });
+  }
+
+  // 2. Production Operator
+  if (process.env.OPERATOR_PASSWORD_HASH) {
+    users.push({
+      id: 'usr-operator-prod',
+      username: process.env.OPERATOR_USERNAME || 'operator_sits_surabaya',
+      passwordHash: process.env.OPERATOR_PASSWORD_HASH,
+      role: ROLES.OPERATOR,
+      name: 'Production Operator',
+      email: null
+    });
+  }
+
+  // 3. Production Viewer
+  if (process.env.VIEWER_PASSWORD_HASH) {
+    users.push({
+      id: 'usr-viewer-prod',
+      username: process.env.VIEWER_USERNAME || 'viewer_sits_surabaya',
+      passwordHash: process.env.VIEWER_PASSWORD_HASH,
+      role: ROLES.VIEWER,
+      name: 'Production Viewer',
+      email: null
+    });
+  }
+
+  // 4. Production Structured JSON User DB (opsional untuk banyak user)
+  if (process.env.PRODUCTION_USERS_JSON) {
+    try {
+      const parsed = JSON.parse(process.env.PRODUCTION_USERS_JSON);
+      if (Array.isArray(parsed)) {
+        for (const u of parsed) {
+          if (u.id && u.username && u.passwordHash && Object.values(ROLES).includes(u.role)) {
+            // Cegah duplikasi ID atau username
+            if (!users.some(existing => existing.username.toLowerCase() === u.username.toLowerCase())) {
+              users.push({
+                id: String(u.id),
+                username: String(u.username),
+                passwordHash: String(u.passwordHash),
+                role: u.role,
+                name: String(u.name || u.username),
+                email: u.email ? String(u.email) : null
+              });
+            }
+          }
+        }
       }
-    ] : [])
+    } catch (e) {
+      console.warn('[USERS_DB] Gagal mem-parse PRODUCTION_USERS_JSON:', e.message);
+    }
+  }
+
+  return users;
+}
+
+export const USERS_DB = IS_PRODUCTION
+  ? loadProductionUsers()
   : DEV_USERS;
 
 

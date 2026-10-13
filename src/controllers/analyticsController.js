@@ -276,8 +276,8 @@ export class AnalyticsController {
       scenarioCard.innerHTML = `
         <div class="section-head compact" style="margin-bottom: 12px;">
           <div>
-            <h2>⚖️ Simulasi Skenario: Kondisi dasar vs optimasi model (${escapeHtml(snapshot.hourLabel)})</h2>
-            <p>Perbandingan jaringan simulasi pada jam terpilih. Filter koridor hanya mengubah grafik dan KPI yang terikat pada filter tersebut.</p>
+            <h2>Simulasi lalu lintas dan sinyal (${escapeHtml(snapshot.hourLabel)})</h2>
+            <p>Fixed-time dibanding adaptive pada input, seed, dan horizon yang sama. Seluruh nilai adalah keluaran model agregat sintetis.</p>
           </div>
           <span class="badge" style="background: rgba(0, 229, 255, 0.15); color: var(--primary-2); font-weight: 700; padding: 4px 10px; border-radius: 8px;">Model skenario deterministik</span>
         </div>
@@ -300,34 +300,33 @@ export class AnalyticsController {
           </div>
 
           <div style="background: var(--panel-soft); padding: 14px; border-radius: 10px; border: 1px solid rgba(0, 229, 255, 0.3);">
-            <div style="font-size: 11px; font-weight: 800; color: var(--primary-2); text-transform: uppercase; margin-bottom: 8px;">✨ SKENARIO SPLIT KANDIDAT</div>
+            <div style="font-size: 11px; font-weight: 800; color: var(--primary-2); text-transform: uppercase; margin-bottom: 8px;">ADAPTIVE SIGNAL</div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Waktu Tunggu:</span><strong style="color: var(--status-success);">${escapeHtml(sc.optimized.waitTimeSec)} detik (-${escapeHtml(sc.delta.waitTimeReductionPct)}%)</strong>
+              <span>Green split:</span><strong>${escapeHtml(sc.optimized.greenSplitSec)} dtk</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Panjang Antrean:</span><strong style="color: var(--status-success);">${escapeHtml(sc.optimized.queueMeters)} m (-${escapeHtml(sc.delta.queueReductionPct)}%)</strong>
+              <span>Antrean:</span><strong>${escapeHtml(sc.optimized.queueMeters)} m (${escapeHtml(sc.delta.queueReductionPct)}% perubahan)</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Kecepatan Rerata:</span><strong style="color: var(--primary-2);">${escapeHtml(sc.optimized.speedKmh)} km/jam (+${escapeHtml(sc.delta.speedGainPct)}%)</strong>
+              <span>Travel time:</span><strong>${escapeHtml(sc.optimized.travelTimeMinutes)} menit (${escapeHtml(sc.delta.travelTimeDeltaMinutes)} Δ)</strong>
             </div>
             <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between;">
-              <span>Kendaraan per jam:</span><strong style="color: var(--primary-2);">${escapeHtml(sc.optimized.throughputVehPerHour)} kend/jam (+${escapeHtml(sc.delta.throughputGainPct)}%)</strong>
+              <span>Throughput / congestion:</span><strong>${escapeHtml(sc.optimized.throughputVehPerHour)} kend/jam · ${escapeHtml(sc.optimized.congestionIndex)}</strong>
             </div>
           </div>
 
-          <div style="background: var(--panel-soft); padding: 14px; border-radius: 10px; border: 1px solid rgba(16, 185, 129, 0.3);">
-            <div style="font-size: 11px; font-weight: 800; color: var(--status-success); text-transform: uppercase; margin-bottom: 8px;">🌱 DAMPAK TURUNAN SIMULASI</div>
-            <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>BBM model:</span><strong style="color: var(--status-success);">${escapeHtml(sc.delta.fuelSavedLiters)} liter</strong>
-            </div>
-            <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>CO₂ model:</span><strong style="color: var(--status-success);">${escapeHtml(sc.delta.co2SavedKg)} kg</strong>
-            </div>
-            <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span>Nilai biaya model:</span><strong style="color: var(--status-warning);">Rp ${Number(sc.delta.monetarySavedRp || 0).toLocaleString('id-ID')}</strong>
-            </div>
-            <small style="color: var(--text-muted); font-size: 10px; display: block; margin-top: 6px;">${escapeHtml(sc.assumptions.responseModel)} Faktor BBM, emisi, dan harga juga merupakan asumsi; bukan hasil ukur.</small>
+          <div style="background: var(--panel-soft); padding: 14px; border-radius: 10px; border: 1px solid var(--border);">
+            <div style="font-size: 11px; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px;">ASUMSI DAN CAKUPAN</div>
+            <div style="font-size: 12px; color: var(--text); margin-bottom: 6px;">Horizon: ${escapeHtml(snapshot.prediction?.horizonMinutes ?? snapshot.trafficModel?.horizonMinutes)} menit · Seed: ${escapeHtml(snapshot.trafficModel?.seed)}</div>
+            <small style="color: var(--text-muted); font-size: 10px; display: block; margin-top: 6px;">${escapeHtml(snapshot.prediction?.limitations || sc.assumptions.responseModel)}</small>
           </div>
+        </div>
+
+        <div style="margin-top: 12px; overflow-x: auto;">
+          <table class="data-table" aria-label="Perbandingan skenario traffic simulasi">
+            <thead><tr><th>Skenario</th><th>Travel time</th><th>Antrean</th><th>Congestion</th><th>Throughput</th></tr></thead>
+            <tbody>${Object.entries(snapshot.scenarioResults?.scenarios || {}).map(([key, result]) => `<tr><td>${escapeHtml(({ normal: 'Normal', rushHour: 'Rush hour', heavyRain: 'Hujan lebat', majorIncident: 'Insiden besar', adaptiveSignals: 'Sinyal adaptif', emergencyGreenWave: 'Emergency green wave' })[key] || key)}</td><td>${escapeHtml(result.metrics.averageTravelTimeMinutes)} mnt</td><td>${escapeHtml(result.metrics.queueMeters)} m</td><td>${escapeHtml(result.metrics.congestionIndex)}</td><td>${escapeHtml(result.metrics.throughputVehPerHour)} kend/jam</td></tr>`).join('')}</tbody>
+          </table>
         </div>
       `;
     }

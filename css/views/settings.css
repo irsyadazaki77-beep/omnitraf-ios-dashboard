@@ -49,7 +49,6 @@
 
 .settings-nav-list {
   list-style: none;
-  padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
@@ -254,7 +253,11 @@ body.theme-light .settings-kbd-shortcut,
 /* Responsive */
 @media (max-width: 900px) {
   .settings-workspace-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-content-column,
+  .settings-category-panel {
+    min-width: 0;
   }
   .settings-nav-sidebar {
     position: static;
@@ -276,13 +279,22 @@ body.theme-light .settings-kbd-shortcut,
     align-items: flex-start;
     gap: 12px;
   }
+  .opt-row > div {
+    width: 100%;
+    min-width: 0;
+  }
   .toggle-action-wrap {
     align-items: flex-start;
   }
   .settings-volume-row {
     width: 100%;
+    min-width: 0;
   }
   .settings-vol-range {
     flex: 1;
+  }
+  .settings-reset-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

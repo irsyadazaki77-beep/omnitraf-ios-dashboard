@@ -4,7 +4,9 @@
  * ESG Impact Calculations, Data Quality Layer, and Rule-Based Recommendations.
  */
 
-export const MODEL_VERSION = "v5.2.0-deterministic-diurnal";
+import { compareTrafficScenarios, recommendAdaptiveSignal, simulateTrafficNetwork } from './trafficModel.js';
+
+export const MODEL_VERSION = "v6.0.0-aggregate-flow";
 
 export const CORRIDORS_CONFIG = [
   { id: "corridor-ayani", name: "A. Yani / Wonokromo", capacity: 3200, lengthKm: 4.8, baselineSpeedKmh: 45 },
@@ -109,7 +111,6 @@ export function calculateDataQuality(inputState = {}) {
  */
 export function generateForecastSnapshot(hour = 8, state = {}) {
   const h = Math.round(Math.max(0, Math.min(23, Number(hour) || 0)));
-  const baseIntensity = calculateDiurnalIntensity(h);
   const dataQuality = calculateDataQuality(state);
 
   const isChaos = !!state.isChaosMode;
@@ -122,18 +123,25 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
     : [];
   const activeEmergencies = Array.isArray(state.activeEmergencies) ? state.activeEmergencies.filter(e => e.status !== 'COMPLETED' && e.status !== 'CANCELLED') : [];
 
-  // Modifiers
-  let intensity = baseIntensity;
-  if (isChaos) intensity = Math.min(0.98, intensity + 0.35);
-  if (isRain) intensity = Math.min(0.98, intensity + 0.12);
-  if (incidents.length > 0) intensity = Math.min(0.98, intensity + 0.05 * incidents.length);
-  if (greenWave) intensity = Math.max(0.12, intensity - 0.15);
-
-  const probabilityValue = Math.round(intensity * 100);
-  const candidateOptimizedSplit = Math.min(90, Math.max(35, greenSplit + (probabilityValue > 60 ? 10 : 0)));
-  const expectedSpeedKmh = Math.max(8, Math.round(54 - (intensity * 40)));
-  const expectedVolume = Math.round(500 + intensity * 1200);
-  const expectedQueueLength = Math.round(20 + intensity * 280);
+  const modelState = { ...state, simulatedHour: h, incidents, activeEmergencies };
+  const traffic = simulateTrafficNetwork(modelState, {
+    hour: h,
+    seed: Number(state.simulation?.seed ?? 42),
+    horizonMinutes: 60,
+    rushHour: isChaos
+  });
+  const scenarioResults = compareTrafficScenarios(modelState, {
+    hour: h,
+    seed: Number(state.simulation?.seed ?? 42),
+    horizonMinutes: 60
+  });
+  const intensity = traffic.congestionIndex / 100;
+  const probabilityValue = traffic.congestionIndex;
+  const optimizedRecommendation = recommendAdaptiveSignal((state.intersections || []).find(node => node.id === 'node-wonokromo') || { id: 'node-wonokromo', greenSplit }, state);
+  const candidateOptimizedSplit = optimizedRecommendation.targetGreenSec;
+  const expectedSpeedKmh = Math.round(traffic.averageSpeedKmh);
+  const expectedVolume = traffic.demandVehPerHour;
+  const expectedQueueLength = traffic.queueMeters;
 
   // Risk Classification
   let riskLevel = "LOW";
@@ -189,12 +197,12 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
     expectedImpact = "Parameter keselamatan disimulasikan; dampak terhadap kecelakaan tidak dihitung.";
     recRisk = "Low";
   } else if (probabilityValue >= 75) {
-    recText = `⚡ Skenario model: uji Green Split A. Yani–Wonokromo +${Math.max(0, candidateOptimizedSplit - greenSplit)} detik; bandingkan dampaknya pada MERR.`;
+    recText = `Skenario model: uji Green Split A. Yani–Wonokromo ${greenSplit} → ${candidateOptimizedSplit} detik; bandingkan dampaknya pada MERR.`;
     reasonCodes = ["HIGH_CONGESTION", "LOW_SPEED", "LONG_QUEUE"];
     expectedImpact = "Perubahan indikator hanya berupa skenario model; dampak lapangan belum divalidasi.";
     recRisk = "Medium";
   } else if (probabilityValue >= 48) {
-    recText = `✨ Skenario model: uji Green Split Wonokromo +${Math.max(0, candidateOptimizedSplit - greenSplit)} detik untuk membandingkan antrean frontage.`;
+    recText = `Skenario model: uji Green Split Wonokromo ${greenSplit} → ${candidateOptimizedSplit} detik untuk membandingkan antrean frontage.`;
     reasonCodes = ["MODERATE_CONGESTION", "QUEUE_BUILDUP"];
     expectedImpact = "Perubahan indikator hanya berupa skenario model; dampak lapangan belum divalidasi.";
     recRisk = "Low";
@@ -203,7 +211,7 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
   // Stable deterministic recommendation ID based on hour and primary reason
   const primaryReason = reasonCodes[0] || "REC";
   const recommendationId = `REC-${h.toString().padStart(2, '0')}-${primaryReason.slice(0, 8)}`;
-  const snapshotTimestamp = state.simulatedTimeIso || state.timestamp || (state.simTimeMs ? new Date(state.simTimeMs).toISOString() : new Date().toISOString());
+  const snapshotTimestamp = state.simulatedTimeIso || state.timestamp || (state.simTimeMs ? new Date(state.simTimeMs).toISOString() : `${h.toString().padStart(2, '0')}:00 WIB`);
 
   const recommendation = {
     recommendationId,
@@ -216,30 +224,18 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
     timestamp: snapshotTimestamp
   };
 
-  // Scenario Comparison: Baseline vs AI Optimized
-  const optimizedSplit = candidateOptimizedSplit;
-  const waitTimeBaseline = Math.round(30 + intensity * 50);
-  const queueBaselineMeters = Math.round(50 + intensity * 250);
-  const speedBaselineKmh = expectedSpeedKmh;
-  const throughputBaseline = Math.round(1100 + intensity * 800);
-  // Illustrative simulator response is proportional to the configured split
-  // change. Identical inputs produce zero claimed benefit. This is still a
-  // transparent scenario assumption, not a field-calibrated traffic model.
-  const addedGreenSec = Math.max(0, optimizedSplit - greenSplit);
-  const responseScale = Math.min(1, addedGreenSec / 10);
-  const waitReductionRatio = 0.28 * responseScale;
-  const queueReductionRatio = 0.35 * responseScale;
-  const speedGainRatio = 0.20 * responseScale;
-  const throughputGainRatio = 0.18 * responseScale;
-  const waitTimeOptimized = Math.round(waitTimeBaseline * (1 - waitReductionRatio));
-  const queueOptimizedMeters = Math.round(queueBaselineMeters * (1 - queueReductionRatio));
-  const speedOptimizedKmh = Math.round(speedBaselineKmh * (1 + speedGainRatio));
-  const throughputOptimized = Math.round(throughputBaseline * (1 + throughputGainRatio));
-
-  const idlingHoursSaved = Number(((waitTimeBaseline - waitTimeOptimized) * expectedVolume / 3600).toFixed(1));
-  const fuelSavedLiters = Number((idlingHoursSaved * ESG_CONSTANTS.IDLING_FUEL_LITERS_PER_HOUR).toFixed(1));
-  const co2SavedKg = Number((fuelSavedLiters * ESG_CONSTANTS.CO2_KG_PER_LITER_FUEL).toFixed(1));
-  const monetarySavedRp = Math.round(fuelSavedLiters * ESG_CONSTANTS.FUEL_PRICE_RP_PER_LITER);
+  // Fixed-time vs adaptive uses the same deterministic input state and seed.
+  const baselineModel = scenarioResults.scenarios.normal.metrics;
+  const optimizedModel = scenarioResults.scenarios.adaptiveSignals.metrics;
+  const waitTimeBaseline = Math.round(baselineModel.queueVehicles / Math.max(1, baselineModel.throughputVehPerHour) * 3600);
+  const waitTimeOptimized = Math.round(optimizedModel.queueVehicles / Math.max(1, optimizedModel.throughputVehPerHour) * 3600);
+  const queueBaselineMeters = baselineModel.queueMeters;
+  const queueOptimizedMeters = optimizedModel.queueMeters;
+  const speedBaselineKmh = Math.round(baselineModel.averageSpeedKmh);
+  const speedOptimizedKmh = Math.round(optimizedModel.averageSpeedKmh);
+  const throughputBaseline = baselineModel.throughputVehPerHour;
+  const throughputOptimized = optimizedModel.throughputVehPerHour;
+  const pctDelta = (before, after) => before > 0 ? Math.round((before - after) / before * 100) : 0;
 
   const scenarioComparison = {
     baseline: {
@@ -247,60 +243,49 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
       waitTimeSec: waitTimeBaseline,
       queueMeters: queueBaselineMeters,
       speedKmh: speedBaselineKmh,
-      throughputVehPerHour: throughputBaseline
+      throughputVehPerHour: throughputBaseline,
+      travelTimeMinutes: baselineModel.averageTravelTimeMinutes,
+      congestionIndex: baselineModel.congestionIndex
     },
     optimized: {
-      greenSplitSec: optimizedSplit,
+      greenSplitSec: candidateOptimizedSplit,
       waitTimeSec: waitTimeOptimized,
       queueMeters: queueOptimizedMeters,
       speedKmh: speedOptimizedKmh,
-      throughputVehPerHour: throughputOptimized
+      throughputVehPerHour: throughputOptimized,
+      travelTimeMinutes: optimizedModel.averageTravelTimeMinutes,
+      congestionIndex: optimizedModel.congestionIndex
     },
     delta: {
-      waitTimeReductionPct: Math.round(((waitTimeBaseline - waitTimeOptimized) / waitTimeBaseline) * 100),
-      queueReductionPct: Math.round(((queueBaselineMeters - queueOptimizedMeters) / queueBaselineMeters) * 100),
-      speedGainPct: Math.round(((speedOptimizedKmh - speedBaselineKmh) / speedBaselineKmh) * 100),
-      throughputGainPct: Math.round(throughputGainRatio * 100),
-      fuelSavedLiters,
-      co2SavedKg,
-      monetarySavedRp
+      waitTimeReductionPct: pctDelta(waitTimeBaseline, waitTimeOptimized),
+      queueReductionPct: pctDelta(queueBaselineMeters, queueOptimizedMeters),
+      speedGainPct: speedBaselineKmh > 0 ? Math.round((speedOptimizedKmh - speedBaselineKmh) / speedBaselineKmh * 100) : 0,
+      throughputGainPct: throughputBaseline > 0 ? Math.round((throughputOptimized - throughputBaseline) / throughputBaseline * 100) : 0,
+      travelTimeDeltaMinutes: Number((optimizedModel.averageTravelTimeMinutes - baselineModel.averageTravelTimeMinutes).toFixed(2)),
+      congestionIndexDelta: optimizedModel.congestionIndex - baselineModel.congestionIndex,
+      throughputDeltaVehPerHour: throughputOptimized - throughputBaseline
     },
     assumptions: {
-      idlingFuelFactor: "0.28 L/jam per kendaraan mengantre",
-      emissionFactor: "2.31 kg CO2 per Liter BBM",
-      fuelPrice: "Rp 14.500/Liter (Pertalite/Solar proxy)",
-      responseModel: "Asumsi demonstrasi: manfaat penuh bertahap untuk tambahan 10 detik green split; tidak divalidasi dengan data lapangan.",
-      addedGreenSec
+      responseModel: "Keluaran fixed-time dan adaptive dihitung terpisah dengan demand, seed, dan horizon yang sama; model bukan hasil kalibrasi lapangan.",
+      addedGreenSec: optimizedRecommendation.deltaGreenSec
     }
   };
 
   // Corridor Breakdown
-  const corridorBreakdown = CORRIDORS_CONFIG.map(c => {
-    const corridorIntensity = Math.min(0.98, Math.max(0.08, intensity * (c.id === 'corridor-ayani' ? 1.15 : c.id === 'corridor-darmo' ? 1.05 : 0.88)));
-    const cSpeed = Math.round(c.baselineSpeedKmh * (1 - corridorIntensity * 0.65));
-    const cQueue = Math.round(corridorIntensity * 180);
-    const cDensity = Math.round(corridorIntensity * 120); // veh/km
-    const cDelay = Math.round(corridorIntensity * 48);
-
-    let cTrend = "stable";
-    if (corridorIntensity > 0.7) cTrend = "worsening";
-    else if (corridorIntensity < 0.3) cTrend = "improving";
-
-    return {
-      corridorId: c.id,
-      name: c.name,
-      volume: Math.round(c.capacity * corridorIntensity),
-      capacity: c.capacity,
-      speed: cSpeed,
-      density: cDensity,
-      queueMeters: cQueue,
-      delaySec: cDelay,
-      signalEfficiencyPct: Math.min(99, Math.max(50, Math.round(100 - corridorIntensity * 40))),
-      riskLevel: corridorIntensity > 0.75 ? "CRITICAL" : corridorIntensity > 0.48 ? "WARNING" : "NORMAL",
-      cameraCoveragePct: dataQuality.cameraCoverage,
-      trendDirection: cTrend
-    };
-  });
+  const corridorBreakdown = traffic.corridors.map(corridor => ({
+    corridorId: corridor.corridorId,
+    name: corridor.name,
+    volume: corridor.demandVehPerHour,
+    capacity: corridor.capacityVehPerHour,
+    speed: Math.round(corridor.speedKmh),
+    density: Number((corridor.demandVehPerHour / Math.max(1, corridor.speedKmh)).toFixed(1)),
+    queueMeters: corridor.queueMeters,
+    delaySec: Math.round(Math.max(0, corridor.travelTimeMinutes * 60 - (CORRIDORS_CONFIG.find(config => config.id === corridor.corridorId).lengthKm / CORRIDORS_CONFIG.find(config => config.id === corridor.corridorId).baselineSpeedKmh * 3600))),
+    signalEfficiencyPct: Math.round(Math.min(99, corridor.capacityVehPerHour / Math.max(1, CORRIDORS_CONFIG.find(config => config.id === corridor.corridorId).capacity) * 100)),
+    riskLevel: corridor.congestionIndex >= 75 ? 'CRITICAL' : corridor.congestionIndex >= 48 ? 'WARNING' : 'NORMAL',
+    cameraCoveragePct: dataQuality.cameraCoverage,
+    trendDirection: corridor.congestionIndex >= 65 ? 'worsening' : corridor.congestionIndex <= 30 ? 'improving' : 'stable'
+  }));
 
   return {
     status: "success",
@@ -323,15 +308,22 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
     dataQuality,
     corridorBreakdown,
     scenarioComparison,
+    trafficModel: traffic,
+    scenarioResults,
+    prediction: {
+      horizonMinutes: traffic.horizonMinutes,
+      assumptions: traffic.assumptions,
+      limitations: 'Synthetic aggregate corridor model; no field calibration, lane-level behavior, or accuracy evaluation is available.'
+    },
     esgImpact: {
       observedSavings: {
         co2SavedKg: state.telemetry?.co2SavedKg ?? state.co2SavedKg ?? null,
         fuelSavedLiters: state.telemetry?.fuelSavedLiters ?? state.fuelSavedLiters ?? null
       },
       simulatedScenarioSavings: {
-        co2SavedKg,
-        fuelSavedLiters,
-        monetarySavedRp
+        co2SavedKg: null,
+        fuelSavedLiters: null,
+        monetarySavedRp: null
       }
     },
     // Backward compatibility fields for legacy UI cards

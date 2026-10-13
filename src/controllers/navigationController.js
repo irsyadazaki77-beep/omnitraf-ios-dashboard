@@ -666,7 +666,14 @@ export class NavigationController {
         chatReturnFocus = document.activeElement;
         document.getElementById('chatInputText')?.focus({ preventScroll: true });
       } else if (returnFocus) {
-        chatReturnFocus?.focus?.({ preventScroll: true });
+        const opener = chatReturnFocus;
+        const openerIsAvailable = opener?.isConnected
+          && opener.getClientRects().length > 0
+          && !opener.closest('[inert], [aria-hidden="true"], details:not([open])');
+        const focusTarget = openerIsAvailable
+          ? opener
+          : opener?.closest('.topbar-overflow')?.querySelector(':scope > summary');
+        focusTarget?.focus?.({ preventScroll: true });
         chatReturnFocus = null;
       }
       soundManager.play('click');

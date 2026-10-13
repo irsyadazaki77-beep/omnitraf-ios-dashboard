@@ -12,6 +12,7 @@ import { realtimeDispatcher } from './realtimeDispatcher.js';
 import { REALTIME_ROOMS } from './eventRegistry.js';
 import { SAFETY_BOUNDARY } from '../config/safetyBoundary.js';
 import { ROLES } from '../config/constants.js';
+import { tokenRevocationService } from '../services/tokenRevocationService.js';
 
 const ROOM_ROLES = new Map([
   [REALTIME_ROOMS.DASHBOARD, [ROLES.VIEWER, ROLES.OPERATOR, ROLES.ADMIN]],
@@ -80,8 +81,20 @@ export function initializeSocketServer(httpServer, { redisManager = null, leader
     if (!token) return next(new Error('AUTHENTICATION_REQUIRED: JWT Bearer token wajib disertakan.'));
     const principal = verifyToken(token);
     if (!principal) return next(new Error('AUTHENTICATION_FAILED: Token tidak valid atau telah kedaluwarsa.'));
-    socket.user = principal;
-    return next();
+
+    tokenRevocationService.isTokenRevoked(token, principal).then((isRevoked) => {
+      if (isRevoked) {
+        return next(new Error('AUTHENTICATION_FAILED: Sesi token telah dicabut (revoked).'));
+      }
+      socket.user = principal;
+      socket.token = token;
+      socket.data.user = principal;
+      socket.data.token = token;
+      return next();
+    }).catch((err) => {
+      console.error('[Socket Handshake] Error checking token revocation:', err);
+      return next(new Error('AUTHENTICATION_FAILED: Gagal memvalidasi status pencabutan sesi.'));
+    });
   });
 
   // Client Connection Handler
@@ -89,6 +102,9 @@ export function initializeSocketServer(httpServer, { redisManager = null, leader
     console.log(`🔌 [Socket.io] Client terhubung: ${socket.id} (User: ${socket.user?.name}, Role: ${socket.user?.role})`);
 
     // Join only rooms this authenticated role may read.
+    if (socket.user?.id) {
+      socket.join(`user:${socket.user.id}`);
+    }
     socket.join(REALTIME_ROOMS.DASHBOARD);
     socket.join(REALTIME_ROOMS.TRAFFIC);
     socket.join(REALTIME_ROOMS.SIGNALS);
@@ -230,7 +246,7 @@ export function initializeSocketServer(httpServer, { redisManager = null, leader
     const visionTicker = setInterval(() => {
       if (!leaseValid()) { stopSimulationLoops(); return; }
       if (OMNITRAF_RUNTIME_MODE === 'single' && io.engine.clientsCount === 0) return;
-      const visionPayload = cvEngine.generateFramePayload(backendState.state.isChaosMode);
+      const visionPayload = cvEngine.generateFramePayload(backendState.state.isChaosMode, backendState.state.trafficModel);
       realtimeDispatcher.dispatchCctvVision(visionPayload);
       if (OMNITRAF_RUNTIME_MODE === 'cluster') {
         leadership?.eventBus?.publish('omnitraf:events:cctv', 'cctv:state', visionPayload.seq, cvEngine.getSnapshot()).catch(() => {});

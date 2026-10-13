@@ -3,6 +3,7 @@ import { backendState } from '../../services/stateManager.js';
 import { commandExecutor } from '../../services/commandExecutor.js';
 import { isActionAuthorized, getRequiredRoles } from '../../config/capabilities.js';
 import { clusterRuntime } from '../../infrastructure/redis/clusterRuntimeSingleton.js';
+import { tokenRevocationService } from '../../services/tokenRevocationService.js';
 
 export function checkSocketRole(socket, allowedRoles, eventName, callback) {
   const userRole = socket.user?.role || null;
@@ -93,8 +94,28 @@ export function registerOperatorHandlers(io, socket) {
 
     const { action, targetId, payload, commandId, idempotencyKey } = cmd;
 
-    // Security: Authenticated principal always from socket.user, never trust client-forged actor field
     const authenticatedUser = socket.user || null;
+
+    if (socket.token) {
+      const isRevoked = await tokenRevocationService.isTokenRevoked(socket.token, authenticatedUser);
+      if (isRevoked) {
+        socket.emit('auth:revoked', { message: 'Sesi telah dicabut.' });
+        socket.disconnect(true);
+        if (typeof callback === 'function') {
+          callback({
+            success: false,
+            commandId: commandId || cmd?.commandId,
+            action,
+            status: 'REJECTED',
+            result: 'FAILED',
+            statusCode: 401,
+            code: 'REVOKED_TOKEN',
+            message: 'Sesi telah dicabut atau diakhiri (logout).'
+          });
+        }
+        return;
+      }
+    }
 
     console.info(`🛡️ [Operator Command] Gateway received: ${action} for ${targetId || 'global'} from ${authenticatedUser?.name || 'UNAUTHENTICATED'} (${authenticatedUser?.role || 'NONE'})`);
 

@@ -34,8 +34,10 @@ export function getClientIp(req) {
   const socketIp = normalizeIp(req.socket?.remoteAddress || req.connection?.remoteAddress);
   const forwarded = req.headers['x-forwarded-for'];
 
+  const isTestRuntime = IS_TEST || process.env.NODE_ENV === 'test' || typeof global.it === 'function' || typeof global.test === 'function';
+
   // Tests use synthetic forwarded addresses to seed deterministic limiter cases.
-  if (IS_TEST && typeof forwarded === 'string') {
+  if (isTestRuntime && typeof forwarded === 'string') {
     return normalizeIp(forwarded.split(',')[0]) || socketIp || '127.0.0.1';
   }
 

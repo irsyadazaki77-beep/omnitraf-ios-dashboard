@@ -4,6 +4,7 @@ import { generateToken, verifyToken } from '../middlewares/auth.js';
 import { createApiErrorResponse, createApiResponse, sanitizeString } from '../middlewares/errorHandler.js';
 import { backendState } from '../services/stateManager.js';
 import { IS_PRODUCTION, TRUST_PROXY } from '../config/env.js';
+import { tokenRevocationService } from '../services/tokenRevocationService.js';
 
 export async function login(req, res) {
   const { username, password } = req.body || {};
@@ -76,13 +77,30 @@ export async function login(req, res) {
   }));
 }
 
-export function logout(req, res) {
+export async function logout(req, res) {
   // Extract token from cookie or Authorization header to identify actor for audit
   let token = req.cookies?.omnitraf_session || null;
   if (!token && req.headers?.authorization && /^Bearer\s+/i.test(req.headers.authorization)) {
     token = req.headers.authorization.replace(/^Bearer\s+/i, '').trim();
   }
   const principal = token ? verifyToken(token) : null;
+
+  // Revoke token server-side so it cannot be used again
+  if (token) {
+    await tokenRevocationService.revokeToken(token);
+  }
+
+  // Disconnect any active Socket.IO connection associated with this revoked token or user
+  if (backendState.io) {
+    try {
+      if (principal?.id) {
+        backendState.io.to(`user:${principal.id}`).emit('auth:revoked', { message: 'Sesi telah diakhiri (logout).' });
+        backendState.io.in(`user:${principal.id}`).disconnectSockets(true);
+      }
+    } catch (sockErr) {
+      console.warn('[AuthController] Error disconnecting revoked sockets:', sockErr.message);
+    }
+  }
 
   // Clear session cookie
   res.clearCookie('omnitraf_session', {

@@ -73,6 +73,7 @@ export const ROUTE_CAPABILITIES = {
   'DELETE /api/diagnostics/chaos/faults/:faultId': 'chaos:fault-clear',
   'GET /api/reports/download': 'reports:read',
   'GET /api/prediction/v1/forecast': 'forecast:read',
+  'GET /api/prediction/v1/scenario-comparison': 'forecast:read',
   'GET /api/prediction/v1/test-cases': 'diagnostics:read',
   'POST /api/terminal/execute': 'terminal:execute',
   'POST /api/incidents': 'incident:create',
@@ -94,8 +95,9 @@ export const ROUTE_CAPABILITIES = {
 };
 
 export function isActionAuthorized(role, action) {
+  if (!role || !Object.values(ROLES).includes(role)) return false;
   const allowed = CAPABILITIES[action];
-  return allowed ? (allowed.includes(PUBLIC) || allowed.includes(role)) : role === ROLES.ADMIN;
+  return allowed ? (allowed.includes(PUBLIC) || allowed.includes(role)) : false;
 }
 
 export function getRequiredRoles(action) {

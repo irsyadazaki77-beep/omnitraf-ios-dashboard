@@ -595,6 +595,17 @@ export class CctvController {
       });
     });
 
+    const applyEnvironment = () => {
+      const timeOfDay = document.getElementById('cctvTimeOfDay')?.value || 'day';
+      const weather = document.getElementById('cctvWeather')?.value || 'clear';
+      this.renderers.forEach((renderer) => renderer.setEnvironment({ timeOfDay, weather }));
+    };
+    ['cctvTimeOfDay', 'cctvWeather'].forEach((id) => {
+      const control = document.getElementById(id);
+      if (control) this.disposer.addEventListener(control, 'change', applyEnvironment);
+    });
+    applyEnvironment();
+
     // Save a screenshot of the simulated camera canvas.
     document.querySelectorAll('#btnCaptureSnapshot, .btn-cam-snapshot').forEach(btn => {
       this.disposer.addEventListener(btn, 'click', (e) => {
@@ -617,6 +628,7 @@ export class CctvController {
     const close = () => {
       modal.classList.remove('show');
       modal.style.display = 'none';
+      if (document.fullscreenElement === modal) document.exitFullscreen?.().catch?.(() => {});
     };
     this.disposer.addEventListener(openButton, 'click', () => {
       const camId = this.activeCamId || 'cctvCanvas1';
@@ -633,6 +645,7 @@ export class CctvController {
       }
       modal.style.display = 'flex';
       modal.classList.add('show');
+      if (typeof modal.requestFullscreen === 'function') modal.requestFullscreen().catch(() => {});
     });
     this.disposer.addEventListener(closeButton, 'click', close);
     this.disposer.addEventListener(modal, 'click', (event) => {
@@ -760,6 +773,11 @@ export class CctvController {
           const status = camRuntime ? camRuntime.status : 'ONLINE';
           const provenance = camRuntime ? camRuntime.provenance : 'SIMULATED';
 
+          renderer.setEnvironment({
+            timeOfDay: document.getElementById('cctvTimeOfDay')?.value || 'day',
+            weather: document.getElementById('cctvWeather')?.value || 'clear'
+          });
+
           // Determine intersection signal state
           const nodeId = camMeta?.nodeId || 'node-wonokromo';
           const node = intersectionById.get(nodeId);
@@ -792,13 +810,7 @@ export class CctvController {
   updateGlitchOverlays(isChaos) {
     if (typeof document === 'undefined') return;
     const overlays = document.querySelectorAll(".cctv-glitch-overlay");
-    overlays.forEach((overlay, idx) => {
-      if (isChaos && (idx === 0 || idx === 1 || idx === 3 || idx === 4)) {
-        overlay.classList.add("show");
-      } else {
-        overlay.classList.remove("show");
-      }
-    });
+    overlays.forEach((overlay) => overlay.classList.remove("show"));
   }
 
   _startWatermarkClock() {

@@ -54,7 +54,7 @@ export class ComputerVisionEngine {
     });
   }
 
-  generateFramePayload(isChaosMode) {
+  generateFramePayload(isChaosMode, trafficModel = null) {
     this.frameSequence++;
     const timestamp = this.clock.now();
     const camerasData = {};
@@ -62,9 +62,17 @@ export class ComputerVisionEngine {
     // First, step the simulation
     this.tickSimulation(isChaosMode);
 
+    const cameraCorridors = {
+      dashCameraCanvas: 'corridor-ayani',
+      cctvCanvas1: 'corridor-ayani',
+      cctvCanvas2: 'corridor-darmo',
+      cctvCanvas3: 'corridor-jemursari',
+      cctvCanvas4: 'corridor-merr'
+    };
     this.cameras.forEach(camId => {
       const vehicles = this.vehiclesPerCam.get(camId) || [];
       const detections = [];
+      const corridorMetrics = trafficModel?.corridors?.find(item => item.corridorId === cameraCorridors[camId]) || null;
 
       vehicles.forEach(v => {
         // Perspective Projection calculation (0..1 normalized space)
@@ -99,7 +107,7 @@ export class ComputerVisionEngine {
           y: Math.max(0.01, Math.min(0.95, yNorm - hNorm / 2)),
           w: wNorm,
           h: hNorm,
-          speedKmh: Math.round((isChaosMode ? 8 : 42) + this.prng.nextFloat() * 6 - 3)
+          speedKmh: corridorMetrics ? Math.round(corridorMetrics.speedKmh) : Math.round((isChaosMode ? 8 : 42) + this.prng.nextFloat() * 6 - 3)
         });
       });
 
@@ -113,6 +121,14 @@ export class ComputerVisionEngine {
         provenance: 'SIMULATED',
         processingLatencyMs: isChaosMode ? Math.floor(22 + this.prng.nextFloat() * 15) : Math.floor(4 + this.prng.nextFloat() * 6),
         streamStatus: isChaosMode ? 'DEGRADED' : 'ONLINE',
+        trafficMetrics: corridorMetrics ? {
+          corridorId: corridorMetrics.corridorId,
+          demandVehPerHour: corridorMetrics.demandVehPerHour,
+          queueVehicles: corridorMetrics.queueVehicles,
+          congestionIndex: corridorMetrics.congestionIndex,
+          speedKmh: corridorMetrics.speedKmh,
+          provenance: 'SIMULATED'
+        } : null,
         detections: detections
       };
     });

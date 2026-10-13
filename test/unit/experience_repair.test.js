@@ -22,6 +22,9 @@ test('unknown savings stay unknown and real zeros survive forecasting and report
   const state = { telemetry: { co2SavedKg: 0, fuelSavedLiters: 0, vehiclesToday: 0, avgWaitTime: 0 }, incidents: [{ id: 'I1', status: 'ACTIVE' }] };
   assert.equal(generateForecastSnapshot(8, state).esgImpact.observedSavings.co2SavedKg, 0);
   const snapshot = createReportSnapshot(state, 'Snapshot sesi', '2026-10-10T01:00:00.000Z');
+  assert.equal(snapshot.trafficModel.modelVersion, 'aggregate-flow-v1');
+  assert.equal(snapshot.trafficModel.seed, 42);
+  assert.deepEqual(Object.keys(snapshot.scenarioComparison), ['normal', 'rushHour', 'heavyRain', 'majorIncident', 'adaptiveSignals', 'emergencyGreenWave']);
   state.telemetry.vehiclesToday = 999;
   state.incidents[0].status = 'RESOLVED';
   assert.equal(snapshot.metrics.volume, 0);

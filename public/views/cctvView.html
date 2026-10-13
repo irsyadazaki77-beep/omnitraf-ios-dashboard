@@ -13,6 +13,8 @@
         <div class="cctv-options-content">
           <div class="ios-segmented-control matrix-selector" role="group" aria-label="Layout kamera"><button class="matrix-btn" data-grid="grid-2x2" title="Grid 2x2" aria-pressed="false">Grid</button><button class="matrix-btn" data-grid="grid-1x3" title="Kolom 1x3" aria-pressed="false">Bertumpuk</button><button class="matrix-btn active" data-grid="grid-focus" title="Fokus utama" aria-pressed="true">Fokus</button></div>
           <div class="ios-segmented-control cctv-filter-selector" role="group" aria-label="Filter tampilan kamera"><button class="filter-mode-btn active" data-filter="none">Standar</button><button class="filter-mode-btn" data-filter="mono">Monokrom</button><button class="filter-mode-btn" data-filter="night">Malam</button><button class="filter-mode-btn" data-filter="thermal">Termal</button></div>
+          <label class="cctv-environment-control">Waktu<select id="cctvTimeOfDay"><option value="morning">Pagi</option><option value="day" selected>Siang</option><option value="evening">Sore</option><option value="night">Malam</option></select></label>
+          <label class="cctv-environment-control">Cuaca<select id="cctvWeather"><option value="clear" selected>Cerah</option><option value="cloudy">Mendung</option><option value="light-rain">Hujan ringan</option><option value="heavy-rain">Hujan lebat</option></select></label>
           <label class="cctv-threshold-pill" title="Ambang deteksi computer vision"><span>Ambang deteksi</span><strong id="thresholdVal">85%</strong><input id="cctvThresholdRange" class="cctv-range-slider" type="range" min="50" max="95" value="85" /></label>
           <button class="cctv-toolbar-btn" id="btnToggleCVBoxes" type="button" title="Tampilkan atau sembunyikan kotak deteksi">Lapisan deteksi</button>
         </div>
@@ -58,7 +60,7 @@
                   </div>
                   <div class="hud-metric-pill hud-engine hide-mobile">
                     <span class="hud-metric-dot"></span>
-                    <span class="hud-metric-val">SITS Vision Sim · 1080p</span>
+                    <span class="hud-metric-val">SIMULATED SCENE</span>
                   </div>
                 </div>
               </div>
@@ -101,7 +103,7 @@
                   </div>
                   <div class="hud-metric-pill hud-engine hide-mobile">
                     <span class="hud-metric-dot"></span>
-                    <span class="hud-metric-val">SITS Vision Sim · 1080p</span>
+                    <span class="hud-metric-val">SIMULATED SCENE</span>
                   </div>
                 </div>
               </div>
@@ -144,7 +146,7 @@
                   </div>
                   <div class="hud-metric-pill hud-engine hide-mobile">
                     <span class="hud-metric-dot"></span>
-                    <span class="hud-metric-val">SITS Vision Sim · 1080p</span>
+                    <span class="hud-metric-val">SIMULATED SCENE</span>
                   </div>
                 </div>
               </div>
@@ -187,7 +189,7 @@
                   </div>
                   <div class="hud-metric-pill hud-engine hide-mobile">
                     <span class="hud-metric-dot"></span>
-                    <span class="hud-metric-val">SITS Vision Sim · 1080p</span>
+                    <span class="hud-metric-val">SIMULATED SCENE</span>
                   </div>
                 </div>
               </div>
