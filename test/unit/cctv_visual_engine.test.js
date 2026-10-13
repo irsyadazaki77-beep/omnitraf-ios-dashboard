@@ -43,12 +43,18 @@ test('each camera has its own deterministic scene geometry', () => {
   assert.notEqual(scenes[0].seed, scenes[3].seed);
 });
 
-test('vehicles stay visible with detection overlay off and seeded vehicles repeat', () => {
+test('vehicle frame remains visible with detection overlay off and is supplied by simulation', () => {
   const a = makeRenderer('cctvCanvas1');
   const b = makeRenderer('cctvCanvas1');
   assert.deepEqual(a.vehicles, b.vehicles);
+  assert.equal(a.vehicles.length, 0, 'renderer must not invent an independent traffic stream');
+  const frameVehicles = [{ id: 'cctvCanvas1-v0', trackId: 'cctvCanvas1-v0', class: 'car', x: .3, y: .5, w: .04, h: .05, speedKmh: 24, progress: .4, lane: 1 }];
+  a.updateVehicles(frameVehicles);
+  a.updateBoxes(frameVehicles);
   a.render(false, false, false, .016);
-  assert.equal(a.vehicles.length, 17);
+  assert.equal(a.vehicles.length, 1);
+  assert.equal(a.vehicles[0].id, frameVehicles[0].id);
+  assert.equal(a.trackedBoxes.size, 1);
   assert.equal(a.captureSnapshot(), 'data:image/png;base64,simulated');
 });
 
@@ -56,6 +62,7 @@ test('pause freezes traffic and day/night/weather rebuilds the cached scene', ()
   const renderer = makeRenderer('cctvCanvas2');
   renderer.render(false, false, false, .016);
   const initialKey = renderer._sceneKey;
+  renderer.updateVehicles([{ id: 'v1', class: 'car', x: .3, y: .5, w: .04, h: .05, progress: .45 }]);
   const initialProgress = renderer.vehicles[0].progress;
   renderer.render(false, true, false, .5);
   assert.equal(renderer.vehicles[0].progress, initialProgress);
@@ -76,16 +83,15 @@ test('unsupported environment and filter values safely fall back', () => {
   assert.equal(renderer.filterMode, 'none');
 });
 
-test('detection tracks bind to stable vehicle identities and stale/offline status reaches the renderer', () => {
+test('detection tracks retain stable identities and stale/offline status reaches the renderer', () => {
   const renderer = makeRenderer('cctvCanvas1');
   renderer.updateBoxes([{ id: 'track-17', x: .2, y: .3, w: .06, h: .08, class: 'car', speedKmh: 32, confidence: 92 }]);
   renderer.render(false, false, true, .016);
   const track = renderer.trackedBoxes.get('track-17');
-  assert.ok(Number.isInteger(track._simVehicleIndex));
-  const vehicleIndex = track._simVehicleIndex;
+  assert.equal(track.id, 'track-17');
   renderer.updateBoxes([{ id: 'track-17', x: .21, y: .31, w: .06, h: .08, class: 'car', speedKmh: 31, confidence: 93 }]);
   renderer.render(false, false, true, .016);
-  assert.equal(track._simVehicleIndex, vehicleIndex);
+  assert.equal(renderer.trackedBoxes.get('track-17').id, 'track-17');
 
   const statuses = [];
   renderer._drawOsd = (_ctx, _w, _h, _metrics, status) => statuses.push(status);

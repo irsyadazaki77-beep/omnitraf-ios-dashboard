@@ -52,7 +52,9 @@ export class IncidentController {
     this._renderNotificationDrawer(state.incidents);
     this.disposer.addEventListener(window, 'omnitraf:entity-focus', (event) => {
       if (event.detail?.kind !== 'incident') return;
+      const incident = (stateStore.getState().incidents || []).find((entry) => String(entry.id) === String(event.detail.id));
       const target = document.getElementById(`incident-${event.detail.id}`);
+      if (incident) this._renderIncidentInspector(incident);
       if (!target) return;
       target.tabIndex = -1;
       target.classList.add('entity-search-focus');
@@ -570,12 +572,16 @@ export class IncidentController {
     this.selectedIncidentId = incident.id;
     title.textContent = incident.title || 'Insiden simulasi';
     summary.textContent = incident.notes || incident.description || 'Detail skenario insiden simulasi.';
+    const activity = Array.isArray(incident.activity) ? incident.activity : [];
     const values = [
       ['Lokasi', incident.location || 'Belum tersedia'],
       ['Keparahan', incident.severity || incident.priority || 'Belum tersedia'],
       ['Status', incident.status || 'Belum tersedia'],
       ['Waktu', incident.reportedAt && Number.isFinite(new Date(incident.reportedAt).getTime()) ? new Date(incident.reportedAt).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : 'Belum tersedia'],
-      ['Disposisi', incident.assignedUnit || 'Belum tersedia']
+      ['Disposisi', incident.assignedUnit || 'Belum tersedia'],
+      ['Diakui', incident.acknowledgedAt ? new Date(incident.acknowledgedAt).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : 'Belum diakui'],
+      ['Selesai', incident.resolvedAt ? new Date(incident.resolvedAt).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : 'Belum selesai'],
+      ['Kronologi', [incident.reportedAt && `Terdeteksi ${new Date(incident.reportedAt).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`, incident.acknowledgedAt && `Diakui ${new Date(incident.acknowledgedAt).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`, incident.resolvedAt && `Selesai ${new Date(incident.resolvedAt).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`, ...activity.map((entry) => `${entry.status || entry.action || 'Pembaruan'} ${entry.timestamp || entry.at || ''}`)].filter(Boolean).join(' · ') || 'Belum ada aktivitas lanjutan yang tercatat']
     ];
     properties.replaceChildren(...values.map(([label, value]) => {
       const group = document.createElement('div');
@@ -620,7 +626,7 @@ export class IncidentController {
       CONTAINED: 'Tandai mitigasi simulasi',
       RESPONDING: 'Tandai mitigasi',
       MITIGATED: 'Selesaikan skenario'
-    })[current] || 'Lanjutkan alur simulasi';
+    })[current] || 'Transisi tidak tersedia';
   }
 
   _renderDashboardTimeline(incidents) {

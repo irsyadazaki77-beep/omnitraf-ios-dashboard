@@ -27,6 +27,7 @@ import { settingsController } from './controllers/settingsController.js';
 const isViteRuntime = Boolean(import.meta.env);
 
 const controllerLoaders = {
+  city3dController: async () => { if (isViteRuntime) await import('../css/views/city3d.css'); return import('./modules/city3dController.js'); },
   mapManager: async () => {
     if (isViteRuntime) {
       await import('./../css/views/map.css');
@@ -211,6 +212,7 @@ export class App {
         await import('leaflet.markercluster/dist/MarkerCluster.css');
         await import('leaflet.markercluster/dist/MarkerCluster.Default.css');
       },
+      city3d: () => import('../css/views/city3d.css'),
       cctv: () => import('../css/views/cctv.css'),
       signals: async () => { await import('../css/views/signals.css'); await import('../css/views/map.css'); },
       incidents: async () => { await import('../css/views/incidents.css'); await import('../css/views/map.css'); },
@@ -235,6 +237,7 @@ export class App {
     const VIEW_CHANNELS = {
       'dashboard': ['room:dashboard', 'room:traffic', 'room:signals', 'room:incidents', 'room:emergency', 'room:cctv:dashCameraCanvas'],
       'map': ['room:traffic', 'room:incidents', 'room:emergency'],
+      'city3d': ['room:traffic', 'room:incidents', 'room:emergency', 'room:devices', 'room:signals'],
       'cctv': ['room:cctv:dashCameraCanvas', 'room:cctv:cctvCanvas1', 'room:cctv:cctvCanvas2', 'room:cctv:cctvCanvas3', 'room:cctv:cctvCanvas4'],
       'signals': ['room:signals', 'room:traffic'],
       'incidents': ['room:incidents'],
@@ -268,7 +271,7 @@ export class App {
 
     const viewControllers = {
       dashboard: ['cctvController', 'signalsController', 'incidentController', 'emergencyController'],
-      map: ['mapManager'], cctv: ['cctvController'], signals: ['mapManager', 'signalsController'],
+      map: ['mapManager'], city3d: ['city3dController'], cctv: ['cctvController'], signals: ['mapManager', 'signalsController'],
       incidents: ['mapManager', 'incidentController'], emergency: ['emergencyController'], emergencies: ['emergencyController'],
       analytics: ['analyticsController'], prediction: ['analyticsController'],
       devices: ['deviceController'], reports: ['reportController'],
@@ -397,7 +400,7 @@ export class App {
     const viewNames = {
       dashboard: 'Ikhtisar', map: 'Peta', incidents: 'Insiden', emergency: 'Darurat',
       cctv: 'CCTV', signals: 'Sinyal', devices: 'Perangkat', analytics: 'Analitik',
-      prediction: 'Prediksi', reports: 'Laporan', settings: 'Pengaturan', integration: 'Integrasi'
+      prediction: 'Prediksi', reports: 'Laporan', settings: 'Pengaturan', integration: 'Integrasi', city3d: 'Digital Twin 3D'
     };
     const cleanView = String(view).replace('#', '').replace('view-', '');
     message.textContent = `Halaman ${viewNames[cleanView] || cleanView} belum dapat dimuat. Periksa koneksi lalu coba lagi.`;

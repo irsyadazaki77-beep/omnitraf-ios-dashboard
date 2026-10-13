@@ -9,6 +9,7 @@ export class ViewLoader {
     this.viewMap = {
       'dashboard': { file: '/views/dashboardView.html', id: 'view-dashboard', title: 'Ikhtisar' },
       'map': { file: '/views/mapView.html', id: 'view-map', title: 'Peta kota' },
+      'city3d': { file: '/views/city3dView.html', id: 'view-city3d', title: 'Digital Twin 3D' },
       'cctv': { file: '/views/cctvView.html', id: 'view-cctv', title: 'Pemantauan CCTV' },
       'signals': { file: '/views/signalsView.html', id: 'view-signals', title: 'Sinyal lalu lintas' },
       'emergency': { file: '/views/emergenciesView.html', id: 'view-emergency', title: 'Prioritas darurat' },

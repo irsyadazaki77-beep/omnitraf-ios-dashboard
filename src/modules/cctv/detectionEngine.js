@@ -83,6 +83,14 @@ export class DetectionEngine {
         w: clampedW,
         h: clampedH,
         speedKmh,
+        accelerationMps2: Number.isFinite(Number(d.accelerationMps2)) ? Number(d.accelerationMps2) : 0,
+        lane: Number.isInteger(Number(d.lane)) ? Number(d.lane) : null,
+        direction: Number(d.direction) < 0 ? -1 : 1,
+        progress: Number.isFinite(Number(d.progress)) ? Math.max(0, Math.min(1, Number(d.progress))) : null,
+        movement: ['left', 'through', 'right'].includes(d.movement) ? d.movement : 'through',
+        braking: d.braking === true,
+        stopped: d.stopped === true,
+        signalState: String(d.signalState || 'none'),
         provenance: d.provenance || defaultProvenance
       });
     }

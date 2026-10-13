@@ -11,11 +11,11 @@ import { socketClient } from '../../core/socketClient.js';
 import { stateStore } from '../../core/stateStore.js';
 import { diagnostics } from '../../core/diagnostics.js';
 import { REALTIME_ROOMS } from '../../../shared/realtimeRooms.js';
-import { SeededRandom } from '../../../shared/seededRandom.js';
+import { TrafficVehicleSimulation, projectTrafficVehicle, trafficCameraConfig } from '../../../shared/trafficVehicleSimulation.js';
 
 export class CctvRealtimeAdapter {
   constructor(options = {}) {
-    this.localFallbackRandom = options.randomStream || new SeededRandom('omnitraf-cctv-local-fallback');
+    this.localVehicleSimulation = options.vehicleSimulation || new TrafficVehicleSimulation({ seed: 42 });
     this.onFrameCallback = options.onFrame || (() => {});
     this.coalesceVisualUpdates = options.coalesceVisualUpdates === true;
     this.lastProcessedSeq = 0;
@@ -144,18 +144,8 @@ export class CctvRealtimeAdapter {
   }
 
   _startLocalFallback(disposer, camerasRegistry) {
-    this.localFallbackRandom.reset('omnitraf-cctv-local-fallback');
     const currentState = stateStore.getState();
     this.localFallbackTimeMs = Number(currentState.timestampMs || currentState.telemetry?.timestampMs) || Date.now();
-    const localVehicles = new Map();
-    camerasRegistry.forEach((val, id) => {
-      localVehicles.set(id, [
-        { id: `${id}-v0`, lane: 0, progress: 0.15, class: 'ambulance', speed: 0.012, conf: 98 },
-        { id: `${id}-v1`, lane: 1, progress: 0.45, class: 'car', speed: 0.009, conf: 95 },
-        { id: `${id}-v2`, lane: 2, progress: 0.70, class: 'bus', speed: 0.007, conf: 94 },
-        { id: `${id}-v3`, lane: 3, progress: 0.85, class: 'motorcycle', speed: 0.011, conf: 92 }
-      ]);
-    });
 
     disposer.setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
@@ -166,49 +156,35 @@ export class CctvRealtimeAdapter {
         return;
       }
 
-      const isChaos = stateStore.getState().isChaosMode;
+      const simulationState = stateStore.getState();
+      const isChaos = simulationState.isChaosMode;
       this.localFallbackTimeMs += 300;
       const timestamp = this.localFallbackTimeMs;
       this.lastProcessedSeq++;
+      this.localVehicleSimulation.step(simulationState, .3);
 
       const camerasData = {};
 
       camerasRegistry.forEach((val, camId) => {
-        const vehicles = localVehicles.get(camId) || [];
-        const detections = [];
-
-        vehicles.forEach(v => {
-          v.progress += isChaos ? v.speed * 0.3 : v.speed;
-          if (v.progress > 1.0) {
-            v.progress = 0;
-            v.lane = this.localFallbackRandom.rangeInt(0, 3);
-          }
-          const t = v.progress;
-          const vx = 0.5, vy = 0.28;
-          const laneEnds = [0.12, 0.36, 0.64, 0.88];
-          const bx = laneEnds[v.lane];
-          const x = vx + (bx - vx) * t;
-          const y = vy + (1.0 - vy) * t;
-          const scale = 0.2 + t * 0.8;
-          
-          let baseW = 0.12, baseH = 0.09;
-          if (v.class === 'bus') { baseW = 0.16; baseH = 0.12; }
-          else if (v.class === 'ambulance') { baseW = 0.14; baseH = 0.10; }
-
-          const w = baseW * scale;
-          const h = baseH * scale;
-
-          detections.push({
-            id: v.id,
-            trackId: v.id,
-            class: v.class,
-            confidence: v.conf,
-            x: Math.max(0.01, Math.min(0.95, x - w / 2)),
-            y: Math.max(0.01, Math.min(0.95, y - h / 2)),
-            w,
-            h,
-            speedKmh: Math.round((isChaos ? 12 : 45) + this.localFallbackRandom.range(0, 4))
-          });
+        const config = trafficCameraConfig(camId);
+        if (!config) return;
+        const corridor = simulationState.trafficModel?.corridors?.find(item => item.corridorId === config.corridorId);
+        const node = simulationState.intersections?.find(item => item.id === config.nodeId);
+        const detections = this.localVehicleSimulation.getVehicles(camId).map(vehicle => {
+          const position = projectTrafficVehicle(vehicle, config.scene);
+          const scale = Math.max(.38, Math.min(1.25, position.depth));
+          const sizes = { car: [.105, .075], bus: [.145, .105], truck: [.14, .10], motorcycle: [.058, .068], ambulance: [.12, .082] };
+          const [baseW, baseH] = sizes[vehicle.type] || sizes.car;
+          return {
+            id: vehicle.id, trackId: vehicle.id, class: vehicle.type, confidence: vehicle.confidence,
+            x: Math.max(.002, Math.min(.998 - baseW * scale, position.x - baseW * scale / 2)),
+            y: Math.max(.002, Math.min(.998 - baseH * scale, position.y - baseH * scale / 2)),
+            w: baseW * scale, h: baseH * scale,
+            speedKmh: Math.round(vehicle.speedKmh), accelerationMps2: vehicle.acceleration,
+            lane: vehicle.lane, direction: vehicle.direction, progress: Number(vehicle.progress.toFixed(4)),
+            movement: vehicle.movement, braking: vehicle.braking, stopped: vehicle.stopped,
+            signalState: node?.state || (config.scene === 'roundabout' ? 'yield' : 'none'), provenance: 'SIMULATED'
+          };
         });
 
         camerasData[camId] = {
@@ -216,10 +192,18 @@ export class CctvRealtimeAdapter {
           timestamp,
           sequence: this.lastProcessedSeq,
           fps: isChaos ? 18 : 30,
-          resolution: '1920x1080',
-          source: 'Local Simulation Fallback',
+          source: 'OmniTRAF local traffic simulation',
+          provenance: 'SIMULATED',
           processingLatencyMs: isChaos ? 28 : 5,
           streamStatus: isChaos ? 'DEGRADED' : 'ONLINE',
+          scene: config.scene,
+          intersectionId: config.nodeId,
+          signalState: node?.state || (config.scene === 'roundabout' ? 'yield' : 'none'),
+          trafficMetrics: corridor ? { ...corridor, provenance: 'SIMULATED' } : {
+            scope: 'network-average', speedKmh: simulationState.trafficModel?.averageSpeedKmh ?? null,
+            queueVehicles: simulationState.trafficModel?.queueVehicles ?? null,
+            congestionIndex: simulationState.trafficModel?.congestionIndex ?? null, provenance: 'SIMULATED'
+          },
           detections
         };
       });
@@ -228,6 +212,7 @@ export class CctvRealtimeAdapter {
         seq: this.lastProcessedSeq,
         timestamp,
         source: 'local',
+        provenance: 'SIMULATED',
         cameras: camerasData
       };
 

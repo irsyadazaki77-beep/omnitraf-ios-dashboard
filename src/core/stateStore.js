@@ -637,7 +637,7 @@ export class StateStore {
 
   updateDomain(domain, partial, options = {}) {
     const domainKeys = {
-      traffic: ['telemetry', 'intersections', 'activeEmergencies', 'isChaosMode', 'chaosLevel', 'greenWaveActive', 'greenSplitWonokromo', 'lastTelemetryAt', 'lastTelemetryTime', 'lastTelemetrySource', 'lastReceivedSequence', 'isStaleData', 'simulation', 'trafficModel', 'canonical'],
+      traffic: ['telemetry', 'intersections', 'activeEmergencies', 'isChaosMode', 'chaosLevel', 'greenWaveActive', 'greenSplitWonokromo', 'isRainMode', 'roadCondition', 'lastTelemetryAt', 'lastTelemetryTime', 'lastTelemetrySource', 'lastReceivedSequence', 'isStaleData', 'simulation', 'trafficModel', 'canonical'],
       intersections: ['intersections', 'canonical'], incidents: ['incidents', 'canonical', 'lastReceivedIncidentSequence'],
       emergencies: ['activeEmergencies', 'emergency112Active', 'greenWaveActive', 'canonical', 'lastReceivedEmergencySequence'],
       devices: ['devices', 'canonical', 'lastReceivedDeviceSequence'], signals: ['intersections', 'canonical', 'lastReceivedSignalSequence'],

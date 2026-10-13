@@ -7,6 +7,58 @@ test.describe('Operational workspace interactions', () => {
     await authenticateAs(page, 'OPERATOR');
   });
 
+  test('Dashboard priority incident opens the matching incident inspector', async ({ page }) => {
+    await page.goto('/#dashboard');
+    await waitForViewReady(page, 'view-dashboard');
+    const incident = page.locator('#priorityOperationsList .priority-operation[data-entity-kind="incident"]').first();
+    await expect(incident).toBeVisible({ timeout: 15000 });
+    const incidentId = await incident.getAttribute('data-entity-id');
+    await incident.click();
+    await waitForViewReady(page, 'view-incidents');
+    await expect(page.locator('#incidentInspector')).toBeVisible();
+    await expect(page.locator('#incidentInspectorProperties')).toContainText('Simpang demo');
+    await expect(page.locator('#incidentInspectorTitle')).not.toBeEmpty();
+  });
+
+  test('3D city mode exposes camera controls and returns to the existing 2D Map', async ({ page }) => {
+    await page.goto('/#city3d');
+    await waitForViewReady(page, 'view-city3d');
+    const canvas = page.locator('#city3dCanvasHost canvas');
+    const fallback = page.locator('#city3dFallback');
+    await expect.poll(async () => (await canvas.count()) > 0 || await fallback.isVisible()).toBeTruthy();
+    if (await canvas.count()) {
+      await page.locator('[data-camera-view="top"]').click();
+      await expect(page.locator('[data-camera-view="top"]')).toHaveClass(/is-active/);
+      await page.locator('[data-camera-view="street"]').click();
+      await expect(page.locator('[data-camera-view="street"]')).toHaveClass(/is-active/);
+      await page.locator('[data-camera-view="isometric"]').click();
+      await expect(page.locator('#city3dFps')).toHaveText(/\d+ FPS/, { timeout: 10000 });
+      await page.screenshot({ path: 'artifacts/phase15-city3d-after.png', fullPage: true });
+      await page.locator('#city3dCameraSelect').selectOption({ index: 1 });
+      await expect(page.locator('#city3dCctvPreview')).toContainText('Virtual camera');
+      await page.locator('#city3dStage').screenshot({ path: 'artifacts/phase15-city3d-camera-preview.png' });
+    }
+    await page.locator('.city3d-map-link').click();
+    await waitForViewReady(page, 'view-map');
+    await expect(page.locator('#map-surabaya')).toBeVisible();
+  });
+
+  test('3D city mode offers the Leaflet fallback when WebGL2 is unavailable', async ({ page }) => {
+    await page.addInitScript(() => {
+      const getContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (type, ...args) {
+        if (type === 'webgl2') return null;
+        return getContext.call(this, type, ...args);
+      };
+    });
+    await page.goto('/#city3d');
+    await waitForViewReady(page, 'view-city3d');
+    await expect(page.locator('#city3dFallback')).toBeVisible();
+    await page.locator('#city3dFallback a[data-view="map"]').click();
+    await waitForViewReady(page, 'view-map');
+    await expect(page.locator('#map-surabaya')).toBeVisible();
+  });
+
   test('incident selection opens the matching inspector and close restores focus', async ({ page }) => {
     await page.goto('/#incidents');
     await waitForViewReady(page, 'view-incidents');

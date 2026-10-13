@@ -25,6 +25,7 @@ export const TEST_USERS = {
 export const ROUTES = [
   { path: '#dashboard', id: 'view-dashboard', label: 'Ikhtisar' },
   { path: '#map', id: 'view-map', label: 'Peta kota' },
+  { path: '#city3d', id: 'view-city3d', label: 'Digital Twin 3D' },
   { path: '#incidents', id: 'view-incidents', label: 'Insiden' },
   { path: '#emergency', id: 'view-emergency', label: 'Prioritas darurat' },
   { path: '#cctv', id: 'view-cctv', label: 'CCTV' },

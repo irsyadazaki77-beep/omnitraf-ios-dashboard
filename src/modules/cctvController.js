@@ -245,6 +245,9 @@ export class CctvController {
         if (this.isActive) {
           const renderer = this.renderers.get(camId);
           if (renderer) {
+            // Scene vehicles come from the full validated simulation frame and
+            // remain visible even when the confidence-filtered boxes are hidden.
+            renderer.updateVehicles(validatedDetections);
             renderer.updateBoxes(acceptedDetections);
           }
         }
@@ -779,9 +782,9 @@ export class CctvController {
           });
 
           // Determine intersection signal state
-          const nodeId = camMeta?.nodeId || 'node-wonokromo';
+          const nodeId = camMeta?.nodeId || null;
           const node = intersectionById.get(nodeId);
-          const signalState = node ? node.state : 'green';
+          const signalState = node ? node.state : (renderer.scene.type === 'roundabout' ? 'yield' : 'none');
 
           renderer.render(isChaos, isPaused, showBoxes, dt, metrics, diag, status, signalState, provenance);
           if (id === this.activeCamId) {

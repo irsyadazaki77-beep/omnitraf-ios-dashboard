@@ -37,6 +37,14 @@ export class TrackingEngine {
         existing.confidence = Math.round(existing.confidence * (1 - alpha) + box.confidence * alpha);
         existing.class = box.class;
         existing.speedKmh = box.speedKmh;
+        existing.accelerationMps2 = box.accelerationMps2;
+        existing.lane = box.lane;
+        existing.direction = box.direction;
+        existing.progress = box.progress;
+        existing.movement = box.movement;
+        existing.braking = box.braking;
+        existing.stopped = box.stopped;
+        existing.signalState = box.signalState;
         existing.provenance = box.provenance || existing.provenance || 'SIMULATED';
 
         // Snap instan jika terjadi perpindahan sangat drastis (reset lintasan)
@@ -64,6 +72,14 @@ export class TrackingEngine {
             class: box.class,
             confidence: box.confidence,
             speedKmh: box.speedKmh,
+            accelerationMps2: box.accelerationMps2,
+            lane: box.lane,
+            direction: box.direction,
+            progress: box.progress,
+            movement: box.movement,
+            braking: box.braking,
+            stopped: box.stopped,
+            signalState: box.signalState,
             trail: [],
             localSpeedKmh: box.speedKmh || 40,
             provenance: box.provenance || 'SIMULATED'
@@ -81,6 +97,14 @@ export class TrackingEngine {
           newBox.class = box.class;
           newBox.confidence = box.confidence;
           newBox.speedKmh = box.speedKmh;
+          newBox.accelerationMps2 = box.accelerationMps2;
+          newBox.lane = box.lane;
+          newBox.direction = box.direction;
+          newBox.progress = box.progress;
+          newBox.movement = box.movement;
+          newBox.braking = box.braking;
+          newBox.stopped = box.stopped;
+          newBox.signalState = box.signalState;
           newBox.trail = [];
           newBox.localSpeedKmh = box.speedKmh || 40;
           newBox.provenance = box.provenance || 'SIMULATED';

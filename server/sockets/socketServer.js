@@ -246,7 +246,7 @@ export function initializeSocketServer(httpServer, { redisManager = null, leader
     const visionTicker = setInterval(() => {
       if (!leaseValid()) { stopSimulationLoops(); return; }
       if (OMNITRAF_RUNTIME_MODE === 'single' && io.engine.clientsCount === 0) return;
-      const visionPayload = cvEngine.generateFramePayload(backendState.state.isChaosMode, backendState.state.trafficModel);
+      const visionPayload = cvEngine.generateFramePayload(backendState.state.isChaosMode, backendState.state.trafficModel, backendState.state);
       realtimeDispatcher.dispatchCctvVision(visionPayload);
       if (OMNITRAF_RUNTIME_MODE === 'cluster') {
         leadership?.eventBus?.publish('omnitraf:events:cctv', 'cctv:state', visionPayload.seq, cvEngine.getSnapshot()).catch(() => {});

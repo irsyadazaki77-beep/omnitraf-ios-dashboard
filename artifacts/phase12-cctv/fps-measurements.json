@@ -2,25 +2,25 @@
   "singleView": [
     {
       "camera": "cctvCanvas1",
-      "fps": 56,
+      "fps": 60,
       "backingWidth": 862,
       "backingHeight": 484
     },
     {
       "camera": "cctvCanvas2",
-      "fps": 61,
+      "fps": 60,
       "backingWidth": 862,
       "backingHeight": 484
     },
     {
       "camera": "cctvCanvas3",
-      "fps": 61,
+      "fps": 60,
       "backingWidth": 862,
       "backingHeight": 484
     },
     {
       "camera": "cctvCanvas4",
-      "fps": 61,
+      "fps": 60,
       "backingWidth": 862,
       "backingHeight": 484
     }
@@ -40,7 +40,7 @@
     },
     {
       "camera": "cctvCanvas3",
-      "fps": 61,
+      "fps": 60,
       "backingWidth": 409,
       "backingHeight": 229
     },

@@ -306,6 +306,19 @@ export class MapManager {
       inspector.hidden = true;
       document.getElementById('mapIntersectionSearch')?.focus({ preventScroll: true });
     });
+    this.activationDisposer.addEventListener(window, 'omnitraf:entity-focus', (event) => {
+      if (event.detail?.route !== 'map' || event.detail?.kind !== 'intersection') return;
+      const marker = this.intersectionMarkersMap.get(String(event.detail.id))?.marker;
+      if (!marker) return;
+      const map = this.maps.get('map-surabaya');
+      const openInspector = () => {
+        this._renderMapInspector(marker);
+        marker.openPopup?.();
+      };
+      const latlng = marker.getLatLng?.();
+      if (latlng) map?.flyTo(latlng, 17, { duration: .5 });
+      setTimeout(openInspector, 550);
+    });
     const inspectorLinks = document.getElementById('mapInspectorLinks');
     if (inspectorLinks) this.activationDisposer.addEventListener(inspectorLinks, 'click', (event) => {
       const link = event.target.closest('a[data-view]');
@@ -1060,7 +1073,7 @@ export class MapManager {
     let name = marker.getPopup?.()?.getContent?.()?.toString?.() || '';
     let rows = [];
     if (kind === 'signal') {
-      entity = (state.intersections || []).find((item) => item.id === id) || {};
+      entity = (state.intersections || []).find((item) => String(item.id) === String(id)) || {};
       name = entity.name || id || 'Simpang';
       rows = [['Fase', entity.state || 'Belum tersedia'], ['Sisa fase', entity.timer == null ? 'Belum tersedia' : String(entity.timer) + ' dtk'], ['Waktu tunggu', entity.waitTime == null ? 'Belum tersedia' : String(entity.waitTime) + ' dtk'], ['Green split', entity.greenSplit == null ? 'Belum tersedia' : String(entity.greenSplit) + ' dtk']];
       summary.textContent = 'Kondisi simpang dari state simulasi.';

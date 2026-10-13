@@ -1,6 +1,6 @@
 /**
- * Procedural CCTV scene renderer. Scene traffic is independent from the synthetic
- * detection/tracking pipeline so hiding detections never hides vehicles.
+ * Procedural CCTV scene renderer. Scene vehicles and detection boxes are two
+ * views of the same SIMULATED traffic frame; hiding boxes leaves vehicles visible.
  */
 import { TrackingEngine } from './trackingEngine.js';
 import { SmoothingEngine } from './smoothingEngine.js';
@@ -29,9 +29,6 @@ const seeded = (seed) => {
   return () => { value = (value * 1664525 + 1013904223) >>> 0; return value / 4294967296; };
 };
 
-const VEHICLE_PALETTES = ['#d9dfdf', '#b7c1c4', '#4e6876', '#7d463d', '#d4a84f', '#344c58', '#899385', '#e5e2d8'];
-const VEHICLE_TYPES = ['car', 'car', 'car', 'motorcycle', 'car', 'bus', 'truck', 'car', 'ambulance'];
-
 export class CctvCanvasRenderer {
   constructor(canvasId, cameraName = 'SITS CCTV') {
     this.canvasId = canvasId;
@@ -42,7 +39,7 @@ export class CctvCanvasRenderer {
     this.filterMode = 'none';
     this.environment = { timeOfDay: 'day', weather: 'clear' };
     this.scene = getCameraScene(canvasId);
-    this.vehicles = this._createVehicles(this.scene.seed);
+    this.vehicles = [];
     this.renderFps = 0;
     this.fpsCounter = 0;
     this.fpsTimer = 0;
@@ -72,20 +69,14 @@ export class CctvCanvasRenderer {
     if (!this.canvas) return null;
     try { return this.canvas.toDataURL('image/png'); } catch (_) { return null; }
   }
-  updateBoxes(boxes) { this._trackingEngine.updateBoxes(boxes); }
-  clear() { this._trackingEngine.clear(); }
-
-  _createVehicles(seed) {
-    const random = seeded(seed);
-    return Array.from({ length: 17 }, (_, index) => ({
-      id: `${this.canvasId}-v${index + 1}`,
-      type: VEHICLE_TYPES[Math.floor(random() * VEHICLE_TYPES.length)],
-      lane: Math.floor(random() * 4), direction: index % 6 === 0 ? -1 : 1,
-      progress: random(), speed: .018 + random() * .027, phase: random() * Math.PI * 2,
-      color: VEHICLE_PALETTES[Math.floor(random() * VEHICLE_PALETTES.length)],
-      braking: false
-    }));
+  updateVehicles(vehicles) {
+    this.vehicles = Array.isArray(vehicles) ? vehicles.map((vehicle) => ({
+      ...vehicle, type: vehicle.class || vehicle.type || 'car',
+      color: vehicle.color || (vehicle.class === 'ambulance' ? '#e6e7df' : '#899385')
+    })) : [];
   }
+  updateBoxes(boxes) { this._trackingEngine.updateBoxes(boxes); }
+  clear() { this._trackingEngine.clear(); this.vehicles = []; }
 
   _dimensions() {
     const rect = this.canvas.getBoundingClientRect?.();
@@ -290,6 +281,9 @@ export class CctvCanvasRenderer {
   }
 
   _vehiclePosition(vehicle) {
+    if (Number.isFinite(vehicle.x) && Number.isFinite(vehicle.y)) {
+      return { x: vehicle.x + vehicle.w / 2, y: vehicle.y + vehicle.h / 2, angle: vehicle.direction < 0 ? 0 : Math.PI, depth: clamp(vehicle.h / .075, .42, 1.2) };
+    }
     const t = vehicle.progress;
     if (this.scene.type === 'roundabout') {
       const angle = t * Math.PI * 2 + vehicle.phase;
@@ -308,7 +302,8 @@ export class CctvCanvasRenderer {
   _drawVehicle(ctx, vehicle, pos, w, h) {
     const depth = clamp(pos.depth, .44, 1.2);
     const typeSize = { car: 1, motorcycle: .62, bus: 1.42, truck: 1.28, ambulance: 1.05 }[vehicle.type] || 1;
-    const width = w * .034 * depth * typeSize, height = h * .026 * depth * typeSize;
+    const width = Number.isFinite(vehicle.w) ? vehicle.w * w * .84 : w * .034 * depth * typeSize;
+    const height = Number.isFinite(vehicle.h) ? vehicle.h * h * .84 : h * .026 * depth * typeSize;
     const x = pos.x * w, y = pos.y * h;
     ctx.save(); ctx.translate(x, y); ctx.rotate(pos.angle);
     // Ground shadow and tires.
@@ -345,43 +340,29 @@ export class CctvCanvasRenderer {
     const drawnLabels = [];
     const lerp = SmoothingEngine.computeLerpFactor(dt, 12);
     this.trackedBoxes.forEach((box) => {
-      const trackKey = String(box.trackId || box.id || 'SIM');
-      if (box._simVehicleTrackId !== trackKey) {
-        box._simVehicleTrackId = trackKey;
-        box._simVehicleIndex = null;
-      }
       const speed = box.speedKmh || 40;
       if (typeof box.localSpeedKmh !== 'number') box.localSpeedKmh = speed;
       box.localSpeedKmh = Math.min(speed, box.localSpeedKmh + dt * 14);
       SmoothingEngine.smoothBox(box, lerp, 1);
-      if (box._simVehicleIndex == null && this.vehicles.length) {
-        const used = new Set([...this.trackedBoxes.values()].map((track) => track._simVehicleIndex).filter(Number.isInteger));
-        let candidate = (this._nextVehicleAssociation || 0) % this.vehicles.length;
-        while (used.has(candidate) && used.size < this.vehicles.length) candidate = (candidate + 1) % this.vehicles.length;
-        box._simVehicleIndex = candidate;
-        this._nextVehicleAssociation = candidate + 1;
-      }
-      const vehicle = this.vehicles[box._simVehicleIndex];
-      const pos = vehicle ? this._vehiclePosition(vehicle) : null;
-      const depth = pos ? clamp(pos.depth, .44, 1.2) : 1;
-      const classKey = String(box.class || vehicle?.type || 'car').toLowerCase();
-      const size = { car: 1, motorcycle: .62, bus: 1.42, truck: 1.28, ambulance: 1.05 }[classKey] || 1;
-      const bw = pos ? w * .034 * depth * size * 1.22 : box.w * w;
-      const bh = pos ? h * .026 * depth * size * 1.75 : box.h * h;
-      const x = pos ? pos.x * w - bw / 2 : box.x * w;
-      const y = pos ? pos.y * h - bh * .58 : box.y * h;
-      const cls = classKey, color = CLASS_COLORS[cls] || '#7dd3fc';
+      const bw = box.w * w, bh = box.h * h;
+      const x = box.x * w, y = box.y * h;
+      const cls = String(box.class || 'car').toLowerCase(), color = CLASS_COLORS[cls] || '#7dd3fc';
       ctx.strokeStyle = color; ctx.lineWidth = Math.max(1, w / 900); ctx.strokeRect(x, y, bw, bh);
       const rawId = String(box.trackId || box.id || 'SIM');
-      const id = rawId.match(/\d+$/)?.[0] ? `TRK ${rawId.match(/\d+$/)[0].padStart(2, '0')}` : rawId.slice(0, 12);
-      const text = `${id} · ${cls.toUpperCase()} · ${Math.round(box.localSpeedKmh)} km/h`;
-      ctx.font = `${Math.max(8, w / 90)}px sans-serif`;
-      const labelW = ctx.measureText(text).width + 8, labelH = Math.max(14, h / 24);
-      let labelY = Math.max(24, y - labelH - 2);
-      while (drawnLabels.some((r) => x < r.x + r.w && x + labelW > r.x && labelY < r.y + r.h && labelY + labelH > r.y)) labelY += labelH;
-      drawnLabels.push({ x, y: labelY, w: labelW, h: labelH });
-      ctx.fillStyle = 'rgba(13,20,21,.78)'; ctx.fillRect(x, labelY, labelW, labelH);
-      ctx.fillStyle = '#fff'; ctx.fillText(text, x + 4, labelY + labelH * .72);
+      const id = rawId.match(/\d+$/)?.[0] ? `#${rawId.match(/\d+$/)[0].padStart(2, '0')}` : rawId.slice(0, 8);
+      const shortClass = ({ motorcycle: 'MOTO', ambulance: 'AMB' })[cls] || cls.toUpperCase();
+      const text = `${id} ${shortClass} ${Math.round(box.localSpeedKmh)} km/h`;
+      ctx.font = `${Math.max(8, w / 120)}px sans-serif`;
+      const labelW = ctx.measureText(text).width + 6, labelH = Math.max(13, h / 29);
+      const candidates = [y - labelH - 2, y + bh + 2, y - (labelH + 3) * 2, y - (labelH + 3) * 3];
+      const labelY = candidates.find((candidateY) => candidateY >= 22 && candidateY + labelH < h - 3 &&
+        !drawnLabels.some((r) => x < r.x + r.w && x + labelW > r.x && candidateY < r.y + r.h && candidateY + labelH > r.y) &&
+        !(x < x + bw && x + labelW > x && candidateY < y + bh && candidateY + labelH > y));
+      if (labelY !== undefined) {
+        drawnLabels.push({ x, y: labelY, w: labelW, h: labelH });
+        ctx.fillStyle = 'rgba(13,20,21,.72)'; ctx.fillRect(x, labelY, labelW, labelH);
+        ctx.fillStyle = '#fff'; ctx.fillText(text, x + 3, labelY + labelH * .72);
+      }
     });
   }
 
@@ -396,7 +377,7 @@ export class CctvCanvasRenderer {
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     this.fpsCounter++;
     if (!this.fpsTimer) this.fpsTimer = now;
-    if (now - this.fpsTimer >= 1000) { this.renderFps = Math.round(this.fpsCounter * 1000 / (now - this.fpsTimer)); this.fpsCounter = 0; this.fpsTimer = now; }
+    if (now - this.fpsTimer >= 1000) { this.renderFps = Math.min(60, Math.round(this.fpsCounter * 1000 / (now - this.fpsTimer))); this.fpsCounter = 0; this.fpsTimer = now; }
     this._ensureScene(w, h);
     ctx.save();
     if (this.filterMode === 'mono') ctx.filter = 'grayscale(1) contrast(1.08)';
@@ -406,18 +387,9 @@ export class CctvCanvasRenderer {
     if (this._sceneCanvas) ctx.drawImage(this._sceneCanvas, 0, 0, w, h);
     else this._drawEnvironment(ctx, w, h);
 
-    this.vehicles.forEach((vehicle) => {
-      const stopping = signalState === 'red' && this.scene.signal && vehicle.lane < 2;
-      vehicle.braking = stopping && vehicle.progress > .60;
-      if (!isPaused) {
-        if (vehicle.braking) vehicle.progress = Math.min(.63, vehicle.progress);
-        else vehicle.progress += vehicle.speed * dt * 2.6 * (this.environment.weather === 'heavy-rain' ? .62 : 1);
-        if (vehicle.progress > 1) vehicle.progress = 0;
-      }
-    });
     [...this.vehicles].sort((a, b) => this._vehiclePosition(a).depth - this._vehiclePosition(b).depth)
       .forEach((vehicle) => this._drawVehicle(ctx, vehicle, this._vehiclePosition(vehicle), w, h));
-    if (showBoxes && !isPaused) this._drawDetectionOverlay(ctx, w, h, dt);
+    if (showBoxes) this._drawDetectionOverlay(ctx, w, h, dt);
 
     // Mild sensor texture/noise, deliberately restrained.
     if (this._frame % 3 === 0) {

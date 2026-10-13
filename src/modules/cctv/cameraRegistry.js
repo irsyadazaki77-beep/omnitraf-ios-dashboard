@@ -46,7 +46,7 @@ export const CAMERA_DEFINITIONS = Object.freeze([
     name: 'Bundaran Waru (Gerbang Kota)',
     shortName: 'BUNDARAN WARU',
     location: 'Bundaran Waru - Gerbang Masuk Kota Surabaya',
-    nodeId: 'node-wonokromo',
+    nodeId: null,
     edgeDeviceId: 'NODE-EDGE-03',
     capabilities: Object.freeze(['detection', 'tracking', 'telemetry', 'snapshot']),
     defaultResolution: '1920x1080',

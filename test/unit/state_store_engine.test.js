@@ -47,10 +47,17 @@ test('traffic realtime domain accepts simulation clock and model payload fields'
   const simulation = { status: 'PAUSED', simulationTimeMs: 1234 };
   const trafficModel = { seed: 412, congestionIndex: 54 };
 
-  store.updateTraffic({ simulation, trafficModel }, { emitGeneric: false });
+  store.updateTraffic({
+    simulation,
+    trafficModel,
+    isRainMode: true,
+    roadCondition: 'wet'
+  }, { emitGeneric: false });
 
   assert.deepEqual(store.getState().simulation, simulation);
   assert.deepEqual(store.getState().trafficModel, trafficModel);
+  assert.equal(store.getState().isRainMode, true);
+  assert.equal(store.getState().roadCondition, 'wet');
 });
 
 test('batch sends one selector callback for a logical multi-domain update', () => {

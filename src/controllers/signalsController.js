@@ -13,7 +13,7 @@ import { commandLayer } from '../core/commandLayer.js';
 import { Disposer } from '../core/disposer.js';
 import { signalsView } from '../ui/adapters/signalsView.js';
 import { authManager } from '../core/authManager.js';
-import { recommendAdaptiveSignal } from '../modules/trafficModel.js';
+import { recommendAdaptiveSignal, simulateTrafficNetwork } from '../modules/trafficModel.js';
 
 export class SignalsController {
   constructor() {
@@ -528,7 +528,9 @@ export class SignalsController {
     const buttons = document.querySelectorAll('button[data-action="simulate"], button[data-action="apply-ai"], .btn-apply-ai, #btnApplyAiRec');
     buttons.forEach(btn => {
       this.disposer.addEventListener(btn, "click", () => {
-        this.openAiRecommendationModal('node-wonokromo', 'Simpang Wonokromo (A. Yani)');
+        const nodeId = btn.dataset.recommendationIntersection || 'node-wonokromo';
+        const node = (stateStore.getState().intersections || []).find(item => String(item.id) === String(nodeId));
+        this.openAiRecommendationModal(nodeId, node?.name || 'Simpang pada model');
       });
     });
 
@@ -561,13 +563,13 @@ export class SignalsController {
             action: 'ai:apply-recommendation',
             targetType: 'intersection',
             targetId: this._currentTargetNode || 'node-wonokromo',
-            payload: { targetSplit: this._recommendedSplit }
-          }, false); // low-risk
+            payload: { targetSplit: this._recommendedSplit, recommendationId: `rec-${this._currentTargetNode}-${this._recommendedSplit}-${Date.now()}` }
+          }, true);
 
           closeModal();
           soundManager.play('success');
           if (typeof window.showToast === "function") {
-            window.showToast("Rekomendasi model contoh diterapkan pada state simulasi; tidak dikirim ke APILL.");
+            window.showToast("Server simulator mengonfirmasi rekomendasi. Perubahan hanya pada state simulasi; tidak dikirim ke APILL.");
           }
         } catch (err) {
           console.warn("[SignalsController] AI recommendation failed:", err);
@@ -601,10 +603,18 @@ export class SignalsController {
     this._recommendedSplit = target;
     const cycle = target + Number(node.redDuration ?? 25) + Number(node.yellowDuration ?? 3);
     if (title) title.textContent = `Pratinjau skenario: ${node.name || nodeName}`;
-    const corridor = stateStore.getState().trafficModel?.corridors?.find(item => item.intersectionId === nodeId);
+    const state = stateStore.getState();
+    const base = simulateTrafficNetwork(state, { horizonMinutes: 15 });
+    const corridor = base.corridors.find(item => String(item.intersectionId) === String(nodeId));
+    const initialQueues = Object.fromEntries(base.corridors.map(item => [item.corridorId, item.initialQueueVehicles]));
+    const preview = simulateTrafficNetwork({ ...state, intersections: state.intersections.map(item => String(item.id) === String(nodeId) ? { ...item, greenSplit: target, pendingGreenSplit: target } : item) }, { horizonMinutes: 15, initialQueues, seed: base.seed });
+    const previewCorridor = preview.corridors.find(item => String(item.intersectionId) === String(nodeId));
     if (volQ) volQ.textContent = `${Math.round(corridor?.demandVehPerHour ?? recommendation.demandVehPerHour)} kend/jam · antrean ${Math.round(node.queueVehicles ?? recommendation.queueVehicles)} kend`;
-    if (flowRatio) flowRatio.textContent = recommendation.reason;
-    if (delaySaved) delaySaved.textContent = 'Perlu diuji pada perbandingan skenario';
+    if (flowRatio) flowRatio.textContent = `${recommendation.reason} Preview deterministik dengan seed ${base.seed}; bukan hasil kalibrasi kondisi lapangan.`;
+    if (delaySaved) {
+      const queueDelta = Math.round(preview.queueVehicles - base.queueVehicles);
+      delaySaved.textContent = `Model 15 menit: antrean jaringan ${Math.round(base.queueVehicles)} → ${Math.round(preview.queueVehicles)} kendaraan (${queueDelta > 0 ? '+' : ''}${queueDelta}); simpang ${Math.round(corridor?.queueVehicles || 0)} → ${Math.round(previewCorridor?.queueVehicles || 0)}.`;
+    }
     if (splitDiff) splitDiff.textContent = `${current} dtk → ${target} dtk (${target - current >= 0 ? '+' : ''}${target - current})`;
     const update = (id, text) => { const element = document.getElementById(id); if (element) element.textContent = text; };
     update('aiRecOldText', `${current} dtk`);

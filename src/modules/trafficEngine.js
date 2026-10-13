@@ -18,7 +18,7 @@ import { socketClient } from '../core/socketClient.js';
 import { commandLayer } from '../core/commandLayer.js';
 import { authManager } from '../core/authManager.js';
 import { generateForecastSnapshot } from './forecastEngine.js';
-import { simulateTrafficNetwork } from './trafficModel.js';
+import { simulateTrafficNetwork, recommendAdaptiveSignal } from './trafficModel.js';
 import { SeededRandom } from '../../shared/seededRandom.js';
 
 export class TrafficEngine {
@@ -163,6 +163,7 @@ export class TrafficEngine {
     this._renderKpiMetrics(telemetry, state);
     this._renderEmergencyList(emergencies);
     this._renderPriorityOperations(state, emergencies);
+    this._renderOperatorRecommendation(state);
     this._renderCorridorRanking(state);
     this._renderIncidentTimeline(state.incidents || []);
     this._renderNotifications(state.incidents || []);
@@ -369,19 +370,27 @@ export class TrafficEngine {
     const deviceFaults = Array.isArray(state.devices) ? state.devices.filter((device) =>
       ['OFFLINE', 'DEGRADED', 'STALE', 'FAULT', 'RECOVERING', 'MAINTENANCE'].includes(String(device.status === 'MAINTENANCE' ? device.status : device.healthLevel || '').toUpperCase())
     ) : [];
+    const queueSource = state.trafficModel?.corridors || (state.intersections || []).map((node) => ({
+      intersectionId: node.id, name: node.name, queueVehicles: node.queueVehicles, speedKmh: node.speedKmh
+    }));
+    const queues = queueSource.filter((item) => Number(item.queueVehicles) >= 25)
+      .map((item) => ({ title: item.name || item.corridorId, detail: `Antrean model ${Math.round(item.queueVehicles)} kendaraan · ${Math.round(item.speedKmh || 0)} km/jam`, href: '#map', label: 'Antrean', kind: 'intersection', id: item.intersectionId }));
     const entries = [
       ...incidents.map((item) => ({ title: item.title || 'Insiden prioritas', detail: `${item.location || 'Lokasi tidak tersedia'} · ${item.status || 'Aktif'}`, href: '#incidents', label: 'Insiden', kind: 'incident', id: item.id })),
       ...signalFaults.map((item) => ({ title: item.name || item.intersectionName || item.id || 'Simpang', detail: `Sinyal · ${item.healthLevel || item.status}`, href: '#signals', label: 'Sinyal', kind: 'intersection', id: item.id })),
       ...deviceFaults.map((item) => ({ title: item.deviceName || item.deviceId || 'Perangkat', detail: `Perangkat · ${item.status === 'MAINTENANCE' ? item.status : item.healthLevel || 'Status tidak tersedia'}`, href: '#devices', label: 'Perangkat', kind: 'device', id: item.deviceId })),
-      ...emergencies.map((item) => ({ title: item.vehicleId || item.vehicleType || 'Skenario darurat', detail: `Darurat · ${item.status || 'Aktif'}`, href: '#emergency', label: 'Darurat', kind: 'emergency', id: item.vehicleId || item.id }))
+      ...emergencies.map((item) => ({ title: item.vehicleId || item.vehicleType || 'Skenario darurat', detail: `Darurat · ${item.status || 'Aktif'}`, href: '#emergency', label: 'Darurat', kind: 'emergency', id: item.vehicleId || item.id })),
+      ...queues
     ];
+    const rank = { Darurat: 0, Insiden: 1, Sinyal: 2, Perangkat: 3, Antrean: 4 };
+    entries.sort((a, b) => (rank[a.label] ?? 5) - (rank[b.label] ?? 5));
     const signature = JSON.stringify(entries);
     if (container.dataset.snapshot === signature) return;
     container.dataset.snapshot = signature;
     if (!entries.length) {
       const empty = document.createElement('p');
       empty.className = 'priority-empty-state';
-      empty.textContent = 'Tidak ada insiden prioritas aktif.';
+      empty.textContent = 'Tidak ada exception operasi aktif.';
       container.replaceChildren(empty);
       return;
     }
@@ -407,6 +416,29 @@ export class TrafficEngine {
       row.append(copy, type);
       return row;
     }));
+  }
+
+  _renderOperatorRecommendation(state) {
+    const text = document.getElementById('aiRecText');
+    const button = document.getElementById('btnApplyAiRec');
+    if (!text || !button) return;
+    const corridorModels = state.trafficModel?.corridors || (state.intersections || []).map((node) => ({
+      intersectionId: node.id, name: node.name, queueVehicles: node.queueVehicles, demandVehPerHour: node.vehicleDemandVehPerHour
+    }));
+    const crowded = corridorModels.filter((item) => Number(item.queueVehicles) >= 25)
+      .sort((a, b) => Number(b.queueVehicles) - Number(a.queueVehicles))[0]
+      || corridorModels.slice().sort((a, b) => Number(b.queueVehicles) - Number(a.queueVehicles))[0];
+    const intersection = crowded && (state.intersections || []).find((item) => String(item.id) === String(crowded.intersectionId));
+    if (!intersection) {
+      text.textContent = 'Data simpang belum tersedia untuk rekomendasi. Hasil berbasis aturan dan state simulator.';
+      button.disabled = true;
+      button.dataset.recommendationIntersection = '';
+      return;
+    }
+    const recommendation = recommendAdaptiveSignal(intersection, state);
+    text.textContent = `${intersection.name || crowded.name}: antrean model ${Math.round(crowded.queueVehicles)} kendaraan. Model merekomendasikan hijau ${recommendation.currentGreenSec} → ${recommendation.targetGreenSec} detik. ${recommendation.reason} Asumsi memakai kapasitas koridor dan demand sintetis.`;
+    button.disabled = false;
+    button.dataset.recommendationIntersection = String(intersection.id);
   }
 
   /**
