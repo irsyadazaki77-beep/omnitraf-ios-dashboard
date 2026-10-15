@@ -224,9 +224,9 @@ export class AnalyticsController {
     }
 
     if (qualityBadge) {
-      const provColor = provenance === 'DEGRADED' ? 'var(--warning)' : 'var(--status-warning)';
+      const provenanceTone = provenance === 'DEGRADED' ? 'is-degraded' : 'is-current';
       qualityBadge.innerHTML = `
-        <span class="badge provenance-badge simulated" style="border-color: ${provColor};">
+        <span class="badge provenance-badge simulated ${provenanceTone}">
           SUMBER: ${escapeHtml(({ 'REALTIME-DERIVED': 'STREAM SIMULATOR', SIMULATED: 'MODEL LOKAL', DEGRADED: 'MODEL · INPUT TIDAK TERKINI' })[provenance] || 'MODEL SIMULASI')}
         </span>
         <span class="badge provenance-badge simulated">
@@ -242,13 +242,13 @@ export class AnalyticsController {
 
     if (recTextEl && rec) {
       recTextEl.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 4px;">
-          <strong style="color: var(--primary-2); font-size: 11px;">[ID: ${escapeHtml(rec.recommendationId || 'REC-AI')}]</strong>
-          <span style="font-size: 10px; color: var(--text-muted);">Dampak model: ${escapeHtml(rec.expectedImpact)}</span>
+        <div class="csp-style-a922e2852b" >
+          <strong class="csp-style-ee40d7250a" >[ID: ${escapeHtml(rec.recommendationId || 'REC-AI')}]</strong>
+          <span class="csp-style-51c0d45556" >Dampak model: ${escapeHtml(rec.expectedImpact)}</span>
         </div>
-        <div style="font-size: 13px; font-weight: 600; color: #e2e8f0; line-height: 1.4;">${escapeHtml(rec.text)}</div>
-        <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;">
-          ${(Array.isArray(rec.reasonCodes) ? rec.reasonCodes : []).map(r => `<span style="font-size: 9.5px; padding: 2px 6px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--primary-2); border-radius: 4px;">${escapeHtml(r)}</span>`).join('')}
+        <div class="csp-style-f8ef498b4e" >${escapeHtml(rec.text)}</div>
+        <div class="csp-style-4d319d31fb" >
+          ${(Array.isArray(rec.reasonCodes) ? rec.reasonCodes : []).map(r => `<span class="csp-style-e74deeea43" >${escapeHtml(r)}</span>`).join('')}
         </div>
       `;
     }
@@ -274,55 +274,55 @@ export class AnalyticsController {
 
     if (scenarioCard) {
       scenarioCard.innerHTML = `
-        <div class="section-head compact" style="margin-bottom: 12px;">
+        <div class="section-head compact csp-style-c804002a41" >
           <div>
             <h2>Simulasi lalu lintas dan sinyal (${escapeHtml(snapshot.hourLabel)})</h2>
             <p>Fixed-time dibanding adaptive pada input, seed, dan horizon yang sama. Seluruh nilai adalah keluaran model agregat sintetis.</p>
           </div>
-          <span class="badge" style="background: rgba(0, 229, 255, 0.15); color: var(--primary-2); font-weight: 700; padding: 4px 10px; border-radius: 8px;">Model skenario deterministik</span>
+          <span class="badge csp-style-6ec7b3daee" >Model skenario deterministik</span>
         </div>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 12px;">
-          <div style="background: var(--panel-soft); padding: 14px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08);">
-            <div style="font-size: 11px; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px;">📊 KONDISI DASAR SIMULASI</div>
-            <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
+        <div class="csp-style-c4768e9da6" >
+          <div class="csp-style-6937120e98" >
+            <div class="csp-style-e299abfcda" >📊 KONDISI DASAR SIMULASI</div>
+            <div class="csp-style-81d720cad6" >
               <span>Waktu Tunggu:</span><strong>${escapeHtml(sc.baseline.waitTimeSec)} detik</strong>
             </div>
-            <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <div class="csp-style-81d720cad6" >
               <span>Panjang Antrean:</span><strong>${escapeHtml(sc.baseline.queueMeters)} m</strong>
             </div>
-            <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <div class="csp-style-81d720cad6" >
               <span>Kecepatan Rerata:</span><strong>${escapeHtml(sc.baseline.speedKmh)} km/jam</strong>
             </div>
-            <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between;">
+            <div class="csp-style-82d51749de" >
               <span>Kendaraan per jam:</span><strong>${escapeHtml(sc.baseline.throughputVehPerHour)} kend/jam</strong>
             </div>
           </div>
 
-          <div style="background: var(--panel-soft); padding: 14px; border-radius: 10px; border: 1px solid rgba(0, 229, 255, 0.3);">
-            <div style="font-size: 11px; font-weight: 800; color: var(--primary-2); text-transform: uppercase; margin-bottom: 8px;">ADAPTIVE SIGNAL</div>
-            <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <div class="csp-style-95c01e8a4c" >
+            <div class="csp-style-3ca4a60483" >ADAPTIVE SIGNAL</div>
+            <div class="csp-style-81d720cad6" >
               <span>Green split:</span><strong>${escapeHtml(sc.optimized.greenSplitSec)} dtk</strong>
             </div>
-            <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <div class="csp-style-81d720cad6" >
               <span>Antrean:</span><strong>${escapeHtml(sc.optimized.queueMeters)} m (${escapeHtml(sc.delta.queueReductionPct)}% perubahan)</strong>
             </div>
-            <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <div class="csp-style-81d720cad6" >
               <span>Travel time:</span><strong>${escapeHtml(sc.optimized.travelTimeMinutes)} menit (${escapeHtml(sc.delta.travelTimeDeltaMinutes)} Δ)</strong>
             </div>
-            <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between;">
+            <div class="csp-style-82d51749de" >
               <span>Throughput / congestion:</span><strong>${escapeHtml(sc.optimized.throughputVehPerHour)} kend/jam · ${escapeHtml(sc.optimized.congestionIndex)}</strong>
             </div>
           </div>
 
-          <div style="background: var(--panel-soft); padding: 14px; border-radius: 10px; border: 1px solid var(--border);">
-            <div style="font-size: 11px; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px;">ASUMSI DAN CAKUPAN</div>
-            <div style="font-size: 12px; color: var(--text); margin-bottom: 6px;">Horizon: ${escapeHtml(snapshot.prediction?.horizonMinutes ?? snapshot.trafficModel?.horizonMinutes)} menit · Seed: ${escapeHtml(snapshot.trafficModel?.seed)}</div>
-            <small style="color: var(--text-muted); font-size: 10px; display: block; margin-top: 6px;">${escapeHtml(snapshot.prediction?.limitations || sc.assumptions.responseModel)}</small>
+          <div class="csp-style-f3e69a2866" >
+            <div class="csp-style-e299abfcda" >ASUMSI DAN CAKUPAN</div>
+            <div class="csp-style-bd751d6f81" >Horizon: ${escapeHtml(snapshot.prediction?.horizonMinutes ?? snapshot.trafficModel?.horizonMinutes)} menit · Seed: ${escapeHtml(snapshot.trafficModel?.seed)}</div>
+            <small class="csp-style-4ac0d15c27" >${escapeHtml(snapshot.prediction?.limitations || sc.assumptions.responseModel)}</small>
           </div>
         </div>
 
-        <div style="margin-top: 12px; overflow-x: auto;">
+        <div class="csp-style-b1e5abc878" >
           <table class="data-table" aria-label="Perbandingan skenario traffic simulasi">
             <thead><tr><th>Skenario</th><th>Travel time</th><th>Antrean</th><th>Congestion</th><th>Throughput</th></tr></thead>
             <tbody>${Object.entries(snapshot.scenarioResults?.scenarios || {}).map(([key, result]) => `<tr><td>${escapeHtml(({ normal: 'Normal', rushHour: 'Rush hour', heavyRain: 'Hujan lebat', majorIncident: 'Insiden besar', adaptiveSignals: 'Sinyal adaptif', emergencyGreenWave: 'Emergency green wave' })[key] || key)}</td><td>${escapeHtml(result.metrics.averageTravelTimeMinutes)} mnt</td><td>${escapeHtml(result.metrics.queueMeters)} m</td><td>${escapeHtml(result.metrics.congestionIndex)}</td><td>${escapeHtml(result.metrics.throughputVehPerHour)} kend/jam</td></tr>`).join('')}</tbody>
@@ -350,41 +350,41 @@ export class AnalyticsController {
 
     if (corridorCard) {
       corridorCard.innerHTML = `
-        <div class="section-head compact" style="margin-bottom: 12px;">
+        <div class="section-head compact csp-style-c804002a41" >
           <div>
             <h2>🛣️ Kinerja koridor & prioritas model</h2>
             <p>Pemantauan beban, kecepatan, kepadatan, dan tingkat risiko operasional per koridor utama Surabaya.</p>
           </div>
-          <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: var(--primary-2); font-weight: 700; padding: 4px 10px; border-radius: 8px;">Peringkat risiko model</span>
+          <span class="badge csp-style-7551a38403" >Peringkat risiko model</span>
         </div>
 
-        <div style="overflow-x: auto;">
-          <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+        <div class="analytics-corridor-table-scroll csp-style-aeadbd0923" >
+          <table class="csp-style-f767132568" >
             <thead>
-              <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); text-align: left;">
-                <th style="padding: 8px;">Koridor Utama</th>
-                <th style="padding: 8px;">Volume / Kapasitas</th>
-                <th style="padding: 8px;">Kecepatan</th>
-                <th style="padding: 8px;">Kepadatan</th>
-                <th style="padding: 8px;">Antrean</th>
-                <th style="padding: 8px;">Tundaan</th>
-                <th style="padding: 8px;">Efisiensi model</th>
-                <th style="padding: 8px;">Status Risiko</th>
+              <tr class="csp-style-3f7df59d75" >
+                <th class="csp-style-a905015236" >Koridor Utama</th>
+                <th class="csp-style-a905015236" >Volume / Kapasitas</th>
+                <th class="csp-style-a905015236" >Kecepatan</th>
+                <th class="csp-style-a905015236" >Kepadatan</th>
+                <th class="csp-style-a905015236" >Antrean</th>
+                <th class="csp-style-a905015236" >Tundaan</th>
+                <th class="csp-style-a905015236" >Efisiensi model</th>
+                <th class="csp-style-a905015236" >Status Risiko</th>
               </tr>
             </thead>
             <tbody>
               ${list.map(c => {
-                const riskBadge = c.riskLevel === 'CRITICAL' ? '<span style="color:var(--status-danger); font-weight:800;">🔴 KRITIS</span>' : c.riskLevel === 'WARNING' ? '<span style="color:var(--status-warning); font-weight:800;">🟡 WASPADA</span>' : '<span style="color:var(--status-success); font-weight:800;">🟢 NORMAL</span>';
+                const riskBadge = c.riskLevel === 'CRITICAL' ? '<span class="csp-style-d1ba4c5999" >🔴 KRITIS</span>' : c.riskLevel === 'WARNING' ? '<span class="csp-style-8e80d1a1e4" >🟡 WASPADA</span>' : '<span class="csp-style-468e43ab8f" >🟢 NORMAL</span>';
                 return `
-                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                    <td style="padding: 10px 8px; font-weight: 700; color: var(--text);">${escapeHtml(c.name)}</td>
-                    <td style="padding: 10px 8px;">${escapeHtml(c.volume)} / ${escapeHtml(c.capacity)} veh/h</td>
-                    <td style="padding: 10px 8px; color: var(--primary-2); font-weight: 700;">${escapeHtml(c.speed)} km/h</td>
-                    <td style="padding: 10px 8px;">${escapeHtml(c.density)} veh/km</td>
-                    <td style="padding: 10px 8px;">${escapeHtml(c.queueMeters)} m</td>
-                    <td style="padding: 10px 8px;">${escapeHtml(c.delaySec)}s</td>
-                    <td style="padding: 10px 8px; color: var(--status-success); font-weight: 700;">${escapeHtml(c.signalEfficiencyPct)}%</td>
-                    <td style="padding: 10px 8px;">${riskBadge}</td>
+                  <tr class="csp-style-3ba99fda1f" >
+                    <td class="csp-style-f57ab1864e" >${escapeHtml(c.name)}</td>
+                    <td class="csp-style-00f5c9bfde" >${escapeHtml(c.volume)} / ${escapeHtml(c.capacity)} veh/h</td>
+                    <td class="csp-style-2845101368" >${escapeHtml(c.speed)} km/h</td>
+                    <td class="csp-style-00f5c9bfde" >${escapeHtml(c.density)} veh/km</td>
+                    <td class="csp-style-00f5c9bfde" >${escapeHtml(c.queueMeters)} m</td>
+                    <td class="csp-style-00f5c9bfde" >${escapeHtml(c.delaySec)}s</td>
+                    <td class="csp-style-60cb7315b2" >${escapeHtml(c.signalEfficiencyPct)}%</td>
+                    <td class="csp-style-00f5c9bfde" >${riskBadge}</td>
                   </tr>
                 `;
               }).join('')}

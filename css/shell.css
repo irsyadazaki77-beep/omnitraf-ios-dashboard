@@ -377,6 +377,10 @@
   color: #ffffff;
 }
 
+.theme-light .nav-item.active .nav-icon {
+  color: #1d4ed8;
+}
+
 .nav-icon {
   width: 18px;
   height: 18px;
@@ -1212,6 +1216,24 @@ body.theme-light .mobile-tab-bar,
   .topbar {
     margin-inline: -10px;
     padding-inline: 8px;
+  }
+
+  .topbar-left-mobile {
+    min-width: 0;
+    flex-shrink: 1;
+  }
+
+  .shell-page-context {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  #shellPageTitle {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 120px;
   }
 
   .shell-page-kicker,

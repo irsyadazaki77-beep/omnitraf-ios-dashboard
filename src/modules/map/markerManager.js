@@ -82,7 +82,7 @@ export class MarkerManager {
   createIncidentIcon(severity, title) {
     return L.divIcon({
       className: 'custom-incident-div-icon',
-      html: `<div class="leaflet-incident-marker ${severity === 'danger' ? 'danger' : 'warning'}" style="background: ${severity === 'danger' ? '#ef4444' : '#f59e0b'};" title="${title || ''}">⚠️</div>`,
+      html: `<div class="leaflet-incident-marker ${severity === 'danger' ? 'danger' : 'warning'}" title="${title || ''}">⚠️</div>`,
       iconSize: [28, 28],
       iconAnchor: [14, 14]
     });
@@ -163,13 +163,9 @@ export class MarkerManager {
       const entry = currentMap.get(inc.id);
       if (entry && entry.marker) {
         const severity = inc.severity || 'warning';
-        entry.marker.setIcon(this.createIncidentIcon(severity, inc.title));
-        if (typeof createPopupFn === 'function') {
-          entry.marker.setPopupContent(createPopupFn(inc));
-        }
-        if (inc.coordinates && Array.isArray(inc.coordinates)) {
-          entry.marker.setLatLng(inc.coordinates);
-        }
+        entry.marker.setIcon?.(this.createIncidentIcon(severity, inc.title));
+        if (typeof createPopupFn === 'function') entry.marker.setPopupContent?.(createPopupFn(inc));
+        if (inc.coordinates && Array.isArray(inc.coordinates)) entry.marker.setLatLng?.(inc.coordinates);
         entry.data = inc;
       }
     });

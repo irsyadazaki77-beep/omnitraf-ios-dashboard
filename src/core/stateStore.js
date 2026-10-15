@@ -121,6 +121,7 @@ export const INITIAL_STATE = {
   emergency112Active: false,
   isRainMode: false,
   roadCondition: "dry", // 'dry' | 'wet'
+  visualEnvironment: null, // Shared synthetic CCTV/City3D presentation state; does not affect traffic calculations.
   activeIncidentFilter: "all",
 
   // CCTV & Computer Vision

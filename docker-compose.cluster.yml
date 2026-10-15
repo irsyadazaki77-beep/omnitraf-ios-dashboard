@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-omnitraf_cluster_test}
       POSTGRES_USER: ${POSTGRES_USER:-omnitraf_test}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cluster_test_only_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD for the cluster test stack}
     volumes:
       - omnitraf-cluster-postgres:/var/lib/postgresql/data
     healthcheck:
@@ -35,11 +35,13 @@ services:
       SIMULATION_ONLY: "true"
       OMNITRAF_RUNTIME_MODE: cluster
       DB_DRIVER: postgres
-      DATABASE_URL: postgresql://${POSTGRES_USER:-omnitraf_test}:${POSTGRES_PASSWORD:-cluster_test_only_password}@postgres:5432/${POSTGRES_DB:-omnitraf_cluster_test}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-omnitraf_test}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD for the cluster test stack}@postgres:5432/${POSTGRES_DB:-omnitraf_cluster_test}
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-cluster-test-only-not-for-production}
+      JWT_SECRET: ${JWT_SECRET:?Set a unique JWT_SECRET for the cluster test stack (minimum 32 characters)}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?Set HTTPS ALLOWED_ORIGINS for the cluster test stack}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:?Set a bcrypt ADMIN_PASSWORD_HASH for the cluster test stack}
       INSTANCE_ID: node-a
-    ports: ["3001:3000"]
+    ports: ["127.0.0.1:3001:3000"]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/readyz | grep -q 'READY'"]
       interval: 10s
@@ -55,7 +57,7 @@ services:
     environment:
       <<: *cluster-env
       INSTANCE_ID: node-b
-    ports: ["3002:3000"]
+    ports: ["127.0.0.1:3002:3000"]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/readyz | grep -q 'READY'"]
       interval: 10s
@@ -71,7 +73,7 @@ services:
     environment:
       <<: *cluster-env
       INSTANCE_ID: node-c
-    ports: ["3003:3000"]
+    ports: ["127.0.0.1:3003:3000"]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/readyz | grep -q 'READY'"]
       interval: 10s

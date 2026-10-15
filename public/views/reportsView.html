@@ -40,13 +40,13 @@
         <div class="section-head compact">
           <div>
             <h2>Konfigurasi Dokumen</h2>
-            <p>Tetapkan snapshot dan buat berkas mobilitas.</p>
+            <p>Buat snapshot sesi, lalu gunakan snapshot yang sama untuk semua format.</p>
           </div>
           <span class="badge badge-simulated">SNAPSHOT SESI</span>
         </div>
-        <p class="reports-scope-note">Snapshot mengambil volume lalu lintas, waktu tunggu, estimasi CO₂, dan daftar insiden aktif secara atomik.</p>
-        <button class="btn btn-primary report-action-btn" type="button" data-action="download-report" data-report-type="Snapshot sesi">
-          📄 Buat &amp; Unduh PDF Snapshot Sesi
+        <p class="reports-scope-note" id="activeReportSnapshotState" role="status" aria-live="polite">Belum ada snapshot. Buat snapshot untuk mengaktifkan ekspor CSV, PDF, JSON, dan cetak.</p>
+        <button class="btn btn-primary report-action-btn" id="btnCreateReportSnapshot" type="button" data-action="download-report" data-report-type="Snapshot sesi">
+          Buat Snapshot Baru &amp; Pratinjau
         </button>
       </article>
 
@@ -59,15 +59,15 @@
           </div>
         </div>
         <div class="reports-format-buttons">
-          <button class="btn btn-outline" id="btnExportCsv" type="button">
+          <button class="btn btn-outline" id="btnExportCsv" type="button" disabled aria-describedby="activeReportSnapshotState">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
             <span>Unduh CSV Insiden</span>
           </button>
-          <button class="btn btn-outline" id="btnPrintExecutive" type="button">
+          <button class="btn btn-outline" id="btnPrintExecutive" type="button" disabled aria-describedby="activeReportSnapshotState">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
             <span>Cetak / Cetak PDF Sistem</span>
           </button>
-          <button class="btn btn-secondary" id="btnCopyTelemetryJson" type="button">
+          <button class="btn btn-secondary" id="btnCopyTelemetryJson" type="button" disabled aria-describedby="activeReportSnapshotState">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             <span>Salin JSON Telemetri</span>
           </button>
@@ -110,7 +110,9 @@
             </div>
             <div class="doc-meta-strip">
               <div><span>Status:</span> <strong>Sintetis</strong></div>
-              <div><span>Waktu Snapshot:</span> <strong id="docPreviewTime">Sesuai Jam Operasional</strong></div>
+              <div><span>ID Snapshot:</span> <strong id="docPreviewSnapshotId">Belum dibuat</strong></div>
+              <div><span>Waktu Snapshot:</span> <strong id="docPreviewTime">Belum dibuat</strong></div>
+              <div><span>Kesegaran state:</span> <strong id="docPreviewFreshness">Belum dibuat</strong></div>
               <div><span>Cakupan:</span> <strong>Koridor Utama</strong></div>
             </div>
             
@@ -119,15 +121,15 @@
               <div class="doc-kpi-grid">
                 <div class="doc-kpi-item">
                   <span class="kpi-label">Volume Terlayani</span>
-                  <strong class="kpi-val" id="docPreviewVolume">Model 24 Jam</strong>
+                  <strong class="kpi-val" id="docPreviewVolume">Belum dibuat</strong>
                 </div>
                 <div class="doc-kpi-item">
                   <span class="kpi-label">Waktu Tunggu Simpang</span>
-                  <strong class="kpi-val" id="docPreviewWait">Optimal Skenario</strong>
+                  <strong class="kpi-val" id="docPreviewWait">Belum dibuat</strong>
                 </div>
                 <div class="doc-kpi-item">
                   <span class="kpi-label">Estimasi Reduksi CO₂</span>
-                  <strong class="kpi-val" id="docPreviewCo2">Model Dampak</strong>
+                  <strong class="kpi-val" id="docPreviewCo2">Belum dibuat</strong>
                 </div>
               </div>
             </div>
@@ -150,7 +152,7 @@
   <div id="executivePrintDoc" class="print-only-container">
     <div class="print-letterhead">
       <div class="print-logo-col">
-        <img src="/assets/omnitraf-logo-original.png" alt="Logo OmniTRAF" />
+        <img src="/assets/omnitraf-logo.png" alt="Logo OmniTRAF" width="148" height="34" />
       </div>
       <div class="print-title-col">
         <h1>OMNITRAF</h1>
@@ -161,7 +163,7 @@
 
     <div class="print-report-heading">
       <h3 class="print-report-title">SNAPSHOT SESI MOBILITAS SIMULASI</h3>
-      <p class="print-meta-line">ID Demo: OMNITRAF-SIM &nbsp;|&nbsp; Waktu pembuatan: <span id="printDateStr">—</span></p>
+          <p class="print-meta-line">ID snapshot: <span id="printSnapshotId">—</span> &nbsp;|&nbsp; State: <span id="printSourceFreshness">—</span> &nbsp;|&nbsp; Waktu pembuatan: <span id="printDateStr">—</span></p>
       <p class="print-safety-note">DATA SIMULASI • BUKAN DOKUMEN RESMI ATAU HASIL PENGUKURAN KOTA</p>
     </div>
 

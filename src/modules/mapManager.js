@@ -12,14 +12,13 @@ import {
   KALIMAS_RIVER_GEOJSON,
   SURABAYA_DISTRICTS_GEOJSON,
   SURABAYA_INCIDENTS_GEOJSON,
-  SURABAYA_LANDMARKS_GEOJSON,
-  SITS_CCTV_CAMERAS_GEOJSON
+  SURABAYA_LANDMARKS_GEOJSON
 } from '../config/surabayaCoords.js';
 import { stateStore } from '../core/stateStore.js';
 import { soundManager } from '../core/soundManager.js';
 import { Disposer } from '../core/disposer.js';
 import { diagnostics } from '../core/diagnostics.js';
-import { CAMERA_DEFINITIONS } from './cctv/cameraRegistry.js';
+import { CAMERA_DEFINITIONS, getCameraMapFeatureCollection } from './cctv/cameraRegistry.js';
 
 import { createCartoTileLayer, getBasemapTileUrl, safeAddLayers, createClusterGroup, layerManager } from './map/layerManager.js';
 import { markerManager } from './map/markerManager.js';
@@ -220,6 +219,11 @@ export class MapManager {
     this.isActive = true;
 
     this.initAllMaps();
+    const state = stateStore.getState();
+    this.syncActiveEmergenciesFromState(state.activeEmergencies || []);
+    this.updateIncidentsOnMap(state.incidents || []);
+    this.syncIntersectionsFromState(state.intersections || []);
+    this.updateDeviceMapVisuals(state.devices || []);
     this._bindZoomControls();
     this._bindLandmarkHUDClose();
     this.activationDisposer.addEventListener(window, 'omnitraf:entity-focus', (event) => this._handleEntityFocus(event.detail));
@@ -359,10 +363,8 @@ export class MapManager {
     let target = null;
     if (request.kind === 'intersection') target = this.intersectionMarkersMap.get(String(request.id))?.marker;
     if (request.kind === 'incident') {
-      for (const groups of this.layerGroupsMap.values()) {
-        target = groups['warn-points']?._omniIncidentMarkers?.get(String(request.id))?.marker;
-        if (target) break;
-      }
+      const mapLayers = this.layerGroupsMap.get('map-surabaya');
+      target = mapLayers?.['warn-points']?._omniIncidentMarkers?.get(String(request.id))?.marker;
     }
     if (request.kind === 'cctv') {
       for (const groups of this.layerGroupsMap.values()) {
@@ -505,6 +507,10 @@ export class MapManager {
         const speed = p.speed || 30;
         const los = getCorridorLOS(speed);
         layer.bindPopup(this.popupManager.createCorridorPopupContent(p, los), { maxWidth: 300 });
+        layer.on('popupopen', (event) => {
+          const fill = event.popup.getElement()?.querySelector('.vc-progress-fill');
+          if (fill) fill.style.width = `${Math.max(0, Math.min(100, Number(los.vc) * 100))}%`;
+        });
       }
     });
 
@@ -603,7 +609,7 @@ export class MapManager {
   drawLandmarksAndCctv(map, landmarkGroup, masterCluster) {
     if (!map) return;
 
-    const cctvGeoJson = L.geoJSON(SITS_CCTV_CAMERAS_GEOJSON, {
+    const cctvGeoJson = L.geoJSON(getCameraMapFeatureCollection(), {
       pointToLayer: (feature, latlng) => {
         const p = feature.properties;
         const cctvIcon = L.divIcon({
@@ -615,7 +621,7 @@ export class MapManager {
         const marker = L.marker(latlng, { icon: cctvIcon });
         marker._omniMarkerType = 'cctv';
         marker._omniEntityId = p.id;
-        marker._omniCameraId = CAMERA_DEFINITIONS.find((camera) => camera.name.toLocaleLowerCase().split(/[^a-z0-9]+/).filter((part) => part.length > 4).some((part) => p.name.toLocaleLowerCase().includes(part)))?.id || null;
+        marker._omniCameraId = p.cameraId;
         marker.feature = feature;
         return marker;
       },
@@ -863,6 +869,7 @@ export class MapManager {
     ];
 
     DENSITY_HEATMAP_POINTS.forEach(pt => {
+      const tone = pt.color === '#f59e0b' ? 'amber' : pt.color === '#3b82f6' ? 'blue' : 'green';
       const outerCircle = L.circle([pt.lat, pt.lng], {
         radius: pt.radius,
         color: pt.color,
@@ -883,14 +890,14 @@ export class MapManager {
       const popupContent = `
         <div class="ios-popup-card">
           <div class="ios-popup-header">
-            <span class="cctv-live-tag" style="background: ${pt.color}22; color: ${pt.color};"><span class="live-dot" style="background:${pt.color};"></span> HEATMAP KEPADATAN</span>
+            <span class="cctv-live-tag heatmap-tone-${tone}"><span class="live-dot"></span> HEATMAP KEPADATAN</span>
             <span class="ios-popup-subtitle">SENSOR SPASIAL SITS</span>
           </div>
           <h4 class="ios-popup-title">🔥 ${pt.name}</h4>
           <div class="ios-popup-info-grid">
             <div class="ios-info-row">
               <span class="ios-info-label">Intensitas Beban:</span>
-              <span class="ios-info-value" style="color:${pt.color}; font-weight:800;">${pt.level}</span>
+              <span class="ios-info-value heatmap-text-${tone} csp-style-heavy">${pt.level}</span>
             </div>
             <div class="ios-info-row">
               <span class="ios-info-label">Volume Kendaraan:</span>
@@ -898,7 +905,7 @@ export class MapManager {
             </div>
             <div class="ios-info-row">
               <span class="ios-info-label">Derajat Kejenuhan (V/C):</span>
-              <span class="ios-info-value" style="font-weight:700;">${pt.vcr}</span>
+              <span class="ios-info-value csp-style-9c3785c28e" >${pt.vcr}</span>
             </div>
           </div>
         </div>
@@ -1069,6 +1076,8 @@ export class MapManager {
     const state = stateStore.getState();
     const kind = marker._omniMarkerType;
     const id = marker._omniEntityId;
+    inspector.dataset.entityKind = String(kind || 'entity');
+    inspector.dataset.entityId = String(id || '');
     let entity = null;
     let name = marker.getPopup?.()?.getContent?.()?.toString?.() || '';
     let rows = [];
@@ -1080,8 +1089,15 @@ export class MapManager {
     } else if (kind === 'incident') {
       entity = (state.incidents || []).find((item) => String(item.id) === String(id)) || marker.data || {};
       name = entity.title || 'Insiden simulasi';
-      rows = [['Status', entity.status || 'Belum tersedia'], ['Keparahan', entity.severity || 'Belum tersedia'], ['Lokasi', entity.location || 'Belum tersedia']];
-      summary.textContent = entity.notes || 'Detail insiden pada model simulasi.';
+      rows = [
+        ['Status workflow', entity.status || 'Belum tersedia'],
+        ['Dampak jalan', entity.roadImpactRecoveredAt || entity.roadImpactRecovered === true ? 'Pulih pada model' : 'Tetap diterapkan sampai pemulihan dikonfirmasi'],
+        ['Keparahan', entity.severity || 'Belum tersedia'],
+        ['Lokasi', entity.location || 'Belum tersedia']
+      ];
+      summary.textContent = entity.roadImpactRecoveredAt || entity.roadImpactRecovered === true
+        ? entity.notes || 'Insiden simulasi; dampak jalan sudah dinyatakan pulih.'
+        : 'Insiden simulasi; status workflow tidak menghapus dampak jalan sebelum pemulihan dikonfirmasi.';
     } else if (kind === 'cctv') {
       name = marker.feature?.properties?.name || 'Kamera simulasi';
       rows = [['Status', 'Feed sintetis'], ['Sumber', 'Simulasi lokal']];
@@ -1091,9 +1107,8 @@ export class MapManager {
       rows = [['Sumber', 'Model simulasi']];
       summary.textContent = 'Entity pada peta simulasi.';
     }
-    const cameraName = marker.feature?.properties?.name || '';
     const relatedCamera = kind === 'cctv'
-      ? CAMERA_DEFINITIONS.find((camera) => camera.name.toLocaleLowerCase().split(/[^a-z0-9]+/).filter((part) => part.length > 4).some((part) => cameraName.toLocaleLowerCase().includes(part)))?.id
+      ? marker._omniCameraId || marker.feature?.properties?.cameraId || null
       : CAMERA_DEFINITIONS.find((camera) => camera.nodeId === id)?.id
         || Object.entries(state.cctvCamerasMetrics || {}).find(([, camera]) => String(camera.nodeId || camera.intersectionId || '') === String(id))?.[0];
     this.selectedMapEntity = { kind: kind === 'incident' ? 'incident' : 'intersection', id, cameraId: relatedCamera };

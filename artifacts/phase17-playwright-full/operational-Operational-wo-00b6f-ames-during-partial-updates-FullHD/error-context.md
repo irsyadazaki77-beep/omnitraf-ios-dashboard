@@ -1,0 +1,191 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: operational.spec.js >> Operational workspace interactions >> 3D consumes the same CCTV detections and preserves camera frames during partial updates
+- Location: tests\e2e\operational.spec.js:54:3
+
+# Error details
+
+```
+Error: expect(received).toContain(expected) // indexOf
+
+Expected substring: "cctvCanvas1-v-sync"
+Received string:    "cctvCanvas1-v1,cctvCanvas1-v2,cctvCanvas1-v4,cctvCanvas1-v5,cctvCanvas1-v6,cctvCanvas1-v8,cctvCanvas2-v3,cctvCanvas2-v5,cctvCanvas2-v7,cctvCanvas2-v8,cctvCanvas3-v2,cctvCanvas3-v6,cctvCanvas3-v7,cctvCanvas3-v8,cctvCanvas3-v9,cctvCanvas3-v11,cctvCanvas4-v1,cctvCanvas4-v4,cctvCanvas4-v5,cctvCanvas4-v8,cctvCanvas4-v9,cctvCanvas4-v11,cctvCanvas2-v1,cctvCanvas2-v6,cctvCanvas3-v3,cctvCanvas3-v4,cctvCanvas1-v0,cctvCanvas1-v3,cctvCanvas1-v10,cctvCanvas2-v0,cctvCanvas2-v9,cctvCanvas2-v10,cctvCanvas3-v0,cctvCanvas3-v5,cctvCanvas4-v0,cctvCanvas4-v6,cctvCanvas1-v7,cctvCanvas1-v11,cctvCanvas2-v2,cctvCanvas2-v11,cctvCanvas4-v3,cctvCanvas4-v7,cctvCanvas1-v9,cctvCanvas2-v4,cctvCanvas3-v1,cctvCanvas3-v10,cctvCanvas4-v2,cctvCanvas4-v10"
+```
+
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - link "Lewati ke konten utama" [ref=e2] [cursor=pointer]:
+    - /url: "#mainContent"
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - link "OmniTRAF home" [ref=e5] [cursor=pointer]:
+        - /url: "#dashboard"
+        - img "Ikon OmniTRAF SITS Surabaya" [ref=e7]
+        - generic [ref=e8]:
+          - img "Logo OmniTRAF Adaptive Urban Mobility System" [ref=e9]
+          - generic [ref=e10]: Surabaya Command Center
+      - button "Ciutkan sidebar" [expanded] [ref=e11] [cursor=pointer]:
+        - generic [ref=e14]: Collapse sidebar
+      - button "Cari halaman Ctrl K" [ref=e15] [cursor=pointer]:
+        - generic [ref=e20]:
+          - text: Cari halaman
+          - generic [ref=e21]: Ctrl K
+      - navigation "Primary navigation" [ref=e22]:
+        - region [ref=e23]:
+          - heading "Operasi" [level=2] [ref=e24]
+          - link "Ikhtisar" [ref=e25] [cursor=pointer]:
+            - /url: "#dashboard"
+          - link "Peta kota" [ref=e33] [cursor=pointer]:
+            - /url: "#map"
+          - link "Digital Twin 3D" [ref=e39] [cursor=pointer]:
+            - /url: "#city3d"
+            - generic [aria-hidden] [ref=e40]: 3D
+          - link "Insiden" [ref=e42] [cursor=pointer]:
+            - /url: "#incidents"
+          - link "Darurat" [ref=e47] [cursor=pointer]:
+            - /url: "#emergency"
+        - region [ref=e52]:
+          - heading "Pemantauan" [level=2] [ref=e53]
+          - link "CCTV" [ref=e54] [cursor=pointer]:
+            - /url: "#cctv"
+          - link "Sinyal" [ref=e61] [cursor=pointer]:
+            - /url: "#signals"
+          - link "Perangkat" [ref=e69] [cursor=pointer]:
+            - /url: "#devices"
+        - region [ref=e75]:
+          - heading "Analitik & prediksi" [level=2] [ref=e76]
+          - link "Analitik" [ref=e77] [cursor=pointer]:
+            - /url: "#analytics"
+          - link "Prediksi" [ref=e83] [cursor=pointer]:
+            - /url: "#prediction"
+          - button "Intelijen sinyal" [ref=e89] [cursor=pointer]
+          - link "Laporan" [ref=e94] [cursor=pointer]:
+            - /url: "#reports"
+            - generic [aria-hidden] [ref=e95]: ▤
+        - region [ref=e97]:
+          - heading "Sistem" [level=2] [ref=e98]
+          - link "Integrasi" [ref=e99] [cursor=pointer]:
+            - /url: "#integration"
+          - link "Pengaturan" [ref=e105] [cursor=pointer]:
+            - /url: "#settings"
+          - link "Arsitektur sistem" [ref=e109] [cursor=pointer]:
+            - /url: "#about-engine"
+    - main [ref=e114]:
+      - generic "Navigasi halaman" [ref=e115]:
+        - generic [ref=e117]:
+          - generic [ref=e118]: OMNITRAF · SIMULASI
+          - strong [ref=e119]: Digital Twin 3D
+        - generic "Aksi utama" [ref=e120]:
+          - button "Cari Ctrl K" [ref=e121] [cursor=pointer]:
+            - generic [aria-hidden] [ref=e122]: ⌕
+            - generic [ref=e123]: Cari
+            - generic [ref=e124]: Ctrl K
+          - generic "Status prototipe OmniTRAF" [ref=e125]:
+            - generic [ref=e126]: Selasa, 13 Okt 2026 | 18.48 WIB
+            - strong [ref=e129]: Server Simulasi Tersambung
+          - generic [ref=e130]:
+            - button "Ganti ke tema terang" [ref=e131] [cursor=pointer]:
+              - generic [aria-hidden] [ref=e132]: ☾
+            - 'button "Active scenario notifications: 3" [ref=e133] [cursor=pointer]':
+              - generic [ref=e137]: "3"
+            - group [ref=e138]:
+              - generic "Aksi lainnya" [ref=e139] [cursor=pointer]: ···
+          - button "Sesi Operator Demo. Kontrol keluar tersedia di navigasi." [ref=e140] [cursor=pointer]:
+            - generic [aria-hidden] [ref=e142]: OD
+            - generic [ref=e143]:
+              - strong [ref=e144]: Operator Demo
+              - generic [ref=e145]: Operator
+          - button "Keluar" [ref=e146] [cursor=pointer]
+      - group "Batas simulasi" [ref=e147]:
+        - generic [ref=e148] [cursor=pointer]:
+          - strong [ref=e149]: SIMULASI
+          - text: Data sintetis · tanpa kendali perangkat lapangan
+      - generic [ref=e151]:
+        - generic [ref=e152]:
+          - generic [ref=e153]:
+            - paragraph [ref=e154]: OMNITRAF · DIGITAL TWIN SIMULASI
+            - heading "Digital Twin 3D" [level=1] [ref=e155]
+            - paragraph [ref=e156]: Representasi kota sintetis yang mengikuti state TrafficModel, sinyal, perangkat, dan insiden.
+          - generic [ref=e157]: VISUAL SINTETIS · BUKAN REKONSTRUKSI PRESISI
+        - region "Visualisasi kota 3D dan detail entity" [ref=e158]:
+          - generic [ref=e159]:
+            - toolbar "Kontrol visualisasi 3D":
+              - group "Sudut pandang kamera" [ref=e160]:
+                - button "Atas" [ref=e161] [cursor=pointer]
+                - button "Isometrik" [ref=e162] [cursor=pointer]
+                - button "Jalan" [ref=e163] [cursor=pointer]
+              - generic [ref=e164]:
+                - generic [ref=e165]: Virtual camera
+                - combobox "Pilih sudut pandang virtual kamera" [ref=e166]:
+                  - option "Tidak ada kamera" [selected]
+                  - option "CAM-01 · SIMPANG WONOKROMO"
+                  - option "CAM-02 · KORIDOR RAYA DARMO"
+                  - option "CAM-03 · BUNDARAN WARU"
+                  - option "CAM-04 · SIMPANG JEMURSARI"
+                - generic [ref=e167]: Kualitas
+                - combobox "Kualitas render kota 3D" [ref=e168]:
+                  - option "Low"
+                  - option "Balanced" [selected]
+                  - option "High"
+                - button "Reset" [ref=e169] [cursor=pointer]
+                - link "Peta 2D" [ref=e170] [cursor=pointer]:
+                  - /url: "#map"
+                - group [ref=e171]:
+                  - generic "Lapisan" [ref=e172] [cursor=pointer]
+            - application "Kota simulasi 3D. Seret untuk orbit, geser dengan tombol kanan atau Shift, gulir untuk zoom, klik entity untuk detail." [ref=e173]
+            - generic:
+              - strong: Virtual camera preview
+              - generic: Pilih kamera sintetis untuk mengubah titik pandang scene.
+            - generic:
+              - generic: SIMULATED · ACTIVE
+              - generic: — FPS
+              - generic "8216 triangles · balanced · render scale 0.75 · geometry/texture counts": CPU 0.9ms · GPU n/a · 33 draw · 33g/1t
+              - generic: SIMULATED · frame 101 · 48 agen · 07.01.41
+              - generic: AGEN VISUAL SINTETIS
+        - generic [ref=e175]:
+          - generic [ref=e176]: Arus lancar
+          - generic [ref=e178]: Padat / antrean
+          - generic [ref=e180]: Insiden / fase merah
+          - generic [ref=e182]: Simpang dan kamera
+          - generic [ref=e184]: "Drag: orbit · Shift + drag: pan · Wheel: zoom"
+  - dialog [aria-hidden] [ref=e185]:
+    - generic [ref=e186]:
+      - generic [ref=e187]:
+        - generic [ref=e188]: 🔔
+        - generic [ref=e189]:
+          - heading [level=3] [ref=e190]: Contoh Skenario Insiden
+          - paragraph [ref=e191]: Data demo, bukan laporan operasional
+      - button [ref=e192] [cursor=pointer]: ×
+    - generic [ref=e193]:
+      - article [ref=e194]:
+        - strong [ref=e195]: Skenario kendaraan mogok
+        - paragraph [ref=e196]: Simpang demo 01 · ACTIVE
+        - paragraph [ref=e197]: Skenario contoh; tidak ada petugas atau unit derek yang ditugaskan.
+        - link [ref=e198] [cursor=pointer]:
+          - /url: "#incidents"
+          - text: Buka daftar insiden
+      - article [ref=e199]:
+        - strong [ref=e200]: Skenario genangan air
+        - paragraph [ref=e201]: Koridor demo 02 · ACKNOWLEDGED
+        - paragraph [ref=e202]: Skenario contoh genangan; bukan pengukuran atau laporan lapangan.
+        - link [ref=e203] [cursor=pointer]:
+          - /url: "#incidents"
+          - text: Buka daftar insiden
+      - article [ref=e204]:
+        - strong [ref=e205]: Skenario antrean panjang
+        - paragraph [ref=e206]: Simpang demo 03 · ACTIVE
+        - paragraph [ref=e207]: Antrean sintetis 180 meter pada skenario simulator.
+        - link [ref=e208] [cursor=pointer]:
+          - /url: "#incidents"
+          - text: Buka daftar insiden
+  - status [ref=e210]: ✓ Notifikasi
+  - status
+```

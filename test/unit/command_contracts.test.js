@@ -77,6 +77,10 @@ test('legacy status and emergency aliases normalize once to canonical command fo
   assert.equal(status.payload.status, 'DISPATCHED');
   const resolved = normalizeAndValidateCommand({ action: 'incident:update-status', targetId: 'INC-22', payload: { status: 'resolved' } });
   assert.equal(resolved.action, 'incident:resolve');
+  const roadRecovered = normalizeAndValidateCommand({ action: 'incident:road-recovered', targetId: 'INC-22', payload: { notes: 'Kondisi lajur pulih pada model.' } });
+  assert.equal(roadRecovered.action, 'incident:road-recovered');
+  assert.equal(roadRecovered.targetId, 'INC-22');
+  assert.equal(roadRecovered.payload.notes, 'Kondisi lajur pulih pada model.');
   const emergency = normalizeAndValidateCommand({ action: 'emergency:activate', targetId: 'AMB-22', payload: { vehicleId: 'AMB-22', routeId: 'route-soetomo' } });
   assert.equal(emergency.payload.code, 'AMB-22');
   assert.equal(emergency.payload.route, 'route-soetomo');

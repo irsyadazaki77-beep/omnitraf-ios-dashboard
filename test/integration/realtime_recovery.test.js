@@ -11,7 +11,7 @@ process.env.DB_PATH = testDatabasePath('realtime-recovery.sqlite');
 const { server } = await import('../../server.js');
 const { backendState } = await import('../../server/services/stateManager.js');
 const { generateToken } = await import('../../server/middlewares/auth.js');
-const { ROLES } = await import('../../server/config/constants.js');
+const { ROLES, USERS_DB } = await import('../../server/config/constants.js');
 
 describe('Phase 18: Realtime Reliability, Ordering & Recovery Hardening Test Suite', () => {
   let baseUrl;
@@ -33,19 +33,8 @@ describe('Phase 18: Realtime Reliability, Ordering & Recovery Hardening Test Sui
     serverPort = server.address().port;
     baseUrl = `http://127.0.0.1:${serverPort}`;
 
-    adminToken = generateToken({
-      id: 'usr-admin-test',
-      username: 'admintest',
-      role: ROLES.ADMIN,
-      name: 'Admin Test'
-    });
-
-    operatorToken = generateToken({
-      id: 'usr-op-test',
-      username: 'operatortest',
-      role: ROLES.OPERATOR,
-      name: 'Operator Test'
-    });
+    adminToken = generateToken(USERS_DB.find(user => user.role === ROLES.ADMIN));
+    operatorToken = generateToken(USERS_DB.find(user => user.role === ROLES.OPERATOR));
   });
 
   after(async () => {
@@ -163,6 +152,18 @@ describe('Phase 18: Realtime Reliability, Ordering & Recovery Hardening Test Sui
     assert.strictEqual(restData.extra.state.intersections.length, resyncResponse.state.intersections.length);
 
     client.disconnect();
+  });
+
+  test('state:resync flood returns at most 20 snapshots per minute per connection', async () => {
+    const client = Client(baseUrl, { transports: ['websocket'], forceNew: true, auth: { token: operatorToken } });
+    await new Promise((resolve, reject) => { client.once('connect', resolve); client.once('connect_error', reject); });
+    let snapshots = 0;
+    const originalEmit = client.emit.bind(client);
+    client.on('traffic:init', () => { snapshots += 1; });
+    for (let index = 0; index < 25; index += 1) originalEmit('state:resync', {});
+    await new Promise(resolve => setTimeout(resolve, 80));
+    assert.equal(snapshots, 20);
+    client.close();
   });
 
   test('4. Heartbeat ping-pong RTT latency tracking and sequence validation', async () => {

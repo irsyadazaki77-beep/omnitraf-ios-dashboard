@@ -15,7 +15,7 @@ export class ViewLoader {
       'emergency': { file: '/views/emergenciesView.html', id: 'view-emergency', title: 'Prioritas darurat' },
       'emergencies': { file: '/views/emergenciesView.html', id: 'view-emergency', title: 'Prioritas darurat' },
       'analytics': { file: '/views/analyticsView.html', id: 'view-analytics', title: 'Analitik' },
-      'prediction': { file: '/views/predictionView.html', id: 'view-prediction', title: 'Prediksi' },
+      'prediction': { file: '/views/predictionView.html', id: 'view-prediction', title: 'Scenario Lab' },
       'incidents': { file: '/views/incidentsView.html', id: 'view-incidents', title: 'Insiden' },
       'reports': { file: '/views/reportsView.html', id: 'view-reports', title: 'Laporan' },
       'devices': { file: '/views/devicesView.html', id: 'view-devices', title: 'Perangkat' },

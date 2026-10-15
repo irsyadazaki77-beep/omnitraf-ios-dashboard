@@ -70,11 +70,15 @@ class TokenRevocationService {
     this._revokedTokens.set(id, expiryMs);
 
     // Jika berjalan dalam mode klaster atau Redis tersedia, simpan juga di Redis
+    if (OMNITRAF_RUNTIME_MODE === 'cluster' && !redisManager?.isConnected()) {
+      throw new Error('Token revocation store unavailable in cluster mode.');
+    }
     if (redisManager && redisManager.isConnected()) {
       try {
         await redisManager.set(`revoked_token:${id}`, '1', 'EX', expirySeconds);
       } catch (err) {
         console.warn('[TokenRevocation] Gagal mencatat revocations ke Redis:', err.message);
+        if (OMNITRAF_RUNTIME_MODE === 'cluster') throw err;
       }
     }
 
@@ -90,12 +94,16 @@ class TokenRevocationService {
     const now = Date.now();
     this._userRevocationCutoffs.set(String(userId), now);
 
+    if (OMNITRAF_RUNTIME_MODE === 'cluster' && !redisManager?.isConnected()) {
+      throw new Error('User session revocation store unavailable in cluster mode.');
+    }
     if (redisManager && redisManager.isConnected()) {
       try {
         // Simpan cutoff timestamp di Redis selama 48 jam
         await redisManager.set(`user_revoked_cutoff:${userId}`, String(now), 'EX', 172800);
       } catch (err) {
         console.warn('[TokenRevocation] Gagal mencatat user revocation cutoff ke Redis:', err.message);
+        if (OMNITRAF_RUNTIME_MODE === 'cluster') throw err;
       }
     }
 
@@ -134,6 +142,9 @@ class TokenRevocationService {
     }
 
     // 3. Cek Redis jika klaster
+    if (OMNITRAF_RUNTIME_MODE === 'cluster' && !redisManager?.isConnected()) {
+      throw new Error('Token revocation store unavailable in cluster mode.');
+    }
     if (redisManager && redisManager.isConnected()) {
       try {
         const inRedis = await redisManager.get(`revoked_token:${id}`);
@@ -150,6 +161,7 @@ class TokenRevocationService {
         }
       } catch (err) {
         console.warn('[TokenRevocation] Error querying Redis revocation status:', err.message);
+        if (OMNITRAF_RUNTIME_MODE === 'cluster') throw err;
       }
     }
 

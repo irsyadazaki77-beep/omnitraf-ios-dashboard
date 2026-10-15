@@ -526,7 +526,7 @@
 
 /* One selected simulated feed with a compact camera rail */
 .cctv-dashboard { gap:12px; }
-.cctv-workspace-toolbar { display:flex; align-items:center; gap:8px; padding:8px; border:1px solid var(--border-default); border-radius:var(--radius-md); background:var(--surface); }
+.cctv-workspace-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px; border:1px solid var(--border-default); border-radius:var(--radius-md); background:var(--surface); }
 .cctv-workspace-toolbar .cctv-camera-search { flex:1 1 280px; max-width:none; }
 .cctv-view-options { position:relative; }
 .cctv-view-options > summary { display:flex; min-height:40px; align-items:center; padding:0 11px; border:1px solid var(--border-default); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; font-size:12px; font-weight:600; list-style:none; }
@@ -536,6 +536,8 @@
 .cctv-options-content button { min-height:36px; }
 .cctv-options-content .cctv-threshold-pill { display:grid; grid-template-columns:1fr auto; gap:4px 10px; }
 .cctv-options-content .cctv-threshold-pill input { grid-column:1 / -1; width:100%; }
+.cctv-view-options[open] { flex:1 0 100%; min-width:0; max-width:100%; }
+.cctv-view-options[open] .cctv-options-content { position:static; box-sizing:border-box; width:100%; min-width:0; margin-top:8px; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); box-shadow:none; }
 .cctv-environment-control { display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--text-secondary); font-size:12px; }
 .cctv-environment-control select { min-height:34px; padding:0 9px; border:1px solid var(--border-default); border-radius:var(--radius-sm); color:var(--text-primary); background:var(--surface-elevated); }
 .cctv-operational-workspace { display:grid; grid-template-columns:minmax(0,1fr) 250px; gap:12px; align-items:start; }

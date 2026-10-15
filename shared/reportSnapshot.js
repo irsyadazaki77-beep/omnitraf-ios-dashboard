@@ -9,6 +9,7 @@ export function createReportSnapshot(state = {}, type = 'Snapshot sesi', timesta
   return {
     id: `SIM-${timestamp.replace(/\D/g, '').slice(0, 17)}`,
     type, timestamp, source: state.lastTelemetrySource || 'SIMULATED', simulationOnly: true,
+    stale: Boolean(state.isStaleData),
     metrics: {
       volume: numeric(telemetry.vehiclesToday ?? telemetry.totalVehicles),
       waitTime: numeric(telemetry.avgWaitTime), co2Saved: numeric(telemetry.co2SavedKg),

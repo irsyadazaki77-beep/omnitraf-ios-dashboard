@@ -1,6 +1,8 @@
 import 'dotenv/config';
 
-export const NODE_ENV = process.env.NODE_ENV || 'development';
+// Direct server starts default to the safer mode. Local development is opted
+// into by the dedicated npm development launcher.
+export const NODE_ENV = process.env.NODE_ENV || 'production';
 export const IS_PRODUCTION = NODE_ENV === 'production';
 export const IS_TEST = NODE_ENV === 'test' || typeof global.it === 'function' || typeof global.test === 'function';
 
@@ -18,8 +20,13 @@ if (!VALID_NODE_ENVS.includes(NODE_ENV)) {
 
 // Fail-safe JWT Secret: Production MUST supply a strong custom secret via process.env.JWT_SECRET
 const defaultDevSecret = 'omnitraf-surabaya-jwt-secret-key-2026-secure';
+const knownTestSecrets = new Set([
+  defaultDevSecret,
+  'cluster-test-only-not-for-production'
+]);
 if (IS_PRODUCTION) {
-  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === defaultDevSecret || process.env.JWT_SECRET.trim().length < 32) {
+  const jwtSecret = process.env.JWT_SECRET?.trim();
+  if (!jwtSecret || jwtSecret.length < 32 || knownTestSecrets.has(jwtSecret) || /(?:test-only|not-for-production|change-me|example-secret)/i.test(jwtSecret)) {
     console.error('FATAL: JWT_SECRET environment variable is missing, using default development secret, or is too short (min 32 chars) in production mode.');
     process.exit(1);
   }
@@ -88,6 +95,18 @@ if (IS_PRODUCTION) {
   }
   if (allowedOrigins.includes('*')) {
     console.error('FATAL: Wildcard origin (*) is strictly forbidden in production mode.');
+    process.exit(1);
+  }
+  const invalidOrigin = allowedOrigins.find((origin) => {
+    try {
+      const parsed = new URL(origin);
+      return parsed.protocol !== 'https:' || parsed.origin !== origin || parsed.username !== '' || parsed.password !== '';
+    } catch {
+      return true;
+    }
+  });
+  if (invalidOrigin) {
+    console.error('FATAL: ALLOWED_ORIGINS must contain canonical HTTPS origins only in production mode.');
     process.exit(1);
   }
 }

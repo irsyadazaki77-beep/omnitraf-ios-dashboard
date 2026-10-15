@@ -4,15 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node server.js",
-    "dev:server": "node server.js",
+    "dev": "node scripts/start-development.mjs",
+    "dev:server": "node scripts/start-development.mjs",
     "dev:client": "vite",
     "build": "vite build && node scripts/hash-public-assets.mjs && node scripts/report-build-size.mjs",
     "preview": "vite preview",
     "validate": "node scripts/validate-pwa.mjs",
     "lint": "node scripts/run-lint.mjs",
     "lint:css": "node scripts/lint-css.mjs",
-    "start": "node server.js",
+    "start": "node scripts/start-production.mjs",
     "test": "node scripts/run-tests.mjs",
     "test:postgres": "node --test test/postgres/*.test.js",
     "test:cluster": "node --test test/cluster/leadership_failover.test.js",
@@ -43,8 +43,11 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
+    "@eslint/js": "^9.39.5",
     "@playwright/test": "^1.64.0",
     "esbuild": "^0.28.2",
+    "eslint": "^9.39.5",
+    "globals": "^16.5.0",
     "postcss": "^8.5.29",
     "vite": "^8.3.3"
   }

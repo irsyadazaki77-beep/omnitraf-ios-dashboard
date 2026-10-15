@@ -83,6 +83,12 @@ describe('Phase 2 — Canonical Data & State Architecture Tests', () => {
   });
 
   describe('3. Canonical Intersection Model & Normalizer', () => {
+    test('override normalization falls back correctly and honors explicit state', () => {
+      assert.equal(normalizeCanonicalIntersection({ overrideDuration: 0, signal: { isOverrideActive: true } }).signal.override.active, false);
+      assert.equal(normalizeCanonicalIntersection({ signal: { isOverrideActive: true } }).signal.override.active, true);
+      assert.equal(normalizeCanonicalIntersection({ isOverrideActive: false, overrideDuration: 45, signal: { isOverrideActive: true } }).signal.override.active, false);
+    });
+
     test('normalizes intersection with nested signal and traffic slices', () => {
       const raw = {
         id: 'node-wonokromo',

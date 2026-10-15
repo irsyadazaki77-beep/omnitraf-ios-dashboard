@@ -1,5 +1,5 @@
 # OmniTRAF Surabaya — Intelligent Transport System Command Center
-### Prototipe Simulasi & Showcase
+### Simulator Latihan Operator & Showcase · SIMULATION_ONLY
 
 [![Accessibility](https://img.shields.io/badge/Accessibility-Review%20in%20progress-blue?style=for-the-badge&logo=w3c)](https://www.w3.org/WAI/standards-guidelines/wcag/)
 [![PWA](https://img.shields.io/badge/PWA-App%20shell%20offline-blue?style=for-the-badge&logo=pwa)](https://web.dev/progressive-web-apps/)
@@ -11,9 +11,11 @@
 
 ## 🏙️ Ringkasan Proyek (Executive Summary)
 
-**OmniTRAF** adalah prototipe demonstrasi command center mobilitas perkotaan yang menggunakan lokasi dan skenario Surabaya sebagai konteks simulasi. Data lalu lintas, kamera, sensor, petugas, insiden, armada darurat, emisi, dan hasil optimasi adalah data sintetis/contoh. Aplikasi ini **belum terhubung** ke CCTV/RTSP, gateway atau aktuator SITS, layanan 112, GPS armada, maupun data resmi Pemerintah Kota Surabaya. Tombol perintah hanya mengubah state prototipe.
+**OmniTRAF** adalah simulator latihan operator dan showcase command center mobilitas perkotaan dengan lokasi serta skenario Surabaya sebagai konteks. Dashboard, peta, City3D, CCTV simulasi, sinyal, insiden, prioritas darurat, analitik, Scenario Lab, dan laporan membantu pengguna meninjau kondisi model, mencoba keputusan, lalu membandingkan dampaknya. Data lalu lintas, kamera, sensor, petugas, insiden, armada darurat, emisi, dan hasil optimasi adalah data sintetis/contoh. Aplikasi ini **belum terhubung** ke CCTV/RTSP, gateway atau aktuator SITS, layanan 112, GPS armada, maupun data resmi Pemerintah Kota Surabaya. Tombol perintah hanya mengubah state prototipe.
 
 Antarmuka memakai gaya visual yang terinspirasi dashboard operasional. WCAG 2.1 AA belum diaudit atau dinyatakan terpenuhi; aksesibilitas masih perlu diuji pada browser dan perangkat yang dituju. Mode offline menyediakan app shell, bukan pemantauan atau kendali operasional.
+
+Matriks penerimaan operator, sumber bukti, dan gerbang kesiapan lintas 13 workspace tercatat di [OMNITRAF_OPERATOR_READINESS.md](docs/OMNITRAF_OPERATOR_READINESS.md).
 
 ---
 
@@ -130,7 +132,7 @@ npm run dev:server
 npm run dev:client
 ```
 
-Buka `http://localhost:5173`. Vite meneruskan `/api` dan `/socket.io` ke backend lokal di port 3000. `OMNITRAF_BACKEND_ORIGIN` dapat dipakai untuk memilih alamat backend lain.
+Buka `http://localhost:5173`. Vite meneruskan `/api` dan `/socket.io` ke backend lokal di port 3000. `OMNITRAF_BACKEND_ORIGIN` dapat dipakai untuk memilih alamat backend lain. Server dev dan preview hanya listen di loopback; untuk QA dari LAN, set `OMNITRAF_VITE_LAN=true` secara eksplisit dan batasi akses lewat firewall jaringan.
 
 ### Production
 
@@ -140,7 +142,7 @@ npm run build
 npm start
 ```
 
-Server Express menyajikan frontend dari `dist/` pada `http://localhost:3000`. Docker membangun `dist/` di build stage sebelum menjalankan server.
+Server Express menyajikan frontend dari `dist/` pada `http://localhost:3000`. Jika `NODE_ENV` tidak ditentukan, proses server memilih `production` dan menolak konfigurasi secret/origin/akun yang belum lengkap. Untuk development lokal gunakan `npm run dev:server`, yang memilih `development` dan tetap bind ke loopback. Docker membangun `dist/` di build stage sebelum menjalankan server.
 
 ### Database dan deployment Docker
 
@@ -162,13 +164,17 @@ OMNITRAF_RUNTIME_MODE=cluster
 REDIS_URL=redis://host:6379
 ```
 
-Jangan gunakan kredensial development Compose untuk deployment. `DB_POOL_MAX`, `DB_IDLE_TIMEOUT_MS`, `DB_CONNECTION_TIMEOUT_MS`, dan `DB_SSL=true` mengatur pool/TLS; TLS memvalidasi sertifikat secara default. Migrasi schema berversi dijalankan saat startup di bawah PostgreSQL advisory lock. `/healthz` mengukur liveness, sedangkan `/ready` mem-ping database aktif dan mengembalikan 503 bila database atau lifecycle belum siap. Shutdown menutup penerimaan traffic, menghentikan runtime, menguras persistence, lalu menutup pool.
+Jangan gunakan kredensial development Compose untuk deployment. `DB_POOL_MAX`, `DB_IDLE_TIMEOUT_MS`, `DB_CONNECTION_TIMEOUT_MS`, dan `DB_SSL=true` mengatur pool/TLS; TLS memvalidasi sertifikat secara default. Migrasi schema berversi dijalankan saat startup di bawah PostgreSQL advisory lock. `/healthz` mengukur liveness, `/readyz` memakai status ping database cache yang diperbarui tiap lima detik dan dibatasi frekuensinya, sedangkan `/ready` menyediakan readiness terperinci. Shutdown menutup penerimaan traffic, menghentikan runtime, menguras persistence, lalu menutup pool.
 
 Compose tetap sederhana dengan app + sql.js. PostgreSQL development opsional tersedia lewat profile:
 
 ```bash
 docker compose --profile postgres up -d postgres
 ```
+
+Compose aplikasi tidak memublikasikan port HTTP ke host. Pasang container pada Docker network privat milik ingress TLS yang sudah ada; network tersebut harus dibuat lebih dulu dan dipilih dengan `OMNITRAF_INGRESS_NETWORK` (default `omnitraf-ingress`). Ingress harus meneruskan HTTPS publik ke port container `3000` lewat network itu. Produksi wajib mengisi `JWT_SECRET` unik (minimal 32 karakter), `ALLOWED_ORIGINS` berisi origin HTTPS eksplisit, dan minimal satu akun admin valid melalui `ADMIN_PASSWORD_HASH` bcrypt. Jangan gunakan secret atau akun contoh.
+
+`docker-compose.cluster.yml` adalah stack uji lokal. Ia mewajibkan secret dan hash admin eksplisit serta hanya mengikat port node ke `127.0.0.1`; jangan mengekspos port tersebut langsung ke jaringan publik.
 
 Gunakan `DATABASE_URL=postgresql://omnitraf:omnitraf-local-dev-only@postgres:5432/omnitraf` dan `DB_DRIVER=postgres` di konfigurasi app Compose untuk menjalankan app pada database tersebut. Service PostgreSQL memiliki volume dan healthcheck; aplikasi tetap melakukan koneksi/retry per query dan readiness ping sendiri. Test biasa memakai database terisolasi per test file melalui `test/helpers/testDatabasePath.js`; PostgreSQL integration test terpisah berjalan dengan `npm run test:postgres` ketika `DATABASE_URL` test disediakan.
 

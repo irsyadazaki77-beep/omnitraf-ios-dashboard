@@ -45,6 +45,7 @@ const controllerLoaders = {
   incidentController: async () => { if (isViteRuntime) await import('../css/views/incidents.css'); return import('./controllers/incidentController.js'); },
   emergencyController: async () => { if (isViteRuntime) await import('../css/views/emergencies.css'); return import('./controllers/emergencyController.js'); },
   analyticsController: async () => { if (isViteRuntime) await import('../css/views/analytics.css'); return import('./controllers/analyticsController.js'); },
+  scenarioLabController: async () => { if (isViteRuntime) await import('../css/views/prediction.css'); return import('./controllers/scenarioLabController.js'); },
   deviceController: async () => { if (isViteRuntime) await import('../css/views/devices.css'); return import('./controllers/deviceController.js'); },
   reportController: async () => { if (isViteRuntime) await import('../css/views/reports.css'); return import('./controllers/reportController.js'); },
   settingsController: async () => ({ settingsController }),
@@ -66,6 +67,7 @@ export class App {
   async init() {
     if (this.isInitialized) return;
     this.isInitialized = true;
+    if (isViteRuntime) await import('../css/csp-legacy-inline.css');
 
     console.info("🚦 [OmniTRAF] Menginisialisasi SITS Command Center Surabaya Kernel...");
 
@@ -273,7 +275,7 @@ export class App {
       dashboard: ['cctvController', 'signalsController', 'incidentController', 'emergencyController'],
       map: ['mapManager'], city3d: ['city3dController'], cctv: ['cctvController'], signals: ['mapManager', 'signalsController'],
       incidents: ['mapManager', 'incidentController'], emergency: ['emergencyController'], emergencies: ['emergencyController'],
-      analytics: ['analyticsController'], prediction: ['analyticsController'],
+      analytics: ['analyticsController'], prediction: ['analyticsController', 'scenarioLabController'],
       devices: ['deviceController'], reports: ['reportController'],
       settings: ['settingsController'], integration: ['integrationController']
     };
@@ -400,7 +402,7 @@ export class App {
     const viewNames = {
       dashboard: 'Ikhtisar', map: 'Peta', incidents: 'Insiden', emergency: 'Darurat',
       cctv: 'CCTV', signals: 'Sinyal', devices: 'Perangkat', analytics: 'Analitik',
-      prediction: 'Prediksi', reports: 'Laporan', settings: 'Pengaturan', integration: 'Integrasi', city3d: 'Digital Twin 3D'
+      prediction: 'Scenario Lab', reports: 'Laporan', settings: 'Pengaturan', integration: 'Integrasi', city3d: 'Digital Twin 3D'
     };
     const cleanView = String(view).replace('#', '').replace('view-', '');
     message.textContent = `Halaman ${viewNames[cleanView] || cleanView} belum dapat dimuat. Periksa koneksi lalu coba lagi.`;
@@ -437,7 +439,7 @@ export class App {
       'emergency': ['emergencyController'],
       'emergencies': ['emergencyController'],
       'analytics': ['analyticsController'],
-      'prediction': ['analyticsController'],
+      'prediction': ['analyticsController', 'scenarioLabController'],
       'devices': ['deviceController'],
       'reports': ['reportController']
     };

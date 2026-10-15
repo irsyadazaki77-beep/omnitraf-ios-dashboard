@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import { spawnSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import bcrypt from 'bcryptjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,6 +31,16 @@ describe('Security Hardening: Production Environment Fail-Closed & User DB Valid
     assert.ok(res.stderr.includes('Invalid NODE_ENV "staging"'));
   });
 
+  test('1a. Direct starts default to production when NODE_ENV is absent', () => {
+    const env = { ...process.env };
+    delete env.NODE_ENV;
+    const res = spawnSync(process.execPath, [
+      '--input-type=module', '-e', `import './server/config/env.js'; console.log('ENV_OK');`
+    ], { cwd: projectRoot, env, encoding: 'utf8' });
+    assert.equal(res.status, 1);
+    assert.match(res.stderr, /JWT_SECRET environment variable is missing/);
+  });
+
   test('2. Production rejects missing or default JWT_SECRET', () => {
     const res = runEnvCheck({
       NODE_ENV: 'production',
@@ -38,6 +49,11 @@ describe('Security Hardening: Production Environment Fail-Closed & User DB Valid
     });
     assert.strictEqual(res.status, 1);
     assert.ok(res.stderr.includes('JWT_SECRET environment variable is missing, using default development secret, or is too short'));
+  });
+
+  test('2a. Production rejects the cluster test JWT secret', () => {
+    const res = runEnvCheck({ NODE_ENV: 'production', JWT_SECRET: 'cluster-test-only-not-for-production', ALLOWED_ORIGINS: 'https://omnitraf.surabaya.go.id' });
+    assert.strictEqual(res.status, 1);
   });
 
   test('3. Production rejects wildcard (*) in ALLOWED_ORIGINS', () => {
@@ -106,6 +122,32 @@ describe('Security Hardening: Production Environment Fail-Closed & User DB Valid
     assert.ok(res.stdout.includes('ENV_OK'));
   });
 
+  test('8a. Production user loading rejects a missing admin and duplicate accounts', () => {
+    const baseEnv = {
+      ...process.env,
+      NODE_ENV: 'production',
+      JWT_SECRET: 'super-strong-production-jwt-secret-min-32-chars-long!',
+      ALLOWED_ORIGINS: 'https://omnitraf.surabaya.go.id',
+      ADMIN_PASSWORD_HASH: '',
+      OPERATOR_PASSWORD_HASH: '',
+      VIEWER_PASSWORD_HASH: '',
+      PRODUCTION_USERS_JSON: ''
+    };
+    const runConstants = env => spawnSync(process.execPath, ['--input-type=module', '-e', `import './server/config/constants.js';`], { cwd: projectRoot, env, encoding: 'utf8' });
+    const missingAdmin = runConstants(baseEnv);
+    assert.equal(missingAdmin.status, 1);
+    assert.match(missingAdmin.stderr, /at least one valid ADMIN account/);
+
+    const passwordHash = bcrypt.hashSync('valid-production-password', 10);
+    const duplicate = runConstants({
+      ...baseEnv,
+      ADMIN_PASSWORD_HASH: passwordHash,
+      PRODUCTION_USERS_JSON: JSON.stringify([{ id: 'usr-admin-prod', username: 'another-admin', passwordHash, role: 'ADMIN' }])
+    });
+    assert.equal(duplicate.status, 1);
+    assert.match(duplicate.stderr, /duplicate production user id or username/);
+  });
+
   test('9. Production user loading: supports admin, operator, viewer from env and rejects dev fallback', () => {
     const res = spawnSync(process.execPath, [
       '--input-type=module',
@@ -128,11 +170,11 @@ describe('Security Hardening: Production Environment Fail-Closed & User DB Valid
         JWT_SECRET: 'super-strong-production-jwt-secret-min-32-chars-long!',
         ALLOWED_ORIGINS: 'https://omnitraf.surabaya.go.id',
         ADMIN_USERNAME: 'custom_admin',
-        ADMIN_PASSWORD_HASH: '$2a$10$prodAdminHashTestValueOnly1234567890123456789012',
+        ADMIN_PASSWORD_HASH: bcrypt.hashSync('prod-admin-password', 10),
         OPERATOR_USERNAME: 'custom_operator',
-        OPERATOR_PASSWORD_HASH: '$2a$10$prodOperatorHashTestValueOnly12345678901234567890',
+        OPERATOR_PASSWORD_HASH: bcrypt.hashSync('prod-operator-password', 10),
         VIEWER_USERNAME: 'custom_viewer',
-        VIEWER_PASSWORD_HASH: '$2a$10$prodViewerHashTestValueOnly1234567890123456789012'
+        VIEWER_PASSWORD_HASH: bcrypt.hashSync('prod-viewer-password', 10)
       },
       encoding: 'utf8'
     });

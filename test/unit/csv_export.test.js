@@ -21,3 +21,21 @@ test('incident CSV empty state contains only a header and cells normalize safely
   assert.equal(encodeCsvCell(null), '""');
   assert.equal(encodeCsvCell('line\nbreak'), '"line\nbreak"');
 });
+
+test('snapshot CSV always carries the same snapshot ID, including an empty incident set', () => {
+  const snapshot = { id: 'SIM-20261015090000000', timestamp: '2026-10-15T02:00:00.000Z', stale: true };
+  const empty = buildIncidentCsv([], 'SIMULATED', snapshot);
+  assert.match(empty, /"Snapshot ID"/);
+  assert.match(empty, /"SNAPSHOT"/);
+  assert.match(empty, /"SIM-20261015090000000"/);
+  assert.match(empty, /"STALE"/);
+  const [emptyHeader, emptySnapshotRow] = empty.replace(/^\uFEFF/, '').trim().split('\r\n');
+  assert.equal(emptySnapshotRow.split(',').length, emptyHeader.split(',').length);
+
+  const withIncident = buildIncidentCsv([{ id: 'INC-1', status: 'ACTIVE' }], 'SIMULATED', snapshot);
+  assert.match(withIncident, /"INSIDEN"/);
+  assert.match(withIncident, /"SIM-20261015090000000"/);
+  assert.match(withIncident, /"STALE"/);
+  const [incidentHeader, incidentRow] = withIncident.replace(/^\uFEFF/, '').trim().split('\r\n');
+  assert.equal(incidentRow.split(',').length, incidentHeader.split(',').length);
+});

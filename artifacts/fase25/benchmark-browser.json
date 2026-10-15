@@ -1,0 +1,13 @@
+{
+  "webgl2": true,
+  "error": 0,
+  "renderer": "CPU 0.4ms · p95 83.3ms · GPU n/a · 34 draw · 34g/1t",
+  "fps": "17 FPS",
+  "heapBytes": 13400000,
+  "canvas": {
+    "width": 862,
+    "height": 478
+  },
+  "hardwareConcurrency": 20,
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"
+}

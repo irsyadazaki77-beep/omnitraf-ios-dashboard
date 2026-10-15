@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
+import { createHash } from 'node:crypto';
 import { ALLOW_TEST_QUERY_TOKEN_AUTH, JWT_ALGORITHM, JWT_AUDIENCE, JWT_ISSUER, JWT_SECRET, NODE_ENV } from '../config/env.js';
-import { ROLES } from '../config/constants.js';
+import { ROLES, USERS_DB } from '../config/constants.js';
 import { getRequiredRoles, isPublicCapability } from '../config/capabilities.js';
 import { createApiErrorResponse } from './errorHandler.js';
 import { tokenRevocationService } from '../services/tokenRevocationService.js';
@@ -10,12 +11,14 @@ import { randomUUID } from 'crypto';
 export const ALLOWED_JWT_ALGORITHMS = Object.freeze([JWT_ALGORITHM]);
 
 export function generateToken(user) {
+  const credentialVersion = createHash('sha256').update(String(user.passwordHash || '')).digest('hex');
   return jwt.sign({
     id: user.id,
     username: user.username,
     role: user.role,
     name: user.name,
-    email: user.email
+    email: user.email,
+    credentialVersion
   }, JWT_SECRET, {
     algorithm: JWT_ALGORITHM,
     expiresIn: '24h',
@@ -29,13 +32,19 @@ export function generateToken(user) {
 export function principalFromClaims(claims) {
   if (!claims || typeof claims !== 'object' || !claims.id || claims.sub !== claims.id ||
       !claims.username || !Object.values(ROLES).includes(claims.role) ||
-      typeof claims.iat !== 'number' || typeof claims.exp !== 'number') return null;
+      typeof claims.iat !== 'number' || typeof claims.exp !== 'number' ||
+      typeof claims.credentialVersion !== 'string') return null;
+  const user = USERS_DB.find((candidate) => candidate.id === String(claims.id));
+  if (!user || user.username !== String(claims.username) || user.role !== claims.role) return null;
+  const credentialVersion = createHash('sha256').update(String(user.passwordHash || '')).digest('hex');
+  if (claims.credentialVersion !== credentialVersion) return null;
   return Object.freeze({
-    id: String(claims.id),
-    username: String(claims.username),
-    role: claims.role,
-    name: typeof claims.name === 'string' ? claims.name : String(claims.username),
-    email: typeof claims.email === 'string' ? claims.email : null
+    id: user.id,
+    username: user.username,
+    role: user.role,
+    name: user.name,
+    email: user.email,
+    iat: claims.iat
   });
 }
 

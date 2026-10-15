@@ -37,12 +37,16 @@ export class ComputerVisionEngine {
     const state = simulationState || { trafficModel: trafficModel || {}, isChaosMode };
     const model = trafficModel || state.trafficModel || {};
     this.tickSimulation(isChaosMode, { ...state, trafficModel: model }, .3);
+    const corridorsById = new Map((model.corridors || []).map((item) => [String(item.corridorId), item]));
+    const intersectionsById = new Map((state.intersections || []).map((item) => [String(item.id), item]));
+    const activeIncidents = (state.incidents || []).filter((item) => !['RESOLVED', 'CLOSED', 'ARCHIVED', 'CANCELLED'].includes(String(item.status || 'ACTIVE').toUpperCase()));
+    const activeEmergencies = (state.activeEmergencies || []).filter((item) => !['COMPLETED', 'CANCELLED'].includes(String(item.status || '').toUpperCase())).length;
     const camerasData = {};
 
     for (const cameraId of this.cameras) {
       const config = trafficCameraConfig(cameraId);
       const vehicles = this.vehicleSimulation.getVehicles(cameraId);
-      const corridor = config?.corridorId ? model.corridors?.find(item => item.corridorId === config.corridorId) : null;
+      const corridor = config?.corridorId ? corridorsById.get(String(config.corridorId)) : null;
       const speedAggregate = vehicles.length ? vehicles.reduce((sum, item) => sum + item.speedKmh, 0) / vehicles.length : 0;
       const trafficMetrics = corridor ? {
         corridorId: corridor.corridorId,
@@ -64,7 +68,7 @@ export class ComputerVisionEngine {
         speedKmh: model.averageSpeedKmh ?? Number(speedAggregate.toFixed(1)),
         provenance: 'SIMULATED'
       };
-      const node = config?.nodeId ? state.intersections?.find(item => item.id === config.nodeId) : null;
+      const node = config?.nodeId ? intersectionsById.get(String(config.nodeId)) : null;
       const detections = vehicles.map(vehicle => {
         const pos = projectTrafficVehicle(vehicle, config?.scene);
         const [baseW, baseH] = TYPE_SIZE[vehicle.type] || TYPE_SIZE.car;
@@ -92,7 +96,7 @@ export class ComputerVisionEngine {
           provenance: 'SIMULATED'
         };
       });
-      const roadState = this._roadState(cameraId, state);
+      const roadState = this._roadState(cameraId, state, activeIncidents, activeEmergencies);
       camerasData[cameraId] = {
         cameraId,
         timestamp,
@@ -122,9 +126,9 @@ export class ComputerVisionEngine {
     return this.latestFramePayload;
   }
 
-  _roadState(cameraId, state) {
+  _roadState(cameraId, state, activeIncidents = null, activeEmergencies = null) {
     const config = trafficCameraConfig(cameraId);
-    const incidents = (state.incidents || []).filter(item => !['RESOLVED', 'CLOSED', 'ARCHIVED', 'CANCELLED'].includes(String(item.status || 'ACTIVE').toUpperCase()));
+    const incidents = activeIncidents || (state.incidents || []).filter(item => !['RESOLVED', 'CLOSED', 'ARCHIVED', 'CANCELLED'].includes(String(item.status || 'ACTIVE').toUpperCase()));
     const matched = incidents.filter(item => {
       const text = `${item.location || ''} ${item.title || ''} ${item.corridorId || ''} ${item.intersectionId || ''}`.toLowerCase();
       return config?.corridorId && text.includes(config.corridorId.replace('corridor-', ''));
@@ -133,7 +137,7 @@ export class ComputerVisionEngine {
       weather: state.roadCondition === 'wet' || state.isRainMode ? 'wet-simulated' : 'dry-simulated',
       activeIncidentCount: matched.length,
       laneClosed: matched.some(item => item.laneClosed || item.laneClosure || item.closedLanes?.length),
-      activeEmergencyCount: (state.activeEmergencies || []).filter(item => !['COMPLETED', 'CANCELLED'].includes(String(item.status || '').toUpperCase())).length,
+      activeEmergencyCount: activeEmergencies ?? (state.activeEmergencies || []).filter(item => !['COMPLETED', 'CANCELLED'].includes(String(item.status || '').toUpperCase())).length,
       provenance: 'SIMULATED'
     };
   }

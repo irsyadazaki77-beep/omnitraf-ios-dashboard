@@ -1,6 +1,7 @@
 .city3d-view { display:grid; gap:14px; min-width:0; }
 .city3d-header { align-items:flex-start; }
 .city3d-workspace { display:grid; grid-template-columns:minmax(0,1fr) minmax(260px,310px); gap:12px; min-width:0; }
+.city3d-workspace:has(.city3d-inspector[hidden]) { grid-template-columns:minmax(0,1fr); }
 .city3d-stage { position:relative; min-width:0; min-height:640px; overflow:hidden; border:1px solid var(--border-default); border-radius:var(--radius-lg); background:#0d171b; box-shadow:var(--shadow-sm); }
 .city3d-canvas-host { position:absolute; inset:0; }
 .city3d-canvas-host canvas { display:block; width:100%; height:100%; touch-action:none; outline:none; }
@@ -35,4 +36,5 @@
 .city3d-fallback span { color:var(--text-secondary); }
 @media (max-width:900px) { .city3d-workspace { grid-template-columns:minmax(0,1fr); }.city3d-inspector { order:-1; }.city3d-stage { min-height:60vh; } }
 @media (max-width:620px) { .city3d-stage { min-height:68vh; }.city3d-topbar { right:7px; left:7px; align-items:flex-start; flex-direction:column; }.city3d-view-modes,.city3d-stage-actions { max-width:100%; flex-wrap:wrap; }.city3d-stage-actions select { max-width:120px; }.city3d-select-label { display:none; }.city3d-cctv-preview { width:150px; }.city3d-header { flex-direction:column; } }
+@media (max-width:760px) { .city3d-status-row { right:8px; bottom:8px; left:8px; flex-wrap:wrap; gap:5px 8px; max-width:calc(100% - 16px); font-size:9px; }.city3d-status-row > :last-child { margin-left:0; }.city3d-status-row #city3dPerf { order:5; flex-basis:100%; }.city3d-status-row #city3dVehicleFrame { order:6; flex-basis:100%; } }
 @media (prefers-reduced-motion:reduce) { .city3d-control { transition:none; } }

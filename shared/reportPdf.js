@@ -32,7 +32,7 @@ export async function generateReportPdf(snapshot) {
   newPage();
   line(`ID: ${snapshot.id}`); line(`Jenis: ${snapshot.type}`);
   line(`Waktu snapshot: ${new Date(snapshot.timestamp).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB`);
-  line(`Sumber: ${snapshot.source} | Semua format menggunakan snapshot yang sama.`);
+  line(`Sumber: ${snapshot.source} | Kesegaran state: ${snapshot.stale ? 'STALE' : 'CURRENT'} | Semua format menggunakan snapshot yang sama.`);
   y -= 12; line('RINGKASAN SNAPSHOT', { heading: true, size: 13 });
   const m = snapshot.metrics;
   line(`Volume pada penghitung simulator: ${metric(m.volume, ' kendaraan')}`);

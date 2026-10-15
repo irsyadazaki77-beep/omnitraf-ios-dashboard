@@ -1,4 +1,89 @@
 <div class="view-pane" id="view-prediction">
+  <section class="scenario-lab-panel glass-panel" id="scenarioLabPanel" aria-labelledby="scenarioLabTitle">
+    <header class="scenario-lab-header">
+      <div>
+        <div class="analytics-provenance-row"><span class="provenance-badge simulated">SANDBOX · TERISOLASI</span><span class="analytics-units-label">Model agregat deterministik · bukan prediksi dunia nyata</span></div>
+        <h1 id="scenarioLabTitle">Scenario Lab</h1>
+        <p>Rancang eksperimen lalu lintas, jalankan replay yang reproducible, lalu bandingkan metrik pada initial state yang sama.</p>
+      </div>
+      <div class="scenario-lab-status" id="scenarioLabStatus" role="status" aria-live="polite">Siap · simulator authoritative tidak berubah</div>
+    </header>
+
+    <div class="scenario-lab-layout">
+      <aside class="scenario-lab-config" aria-label="Konfigurasi skenario">
+        <div class="scenario-lab-subhead"><div><span class="scenario-lab-kicker">01 / SETUP</span><h2>Konfigurasi run</h2></div></div>
+        <label class="scenario-field">Preset
+          <select id="scenarioPreset"><option value="normal">Normal Traffic</option><option value="rush-hour">Rush Hour</option><option value="heavy-rain">Heavy Rain</option><option value="major-incident">Major Incident</option><option value="road-closure">Road Closure</option><option value="adaptive-signals">Adaptive Signals</option><option value="emergency-green-wave">Emergency Green Wave</option></select>
+        </label>
+        <div class="scenario-field-row">
+          <label class="scenario-field">Seed<input id="scenarioSeed" type="number" min="0" max="2147483647" step="1" value="42" /></label>
+          <label class="scenario-field">Mulai (WIB)<input id="scenarioHour" type="number" min="0" max="23" step="1" value="8" /></label>
+        </div>
+        <div class="scenario-field-row">
+          <label class="scenario-field">Horizon<select id="scenarioHorizon"><option value="15">15 menit</option><option value="30" selected>30 menit</option><option value="60">60 menit</option><option value="120">120 menit</option></select></label>
+          <label class="scenario-field">Koridor<select id="scenarioCorridor"><option value="all">Semua koridor</option></select></label>
+        </div>
+        <label class="scenario-field scenario-range-field">Permintaan <span><strong id="scenarioDemandValue">1,00×</strong><small>rentang model 0,50–1,75×</small></span>
+          <input id="scenarioDemand" type="range" min="0.5" max="1.75" step="0.05" value="1" />
+        </label>
+        <div class="scenario-field-row">
+          <label class="scenario-field">Cuaca<select id="scenarioWeather"><option value="clear">Cerah</option><option value="rain">Hujan</option></select></label>
+          <label class="scenario-field">Insiden<select id="scenarioIncident"><option value="none">Tidak ada</option><option value="low">Rendah</option><option value="medium">Sedang</option><option value="high">Tinggi</option><option value="critical">Kritis</option></select></label>
+        </div>
+        <label class="scenario-field">Strategi sinyal<select id="scenarioStrategy"><option value="fixed">Sinyal tetap</option><option value="adaptive">Adaptif</option><option value="emergency-green-wave">Emergency green wave</option></select></label>
+        <div class="scenario-form-actions">
+          <button type="button" class="btn btn-primary compact" id="scenarioRunButton">Buat &amp; jalankan</button>
+          <button type="button" class="btn btn-ghost compact" id="scenarioSaveButton">Simpan konfigurasi</button>
+        </div>
+        <label class="scenario-field">Konfigurasi tersimpan<select id="scenarioSavedSelect"><option value="">Pilih konfigurasi lokal</option></select></label>
+        <div class="scenario-compare-controls">
+          <div class="scenario-lab-kicker">02 / COMPARE</div>
+          <div class="scenario-field-row">
+            <label class="scenario-field">Baseline<select id="scenarioCompareBase"><option value="normal">Normal Traffic</option></select></label>
+            <label class="scenario-field">Alternatif<select id="scenarioCompareAlt"><option value="rush-hour">Rush Hour</option><option value="road-closure">Road Closure</option></select></label>
+          </div>
+          <button type="button" class="btn btn-ghost compact" id="scenarioCompareButton">Bandingkan skenario</button>
+        </div>
+      </aside>
+
+      <div class="scenario-lab-results">
+        <section class="scenario-run-card" aria-labelledby="scenarioRunTitle">
+          <div class="scenario-lab-subhead scenario-run-heading"><div><span class="scenario-lab-kicker">03 / SIMULATION</span><h2 id="scenarioRunTitle">Simulation timeline</h2></div><span class="scenario-sim-label">SIMULATED</span></div>
+          <div class="scenario-timeline-meta"><span id="scenarioTimelineLabel">Belum ada run</span><span id="scenarioTimelinePct">0%</span></div>
+          <div class="scenario-progress-track" id="scenarioProgressTrack" role="progressbar" aria-label="Scenario progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="scenarioProgressFill"></span><div id="scenarioEventMarkers" aria-hidden="true"></div></div>
+          <div class="scenario-timeline-ticks" id="scenarioTimelineTicks"><span>0 min</span><span>8 min</span><span>15 min</span><span>23 min</span><span>30 min</span></div>
+          <div class="scenario-transport">
+            <button type="button" class="btn btn-primary compact" id="scenarioPlayButton" disabled>▶ Play</button>
+            <button type="button" class="btn btn-ghost compact" id="scenarioPauseButton" disabled>Ⅱ Pause</button>
+            <button type="button" class="btn btn-ghost compact" id="scenarioResetButton" disabled>↺ Reset</button>
+            <button type="button" class="btn btn-ghost compact" id="scenarioReplayButton" disabled>⟲ Replay</button>
+            <div class="scenario-speed-selector" role="group" aria-label="Kecepatan playback">
+              <span class="scenario-speed-label">Kecepatan:</span>
+              <button type="button" class="btn btn-ghost compact scenario-speed-btn is-active" data-speed="1">1×</button>
+              <button type="button" class="btn btn-ghost compact scenario-speed-btn" data-speed="2">2×</button>
+              <button type="button" class="btn btn-ghost compact scenario-speed-btn" data-speed="4">4×</button>
+            </div>
+            <span class="scenario-transport-spacer"></span>
+            <button type="button" class="btn btn-ghost compact" id="scenarioExportJson" disabled>JSON</button>
+            <button type="button" class="btn btn-ghost compact" id="scenarioExportCsv" disabled>CSV</button>
+          </div>
+          <p class="scenario-event-list" id="scenarioEventList">Event marker akan muncul pada timeline saat event model dijadwalkan.</p>
+        </section>
+
+        <section class="scenario-metrics-section" aria-label="Hasil simulasi">
+          <div class="scenario-metric-grid" id="scenarioMetricGrid"><article class="scenario-metric-card"><span>Kecepatan rata-rata</span><strong>—</strong><small>km/jam</small></article><article class="scenario-metric-card"><span>Antrean model</span><strong>—</strong><small>meter</small></article><article class="scenario-metric-card"><span>Indeks kepadatan</span><strong>—</strong><small>0–100</small></article><article class="scenario-metric-card"><span>Throughput</span><strong>—</strong><small>kendaraan/jam</small></article></div>
+          <div class="scenario-chart-card"><div class="scenario-chart-heading"><div><span class="scenario-lab-kicker">MODEL OUTPUT</span><h3>Antrean sepanjang run</h3></div><span class="analytics-units-label">Meter · simulasi</span></div><div id="scenarioTimelineChart" class="scenario-chart-empty">Jalankan skenario untuk melihat seri metrik per menit.</div></div>
+          <div class="scenario-comparison-card" id="scenarioComparisonResult" hidden></div>
+          <details class="scenario-corridor-details"><summary>Rincian metrik koridor</summary><div class="table-responsive"><table class="data-table scenario-corridor-table"><thead><tr><th>Koridor</th><th>Permintaan</th><th>Kecepatan</th><th>Antrean</th><th>Kepadatan</th><th>Fase hijau</th></tr></thead><tbody id="scenarioCorridorRows"><tr><td colspan="6">Belum ada hasil model.</td></tr></tbody></table></div></details>
+          <nav class="scenario-workspace-links" aria-label="Workspace visualisasi simulasi">
+            <span>Workspace sistem</span><a href="#map" data-view="map">Map 2D</a><a href="#city3d" data-view="city3d">Digital Twin 3D</a><a href="#cctv" data-view="cctv">CCTV</a><a href="#signals" data-view="signals">Signals</a><a href="#analytics" data-view="analytics">Analytics</a><a href="#reports" data-view="reports">Reports</a>
+          </nav>
+          <p class="scenario-isolation-note">Run ini membaca snapshot simulasi sebagai initial state, lalu bergerak di sandbox tersendiri. Menavigasi ke workspace lain tidak menerapkan hasil ke state operasional.</p>
+        </section>
+      </div>
+    </div>
+  </section>
+
   <article class="prediction-panel glass-panel" id="card-prediction">
     <div class="section-head prediction-section-head">
       <div>

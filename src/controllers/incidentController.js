@@ -10,6 +10,7 @@ import { socketClient } from '../core/socketClient.js';
 import { commandLayer } from '../core/commandLayer.js';
 import { authManager } from '../core/authManager.js';
 import { Disposer } from '../core/disposer.js';
+import { analyzeIncidentImpact } from '../modules/trafficModel.js';
 
 const TERMINAL_INCIDENT_STATUSES = new Set(['RESOLVED', 'ARCHIVED', 'CLOSED', 'CANCELLED']);
 
@@ -312,6 +313,8 @@ export class IncidentController {
     this.disposer.addStoreSubscription(stateStore, 'state:incidents', ({ value }) => {
       this._renderIncidentListUI(value);
       this._renderNotificationDrawer(value);
+      const selected = (Array.isArray(value) ? value : []).find(item => String(item.id) === String(this.selectedIncidentId));
+      if (selected) this._renderIncidentInspector(selected);
     });
   }
 
@@ -323,7 +326,7 @@ export class IncidentController {
     const canOperate = authManager.hasRole(['OPERATOR', 'ADMIN']);
     notifContainer.innerHTML = "";
     if (list.length === 0) {
-      notifContainer.innerHTML = '<p class="text-muted" style="margin:0;">Belum ada skenario demo.</p>';
+      notifContainer.innerHTML = '<p class="text-muted csp-style-38965f9b18" >Belum ada skenario demo.</p>';
       return;
     }
 
@@ -363,26 +366,26 @@ export class IncidentController {
       const safeNotes = escapeHtml(inc.notes || 'Skenario contoh pada simulator; bukan laporan lapangan.');
 
       card.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="csp-style-3490dbc8a7" >
           <span class="status-badge ${badgeClass}">${badgeLabel}</span>
-          <small style="font-size: 10px; color: var(--text-muted);">${inc.reportedAt ? new Date(inc.reportedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : 'Baru saja'}</small>
+          <small class="csp-style-51c0d45556" >${inc.reportedAt ? new Date(inc.reportedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : 'Baru saja'}</small>
         </div>
-        <strong style="font-size: 12.5px; color: var(--text);">${safeTitle} - ${safeLocation}</strong>
-        <p style="margin: 0; font-size: 11px; color: var(--text-muted); line-height: 1.4;">${safeNotes}</p>
+        <strong class="csp-style-38c22f4c16" >${safeTitle} - ${safeLocation}</strong>
+        <p class="csp-style-21e451afb0" >${safeNotes}</p>
         
         ${isResolved ? `
-          <div style="font-size: 10.5px; color: var(--success); font-weight: 600;">
+          <div class="csp-style-8392da7c0f" >
             ✓ Skenario selesai${responseTimeStr ? ` · Durasi: ${responseTimeStr}` : ''}
           </div>
         ` : ''}
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.06);">
-          <button class="btn btn-ghost compact btn-map-shortcut" style="padding: 4px 8px; font-size: 10.5px;">
+        <div class="csp-style-7da447c09f" >
+          <button class="btn btn-ghost compact btn-map-shortcut csp-style-a60a6bc9f0" >
             📍 Buka di Peta
           </button>
           
           ${!isResolved && canOperate ? `
-            <button class="btn btn-primary compact incident-dispatch-btn" style="padding: 4px 8px; font-size: 10.5px;">${workflowAction}</button>
+            <button class="btn btn-primary compact incident-dispatch-btn csp-style-a60a6bc9f0" >${workflowAction}</button>
           ` : ''}
         </div>
       `;
@@ -530,6 +533,7 @@ export class IncidentController {
     const map = document.getElementById('btnIncidentOpenMap');
     const cctv = document.getElementById('btnIncidentOpenCctv');
     const action = document.getElementById('btnIncidentInspectorAction');
+    const roadRecovered = document.getElementById('btnIncidentMarkRoadRecovered');
     if (list) {
       const selectFromEvent = (event) => {
         if (event.target.closest('button,a,input,select')) return;
@@ -543,7 +547,15 @@ export class IncidentController {
     if (close) this.disposer.addEventListener(close, 'click', () => this._closeIncidentInspector(true));
     if (map) this.disposer.addEventListener(map, 'click', () => {
       const incident = (stateStore.getState().incidents || []).find((entry) => String(entry.id) === String(this.selectedIncidentId));
-      if (incident) window.mapManager?.flyToIncident(incident.location || '', incident.title || 'Insiden simulasi');
+      if (!incident) return;
+      const focus = { kind: 'incident', id: String(incident.id), route: 'map' };
+      stateStore.setState({ pendingEntityFocus: focus });
+      if (window.location.hash === '#map') {
+        window.dispatchEvent(new CustomEvent('omnitraf:entity-focus', { detail: focus }));
+        stateStore.setState({ pendingEntityFocus: null });
+      } else {
+        window.location.hash = 'map';
+      }
     });
     if (cctv) this.disposer.addEventListener(cctv, 'click', () => {
       const incident = (stateStore.getState().incidents || []).find((entry) => String(entry.id) === String(this.selectedIncidentId));
@@ -559,6 +571,38 @@ export class IncidentController {
     if (action) this.disposer.addEventListener(action, 'click', () => {
       if (this.selectedIncidentId) this.dispatchIncident(this.selectedIncidentId);
     });
+    if (roadRecovered) this.disposer.addEventListener(roadRecovered, 'click', () => {
+      if (this.selectedIncidentId) this.markIncidentRoadRecovered(this.selectedIncidentId);
+    });
+  }
+
+  async markIncidentRoadRecovered(id) {
+    const button = document.getElementById('btnIncidentMarkRoadRecovered');
+    if (button) {
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+    }
+    try {
+      await commandLayer.dispatchCommand({
+        action: 'incident:road-recovered',
+        targetType: 'incident',
+        targetId: id,
+        payload: { notes: 'Pemulihan jalan dikonfirmasi operator pada model simulasi.' }
+      }, false);
+      window.showToast(`Dampak jalan insiden #${id} dipulihkan pada model simulasi.`, 'success');
+      soundManager.play('success');
+    } catch (error) {
+      window.showToast(`Pemulihan dampak jalan gagal dikonfirmasi: ${error.message}`, 'danger');
+      soundManager.play('alert');
+    } finally {
+      if (button) {
+        button.removeAttribute('aria-busy');
+        const incident = (stateStore.getState().incidents || []).find(item => String(item.id) === String(id));
+        const authorized = authManager.hasRole(['OPERATOR', 'ADMIN']);
+        const recovered = Boolean(incident?.roadImpactRecoveredAt || incident?.roadImpactRecovered === true);
+        button.disabled = !authorized || !incident || recovered;
+      }
+    }
   }
 
   _renderIncidentInspector(incident) {
@@ -568,14 +612,22 @@ export class IncidentController {
     const properties = document.getElementById('incidentInspectorProperties');
     const action = document.getElementById('btnIncidentInspectorAction');
     const cctv = document.getElementById('btnIncidentOpenCctv');
+    const roadRecovery = document.getElementById('btnIncidentMarkRoadRecovered');
+    const roadImpactHint = document.getElementById('incidentRoadImpactHint');
     if (!inspector || !title || !summary || !properties) return;
     this.selectedIncidentId = incident.id;
+    inspector.dataset.entityKind = 'incident';
+    inspector.dataset.entityId = String(incident.id);
     title.textContent = incident.title || 'Insiden simulasi';
     summary.textContent = incident.notes || incident.description || 'Detail skenario insiden simulasi.';
     const activity = Array.isArray(incident.activity) ? incident.activity : [];
+    const impact = analyzeIncidentImpact(incident, stateStore.getState());
     const values = [
       ['Lokasi', incident.location || 'Belum tersedia'],
       ['Keparahan', incident.severity || incident.priority || 'Belum tersedia'],
+      ['Dampak model', `${impact.reason} Antrean jaringan ${impact.networkQueueDeltaVehicles > 0 ? '+' : ''}${impact.networkQueueDeltaVehicles} kendaraan; waktu tempuh ${impact.networkTravelTimeDeltaMinutes > 0 ? '+' : ''}${impact.networkTravelTimeDeltaMinutes} menit.`],
+      ['Dampak jalan', incident.roadImpactRecoveredAt ? `Pulih pada ${new Date(incident.roadImpactRecoveredAt).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB` : 'Tetap dimodelkan sampai pemulihan jalan dikonfirmasi secara terpisah.'],
+      ['Rekomendasi', `${impact.recommendation} ${impact.provenance}`],
       ['Status', incident.status || 'Belum tersedia'],
       ['Waktu', incident.reportedAt && Number.isFinite(new Date(incident.reportedAt).getTime()) ? new Date(incident.reportedAt).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : 'Belum tersedia'],
       ['Disposisi', incident.assignedUnit || 'Belum tersedia'],
@@ -596,6 +648,18 @@ export class IncidentController {
       action.textContent = this._incidentWorkflowAction(incident.status);
     }
     if (cctv) cctv.hidden = !(incident.cameraId || incident.relatedCameraId);
+    if (roadRecovery) {
+      const recovered = Boolean(incident.roadImpactRecoveredAt || incident.roadImpactRecovered === true);
+      const canOperate = authManager.hasRole(['OPERATOR', 'ADMIN']);
+      roadRecovery.textContent = recovered ? 'Jalan pulih pada model' : 'Tandai jalan pulih (simulasi)';
+      roadRecovery.disabled = recovered || !canOperate;
+      roadRecovery.title = recovered ? 'Pemulihan jalan sudah tercatat pada state simulator.' : canOperate ? '' : 'Aksi ini memerlukan peran Operator atau Admin.';
+    }
+    if (roadImpactHint) roadImpactHint.textContent = incident.roadImpactRecoveredAt
+      ? 'Status workflow dan dampak jalan dicatat terpisah. Model berhenti menerapkan dampak setelah pemulihan jalan simulasi ini diakui server.'
+      : authManager.hasRole(['OPERATOR', 'ADMIN'])
+        ? 'Status selesai tidak menghapus dampak jalan. Dampak model tetap berlaku sampai pemulihan jalan dikonfirmasi di simulator.'
+        : 'Status selesai tidak menghapus dampak jalan. Hanya Operator atau Admin yang dapat mengonfirmasi pemulihan pada simulator.';
     inspector.hidden = false;
     document.querySelectorAll('#incidentLogsList .incident-log-item').forEach((item) => {
       const selected = item.id === `incident-${incident.id}`;
@@ -643,7 +707,7 @@ export class IncidentController {
     }
 
     if (list.length === 0) {
-      timelineEl.innerHTML = `<li style="color: var(--text-dim); padding: 8px 0;">Tidak ada kronologi insiden aktif.</li>`;
+      timelineEl.innerHTML = `<li class="csp-style-2826ae3539" >Tidak ada kronologi insiden aktif.</li>`;
       return;
     }
 

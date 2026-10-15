@@ -53,6 +53,7 @@ export const COMMAND_CONTRACTS = Object.freeze({
   'incident:update-status': { target: 'incidentId', targetType: 'incident-identifier', required: ['targetId', 'status'], fields: { id: field('identifier', { optional: true }), status: field('enum', { values: INCIDENT_STATUS_VALUES, case: 'upper', legacyAlias: { 'DISPATCHED/RESPONDING': 'DISPATCHED' } }), assignedUnit: field('string', { maxLength: 120, optional: true }), notes: field('string', { maxLength: 1000, optional: true }) } },
   'incident:dispatch': { target: 'incidentId', targetType: 'incident-identifier', required: ['targetId'], fields: { id: field('identifier', { optional: true }), status: field('enum', { values: INCIDENT_STATUS_VALUES, default: 'DISPATCHED', optional: true, case: 'upper' }), assignedUnit: field('string', { maxLength: 120, default: 'Unit Demo', optional: true }), notes: field('string', { maxLength: 1000, default: 'Status penugasan contoh diubah pada simulator; tidak ada petugas yang dihubungi.', optional: true }) } },
   'incident:resolve': { target: 'incidentId', targetType: 'incident-identifier', required: ['targetId'], fields: { id: field('identifier', { optional: true }), assignedUnit: field('string', { maxLength: 120, optional: true }), notes: field('string', { maxLength: 1000, optional: true }) } },
+  'incident:road-recovered': { target: 'incidentId', targetType: 'incident-identifier', required: ['targetId'], fields: { id: field('identifier', { optional: true }), notes: field('string', { maxLength: 1000, optional: true }) } },
   'siren:mute': { target: 'audioId', targetType: 'audio-identifier', required: ['targetId', 'muted'], fields: { muted: field('boolean') } },
   'cctv:snapshot': { target: 'cameraId', targetType: 'camera-identifier', required: ['targetId'], fields: {} }
 });
@@ -293,6 +294,7 @@ export function validateCommand(normalized) {
       break;
     }
     case 'incident:resolve': payload.id = targetId; optionalString(payload, 'assignedUnit', 120); optionalString(payload, 'notes', 1000, { allowEmpty: true }); break;
+    case 'incident:road-recovered': payload.id = targetId; optionalString(payload, 'notes', 1000, { allowEmpty: true }); break;
     case 'cctv:snapshot': break;
   }
 

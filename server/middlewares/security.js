@@ -1,4 +1,4 @@
-import { isOriginAllowed, IS_PRODUCTION } from '../config/env.js';
+import { allowedOrigins, isOriginAllowed, IS_PRODUCTION } from '../config/env.js';
 
 /**
  * Middleware CORS untuk REST API Express
@@ -52,16 +52,36 @@ export function securityHeadersMiddleware(req, res, next) {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
 
-  // Frontend libraries and styles are served from the hashed local build.
-  // Inline styles remain for legacy templates; inline scripts and handlers stay blocked.
+  // Socket connections follow the configured application origins. Never use
+  // scheme-wide ws:/wss: sources, which would authorize arbitrary hosts.
+  const socketOrigins = allowedOrigins.flatMap((origin) => {
+    try {
+      const parsed = new URL(origin);
+      if (parsed.protocol === 'https:') return [`wss://${parsed.host}`];
+      if (parsed.protocol === 'http:' && !IS_PRODUCTION) return [`ws://${parsed.host}`];
+    } catch {
+      // Invalid origins are rejected by environment validation in production.
+    }
+    return [];
+  });
+  const connectSources = [...new Set([
+    "'self'",
+    ...socketOrigins
+  ])];
+
+  // Inline style blocks and attributes are both blocked. Dynamic data styling
+  // is applied through CSSOM after rendering, while template styles live in
+  // the local stylesheet bundle.
   const cspDirectives = [
     "default-src 'self'",
     "script-src 'self'",
     "script-src-attr 'none'",
-    "style-src 'self' 'unsafe-inline'",
+    "style-src 'self'",
+    "style-src-elem 'self'",
+    "style-src-attr 'none'",
     "font-src 'self' data:",
     "img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://*.cartocdn.com https://cartocdn.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org",
-    "connect-src 'self' ws: wss: https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://*.cartocdn.com https://cartocdn.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org",
+    `connect-src ${connectSources.join(' ')}`,
     "frame-ancestors 'self'",
     "base-uri 'self'",
     "form-action 'self'",

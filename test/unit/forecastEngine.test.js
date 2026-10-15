@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { calculateDiurnalIntensity, generateForecastSnapshot } from '../../src/modules/forecastEngine.js';
-import { compareTrafficScenarios, recommendAdaptiveSignal, simulateTrafficNetwork } from '../../src/modules/trafficModel.js';
+import { analyzeIncidentImpact, compareTrafficScenarios, planEmergencyRoutes, recommendAdaptiveSignal, simulateTrafficNetwork } from '../../src/modules/trafficModel.js';
 
 describe('Forecast Engine - deterministic diurnal curve', () => {
   test('intensity remains in range and peaks at the configured commute hours', () => {
@@ -54,6 +54,52 @@ describe('Aggregate traffic model and predictive scenarios', () => {
     assert.ok(phaseShare >= 0.3 && phaseShare <= 0.7);
     assert.match(result.reason, /antrean/);
     assert.equal(result.safety.transition, 'pending next signal cycle; yellow/all-red timings unchanged');
+  });
+
+  test('emergency route comparison is deterministic and responds to corridor incidents', () => {
+    const base = { ...state, simulation: { seed: 412 }, intersections: state.intersections || [] };
+    const first = planEmergencyRoutes(base);
+    const replay = planEmergencyRoutes(base);
+    assert.deepStrictEqual(first, replay);
+    assert.equal(first.routes.length, 2);
+    assert.equal(first.recommendedRouteId, first.routes[0].routeId);
+    assert.ok(first.routes[0].travelTimeMinutes > 0);
+
+    const blocked = planEmergencyRoutes({ ...base, incidents: [{ id: 'INC-LANE', status: 'ACTIVE', severity: 'medium', corridorId: 'corridor-ayani', closedLanes: 2, totalLanes: 3 }] });
+    const route = blocked.routes.find(item => item.routeId === 'route-yani-darmo');
+    assert.equal(route.incidentCount, 1);
+    assert.ok(route.travelTimeMinutes > first.routes.find(item => item.routeId === route.routeId).travelTimeMinutes);
+    assert.equal(route.provenance, 'SIMULATED');
+  });
+
+  test('incident impact explains modeled lane closures and green wave previews bound traffic effects', () => {
+    const incident = { id: 'INC-LANE', status: 'ACTIVE', severity: 'medium', corridorId: 'corridor-ayani', closedLanes: 2, totalLanes: 3 };
+    const impact = analyzeIncidentImpact(incident, { ...state, incidents: [incident] });
+    assert.match(impact.reason, /2 lajur ditutup/);
+    assert.equal(impact.affectedCorridors.find(item => item.corridorId === 'corridor-ayani').capacityLossPct, 67);
+    assert.ok(impact.networkQueueDeltaVehicles > 0);
+    assert.ok(impact.networkTravelTimeDeltaMinutes > 0);
+
+    const routePreview = planEmergencyRoutes({ ...state, incidents: [incident] });
+    assert.ok(Number.isFinite(routePreview.trafficImpact.queueDeltaVehicles));
+    assert.ok(Number.isFinite(routePreview.trafficImpact.travelTimeDeltaMinutes));
+  });
+
+  test('incident workflow resolution preserves road impact until explicit recovery acknowledgement', () => {
+    const incident = { id: 'INC-ROAD', status: 'ACTIVE', severity: 'high', corridorId: 'corridor-ayani' };
+    const resolved = { ...incident, status: 'RESOLVED' };
+    const recovered = { ...resolved, roadImpactRecoveredAt: '2026-10-15T02:00:00.000Z' };
+    const activeModel = simulateTrafficNetwork({ ...state, incidents: [incident] }, { hour: 17, seed: 412 });
+    const resolvedModel = simulateTrafficNetwork({ ...state, incidents: [resolved] }, { hour: 17, seed: 412 });
+    const recoveredModel = simulateTrafficNetwork({ ...state, incidents: [recovered] }, { hour: 17, seed: 412 });
+    const impactFor = model => model.corridors.find(corridor => corridor.corridorId === 'corridor-ayani').incidentCapacityLossPct;
+
+    assert.equal(impactFor(activeModel), 42);
+    assert.equal(impactFor(resolvedModel), impactFor(activeModel));
+    assert.equal(impactFor(recoveredModel), 0);
+    assert.equal(analyzeIncidentImpact(recovered, { ...state, incidents: [recovered] }).networkQueueDeltaVehicles, 0);
+    const forecast = generateForecastSnapshot(17, { ...state, incidents: [resolved] });
+    assert.equal(forecast.trafficModel.scenario.incidentCount, 1);
   });
 
   test('forecast output matches modeled metrics and does not claim unevaluated confidence or ESG savings', () => {

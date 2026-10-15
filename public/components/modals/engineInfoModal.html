@@ -1,137 +1,137 @@
-<div class="modal-overlay" id="engineInfoModal" role="dialog" aria-modal="true" aria-labelledby="engineModalTitle" style="display: none;">
-    <div class="modal-content glass-panel engine-modal-content" style="max-width: 860px; width: 94vw; max-height: 90vh; overflow-y: auto; padding: 28px;">
+<div class="modal-overlay csp-style-6e22c58a7a" id="engineInfoModal" role="dialog" aria-modal="true" aria-labelledby="engineModalTitle" >
+    <div class="modal-content glass-panel engine-modal-content csp-style-f871114472" >
       <button class="modal-close" id="closeEngineModal" aria-label="Tutup modal informasi arsitektur">&times;</button>
       
-      <div class="modal-header" id="engineModalTitle" style="border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 20px;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <span style="font-size: 32px; background: rgba(0, 122, 255, 0.15); border: 1px solid rgba(0, 122, 255, 0.3); border-radius: 12px; padding: 6px 12px;">🧠</span>
+      <div class="modal-header csp-style-dc0af31054" id="engineModalTitle" >
+        <div class="csp-style-b5e6692c7c" >
+          <span class="csp-style-cc0bbdce2f" >🧠</span>
           <div>
-            <h2 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.5px;">Arsitektur Prototipe Simulasi OmniTRAF</h2>
-            <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--text-muted);">
+            <h2 class="csp-style-4af14c2568" >Arsitektur Prototipe Simulasi OmniTRAF</h2>
+            <p class="csp-style-6a66b870ef" >
               Model demonstrasi mobilitas perkotaan — data dan perintah belum terhubung ke infrastruktur SITS.
             </p>
           </div>
         </div>
       </div>
 
-      <div class="engine-modal-body" style="display: flex; flex-direction: column; gap: 20px;">
+      <div class="engine-modal-body csp-style-e3d940229f" >
         <!-- 1. Pipeline Arsitektur Data Edge AI & YOLOv8 LERP -->
-        <section class="engine-section glass-soft" style="padding: 16px 20px; border-radius: 14px; border: 1px solid var(--border);">
-          <h3 style="margin: 0 0 8px 0; font-size: 14px; color: var(--primary); display: flex; align-items: center; gap: 8px;">
+        <section class="engine-section glass-soft csp-style-f8ecd865e1" >
+          <h3 class="csp-style-ec604c438b" >
             <span>⚡</span> 1. Pipeline Data Edge AI & Inferensi YOLOv8 dengan 60 FPS LERP (Canvas API)
           </h3>
-          <p style="font-size: 12px; color: var(--text); line-height: 1.6; margin: 0 0 10px 0;">
+          <p class="csp-style-4361afd88e" >
             Prototipe ini <strong>tidak mengakuisisi stream CCTV</strong> dan tidak menjalankan YOLOv8, TensorRT, atau ByteTrack. Adegan dan deteksi yang terlihat dibuat oleh generator simulasi di browser/server; belum ada koneksi RTSP/HLS atau edge gateway SITS.
           </p>
-          <div style="background: rgba(0,0,0,0.25); border-radius: 10px; padding: 12px 16px; font-family: 'Share Tech Mono', monospace; font-size: 11.5px; color: #38bdf8; line-height: 1.5; overflow-x: auto; margin-bottom: 12px;">
+          <div class="csp-style-8a188c282d" >
             [Generator lalu lintas simulasi] ──► [Deteksi sintetis] ──► [Socket.io prototipe] ──► [Canvas browser]
           </div>
-          <div style="padding: 10px 14px; background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; border-radius: 6px; font-size: 11.5px; line-height: 1.6; color: #cbd5e1;">
+          <div class="csp-style-adcb3d9cfd" >
             <strong>Visualisasi Canvas:</strong><br/>
             Browser menggambar adegan dan kotak deteksi sintetis pada Canvas. Laju gambar mengikuti kemampuan perangkat dan browser; ini bukan inferensi video lapangan atau jaminan 60 FPS.
           </div>
         </section>
 
         <!-- 2. Optimasi Sinyal Adaptif -->
-        <section class="engine-section glass-soft" style="padding: 16px 20px; border-radius: 14px; border: 1px solid var(--border);">
-          <h3 style="margin: 0 0 8px 0; font-size: 14px; color: var(--success); display: flex; align-items: center; gap: 8px;">
+        <section class="engine-section glass-soft csp-style-f8ecd865e1" >
+          <h3 class="csp-style-b8e82d5c82" >
             <span>🚥</span> 2. Optimasi Sinyal Adaptif (Dynamic Webster Minimum Delay Method)
           </h3>
-          <p style="font-size: 12px; color: var(--text); line-height: 1.6; margin: 0 0 10px 0;">
+          <p class="csp-style-4361afd88e" >
             Model demonstrasi menghitung rekomendasi alokasi Green Split dari parameter yang dimasukkan pengguna, menggunakan rumus Webster sederhana. Hasilnya tidak diterapkan ke persimpangan fisik dan belum divalidasi untuk kondisi lapangan:
           </p>
-          <div style="background: rgba(0,0,0,0.25); border-radius: 10px; padding: 12px 16px; font-family: 'Share Tech Mono', monospace; font-size: 13px; color: #4ade80;">
+          <div class="csp-style-164e82883a" >
             C₀ = (1.5 × L + 5) / (1 - Y) &nbsp;&nbsp;|&nbsp;&nbsp; gᵢ = (C₀ - L) × (yᵢ / Y)
           </div>
 
           <!-- Interactive Webster Sandbox -->
-          <div style="margin-top: 14px; padding: 14px; background: rgba(0,0,0,0.3); border-radius: 10px; border: 1px solid rgba(74, 222, 128, 0.2);">
-            <div style="font-size: 12px; font-weight: 700; color: #4ade80; margin-bottom: 8px;">🧪 Webster Method Live Calculator Sandbox</div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; align-items: end;">
+          <div class="csp-style-5163dae723" >
+            <div class="csp-style-6aa49f04c6" >🧪 Webster Method Live Calculator Sandbox</div>
+            <div class="csp-style-e798bbea25" >
               <div>
-                <label style="font-size: 11px; color: #94a3b8; display: block; margin-bottom: 4px;">Total Lost Time (L, detik):</label>
-                <input type="number" id="websterLostTime" value="12" min="4" max="30" style="width: 100%; padding: 6px 10px; background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #fff; font-size: 12px;" />
+                <label class="csp-style-6ba354e47f" >Total Lost Time (L, detik):</label>
+                <input type="number" id="websterLostTime" value="12" min="4" max="30" class="csp-style-7f6639deb5" />
               </div>
               <div>
-                <label style="font-size: 11px; color: #94a3b8; display: block; margin-bottom: 4px;">Rasio Arus Total (Y = Σyᵢ):</label>
-                <input type="number" id="websterFlowRatio" value="0.72" step="0.01" min="0.10" max="0.95" style="width: 100%; padding: 6px 10px; background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #fff; font-size: 12px;" />
+                <label class="csp-style-6ba354e47f" >Rasio Arus Total (Y = Σyᵢ):</label>
+                <input type="number" id="websterFlowRatio" value="0.72" step="0.01" min="0.10" max="0.95" class="csp-style-7f6639deb5" />
               </div>
-              <div style="background: rgba(74, 222, 128, 0.1); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(74, 222, 128, 0.3);">
-                <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase;">Siklus Optimum (C₀):</div>
-                <strong id="websterOptCycleResult" style="font-size: 18px; color: #4ade80;">82 detik</strong>
+              <div class="csp-style-6c7140854a" >
+                <div class="csp-style-f2c4f9775f" >Siklus Optimum (C₀):</div>
+                <strong id="websterOptCycleResult" class="csp-style-897c7c0ed2" >82 detik</strong>
               </div>
             </div>
-            <div id="websterCalcSteps" style="font-size: 11px; font-family: 'Share Tech Mono', monospace; color: #a3e635; margin-top: 8px;">
+            <div id="websterCalcSteps" class="csp-style-ced5bf3d63" >
               C₀ = (1.5 × 12 + 5) / (1 - 0.72) = 23 / 0.28 = 82s
             </div>
           </div>
         </section>
 
         <!-- 3. Formula Ilmiah Reduksi Karbon ESG -->
-        <section class="engine-section glass-soft" style="padding: 16px 20px; border-radius: 14px; border: 1px solid var(--border);">
-          <h3 style="margin: 0 0 8px 0; font-size: 14px; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+        <section class="engine-section glass-soft csp-style-f8ecd865e1" >
+          <h3 class="csp-style-14a704268a" >
             <span>🌱</span> 3. Metodologi Ilmiah Estimasi Reduksi Emisi Karbon (ESG Score)
           </h3>
-          <p style="font-size: 12px; color: var(--text); line-height: 1.6; margin: 0 0 10px 0;">
+          <p class="csp-style-4361afd88e" >
             Kalkulator menampilkan estimasi ilustratif berbasis asumsi laju konsumsi dan faktor emisi yang dapat diubah. Angka yang tampil bukan hasil pengukuran Surabaya atau evaluasi Dishub, dan belum divalidasi sebagai inventaris emisi IPCC:
           </p>
-          <div style="background: rgba(0,0,0,0.25); border-radius: 10px; padding: 14px 16px; font-family: 'Share Tech Mono', monospace; font-size: 12px; color: #a5f3fc; line-height: 1.6;">
+          <div class="csp-style-7c3cd866b4" >
             <strong>Formula Reduksi CO₂ Harian:</strong><br/>
             ΔCO₂ (kg) = Σ (Δt_idle × N_kendaraan × SFC_idle × EF_fuel)
           </div>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 12px;">
-            <div style="padding: 8px 12px; background: rgba(255,255,255,0.04); border-radius: 8px;">
-              <small style="color: var(--text-muted); display: block;">Δt_idle (Pengurangan Antrean)</small>
-              <strong style="color: var(--text); font-size: 12px;">-6.4 detik / kendaraan</strong>
+          <div class="csp-style-ee03c3833d" >
+            <div class="csp-style-f084ac64bf" >
+              <small class="csp-style-291cbd61da" >Δt_idle (Pengurangan Antrean)</small>
+              <strong class="csp-style-fa2f241f03" >-6.4 detik / kendaraan</strong>
             </div>
-            <div style="padding: 8px 12px; background: rgba(255,255,255,0.04); border-radius: 8px;">
-              <small style="color: var(--text-muted); display: block;">SFC_idle (Idle Fuel Rate)</small>
-              <strong style="color: var(--text); font-size: 12px;">0.28 L / jam antrean</strong>
+            <div class="csp-style-f084ac64bf" >
+              <small class="csp-style-291cbd61da" >SFC_idle (Idle Fuel Rate)</small>
+              <strong class="csp-style-fa2f241f03" >0.28 L / jam antrean</strong>
             </div>
-            <div style="padding: 8px 12px; background: rgba(255,255,255,0.04); border-radius: 8px;">
-              <small style="color: var(--text-muted); display: block;">EF_fuel (Faktor Emisi BBM)</small>
-              <strong style="color: var(--text); font-size: 12px;">2.31 kg CO₂ / Liter BBM</strong>
+            <div class="csp-style-f084ac64bf" >
+              <small class="csp-style-291cbd61da" >EF_fuel (Faktor Emisi BBM)</small>
+              <strong class="csp-style-fa2f241f03" >2.31 kg CO₂ / Liter BBM</strong>
             </div>
-            <div style="padding: 8px 12px; background: rgba(255,255,255,0.04); border-radius: 8px;">
-              <small style="color: var(--text-muted); display: block;">Dampak Kota Surabaya</small>
-              <strong style="color: var(--success); font-size: 12px;">~1.420 kg CO₂ &amp; 580L BBM / hari</strong>
+            <div class="csp-style-f084ac64bf" >
+              <small class="csp-style-291cbd61da" >Dampak Kota Surabaya</small>
+              <strong class="csp-style-754ec6d51b" >~1.420 kg CO₂ &amp; 580L BBM / hari</strong>
             </div>
           </div>
         </section>
 
         <!-- 4. Protokol Koridor Darurat (Green Wave) -->
-        <section class="engine-section glass-soft" style="padding: 16px 20px; border-radius: 14px; border: 1px solid var(--border);">
-          <h3 style="margin: 0 0 8px 0; font-size: 14px; color: var(--danger); display: flex; align-items: center; gap: 8px;">
+        <section class="engine-section glass-soft csp-style-f8ecd865e1" >
+          <h3 class="csp-style-e6a7c38211" >
             <span>🚨</span> 4. Protokol Preemption Koridor Darurat 112 (Emergency Green Wave)
           </h3>
-          <p style="font-size: 12px; color: var(--text); line-height: 1.6; margin: 0;">
+          <p class="csp-style-74675638fb" >
             Perintah Green Wave dan dispatch hanya mengubah state dalam simulasi. Prototipe ini tidak menerima GPS armada, tidak menghubungi layanan 112, dan tidak mengendalikan APILL. Tidak ada pengukuran yang mendukung klaim pengurangan waktu tanggap.
           </p>
         </section>
 
         <!-- 5. Standar ISO Smart Transport System -->
-        <section class="engine-section glass-soft" style="padding: 16px 20px; border-radius: 14px; border: 1px solid var(--border);">
-          <h3 style="margin: 0 0 8px 0; font-size: 14px; color: #eab308; display: flex; align-items: center; gap: 8px;">
+        <section class="engine-section glass-soft csp-style-f8ecd865e1" >
+          <h3 class="csp-style-32ea2ba8f8" >
             <span>🌐</span> 5. Kepatuhan Standar ISO Smart Transportation Kota Cerdas
           </h3>
-          <p style="font-size: 12px; color: var(--text); line-height: 1.6; margin: 0 0 10px 0;">
+          <p class="csp-style-4361afd88e" >
             Nama dan indikator standar berikut hanya menjadi referensi diskusi. Prototipe ini belum dinilai, diuji kesesuaian, atau disertifikasi terhadap standar tersebut:
           </p>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
-            <div style="background: rgba(0,0,0,0.25); padding: 10px; border-radius: 8px; border-left: 3px solid #eab308;">
-              <strong style="font-size: 12px; color: #fef08a;">ISO 37120 (Sustainable Cities)</strong>
-              <p style="font-size: 11px; color: #94a3b8; margin: 4px 0 0 0;">Indikator mobilitas perkotaan: rasio waktu tempuh komuter, akses transit publik, dan reduksi korban insiden.</p>
+          <div class="csp-style-ee43c13391" >
+            <div class="csp-style-0dc7911857" >
+              <strong class="csp-style-1e4adff1f6" >ISO 37120 (Sustainable Cities)</strong>
+              <p class="csp-style-3e55fa5e6c" >Indikator mobilitas perkotaan: rasio waktu tempuh komuter, akses transit publik, dan reduksi korban insiden.</p>
             </div>
-            <div style="background: rgba(0,0,0,0.25); padding: 10px; border-radius: 8px; border-left: 3px solid #38bdf8;">
-              <strong style="font-size: 12px; color: #bae6fd;">ISO 37122 (Smart Cities Indicators)</strong>
-              <p style="font-size: 11px; color: #94a3b8; margin: 4px 0 0 0;">Indikator rujukan; integrasi APILL, telemetri bus, dan preemption nyata belum tersedia.</p>
+            <div class="csp-style-091ddb246a" >
+              <strong class="csp-style-5f936f9be6" >ISO 37122 (Smart Cities Indicators)</strong>
+              <p class="csp-style-3e55fa5e6c" >Indikator rujukan; integrasi APILL, telemetri bus, dan preemption nyata belum tersedia.</p>
             </div>
           </div>
         </section>
       </div>
 
-      <div class="modal-footer" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-size: 11.5px; color: var(--text-muted);">OmniTRAF • Prototipe demonstrasi nonresmi</span>
+      <div class="modal-footer csp-style-a04c481bb3" >
+        <span class="csp-style-0b61ee3cec" >OmniTRAF • Prototipe demonstrasi nonresmi</span>
         <button class="btn btn-primary" type="button" id="btnCloseEngineInfoFooter">Mengerti &amp; Tutup</button>
       </div>
     </div>
@@ -147,7 +147,7 @@
   <div class="map-tooltip" id="mapTooltip"></div>
 
   <!-- Floating info quick tour tooltip -->
-  <div class="quick-tour-tooltip glass-panel" id="quickTourTooltip" style="display: none;">
+  <div class="quick-tour-tooltip glass-panel csp-style-6e22c58a7a" id="quickTourTooltip" >
     <h3>SITS Command Center Guide</h3>
     <p>Dashboard ini mengoptimalkan lampu lalu lintas secara adaptif berbasis AI.</p>
     <ul>

@@ -20,9 +20,9 @@ export default defineConfig({
   workers: 1, // run single worker to share isolated local test backend cleanly
   reporter: [
     ['list'],
-    ['html', { outputFolder: 'playwright-report', open: 'never' }]
+    ['html', { outputFolder: process.env.PLAYWRIGHT_REPORT_DIR || 'playwright-report', open: 'never' }]
   ],
-  outputDir: 'test-results',
+  outputDir: process.env.PLAYWRIGHT_OUTPUT_DIR || 'test-results',
   snapshotDir: './tests/e2e/__snapshots__',
   use: {
     baseURL: BASE_URL,

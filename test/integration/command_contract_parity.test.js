@@ -48,6 +48,26 @@ test('REST and Socket use the same canonical device command and expose matching 
   assert.equal(restBody.command.result, socketResult.result);
 });
 
+test('REST and Socket expose the same separate incident road-recovery command', async () => {
+  const payload = { notes: 'Pemulihan jalan dikonfirmasi pada simulator.' };
+  const restResponse = await fetch(`${baseUrl}/api/incidents/101/road-recovered`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Cookie: `omnitraf_session=${adminToken}`, 'X-Idempotency-Key': 'CONTRACT-ROAD-REST-01' },
+    body: JSON.stringify(payload)
+  });
+  assert.equal(restResponse.status, 200);
+  const restBody = await restResponse.json();
+  const socketResult = await new Promise(resolve => socket.emit('operator:command', {
+    cmd: { action: 'incident:road-recovered', targetId: '101', payload,
+      commandId: 'CONTRACT-ROAD-SOCKET-CMD', idempotencyKey: 'CONTRACT-ROAD-SOCKET-01' }
+  }, resolve));
+  assert.equal(socketResult.success, true);
+  assert.deepEqual(restBody.command.normalizedCommand, socketResult.normalizedCommand);
+  assert.deepEqual(restBody.command.newState, socketResult.newState);
+  assert.equal(restBody.command.result, socketResult.result);
+  assert.equal(restBody.command.newState.status, 'ACTIVE', 'Road recovery leaves workflow status unchanged.');
+});
+
 test('invalid REST and Socket commands return the same contract error and cause no side effects', async () => {
   const before = { sequence: backendState.deviceSequence, audit: backendState.auditLogs.length };
   const originalExecute = dbManager.execute;

@@ -64,7 +64,7 @@ export class CommandExecutor {
       if (persisted && current) Object.assign(current, persisted);
       return;
     }
-    if (['incident:create','incident:acknowledge','incident:update-status','incident:dispatch','incident:resolve'].includes(action)) {
+    if (['incident:create','incident:acknowledge','incident:update-status','incident:dispatch','incident:resolve','incident:road-recovered'].includes(action)) {
       const persisted = await incidentRepository.findById(targetId);
       if (persisted) {
         const current = backendState.state.incidents.find((incident) => String(incident.id) === String(targetId));
@@ -450,7 +450,7 @@ export class CommandExecutor {
     const notFound = (type) => { throw new ContractValidationError('NOT_FOUND', `${type} '${targetId}' was not found.`, { field: 'targetId', expected: `known ${type}`, actual: targetId, statusCode: 404 }); };
     if (['device:config', 'device:fault', 'device:ping'].includes(action) && !backendState.devicesRegistry.some(device => device.deviceId === targetId)) notFound('device');
     if (['signal:override', 'green-split:update', 'ai:apply-recommendation'].includes(action) && !backendState.state.intersections.some(node => node.id === targetId)) notFound('intersection');
-    if (['incident:acknowledge', 'incident:update-status', 'incident:dispatch', 'incident:resolve'].includes(action) && !(backendState.state.incidents || []).some(incident => String(incident.id) === targetId)) notFound('incident');
+    if (['incident:acknowledge', 'incident:update-status', 'incident:dispatch', 'incident:resolve', 'incident:road-recovered'].includes(action) && !(backendState.state.incidents || []).some(incident => String(incident.id) === targetId)) notFound('incident');
     if (action === 'emergency:cancel' && !(backendState.state.activeEmergencies || []).some(emergency => String(emergency.id) === targetId || String(emergency.vehicleId) === targetId)) notFound('emergency');
     if (action === 'chaos:fault-clear' && targetId !== 'all' && !diagnosticEngine.activeFaults.has(targetId)) notFound('fault');
     if (action === 'emergency:activate' && payload.incidentId && !(backendState.state.incidents || []).some(incident => String(incident.id) === payload.incidentId)) notFound('incident');
@@ -1106,6 +1106,23 @@ export class CommandExecutor {
           entityId: id,
           domainSequence: backendState.incidentSequence,
           customAudit: { details: `Insiden #${id} telah diselesaikan secara definitif.` }
+        };
+      }
+
+      case 'incident:road-recovered': {
+        const previousState = { ...(backendState.state.incidents || []).find(incident => String(incident.id) === String(targetId)) };
+        const incident = await backendState.markIncidentRoadRecovered(targetId, payload.notes, {
+          commandId: finalCommandId,
+          correlationId: finalCorrelationId,
+          actor: actorName
+        });
+        return {
+          resultingState: backendState.state,
+          previousState,
+          newState: incident,
+          entityId: targetId,
+          domainSequence: backendState.incidentSequence,
+          customAudit: { details: `Dampak jalan insiden #${targetId} ditandai pulih pada model simulasi.` }
         };
       }
 

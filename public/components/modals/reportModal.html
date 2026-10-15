@@ -1,5 +1,5 @@
-<div class="modal-overlay" id="reportModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" style="display: none;">
-    <div class="modal-content glass-panel" id="reportModalContent" style="max-width: 680px; width: 94vw; max-height: 90vh; overflow-y: auto; transition: max-width 0.3s ease;">
+<div class="modal-overlay csp-style-6e22c58a7a" id="reportModal" role="dialog" aria-modal="true" aria-hidden="true" inert aria-labelledby="modalTitle" >
+    <div class="modal-content glass-panel csp-style-ad47271667" id="reportModalContent" >
       <button class="modal-close" id="closeModal" aria-label="Tutup modal">&times;</button>
       
       <!-- State 1: Generating Loader -->
@@ -8,7 +8,7 @@
           <h2>Menyusun Laporan Demo Simulasi</h2>
           <p>Mengompilasi state simulator, nilai contoh, dan metrik turunan prototipe.</p>
         </div>
-        <div class="modal-body" style="display: flex; flex-direction: column; align-items: center; padding: 10px 0;">
+        <div class="modal-body csp-style-5bab955d18" >
           <div class="radial-loader">
             <svg viewBox="0 0 100 100">
               <circle class="loader-bg" cx="50" cy="50" r="42" />
@@ -16,26 +16,26 @@
             </svg>
             <div class="loader-percentage" id="loaderPercentage">0%</div>
           </div>
-          <div class="loader-status" id="loaderStatus" style="margin-top: 14px; font-size: 13px; color: var(--text-muted); text-align: center;">Menyusun data lokal simulator...</div>
-          <button class="btn btn-ghost compact" id="btnCancelReportGen" type="button" style="margin-top: 18px;">Batal</button>
+          <div class="loader-status csp-style-5cbb297ca0" id="loaderStatus" >Menyusun data lokal simulator...</div>
+          <button class="btn btn-ghost compact csp-style-a9739ef0ad" id="btnCancelReportGen" type="button" >Batal</button>
         </div>
       </div>
 
       <!-- State 2: Error State (Fallback & Retry) -->
-      <div id="reportErrorState" class="is-hidden" style="display: none; text-align: center; padding: 24px 12px;">
-        <div style="font-size: 42px; margin-bottom: 12px;">⚠️</div>
-        <h3 style="color: var(--danger); font-size: 18px; font-weight: 800; margin-bottom: 8px;">Gagal Menyusun Mobility Snapshot</h3>
-        <p id="reportErrorMessage" style="font-size: 13px; color: var(--text-muted); max-width: 480px; margin: 0 auto 20px auto; line-height: 1.5;">
+      <div id="reportErrorState" class="is-hidden csp-style-a16abc0c93" >
+        <div class="csp-style-9826d381c1" >⚠️</div>
+        <h3 class="csp-style-17a4599951" >Gagal Menyusun Mobility Snapshot</h3>
+        <p id="reportErrorMessage" class="csp-style-a2f9172700" >
           Terjadi kendala saat menyambung ke backend prototipe.
         </p>
-        <div style="display: flex; gap: 10px; justify-content: center;">
+        <div class="csp-style-20336720bc" >
           <button class="btn btn-ghost" id="btnCancelReportError" type="button">Tutup</button>
           <button class="btn btn-primary" id="btnRetryReportGen" type="button">Coba Lagi</button>
         </div>
       </div>
 
       <!-- State 3: Tangible Executive Document Preview -->
-      <div id="reportDocPreviewState" class="is-hidden" style="display: none;">
+      <div id="reportDocPreviewState" class="is-hidden csp-style-6e22c58a7a" >
         <div class="doc-preview-wrapper">
           <!-- Pratinjau dokumen simulasi, bukan kop atau dokumen resmi -->
           <div class="doc-preview-header">

@@ -58,6 +58,10 @@ export class CctvController {
     this.isActive = false;
     this.disposer = new Disposer('CctvController');
     this._isInitialized = false;
+    this._lastIngestedFrame = null;
+    this._intersectionSource = null;
+    this._intersectionById = new Map();
+    this._frameEnvironmentKey = '';
 
     // Realtime adapter
     this.realtimeAdapter = new CctvRealtimeAdapter({
@@ -114,6 +118,15 @@ export class CctvController {
   }
 
   _setupStoreListeners() {
+    // Render from the canonical StateStore event as well as the camera transport
+    // adapter. The router updates CCTV state before forwarding the same socket
+    // frame; identity de-duplication below keeps this single-ingest.
+    this.disposer.addStoreSubscription(stateStore, 'cctv:vision-update', (event) => {
+      if (event?.payload) this._ingestFramePipeline(event.payload, event.source || 'server');
+    });
+    for (const event of ['state:trafficModel', 'state:isRainMode', 'state:roadCondition']) {
+      this.disposer.addStoreSubscription(stateStore, event, () => this._syncEnvironmentFromSimulation(stateStore.getState()));
+    }
     this.disposer.addStoreSubscription(stateStore, 'state:isChaosMode', ({ value }) => {
       this.updateGlitchOverlays(value);
     });
@@ -208,12 +221,31 @@ export class CctvController {
     this.realtimeAdapter.connect(this.disposer, this.camerasRegistry);
   }
 
+  _syncEnvironmentFromSimulation(state = stateStore.getState()) {
+    if (typeof document === 'undefined') return;
+    const hour = Number(state.trafficModel?.hour ?? state.simulation?.hour ?? 12);
+    const storedEnvironment = state.visualEnvironment || {};
+    const timeOfDay = ['morning', 'day', 'evening', 'night'].includes(storedEnvironment.timeOfDay)
+      ? storedEnvironment.timeOfDay
+      : hour < 6 || hour >= 19 ? 'night' : hour < 11 ? 'morning' : hour < 16 ? 'day' : 'evening';
+    const wet = Boolean(state.isRainMode || state.roadCondition === 'wet');
+    let weather = ['clear', 'cloudy', 'light-rain', 'heavy-rain'].includes(storedEnvironment.weather) ? storedEnvironment.weather : 'clear';
+    if (wet && !weather.includes('rain')) weather = 'light-rain';
+    const timeControl = document.getElementById('cctvTimeOfDay');
+    const weatherControl = document.getElementById('cctvWeather');
+    if (timeControl) timeControl.value = timeOfDay;
+    if (weatherControl) weatherControl.value = weather;
+    this.renderers.forEach((renderer) => renderer.setEnvironment({ timeOfDay, weather }));
+  }
+
   /**
    * Pipeline Utama: Ingest -> Sanitize & Filter -> Tracking Update -> Telemetry Metrics -> Sync Store -> UI HUD
    * Multi-camera isolation: Jika pemrosesan kamera A error, kamera B/C/D tetap berjalan normal.
    */
   _ingestFramePipeline(framePayload, source = 'server') {
     if (!framePayload) return;
+    if (framePayload === this._lastIngestedFrame) return;
+    this._lastIngestedFrame = framePayload;
 
     const dataMap = framePayload.cameras || framePayload;
     const isChaos = stateStore.getState().isChaosMode;
@@ -600,14 +632,19 @@ export class CctvController {
 
     const applyEnvironment = () => {
       const timeOfDay = document.getElementById('cctvTimeOfDay')?.value || 'day';
-      const weather = document.getElementById('cctvWeather')?.value || 'clear';
+      let weather = document.getElementById('cctvWeather')?.value || 'clear';
+      const state = stateStore.getState();
+      if ((state.isRainMode || state.roadCondition === 'wet') && !weather.includes('rain')) weather = 'light-rain';
+      const weatherControl = document.getElementById('cctvWeather');
+      if (weatherControl) weatherControl.value = weather;
+      stateStore.setState({ visualEnvironment: { timeOfDay, weather } }, { source: 'visual-environment' });
       this.renderers.forEach((renderer) => renderer.setEnvironment({ timeOfDay, weather }));
     };
     ['cctvTimeOfDay', 'cctvWeather'].forEach((id) => {
       const control = document.getElementById(id);
       if (control) this.disposer.addEventListener(control, 'change', applyEnvironment);
     });
-    applyEnvironment();
+    this._syncEnvironmentFromSimulation();
 
     // Save a screenshot of the simulated camera canvas.
     document.querySelectorAll('#btnCaptureSnapshot, .btn-cam-snapshot').forEach(btn => {
@@ -762,12 +799,21 @@ export class CctvController {
       const isPaused = state.cctvPaused;
       const showBoxes = state.cctvBoxesVisible;
       const intersections = state.intersections || [];
-      const intersectionById = new Map(intersections.map((intersection) => [intersection.id, intersection]));
+      if (intersections !== this._intersectionSource) {
+        this._intersectionSource = intersections;
+        this._intersectionById = new Map(intersections.map((intersection) => [String(intersection.id), intersection]));
+      }
+      const intersectionById = this._intersectionById;
+      const timeOfDay = document.getElementById('cctvTimeOfDay')?.value || 'day';
+      const weather = document.getElementById('cctvWeather')?.value || 'clear';
+      const environmentKey = `${timeOfDay}:${weather}`;
+      const environmentChanged = environmentKey !== this._frameEnvironmentKey;
+      if (environmentChanged) this._frameEnvironmentKey = environmentKey;
 
       const renderStart = performance.now();
       let totalTrackedCount = 0;
 
-      this.renderers.forEach((renderer, id) => {
+      for (const [id, renderer] of this.renderers) {
         if (renderer.canvas && renderer.canvas.offsetParent !== null) {
           const camMeta = cameraRegistry.getMetadata(id);
           const camRuntime = cameraRegistry.getRuntime(id);
@@ -776,14 +822,11 @@ export class CctvController {
           const status = camRuntime ? camRuntime.status : 'ONLINE';
           const provenance = camRuntime ? camRuntime.provenance : 'SIMULATED';
 
-          renderer.setEnvironment({
-            timeOfDay: document.getElementById('cctvTimeOfDay')?.value || 'day',
-            weather: document.getElementById('cctvWeather')?.value || 'clear'
-          });
+          if (environmentChanged) renderer.setEnvironment({ timeOfDay, weather });
 
           // Determine intersection signal state
           const nodeId = camMeta?.nodeId || null;
-          const node = intersectionById.get(nodeId);
+          const node = intersectionById.get(String(nodeId));
           const signalState = node ? node.state : (renderer.scene.type === 'roundabout' ? 'yield' : 'none');
 
           renderer.render(isChaos, isPaused, showBoxes, dt, metrics, diag, status, signalState, provenance);
@@ -800,7 +843,7 @@ export class CctvController {
           }
           totalTrackedCount += renderer.trackedBoxes ? renderer.trackedBoxes.size : 0;
         }
-      });
+      }
 
       const renderDuration = performance.now() - renderStart;
       diagnostics.recordRenderDuration(renderDuration);
@@ -832,6 +875,9 @@ export class CctvController {
   destroy() {
     this.deactivate();
     this.disposer.clear();
+    this._intersectionSource = null;
+    this._intersectionById.clear();
+    this._frameEnvironmentKey = '';
     if (this.observer) {
       this.observer.disconnect();
     }

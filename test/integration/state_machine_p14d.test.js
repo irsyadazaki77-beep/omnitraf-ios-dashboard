@@ -270,8 +270,8 @@ describe('PHASE 14D — Formal Incident & Emergency State Machine + Cross-Module
     backendState.state.activeEmergencies = backendState.state.activeEmergencies.filter(e => e.id !== emgId);
   });
 
-  // 9. Cross-Module Orchestration: Emergency Cancel cleanly restores temporary signal overrides and Green Wave
-  test('9. Cross-Module Orchestration: Emergency Cancel restores signals and disables Green Wave if no other emergency active', async () => {
+  // 9. Cross-Module Orchestration: Emergency Cancel begins signal recovery and disables Green Wave
+  test('9. Cross-Module Orchestration: Emergency Cancel begins safe signal clearance and disables Green Wave', async () => {
     const vehicleCode = `AMB-RESTORE-${Date.now().toString().slice(-4)}`;
     
     // Activate emergency
@@ -301,10 +301,16 @@ describe('PHASE 14D — Formal Incident & Emergency State Machine + Cross-Module
       authenticatedUser: { id: 'usr-admin', name: 'Zaki Admin', role: ROLES.ADMIN }
     });
 
-    // Verify signal preemption cleared and restored to normal
-    assert.strictEqual(wonokromo.isPreempted, undefined);
+    // Recovery is acknowledged as a bounded yellow clearance, then one all-red second.
+    assert.strictEqual(wonokromo.isPreempted, true);
+    assert.strictEqual(wonokromo.preemptionPhase, 'RECOVERY_CLEARANCE');
+    assert.strictEqual(wonokromo.state, 'yellow');
+    wonokromo.preemptionPhaseEndsAtMs = backendState.clock.now() - 1;
+    backendState._stepSignalSimulation();
+    assert.strictEqual(wonokromo.isPreempted, false);
     assert.strictEqual(wonokromo.preemptionVehicleId, undefined);
-    assert.strictEqual(wonokromo.status, 'Normal');
+    assert.strictEqual(wonokromo.state, 'red');
+    assert.match(wonokromo.status, /clearance merah/);
     assert.strictEqual(backendState.state.greenWaveActive, false, 'Green wave must be deactivated after last emergency cancel');
   });
 
@@ -443,9 +449,9 @@ describe('PHASE 14D — Formal Incident & Emergency State Machine + Cross-Module
 
     // Verify emg transitioned to COMPLETED and preemption on node cleared
     assert.strictEqual(emgItem.status, EMERGENCY_STATES.COMPLETED);
-    assert.strictEqual(node.isPreempted, undefined);
-    assert.strictEqual(node.preemptionVehicleId, undefined);
-    assert.ok(node.status === 'Lancar' || node.status === 'Normal');
+    assert.strictEqual(node.isPreempted, true);
+    assert.strictEqual(node.preemptionPhase, 'RECOVERY_CLEARANCE');
+    assert.strictEqual(node.state, 'yellow');
 
     // Clean up
     backendState.state.activeEmergencies = backendState.state.activeEmergencies.filter(e => e.id !== emgId);

@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import { io as Client } from 'socket.io-client';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET } from '../../server/config/env.js';
-import { ROLES } from '../../server/config/constants.js';
+import { ROLES, USERS_DB } from '../../server/config/constants.js';
 import { tokenRevocationService } from '../../server/services/tokenRevocationService.js';
 import { testDatabasePath } from '../helpers/testDatabasePath.js';
 
@@ -121,6 +121,30 @@ describe('Security & Reliability Hardening: Session Revocation & Socket.IO Trust
     const disconnectReason = await disconnectPromise;
     assert.ok(disconnectReason.includes('REVOKED') || disconnectReason === 'DISCONNECTED');
     socket.close();
+  });
+
+  test('4. A role downgrade invalidates REST sessions and disconnects the next active socket event', async () => {
+    const loginRes = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'operator', password: 'operator123' })
+    });
+    const token = loginRes.headers.get('set-cookie')?.match(/omnitraf_session=([^;]+)/)?.[1];
+    const operator = USERS_DB.find(user => user.id === 'usr-operator-01');
+    const originalRole = operator.role;
+    const socket = Client(baseUrl, { transports: ['websocket'], forceNew: true, reconnection: false, auth: { token } });
+    await new Promise((resolve, reject) => { socket.once('connect', resolve); socket.once('connect_error', reject); });
+    try {
+      operator.role = ROLES.VIEWER;
+      const response = await fetch(`${baseUrl}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+      assert.equal(response.status, 401);
+      const disconnected = new Promise(resolve => socket.once('disconnect', resolve));
+      socket.emit('heartbeat:ping', { timestamp: Date.now() });
+      await disconnected;
+    } finally {
+      operator.role = originalRole;
+      socket.close();
+      tokenRevocationService.clear();
+    }
   });
 
   after(async () => {

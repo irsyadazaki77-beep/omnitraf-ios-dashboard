@@ -6,6 +6,8 @@
 
 import { stateStore, escapeHtml } from '../../core/stateStore.js';
 
+const colorTone = (color) => ({ '#22c55e': 'green', '#ef4444': 'red', '#f59e0b': 'amber', '#3b82f6': 'blue' }[String(color || '').toLowerCase()] || 'green');
+
 export class PopupManager {
   constructor() {
     /** @type {number|null} Single live sync timer ID */
@@ -18,14 +20,12 @@ export class PopupManager {
     const p = properties || {};
     const node = nodeState || {};
     const stateColor = (node.state || 'green').toLowerCase();
+    const stateTone = ['red', 'yellow'].includes(stateColor) ? stateColor : 'green';
 
-    let popupColor = '#22c55e';
     let statusLabel = 'JALAN (HIJAU)';
     if (stateColor === 'red') {
-      popupColor = '#ef4444';
       statusLabel = 'BERHENTI (MERAH)';
     } else if (stateColor === 'yellow') {
-      popupColor = '#f59e0b';
       statusLabel = 'PERSIAPAN (KUNING)';
     }
 
@@ -38,24 +38,24 @@ export class PopupManager {
     return `
       <div class="ios-popup-card">
         <div class="ios-popup-header">
-          <span class="cctv-live-tag" style="background: ${popupColor}22; color: ${popupColor}; border: 1px solid ${popupColor}44;">
-            <span class="live-dot" style="background: ${popupColor};"></span> NODE APILL
+          <span class="cctv-live-tag traffic-tone-${stateTone}">
+            <span class="live-dot"></span> NODE APILL
           </span>
           <span class="ios-popup-subtitle">${safeDistrict}</span>
         </div>
-        <h4 class="ios-popup-title" style="margin-top: 6px; font-size: 13.5px; font-weight: 700; color: #ffffff;">🚦 ${safeName}</h4>
+        <h4 class="ios-popup-title csp-style-fbf169d98e" >🚦 ${safeName}</h4>
         <div class="ios-popup-info-grid">
           <div class="ios-info-row">
             <span class="ios-info-label">Sinyal Aktif:</span>
-            <span class="ios-info-value" style="color: ${popupColor}; font-weight: 800; text-transform: uppercase;">${statusLabel}</span>
+            <span class="ios-info-value traffic-text-${stateTone} csp-style-state-label">${statusLabel}</span>
           </div>
           <div class="ios-info-row">
             <span class="ios-info-label">Durasi Timer Sisa:</span>
-            <span class="ios-info-value speed-val" style="color: #00e5ff; font-weight: 800;">${safeTimer} dtk</span>
+            <span class="ios-info-value speed-val csp-style-a6b8d83f78" >${safeTimer} dtk</span>
           </div>
           <div class="ios-info-row">
             <span class="ios-info-label">Fase Hijau Adaptif:</span>
-            <span class="ios-info-value" style="font-weight: 800;">${safeGreen} dtk</span>
+            <span class="ios-info-value csp-style-3387c613ea" >${safeGreen} dtk</span>
           </div>
           <div class="ios-info-row">
             <span class="ios-info-label">Waktu Tunggu Sektoral:</span>
@@ -79,7 +79,7 @@ export class PopupManager {
     return `
       <div class="ios-popup-card incident-popup">
         <div class="ios-popup-header alert">
-          <span class="alert-pill" style="background: ${severity === 'danger' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)'}; color: ${severity === 'danger' ? '#ef4444' : '#f59e0b'}; padding: 2px 6px; border-radius: 4px; font-weight: bold;">⚠️ INSIDEN ${safeCat}</span>
+          <span class="alert-pill incident-tone-${severity}">⚠️ INSIDEN ${safeCat}</span>
           <span class="ios-popup-subtitle">STATUS: ${safeStatus}</span>
         </div>
         <h4 class="ios-popup-title">${safeTitle}</h4>
@@ -90,11 +90,11 @@ export class PopupManager {
           </div>
           <div class="ios-info-row">
             <span class="ios-info-label">Unit Disposisi:</span>
-            <span class="ios-info-value text-primary-2" style="color: #00e5ff; font-weight: bold;">${safeUnit}</span>
+            <span class="ios-info-value text-primary-2 csp-style-47a87f3205" >${safeUnit}</span>
           </div>
           <div class="ios-info-row">
             <span class="ios-info-label">Keterangan:</span>
-            <span class="ios-info-value" style="font-family: inherit; font-weight: normal; color: #cbd5e1;">${safeNotes}</span>
+            <span class="ios-info-value csp-style-a2c5a3fe2e" >${safeNotes}</span>
           </div>
         </div>
       </div>
@@ -122,7 +122,7 @@ export class PopupManager {
         <div class="ios-popup-info-grid">
           <div class="ios-info-row">
             <span class="ios-info-label">Kecepatan:</span>
-            <span class="ios-info-value speed-val" style="color: #ef4444; font-weight: 800;">${safeSpeed}</span>
+            <span class="ios-info-value speed-val csp-style-f7dcd241ab" >${safeSpeed}</span>
           </div>
           <div class="ios-info-row">
             <span class="ios-info-label">Asal:</span>
@@ -146,48 +146,49 @@ export class PopupManager {
     const safeName = escapeHtml(p.name || 'Koridor');
     const safeId = escapeHtml(p.id || '');
     const speed = Number(p.speed || 30);
+    const tone = colorTone(los.color);
     const lastUpdatedStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + " WIB";
 
     return `
       <div class="ios-popup-card">
         <div class="ios-popup-header">
-          <span class="cctv-live-tag" style="background: ${los.color}22; color: ${los.color}; border: 1px solid ${los.color}44;">
-            <span class="live-dot" style="background: ${los.color};"></span> ESTIMASI SIMULASI
+          <span class="cctv-live-tag heatmap-tone-${tone}">
+            <span class="live-dot"></span> ESTIMASI SIMULASI
           </span>
           <span class="ios-popup-subtitle">KORIDOR GEOSPASIAL</span>
         </div>
-        <h4 class="ios-popup-title" style="margin-top: 6px; font-size: 13.5px; font-weight: 700; color: #ffffff;">🛣️ ${safeName}</h4>
+        <h4 class="ios-popup-title csp-style-fbf169d98e" >🛣️ ${safeName}</h4>
         
-        <div class="vc-progress-container" style="margin-top: 10px; margin-bottom: 10px;">
-          <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); margin-bottom: 4px;">
+        <div class="vc-progress-container csp-style-ef850091e1" >
+          <div class="csp-style-a7eea97729" >
             <span>V/C Ratio (Derajat Kejenuhan)</span>
-            <strong style="color: ${los.color}">${(los.vc).toFixed(2)}</strong>
+            <strong class="traffic-text-${tone} csp-style-state-label">${(los.vc).toFixed(2)}</strong>
           </div>
-          <div class="mini-progress-bar" style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; width: 100%;">
-            <div style="width: ${los.vc * 100}%; background: ${los.color}; height: 100%; border-radius: 3px; transition: width 0.5s ease-out;"></div>
+          <div class="mini-progress-bar csp-style-3ff06db502" >
+            <div class="vc-progress-fill heatmap-fill-${tone}" data-width="${Math.max(0, Math.min(100, Number(los.vc) * 100))}"></div>
           </div>
         </div>
 
         <div class="ios-popup-info-grid">
           <div class="ios-info-row">
             <span class="ios-info-label">Kecepatan Estimasi:</span>
-            <span class="ios-info-value speed-val" style="color: #00e5ff; font-weight:800;">${speed} km/jam</span>
+            <span class="ios-info-value speed-val csp-style-e8c35b631c" >${speed} km/jam</span>
           </div>
           <div class="ios-info-row">
             <span class="ios-info-label">Tingkat Kepadatan:</span>
-            <span class="ios-info-value" style="color: ${los.color}; font-weight: 800;">${escapeHtml(los.label)}</span>
+            <span class="ios-info-value traffic-text-${tone} csp-style-state-label">${escapeHtml(los.label)}</span>
           </div>
           <div class="ios-info-row">
             <span class="ios-info-label">Pembaruan Terakhir:</span>
-            <span class="ios-info-value" style="color: var(--text-muted);">${lastUpdatedStr}</span>
+            <span class="ios-info-value csp-style-9d21da37c4" >${lastUpdatedStr}</span>
           </div>
         </div>
 
-        <div class="popup-action-buttons" style="display: flex; gap: 6px; margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px;">
-          <button class="popup-action-btn btn-cctv" data-corridor="${safeId}" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 4px; background: rgba(0, 229, 255, 0.15); border: 1px solid rgba(0, 229, 255, 0.4); color: #00e5ff; font-size: 10.5px; font-weight: 700; padding: 6px 8px; border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+        <div class="popup-action-buttons csp-style-64c93d72dc" >
+          <button class="popup-action-btn btn-cctv csp-style-b49ff614ab" data-corridor="${safeId}" >
             📹 Lihat CCTV
           </button>
-          <button class="popup-action-btn btn-apill" data-corridor="${safeId}" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 4px; background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); color: #22c55e; font-size: 10.5px; font-weight: 700; padding: 6px 8px; border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+          <button class="popup-action-btn btn-apill csp-style-3190f8efad" data-corridor="${safeId}" >
             🚦 Atur APILL
           </button>
         </div>
@@ -268,27 +269,27 @@ export class PopupManager {
             infoGrid.innerHTML = `
               <div class="ios-info-row">
                 <span class="ios-info-label">Status Kamera:</span>
-                <span class="ios-info-value" style="color:${status === 'ONLINE' ? '#10b981' : '#f59e0b'}; font-weight:800;">${status}</span>
+                <span class="ios-info-value traffic-text-${status === 'ONLINE' ? 'green' : 'amber'} csp-style-state-label">${status}</span>
               </div>
               <div class="ios-info-row">
                 <span class="ios-info-label">Volume Kendaraan:</span>
-                <span class="ios-info-value" style="color:#00e5ff; font-weight:800;">${vCount} Unit</span>
+                <span class="ios-info-value csp-style-599033843d" >${vCount} Unit</span>
               </div>
               <div class="ios-info-row">
                 <span class="ios-info-label">Panjang Antrean:</span>
-                <span class="ios-info-value" style="color:#ef4444; font-weight:700;">${qLen} Meter</span>
+                <span class="ios-info-value csp-style-a46f4d83f6" >${qLen} Meter</span>
               </div>
               <div class="ios-info-row">
                 <span class="ios-info-label">Kecepatan Rata-Rata:</span>
-                <span class="ios-info-value speed-val" style="color:#22c55e;">${avgSpeed} km/jam</span>
+                <span class="ios-info-value speed-val csp-style-0b9417d19e" >${avgSpeed} km/jam</span>
               </div>
               <div class="ios-info-row">
                 <span class="ios-info-label">Kepadatan Jalan:</span>
-                <span class="ios-info-value" style="color:#f59e0b;">${density}%</span>
+                <span class="ios-info-value csp-style-398922df1f" >${density}%</span>
               </div>
               <div class="ios-info-row">
                 <span class="ios-info-label">Resiko Insiden:</span>
-                <span class="ios-info-value" style="color:${risk > 70 ? '#ef4444' : '#10b981'};">${risk}%</span>
+                <span class="ios-info-value ${risk > 70 ? 'traffic-text-red' : 'traffic-text-green'}">${risk}%</span>
               </div>
             `;
           }

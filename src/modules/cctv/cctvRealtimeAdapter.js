@@ -57,6 +57,12 @@ export class CctvRealtimeAdapter {
       }
     });
 
+    // The CCTV view renders all four cameras in grid mode. Subscribe to the
+    // canonical aggregate room so it receives the same server frame as City3D,
+    // even before a user explicitly focuses an individual camera.
+    this._subscribedRooms.add(REALTIME_ROOMS.CCTV_ALL);
+    socketClient.subscribeChannels?.([REALTIME_ROOMS.CCTV_ALL]);
+
     // Start local fallback simulation generator for offline demonstration
     this._startLocalFallback(disposer, camerasRegistry);
   }
@@ -70,10 +76,7 @@ export class CctvRealtimeAdapter {
     const room = REALTIME_ROOMS.cctvCamera(camId);
     if (!this._subscribedRooms.has(room)) {
       this._subscribedRooms.add(room);
-      const socket = socketClient.getSocket();
-      if (socket && socket.connected) {
-        socket.emit('channel:subscribe', { channels: [room] });
-      }
+      socketClient.subscribeChannels?.([room]);
     }
   }
 
@@ -86,10 +89,7 @@ export class CctvRealtimeAdapter {
     const room = REALTIME_ROOMS.cctvCamera(camId);
     if (this._subscribedRooms.has(room)) {
       this._subscribedRooms.delete(room);
-      const socket = socketClient.getSocket();
-      if (socket && socket.connected) {
-        socket.emit('channel:unsubscribe', { channels: [room] });
-      }
+      socketClient.unsubscribeChannels?.([room]);
     }
   }
 
@@ -228,6 +228,7 @@ export class CctvRealtimeAdapter {
     if (this._visualFrameHandle !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this._visualFrameHandle);
     this._visualFrameHandle = null;
     this._pendingVisualFrame = null;
+    socketClient.unsubscribeChannels?.([...this._subscribedRooms]);
     this._subscribedRooms.clear();
   }
 }

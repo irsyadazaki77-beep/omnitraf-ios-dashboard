@@ -4,7 +4,7 @@ const CAMERA_CONFIG = Object.freeze({
   dashCameraCanvas: { corridorId: 'corridor-ayani', nodeId: 'node-wonokromo', scene: 'intersection', seed: 1101 },
   cctvCanvas1: { corridorId: 'corridor-ayani', nodeId: 'node-wonokromo', scene: 'intersection', seed: 1101 },
   cctvCanvas2: { corridorId: 'corridor-darmo', nodeId: 'node-darmo', scene: 'boulevard', seed: 2202 },
-  cctvCanvas3: { corridorId: null, nodeId: null, scene: 'roundabout', seed: 3303 },
+  cctvCanvas3: { corridorId: null, nodeId: null, city3dAnchorNodeId: 'node-jemursari', city3dCoordinates: [-7.345, 112.73], scene: 'roundabout', seed: 3303 },
   cctvCanvas4: { corridorId: 'corridor-jemursari', nodeId: 'node-jemursari', scene: 'intersection', seed: 4404 }
 });
 
@@ -68,6 +68,18 @@ export class TrafficVehicleSimulation {
       const incidentLaneClosed = localIncidents.some(item => item.laneClosed || item.laneClosure || item.closedLanes?.length);
       const red = String(node?.state || '').toLowerCase() === 'red';
       const yellow = String(node?.state || '').toLowerCase() === 'yellow';
+      const lanes = new Map();
+      for (const vehicle of vehicles) {
+        if (!vehicle.active) continue;
+        const laneKey = `${vehicle.lane}:${vehicle.direction}`;
+        if (!lanes.has(laneKey)) lanes.set(laneKey, []);
+        lanes.get(laneKey).push(vehicle);
+      }
+      const leaderByVehicle = new Map();
+      for (const laneVehicles of lanes.values()) {
+        laneVehicles.sort((a, b) => a.progress - b.progress);
+        for (let index = 0; index < laneVehicles.length - 1; index++) leaderByVehicle.set(laneVehicles[index], laneVehicles[index + 1]);
+      }
       for (const vehicle of vehicles) {
         if (!vehicle.active) continue;
         let targetSpeed = desiredSpeed;
@@ -78,13 +90,10 @@ export class TrafficVehicleSimulation {
         else if (yellow && config.nodeId && vehicle.lane < 2 && vehicle.progress > stopLine - .12) targetSpeed *= .35;
 
         // A simple safe time-gap rule: the vehicle follows the nearest leader in its lane.
-        const leader = vehicles.reduce((closest, candidate) => {
-          if (!candidate.active || candidate === vehicle || candidate.lane !== vehicle.lane || candidate.direction !== vehicle.direction) return closest;
-          const gap = candidate.progress - vehicle.progress;
-          return gap > 0 && (!closest || gap < closest.gap) ? { gap, vehicle: candidate } : closest;
-        }, null);
-        if (leader && leader.gap < .115) {
-          const safeSpeed = Math.max(0, leader.vehicle.speedKmh * clamp((leader.gap - .035) / .08, 0, 1));
+        const leader = leaderByVehicle.get(vehicle);
+        const gap = leader ? leader.progress - vehicle.progress : Infinity;
+        if (leader && gap < .115) {
+          const safeSpeed = Math.max(0, leader.speedKmh * clamp((gap - .035) / .08, 0, 1));
           targetSpeed = Math.min(targetSpeed, safeSpeed);
         }
         const previousSpeed = vehicle.speedKmh;
@@ -96,7 +105,7 @@ export class TrafficVehicleSimulation {
         const roadMeters = config.scene === 'roundabout' ? 180 : 150;
         let progressDelta = (vehicle.speedKmh / 3.6) * dt / roadMeters;
         if (leader) {
-          const remainingGap = leader.vehicle.progress - vehicle.progress - .035;
+          const remainingGap = gap - .035;
           progressDelta = Math.min(progressDelta, Math.max(0, remainingGap));
           // Convert a spatial safety clamp back into displayed speed so the
           // telemetry and visible motion remain synchronized.

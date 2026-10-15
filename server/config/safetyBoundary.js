@@ -33,6 +33,7 @@ const simulationOnlyActions = new Set([
   'incident:update-status',
   'incident:dispatch',
   'incident:resolve',
+  'incident:road-recovered',
   'siren:mute',
   'cctv:snapshot'
 ]);

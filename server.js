@@ -15,7 +15,7 @@ import express from 'express';
 import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { HOST, PORT, isOriginAllowed, OMNITRAF_RUNTIME_MODE, REDIS_URL } from './server/config/env.js';
+import { HOST, PORT, IS_PRODUCTION, isOriginAllowed, OMNITRAF_RUNTIME_MODE, REDIS_URL } from './server/config/env.js';
 import { dbManager } from './server/db/database.js';
 import { backendState } from './server/services/stateManager.js';
 import { corsMiddleware, securityHeadersMiddleware } from './server/middlewares/security.js';
@@ -102,6 +102,22 @@ try {
 
 const app = express();
 const server = http.createServer(app);
+let cachedDatabaseReady = false;
+let readinessRefreshInFlight = false;
+const refreshReadiness = async () => {
+  if (readinessRefreshInFlight) return;
+  readinessRefreshInFlight = true;
+  try {
+    cachedDatabaseReady = startupLifecycle === 'READY' && dbManager.isInitialized && await dbManager.ping();
+  } catch {
+    cachedDatabaseReady = false;
+  } finally {
+    readinessRefreshInFlight = false;
+  }
+};
+const readinessTimer = setInterval(refreshReadiness, 5000);
+readinessTimer.unref?.();
+void refreshReadiness();
 
 // 1. Security & Standard Middlewares
 app.use(corsMiddleware);
@@ -142,8 +158,8 @@ app.get('/healthz', requireCapability('health:liveness'), (req, res) => {
 });
 
 // Minimal infrastructure readiness probe: no identity or cluster diagnostics.
-app.get('/readyz', async (_req, res) => {
-  const databaseReady = startupLifecycle === 'READY' && dbManager.isInitialized && await dbManager.ping();
+app.get('/readyz', rateLimiter({ windowMs: 15000, max: 60, keyPrefix: 'readyz' }), (_req, res) => {
+  const databaseReady = cachedDatabaseReady;
   const cluster = leadershipManager?.getDiagnostics();
   const clusterReady = OMNITRAF_RUNTIME_MODE === 'single' || Boolean(
     redisManager.isConnected() && cluster?.synchronized && ['LEADER', 'FOLLOWER'].includes(cluster?.role)
@@ -228,7 +244,8 @@ app.use(express.json({ limit: '1mb' }));
 app.use((req, res, next) => {
   const unsafeMethod = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
   const origin = req.headers.origin;
-  if (unsafeMethod && origin && !isOriginAllowed(origin)) {
+  const hasSessionCookie = /(?:^|;\s*)omnitraf_session=/.test(req.headers.cookie || '');
+  if (unsafeMethod && ((origin && !isOriginAllowed(origin)) || (IS_PRODUCTION && hasSessionCookie && !origin))) {
     return res.status(403).json({
       success: false,
       code: 'CSRF_ORIGIN_REJECTED',
@@ -379,6 +396,7 @@ export function shutdown(signal = 'manual', timeoutMs = 10000) {
         if (!server.listening) return resolve();
         server.close(() => resolve());
       });
+      clearInterval(readinessTimer);
       await commandExecutor.drain();
       backendState.stopRuntime?.();
       backendState.simEngine?.stop?.();

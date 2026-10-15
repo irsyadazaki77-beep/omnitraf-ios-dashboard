@@ -370,4 +370,31 @@ describe('PHASE 14C — Command Authority, Idempotency, Authorization & Audit In
 
     assert.strictEqual(backendState.signalSequence, initialSignalSeq + 1, 'Signal sequence must increment exactly once');
   });
+
+  test('11. Road recovery is a separate acknowledged operator command', async () => {
+    const incident = backendState.state.incidents.find(item => String(item.id) === '101');
+    const originalStatus = incident.status;
+    const initialIncidentSeq = backendState.incidentSequence;
+
+    const viewerOutcome = await commandExecutor.executeCommand({
+      action: 'incident:road-recovered', targetId: '101', payload: {},
+      commandId: 'CMD-ROAD-RECOVERY-VIEWER', idempotencyKey: 'IDEMP-ROAD-RECOVERY-VIEWER',
+      authenticatedUser: { id: 'usr-viewer', name: 'Viewer Sesi', role: ROLES.VIEWER }
+    });
+    assert.equal(viewerOutcome.success, false);
+    assert.equal(viewerOutcome.code, 'FORBIDDEN');
+    assert.equal(incident.roadImpactRecoveredAt, undefined);
+
+    const outcome = await commandExecutor.executeCommand({
+      action: 'incident:road-recovered', targetId: '101', payload: { notes: 'Pulih pada model simulasi.' },
+      commandId: 'CMD-ROAD-RECOVERY-OPERATOR', idempotencyKey: 'IDEMP-ROAD-RECOVERY-OPERATOR',
+      correlationId: 'CORR-ROAD-RECOVERY-OPERATOR',
+      authenticatedUser: { id: 'usr-op', name: 'Operator Latihan', role: ROLES.OPERATOR }
+    });
+    assert.equal(outcome.success, true);
+    assert.equal(outcome.status, 'SERVER_APPLIED');
+    assert.equal(outcome.newState.roadImpactRecoveryNote, 'Pulih pada model simulasi.');
+    assert.equal(outcome.newState.status, originalStatus, 'Road recovery does not change incident workflow status.');
+    assert.equal(backendState.incidentSequence, initialIncidentSeq + 1);
+  });
 });

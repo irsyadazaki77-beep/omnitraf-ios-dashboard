@@ -14,26 +14,26 @@ export class ConfirmationService {
     const existing = document.getElementById(this._modalId);
     if (!existing) {
       const modalHtml = `
-        <div class="modal-overlay" id="${this._modalId}" style="display:none; z-index:99999; justify-content:center; align-items:center; background:rgba(15,23,42,0.85); backdrop-filter:blur(4px); transition:opacity 0.2s;">
-          <div class="modal-content glass-panel" style="max-width:480px; width:94vw; border:1px solid rgba(239,68,68,0.4); padding:24px; border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.5);">
-            <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
-              <span style="font-size:32px; color:#ef4444;">⚠️</span>
+        <div class="modal-overlay csp-style-236ff41546" id="${this._modalId}" >
+          <div class="modal-content glass-panel csp-style-215c085d3a" >
+            <div class="csp-style-834fd65dce" >
+              <span class="csp-style-0d7886adef" >⚠️</span>
               <div>
-                <h3 style="margin:0; font-size:18px; font-weight:800; color:#fff;" id="confirmModalTitle">KONFIRMASI PERINTAH BERISIKO TINGGI</h3>
-                <p style="margin:2px 0 0 0; font-size:11px; color:#ef4444; text-transform:uppercase; font-weight:700; letter-spacing:0.5px;" id="confirmModalLevel">CRITICAL ACTION REQUIRED</p>
+                <h3 id="confirmModalTitle" class="csp-style-cebb3cba63">KONFIRMASI PERINTAH BERISIKO TINGGI</h3>
+                <p id="confirmModalLevel" class="csp-style-66e38c5e16">CRITICAL ACTION REQUIRED</p>
               </div>
             </div>
             
-            <div style="font-size:12.5px; line-height:1.5; color:#cbd5e1; background:rgba(0,0,0,0.2); padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.05); margin-bottom:18px;">
-              <div style="margin-bottom:6px;"><strong style="color:#94a3b8;">Target / Lokasi:</strong> <span id="confirmModalTarget" style="color:#fff; font-family:'Share Tech Mono'; font-weight:700;">-</span></div>
-              <div style="margin-bottom:6px;"><strong style="color:#94a3b8;">Alasan / Deskripsi:</strong> <span id="confirmModalReason">-</span></div>
-              <div style="margin-bottom:6px;"><strong style="color:#94a3b8;">Estimasi Durasi:</strong> <span id="confirmModalDuration" style="color:#38bdf8;">-</span></div>
-              <div><strong style="color:#94a3b8;">Persimpangan Terdampak:</strong> <span id="confirmModalImpacted" style="color:#f59e0b;">-</span></div>
+            <div class="csp-style-f9ecf9a5c4" >
+              <div class="csp-style-abd137b89b" ><strong class="csp-style-9fbb568a76" >Target / Lokasi:</strong> <span id="confirmModalTarget" class="csp-style-7763de74ad" >-</span></div>
+              <div class="csp-style-abd137b89b" ><strong class="csp-style-9fbb568a76" >Alasan / Deskripsi:</strong> <span id="confirmModalReason">-</span></div>
+              <div class="csp-style-abd137b89b" ><strong class="csp-style-9fbb568a76" >Estimasi Durasi:</strong> <span id="confirmModalDuration" class="csp-style-1d6ef49380" >-</span></div>
+              <div><strong class="csp-style-9fbb568a76" >Persimpangan Terdampak:</strong> <span id="confirmModalImpacted" class="csp-style-398922df1f" >-</span></div>
             </div>
 
-            <div style="display:flex; justify-content:flex-end; gap:10px;">
-              <button class="btn btn-ghost" id="btnConfirmCancel" style="padding:8px 16px; font-size:12px;">Batalkan</button>
-              <button class="btn btn-primary" id="btnConfirmProceed" style="background:#ef4444; border-color:#ef4444; color:#fff; padding:8px 20px; font-weight:700; font-size:12px;">Setujui & Kirim</button>
+            <div class="csp-style-74aa97bfdf" >
+              <button class="btn btn-ghost csp-style-76e392845e" id="btnConfirmCancel" >Batalkan</button>
+              <button class="btn btn-primary csp-style-95688b0491" id="btnConfirmProceed" >Setujui & Kirim</button>
             </div>
           </div>
         </div>

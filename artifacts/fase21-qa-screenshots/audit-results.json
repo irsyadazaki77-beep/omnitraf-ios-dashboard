@@ -1,0 +1,509 @@
+[
+  {
+    "view": "dashboard",
+    "viewport": "desktop",
+    "metrics": {
+      "windowW": 1440,
+      "docScrollW": 1440,
+      "bodyScrollW": 1440,
+      "mainScrollW": 1200,
+      "viewScrollW": 1152,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-dashboard-desktop.png"
+  },
+  {
+    "view": "map",
+    "viewport": "desktop",
+    "metrics": {
+      "windowW": 1440,
+      "docScrollW": 1440,
+      "bodyScrollW": 1440,
+      "mainScrollW": 1200,
+      "viewScrollW": 1152,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-map-desktop.png"
+  },
+  {
+    "view": "city3d",
+    "viewport": "desktop",
+    "metrics": {
+      "windowW": 1440,
+      "docScrollW": 1440,
+      "bodyScrollW": 1440,
+      "mainScrollW": 1200,
+      "viewScrollW": 1152,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-city3d-desktop.png"
+  },
+  {
+    "view": "cctv",
+    "viewport": "desktop",
+    "metrics": {
+      "windowW": 1440,
+      "docScrollW": 1440,
+      "bodyScrollW": 1440,
+      "mainScrollW": 1200,
+      "viewScrollW": 1152,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-cctv-desktop.png"
+  },
+  {
+    "view": "signals",
+    "viewport": "desktop",
+    "metrics": {
+      "windowW": 1440,
+      "docScrollW": 1440,
+      "bodyScrollW": 1440,
+      "mainScrollW": 1200,
+      "viewScrollW": 1152,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-signals-desktop.png"
+  },
+  {
+    "view": "incidents",
+    "viewport": "desktop",
+    "metrics": {
+      "windowW": 1440,
+      "docScrollW": 1440,
+      "bodyScrollW": 1440,
+      "mainScrollW": 1200,
+      "viewScrollW": 1152,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-incidents-desktop.png"
+  },
+  {
+    "view": "emergency",
+    "viewport": "desktop",
+    "metrics": {
+      "windowW": 1440,
+      "docScrollW": 1440,
+      "bodyScrollW": 1440,
+      "mainScrollW": 1200,
+      "viewScrollW": 1152,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-emergency-desktop.png"
+  },
+  {
+    "view": "devices",
+    "viewport": "desktop",
+    "metrics": {
+      "windowW": 1440,
+      "docScrollW": 1440,
+      "bodyScrollW": 1440,
+      "mainScrollW": 1200,
+      "viewScrollW": 1152,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-devices-desktop.png"
+  },
+  {
+    "view": "analytics",
+    "viewport": "desktop",
+    "metrics": {
+      "windowW": 1440,
+      "docScrollW": 1440,
+      "bodyScrollW": 1440,
+      "mainScrollW": 1200,
+      "viewScrollW": 1152,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-analytics-desktop.png"
+  },
+  {
+    "view": "prediction",
+    "viewport": "desktop",
+    "metrics": {
+      "windowW": 1440,
+      "docScrollW": 1440,
+      "bodyScrollW": 1440,
+      "mainScrollW": 1200,
+      "viewScrollW": 1152,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-prediction-desktop.png"
+  },
+  {
+    "view": "reports",
+    "viewport": "desktop",
+    "metrics": {
+      "windowW": 1440,
+      "docScrollW": 1440,
+      "bodyScrollW": 1440,
+      "mainScrollW": 1200,
+      "viewScrollW": 1152,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-reports-desktop.png"
+  },
+  {
+    "view": "integration",
+    "viewport": "desktop",
+    "metrics": {
+      "windowW": 1440,
+      "docScrollW": 1440,
+      "bodyScrollW": 1440,
+      "mainScrollW": 1200,
+      "viewScrollW": 1152,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-integration-desktop.png"
+  },
+  {
+    "view": "settings",
+    "viewport": "desktop",
+    "metrics": {
+      "windowW": 1440,
+      "docScrollW": 1440,
+      "bodyScrollW": 1440,
+      "mainScrollW": 1200,
+      "viewScrollW": 1152,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-settings-desktop.png"
+  },
+  {
+    "view": "dashboard",
+    "viewport": "tablet",
+    "metrics": {
+      "windowW": 768,
+      "docScrollW": 768,
+      "bodyScrollW": 768,
+      "mainScrollW": 768,
+      "viewScrollW": 744,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-dashboard-tablet.png"
+  },
+  {
+    "view": "map",
+    "viewport": "tablet",
+    "metrics": {
+      "windowW": 768,
+      "docScrollW": 768,
+      "bodyScrollW": 768,
+      "mainScrollW": 768,
+      "viewScrollW": 744,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-map-tablet.png"
+  },
+  {
+    "view": "city3d",
+    "viewport": "tablet",
+    "metrics": {
+      "windowW": 768,
+      "docScrollW": 768,
+      "bodyScrollW": 768,
+      "mainScrollW": 768,
+      "viewScrollW": 744,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-city3d-tablet.png"
+  },
+  {
+    "view": "cctv",
+    "viewport": "tablet",
+    "metrics": {
+      "windowW": 768,
+      "docScrollW": 768,
+      "bodyScrollW": 768,
+      "mainScrollW": 768,
+      "viewScrollW": 744,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-cctv-tablet.png"
+  },
+  {
+    "view": "signals",
+    "viewport": "tablet",
+    "metrics": {
+      "windowW": 768,
+      "docScrollW": 768,
+      "bodyScrollW": 768,
+      "mainScrollW": 768,
+      "viewScrollW": 744,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-signals-tablet.png"
+  },
+  {
+    "view": "incidents",
+    "viewport": "tablet",
+    "metrics": {
+      "windowW": 768,
+      "docScrollW": 768,
+      "bodyScrollW": 768,
+      "mainScrollW": 768,
+      "viewScrollW": 744,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-incidents-tablet.png"
+  },
+  {
+    "view": "emergency",
+    "viewport": "tablet",
+    "metrics": {
+      "windowW": 768,
+      "docScrollW": 768,
+      "bodyScrollW": 768,
+      "mainScrollW": 768,
+      "viewScrollW": 744,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-emergency-tablet.png"
+  },
+  {
+    "view": "devices",
+    "viewport": "tablet",
+    "metrics": {
+      "windowW": 768,
+      "docScrollW": 768,
+      "bodyScrollW": 768,
+      "mainScrollW": 768,
+      "viewScrollW": 744,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-devices-tablet.png"
+  },
+  {
+    "view": "analytics",
+    "viewport": "tablet",
+    "metrics": {
+      "windowW": 768,
+      "docScrollW": 768,
+      "bodyScrollW": 768,
+      "mainScrollW": 768,
+      "viewScrollW": 744,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-analytics-tablet.png"
+  },
+  {
+    "view": "prediction",
+    "viewport": "tablet",
+    "metrics": {
+      "windowW": 768,
+      "docScrollW": 768,
+      "bodyScrollW": 768,
+      "mainScrollW": 768,
+      "viewScrollW": 744,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-prediction-tablet.png"
+  },
+  {
+    "view": "reports",
+    "viewport": "tablet",
+    "metrics": {
+      "windowW": 768,
+      "docScrollW": 768,
+      "bodyScrollW": 768,
+      "mainScrollW": 768,
+      "viewScrollW": 744,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-reports-tablet.png"
+  },
+  {
+    "view": "integration",
+    "viewport": "tablet",
+    "metrics": {
+      "windowW": 768,
+      "docScrollW": 768,
+      "bodyScrollW": 768,
+      "mainScrollW": 768,
+      "viewScrollW": 744,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-integration-tablet.png"
+  },
+  {
+    "view": "settings",
+    "viewport": "tablet",
+    "metrics": {
+      "windowW": 768,
+      "docScrollW": 768,
+      "bodyScrollW": 768,
+      "mainScrollW": 768,
+      "viewScrollW": 744,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-settings-tablet.png"
+  },
+  {
+    "view": "dashboard",
+    "viewport": "mobile",
+    "metrics": {
+      "windowW": 390,
+      "docScrollW": 390,
+      "bodyScrollW": 390,
+      "mainScrollW": 390,
+      "viewScrollW": 366,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-dashboard-mobile.png"
+  },
+  {
+    "view": "map",
+    "viewport": "mobile",
+    "metrics": {
+      "windowW": 390,
+      "docScrollW": 390,
+      "bodyScrollW": 390,
+      "mainScrollW": 390,
+      "viewScrollW": 366,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-map-mobile.png"
+  },
+  {
+    "view": "city3d",
+    "viewport": "mobile",
+    "metrics": {
+      "windowW": 390,
+      "docScrollW": 390,
+      "bodyScrollW": 390,
+      "mainScrollW": 390,
+      "viewScrollW": 366,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-city3d-mobile.png"
+  },
+  {
+    "view": "cctv",
+    "viewport": "mobile",
+    "metrics": {
+      "windowW": 390,
+      "docScrollW": 390,
+      "bodyScrollW": 390,
+      "mainScrollW": 390,
+      "viewScrollW": 366,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-cctv-mobile.png"
+  },
+  {
+    "view": "signals",
+    "viewport": "mobile",
+    "metrics": {
+      "windowW": 390,
+      "docScrollW": 390,
+      "bodyScrollW": 390,
+      "mainScrollW": 390,
+      "viewScrollW": 366,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-signals-mobile.png"
+  },
+  {
+    "view": "incidents",
+    "viewport": "mobile",
+    "metrics": {
+      "windowW": 390,
+      "docScrollW": 390,
+      "bodyScrollW": 390,
+      "mainScrollW": 390,
+      "viewScrollW": 366,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-incidents-mobile.png"
+  },
+  {
+    "view": "emergency",
+    "viewport": "mobile",
+    "metrics": {
+      "windowW": 390,
+      "docScrollW": 390,
+      "bodyScrollW": 390,
+      "mainScrollW": 390,
+      "viewScrollW": 366,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-emergency-mobile.png"
+  },
+  {
+    "view": "devices",
+    "viewport": "mobile",
+    "metrics": {
+      "windowW": 390,
+      "docScrollW": 390,
+      "bodyScrollW": 390,
+      "mainScrollW": 390,
+      "viewScrollW": 366,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-devices-mobile.png"
+  },
+  {
+    "view": "analytics",
+    "viewport": "mobile",
+    "metrics": {
+      "windowW": 390,
+      "docScrollW": 390,
+      "bodyScrollW": 390,
+      "mainScrollW": 390,
+      "viewScrollW": 366,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-analytics-mobile.png"
+  },
+  {
+    "view": "prediction",
+    "viewport": "mobile",
+    "metrics": {
+      "windowW": 390,
+      "docScrollW": 390,
+      "bodyScrollW": 390,
+      "mainScrollW": 390,
+      "viewScrollW": 366,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-prediction-mobile.png"
+  },
+  {
+    "view": "reports",
+    "viewport": "mobile",
+    "metrics": {
+      "windowW": 390,
+      "docScrollW": 390,
+      "bodyScrollW": 390,
+      "mainScrollW": 390,
+      "viewScrollW": 366,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-reports-mobile.png"
+  },
+  {
+    "view": "integration",
+    "viewport": "mobile",
+    "metrics": {
+      "windowW": 390,
+      "docScrollW": 390,
+      "bodyScrollW": 390,
+      "mainScrollW": 390,
+      "viewScrollW": 366,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-integration-mobile.png"
+  },
+  {
+    "view": "settings",
+    "viewport": "mobile",
+    "metrics": {
+      "windowW": 390,
+      "docScrollW": 390,
+      "bodyScrollW": 390,
+      "mainScrollW": 390,
+      "viewScrollW": 366,
+      "viewVisible": true
+    },
+    "screenshot": "fase21-settings-mobile.png"
+  }
+]

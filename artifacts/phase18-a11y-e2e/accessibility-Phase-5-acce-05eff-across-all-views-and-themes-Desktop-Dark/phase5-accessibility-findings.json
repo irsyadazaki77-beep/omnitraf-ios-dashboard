@@ -1,0 +1,132 @@
+[
+  {
+    "route": "view-dashboard",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "route": "view-dashboard",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "route": "view-map",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "route": "view-map",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "route": "view-city3d",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "route": "view-city3d",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "route": "view-incidents",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "route": "view-incidents",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "route": "view-emergency",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "route": "view-emergency",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "route": "view-cctv",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "route": "view-cctv",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "route": "view-signals",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "route": "view-signals",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "route": "view-devices",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "route": "view-devices",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "route": "view-analytics",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "route": "view-analytics",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "route": "view-prediction",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "route": "view-prediction",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "route": "view-reports",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "route": "view-reports",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "route": "view-integration",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "route": "view-integration",
+    "theme": "light",
+    "violations": []
+  },
+  {
+    "route": "view-settings",
+    "theme": "dark",
+    "violations": []
+  },
+  {
+    "route": "view-settings",
+    "theme": "light",
+    "violations": []
+  }
+]

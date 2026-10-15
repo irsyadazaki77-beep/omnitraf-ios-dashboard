@@ -1,0 +1,11 @@
+{
+  "cycles": 3,
+  "rendererSamples": [
+    "CPU 60.3ms · p95 0.0ms · GPU n/a · 34 draw · 34g/1t",
+    "CPU 0.7ms · p95 100.0ms · GPU n/a · 34 draw · 34g/1t",
+    "CPU 0.5ms · p95 100.0ms · GPU n/a · 34 draw · 34g/1t"
+  ],
+  "heapBeforeForcedGcBytes": 9020140,
+  "heapAfterForcedGcBytes": 9441340,
+  "heapDeltaBytes": 421200
+}

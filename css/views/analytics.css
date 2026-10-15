@@ -166,6 +166,7 @@ body.theme-light #analyticsHourBadge { color: #1d4ed8; }
 
 /* 3-Column Primary KPI Strip */
 .trend-layout {
+  min-width: 0;
   display: grid;
   grid-template-columns: 240px 1fr;
   gap: var(--space-4);
@@ -207,6 +208,7 @@ body.theme-light #analyticsHourBadge { color: #1d4ed8; }
 /* Dominant Main Chart */
 .chart-container {
   width: 100%;
+  min-width: 0;
   position: relative;
   background: var(--surface-base);
   border-radius: var(--radius-md);
@@ -296,6 +298,8 @@ body.theme-light #analyticsHourBadge { color: #1d4ed8; }
 
 /* Accessible Details Table */
 .series-detail {
+  min-width: 0;
+  max-width: 100%;
   margin-top: var(--space-3);
   padding: 10px 14px;
   background: var(--surface-raised);
@@ -318,6 +322,8 @@ body.theme-light #analyticsHourBadge { color: #1d4ed8; }
 
 .table-scroll {
   overflow-x: auto;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
   max-height: 240px;
   margin-top: 6px;
@@ -325,6 +331,7 @@ body.theme-light #analyticsHourBadge { color: #1d4ed8; }
 
 .table-scroll table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 11.5px;
   text-align: left;
@@ -342,13 +349,26 @@ body.theme-light #analyticsHourBadge { color: #1d4ed8; }
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-primary);
   font-family: var(--font-mono);
+  overflow-wrap: anywhere;
 }
 
 /* Expanded Section: Insights, Comparison & ESG */
 .analytics-expanded {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+#analyticsCorridorBreakdownCard,
+.analytics-corridor-table-scroll {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.analytics-corridor-table-scroll {
+  width: 100%;
+  overflow-x: auto;
 }
 
 /* ESG Environmental Impact Section */
@@ -645,7 +665,7 @@ body.theme-light .esg-impact-metric,
 /* Responsive Rules */
 @media (max-width: 900px) {
   .trend-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .trend-summary {
     display: grid;

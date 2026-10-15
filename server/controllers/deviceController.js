@@ -60,7 +60,7 @@ export async function updateDeviceConfig(req, res) {
 }
 
 export async function pingDevice(req, res) {
-  const deviceId = req.query.deviceId || req.body?.deviceId;
+  const deviceId = req.body?.deviceId;
   const commandId = req.body?.commandId || `CMD-PING-${Date.now()}`;
   const correlationId = req.headers['x-correlation-id'] || req.body?.correlationId || `CORR-PING-${Date.now()}`;
 

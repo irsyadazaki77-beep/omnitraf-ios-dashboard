@@ -1,0 +1,329 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: scenario-lab.spec.js >> Scenario Lab isolated simulation workflow >> builds, replays, compares, exports, and captures a deterministic lab run
+- Location: tests\e2e\scenario-lab.spec.js:8:3
+
+# Error details
+
+```
+Error: expect(locator).toBeVisible() failed
+
+Locator:  locator('#scenarioCorridorRows tr').first()
+Expected: visible
+Received: hidden
+Timeout:  10000ms
+
+Call log:
+  - Expect "toBeVisible" locator('#scenarioCorridorRows tr').first() with timeout 10000ms
+  - waiting for locator('#scenarioCorridorRows tr').first()
+    22 × locator resolved to <tr>…</tr>
+       - unexpected value "hidden"
+
+```
+
+```yaml
+- link "Lewati ke konten utama":
+  - /url: "#mainContent"
+- complementary:
+  - link "OmniTRAF home":
+    - /url: "#dashboard"
+    - img "Ikon OmniTRAF SITS Surabaya"
+    - img "Logo OmniTRAF Adaptive Urban Mobility System"
+    - text: Surabaya Command Center
+  - button "Ciutkan sidebar" [expanded]: Collapse sidebar
+  - button "Cari halaman Ctrl K"
+  - navigation "Primary navigation":
+    - region "Operasi":
+      - heading "Operasi" [level=2]
+      - link "Ikhtisar":
+        - /url: "#dashboard"
+        - img
+        - text: Ikhtisar
+      - link "Peta kota":
+        - /url: "#map"
+        - img
+        - text: Peta kota
+      - link "Digital Twin 3D":
+        - /url: "#city3d"
+      - link "Insiden":
+        - /url: "#incidents"
+        - img
+        - text: Insiden
+      - link "Darurat":
+        - /url: "#emergency"
+        - img
+        - text: Darurat
+    - region "Pemantauan":
+      - heading "Pemantauan" [level=2]
+      - link "CCTV":
+        - /url: "#cctv"
+        - img
+        - text: CCTV
+      - link "Sinyal":
+        - /url: "#signals"
+        - img
+        - text: Sinyal
+      - link "Perangkat":
+        - /url: "#devices"
+        - img
+        - text: Perangkat
+    - region "Analitik & prediksi":
+      - heading "Analitik & prediksi" [level=2]
+      - link "Analitik":
+        - /url: "#analytics"
+        - img
+        - text: Analitik
+      - link "Prediksi":
+        - /url: "#prediction"
+        - img
+        - text: Prediksi
+      - button "Intelijen sinyal"
+      - link "Laporan":
+        - /url: "#reports"
+    - region "Sistem":
+      - heading "Sistem" [level=2]
+      - link "Integrasi":
+        - /url: "#integration"
+        - img
+        - text: Integrasi
+      - link "Pengaturan":
+        - /url: "#settings"
+        - img
+        - text: Pengaturan
+      - link "Arsitektur sistem":
+        - /url: "#about-engine"
+- main:
+  - text: OMNITRAF · SIMULASI
+  - strong: Prediksi
+  - button "Cari Ctrl K"
+  - text: Selasa, 13 Okt 2026 | 19.13 WIB
+  - strong: Server Simulasi Tersambung
+  - button "Ganti ke tema terang"
+  - 'button "Active scenario notifications: 3"': "3"
+  - group: ···
+  - button "Sesi Operator Demo. Kontrol keluar tersedia di navigasi.":
+    - strong: Operator Demo
+    - text: Operator
+  - button "Keluar"
+  - group "Batas simulasi":
+    - strong: SIMULASI
+    - text: Data sintetis · tanpa kendali perangkat lapangan
+  - region "Scenario Lab":
+    - text: SANDBOX · TERISOLASI Model agregat deterministik · bukan prediksi dunia nyata
+    - heading "Scenario Lab" [level=1]
+    - paragraph: Rancang eksperimen lalu lintas, jalankan replay yang reproducible, lalu bandingkan metrik pada initial state yang sama.
+    - status: Sandbox terisolasi · completed · simulator authoritative tidak berubah
+    - complementary "Konfigurasi skenario":
+      - text: 01 / SETUP
+      - heading "Konfigurasi run" [level=2]
+      - text: Preset
+      - combobox "Preset":
+        - option "Normal Traffic"
+        - option "Rush Hour"
+        - option "Heavy Rain"
+        - option "Major Incident" [selected]
+        - option "Adaptive Signals"
+        - option "Emergency Green Wave"
+      - text: Seed
+      - spinbutton "Seed": "42"
+      - text: Mulai (WIB)
+      - spinbutton "Mulai (WIB)": "8"
+      - text: Horizon
+      - combobox "Horizon":
+        - option "15 menit" [selected]
+        - option "30 menit"
+        - option "60 menit"
+        - option "120 menit"
+      - text: Koridor
+      - combobox "Koridor":
+        - option "Semua koridor" [selected]
+        - option "A. Yani / Wonokromo"
+        - option "A. Yani - Jemursari"
+        - option "Raya Darmo"
+        - option "Tunjungan - Siola"
+        - option "MERR Kertajaya"
+        - option "Diponegoro"
+      - text: Permintaan
+      - strong: 1,00×
+      - text: rentang model 0,50–1,75×
+      - slider "Permintaan 1,00× rentang model 0,50–1,75×": "1"
+      - text: Cuaca
+      - combobox "Cuaca":
+        - option "Cerah" [selected]
+        - option "Hujan"
+      - text: Insiden
+      - combobox "Insiden":
+        - option "Tidak ada"
+        - option "Rendah"
+        - option "Sedang"
+        - option "Tinggi"
+        - option "Kritis" [selected]
+      - text: Strategi sinyal
+      - combobox "Strategi sinyal":
+        - option "Sinyal tetap" [selected]
+        - option "Adaptif"
+        - option "Emergency green wave"
+      - button "Buat & jalankan"
+      - button "Simpan konfigurasi"
+      - text: Konfigurasi tersimpan
+      - combobox "Konfigurasi tersimpan":
+        - option "Pilih konfigurasi lokal" [selected]
+      - text: 02 / COMPARE Baseline
+      - combobox "Baseline":
+        - option "Normal Traffic" [selected]
+        - option "Rush Hour"
+        - option "Heavy Rain"
+        - option "Major Incident"
+        - option "Adaptive Signals"
+        - option "Emergency Green Wave"
+      - text: Alternatif
+      - combobox "Alternatif":
+        - option "Normal Traffic"
+        - option "Rush Hour" [selected]
+        - option "Heavy Rain"
+        - option "Major Incident"
+        - option "Adaptive Signals"
+        - option "Emergency Green Wave"
+      - button "Bandingkan skenario"
+    - region "Simulation timeline":
+      - text: 03 / SIMULATION
+      - heading "Simulation timeline" [level=2]
+      - text: SIMULATED completed · menit 15/15 · seed 42 100%
+      - progressbar "Scenario progress"
+      - text: 00:00 15 30 45 60+ menit
+      - button "▶ Play"
+      - button "Ⅱ Pause"
+      - button "↺ Reset"
+      - button "⟲ Replay"
+      - button "JSON"
+      - button "CSV"
+      - paragraph: Insiden critical · menit 7
+    - region "Hasil simulasi":
+      - article:
+        - text: Kecepatan rata-rata
+        - strong: "11.2"
+        - text: km/jam
+      - article:
+        - text: Antrean model
+        - strong: "7086"
+        - text: meter
+      - article:
+        - text: Indeks kepadatan
+        - strong: "80"
+        - text: 0–100
+      - article:
+        - text: Throughput
+        - strong: "10431"
+        - text: kendaraan/jam
+      - text: MODEL OUTPUT
+      - heading "Antrean sepanjang run" [level=3]
+      - text: Meter · simulasi
+      - img "Antrean simulasi per menit": menit 0 menit 15 7795 m
+      - group: Rincian metrik koridor
+      - navigation "Workspace visualisasi simulasi":
+        - text: Workspace sistem
+        - link "Map 2D":
+          - /url: "#map"
+        - link "Digital Twin 3D":
+          - /url: "#city3d"
+        - link "CCTV":
+          - /url: "#cctv"
+        - link "Signals":
+          - /url: "#signals"
+        - link "Analytics":
+          - /url: "#analytics"
+        - link "Reports":
+          - /url: "#reports"
+      - paragraph: Run ini membaca snapshot simulasi sebagai initial state, lalu bergerak di sandbox tersendiri. Menavigasi ke workspace lain tidak menerapkan hasil ke state operasional.
+  - article:
+    - article:
+      - heading "Simulasi lalu lintas dan sinyal (08:00 WIB)" [level=2]
+      - paragraph: Fixed-time dibanding adaptive pada input, seed, dan horizon yang sama. Seluruh nilai adalah keluaran model agregat sintetis.
+      - text: "Model skenario deterministik 📊 KONDISI DASAR SIMULASI Waktu Tunggu:"
+      - strong: 240 detik
+      - text: "Panjang Antrean:"
+      - strong: 6471 m
+      - text: "Kecepatan Rerata:"
+      - strong: 13 km/jam
+      - text: "Kendaraan per jam:"
+      - strong: 12926 kend/jam
+      - text: "ADAPTIVE SIGNAL Green split:"
+      - strong: 49 dtk
+      - text: "Antrean:"
+      - strong: 4252 m (34% perubahan)
+      - text: "Travel time:"
+      - strong: 15.43 menit (-1.68 Δ)
+      - text: "Throughput / congestion:"
+      - strong: 13221 kend/jam · 69
+      - text: "ASUMSI DAN CAKUPAN Horizon: 60 menit · Seed: 42 Synthetic aggregate corridor model; no field calibration, lane-level behavior, or accuracy evaluation is available."
+      - table "Perbandingan skenario traffic simulasi":
+        - rowgroup:
+          - row "Skenario Travel time Antrean Congestion Throughput":
+            - columnheader "Skenario"
+            - columnheader "Travel time"
+            - columnheader "Antrean"
+            - columnheader "Congestion"
+            - columnheader "Throughput"
+        - rowgroup:
+          - row "Normal 17.11 mnt 6471 m 70 12926 kend/jam":
+            - cell "Normal"
+            - cell "17.11 mnt"
+            - cell "6471 m"
+            - cell "70"
+            - cell "12926 kend/jam"
+          - row "Rush hour 38.61 mnt 52537 m 99 12926 kend/jam":
+            - cell "Rush hour"
+            - cell "38.61 mnt"
+            - cell "52537 m"
+            - cell "99"
+            - cell "12926 kend/jam"
+          - row "Hujan lebat 38.61 mnt 27800 m 91 10083 kend/jam":
+            - cell "Hujan lebat"
+            - cell "38.61 mnt"
+            - cell "27800 m"
+            - cell "91"
+            - cell "10083 kend/jam"
+          - row "Insiden besar 23.81 mnt 25185 m 80 10431 kend/jam":
+            - cell "Insiden besar"
+            - cell "23.81 mnt"
+            - cell "25185 m"
+            - cell "80"
+            - cell "10431 kend/jam"
+          - row "Sinyal adaptif 15.43 mnt 4252 m 69 13221 kend/jam":
+            - cell "Sinyal adaptif"
+            - cell "15.43 mnt"
+            - cell "4252 m"
+            - cell "69"
+            - cell "13221 kend/jam"
+          - row "Emergency green wave 15.71 mnt 4713 m 69 13160 kend/jam":
+            - cell "Emergency green wave"
+            - cell "15.71 mnt"
+            - cell "4713 m"
+            - cell "69"
+            - cell "13160 kend/jam"
+    - text: SIMULASI · MODEL DETERMINISTIK Horizon prakiraan 24 jam · bukan probabilitas terkalibrasi
+    - heading "Prakiraan Kepadatan dan Horizon Model" [level=2]
+    - paragraph: Proyeksi kondisi koridor Surabaya per jam berdasarkan parameter model sintetis. Nilai risiko tidak dikirim ke APILL atau sistem kendali lapangan.
+    - text: "Kondisi pada jam model:"
+    - strong: Tinggi
+    - button "🧪 Evaluasi 15 skenario model"
+    - text: "Horizon Waktu: 08:00 WIB Status: Risiko macet tinggi"
+    - slider "Pilih jam prakiraan model": "8"
+    - text: 00:00 04:00 08:00 12:00 16:00 20:00 23:00 Estimasi Kecepatan Arteri 10 km/jam Model kecepatan agregat Indeks Risiko Model 84/100 Indeks relatif (0–100); bukan probabilitas empiris Skenario Rekomendasi Model (Simulasi)
+    - strong: "[ID: REC-08-HIGH_CON]"
+    - text: "Dampak model: Perubahan indikator hanya berupa skenario model; dampak lapangan belum divalidasi. Skenario model: uji Green Split A. Yani–Wonokromo 35 → 49 detik; bandingkan dampaknya pada MERR. HIGH_CONGESTION LOW_SPEED LONG_QUEUE"
+    - group:
+      - text: ℹ️ Asumsi Model, Keterbatasan & Asal Data
+      - strong: Batasan Interpretasi
+      - paragraph: Indeks risiko merupakan skor heuristik berbasis rasio volume/kapasitas koridor sintetis dan fluktuasi waktu tunggu. Nilai ini tidak mewakili probabilitas terkalibrasi statistik dan tidak terhubung ke APILL Dishub.
+      - strong: Sumber Masukan
+      - paragraph: Data jam dihitung menggunakan kurva diurnal Surabaya standar dengan faktor puncak pagi (07:00–09:00 WIB) dan sore (16:30–18:30 WIB). Seluruh rekomendasi skenario bersifat hipotetis.
+- status: ✓ Notifikasi
+- status
+```

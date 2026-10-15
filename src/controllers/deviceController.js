@@ -157,21 +157,21 @@ export class DeviceController {
       // Tentukan status badge HTML
       let badgeHtml = "";
       if (safeHealthLevel === "HEALTHY") {
-        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:var(--status-success);"></span><span class="pulse-ring-inner" style="background:var(--status-success);"></span></span><span style="color:var(--status-success); font-weight:700;">DEMO · HEALTHY</span>`;
+        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer csp-style-b65ece3938" ></span><span class="pulse-ring-inner csp-style-dcb4fdfd4d" ></span></span><span class="csp-style-ed3e812c02" >DEMO · HEALTHY</span>`;
       } else if (safeHealthLevel === "DEGRADED") {
-        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:var(--status-warning);"></span><span class="pulse-ring-inner" style="background:var(--status-warning);"></span></span><span style="color:var(--status-warning); font-weight:700;">DEMO · DEGRADED</span>`;
+        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer csp-style-2a80313527" ></span><span class="pulse-ring-inner csp-style-2d768f0021" ></span></span><span class="csp-style-a2c99af06b" >DEMO · DEGRADED</span>`;
       } else if (safeHealthLevel === "STALE") {
-        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:var(--text-secondary);"></span><span class="pulse-ring-inner" style="background:var(--text-secondary);"></span></span><span style="color:var(--text-secondary); font-weight:700;">DEMO · STALE</span>`;
+        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer csp-style-b8cda7cc8d" ></span><span class="pulse-ring-inner csp-style-f9b2cd68f1" ></span></span><span class="csp-style-298f93c1d8" >DEMO · STALE</span>`;
       } else if (safeHealthLevel === "FAULT") {
-        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:var(--status-danger);"></span><span class="pulse-ring-inner" style="background:var(--status-danger);"></span></span><span style="color:var(--status-danger); font-weight:700;">FAULT DEMO</span>`;
+        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer csp-style-5e2eb70197" ></span><span class="pulse-ring-inner csp-style-e1240c95e0" ></span></span><span class="csp-style-d43e962094" >FAULT DEMO</span>`;
       } else if (safeHealthLevel === "RECOVERING") {
-        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:#38bdf8;"></span><span class="pulse-ring-inner" style="background:#38bdf8;"></span></span><span style="color:#38bdf8; font-weight:700;">DEMO · RECOVERING</span>`;
+        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer csp-style-8b4e03be1e" ></span><span class="pulse-ring-inner csp-style-40999ca7a2" ></span></span><span class="csp-style-7a9b88f67c" >DEMO · RECOVERING</span>`;
       } else if (safeHealthLevel === "MAINTENANCE") {
         badgeHtml = `<span class="status-badge gray">MAINTENANCE · DEMO</span>`;
       } else if (safeHealthLevel === "SIMULATED") {
         badgeHtml = `<span class="status-badge gray">MODEL ONLY</span>`;
       } else { // OFFLINE
-        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer" style="border-color:var(--text-secondary);"></span><span class="pulse-ring-inner" style="background:var(--text-secondary);"></span></span><span style="color:var(--text-secondary); font-weight:700;">OFFLINE DEMO</span>`;
+        badgeHtml = `<span class="status-dot-wrapper"><span class="pulse-ring-outer csp-style-b8cda7cc8d" ></span><span class="pulse-ring-inner csp-style-f9b2cd68f1" ></span></span><span class="csp-style-298f93c1d8" >OFFLINE DEMO</span>`;
       }
 
       // Bar indikator CPU load
@@ -179,9 +179,9 @@ export class DeviceController {
       const cpuBarHtml = cpuReading === null ? '<span class="metric-unavailable">Tidak tersedia</span>' : `
         <div class="diag-bar-wrap">
           <div class="diag-bar-track">
-            <div class="diag-bar-fill ${cpuColor}" style="width: ${cpuPercent}%;"></div>
+            <div class="diag-bar-fill ${cpuColor}" data-cpu-width="${cpuPercent}"></div>
           </div>
-          <span class="diag-val" style="font-family:'Share Tech Mono';">${cpuPercent}%</span>
+          <span class="diag-val csp-style-0fa5eb5e69" >${cpuPercent}%</span>
         </div>
       `;
 
@@ -191,9 +191,9 @@ export class DeviceController {
       const tempBarHtml = temperatureReading === null ? '<span class="metric-unavailable">Tidak tersedia</span>' : `
         <div class="diag-temp-wrap">
           <div class="diag-temp-bar">
-            <div class="diag-temp-fill ${tempColorClass}" style="width: ${Math.min(100, (temperatureC / 100) * 100)}%;"></div>
+            <div class="diag-temp-fill ${tempColorClass}" data-temperature-width="${Math.min(100, (temperatureC / 100) * 100)}"></div>
           </div>
-          <span class="badge-temp ${tempBadgeClass}" style="font-family:'Share Tech Mono';">${temperatureC}°C</span>
+          <span class="badge-temp ${tempBadgeClass} csp-style-0fa5eb5e69" >${temperatureC}°C</span>
         </div>
       `;
 
@@ -225,16 +225,16 @@ export class DeviceController {
         <tr class="device-row ${this.selectedDeviceId === dev.deviceId ? 'active-row-highlight' : ''}" data-device="${safeDeviceId}" data-health="${safeHealthLevel.toLowerCase()}">
           <td><strong>${safeDeviceId}</strong></td>
           <td>
-            <div style="font-weight:600;">${safeDeviceName}</div>
-            <small style="color:var(--text-secondary); font-size:10px;">${safeLocation}</small>
+            <div class="csp-style-6b2a94ea3b" >${safeDeviceName}</div>
+            <small class="csp-style-b85e4ee13b" >${safeLocation}</small>
           </td>
-          <td style="font-size:11px; color:var(--text-secondary);">${safeType}</td>
+          <td class="csp-style-590d45757a" >${safeType}</td>
           <td>${badgeHtml}</td>
           <td>${cpuBarHtml}</td>
           <td>${tempBarHtml}</td>
-          <td class="device-ping" style="font-family:'Share Tech Mono';">${latencyMs === null || safeHealthLevel === 'OFFLINE' ? '—' : latencyMs + ' ms model'}</td>
+          <td class="device-ping csp-style-0fa5eb5e69" >${latencyMs === null || safeHealthLevel === 'OFFLINE' ? '—' : latencyMs + ' ms model'}</td>
           <td class="device-ping-spark">${sparklineHtml}</td>
-          <td style="font-size:11px; font-family:'Share Tech Mono';">${inferenceRateText}</td>
+          <td class="csp-style-391f6faa07" >${inferenceRateText}</td>
         <td><button type="button" class="btn btn-ghost compact btn-device-detail" aria-label="Lihat detail ${safeDeviceName}">Lihat detail</button>${authManager.hasRole(['OPERATOR', 'ADMIN']) && !['SIMULATED', 'MAINTENANCE'].includes(safeHealthLevel) ? `<button type="button" aria-label="Uji koneksi simulasi ${safeDeviceId}" class="btn btn-ghost compact btn-ping-device-row" data-device="${safeDeviceId}">Uji koneksi demo</button>` : ''}</td>
         </tr>
       `;
@@ -245,6 +245,8 @@ export class DeviceController {
     }
 
     tbody.innerHTML = html;
+    tbody.querySelectorAll('[data-cpu-width]').forEach((bar) => { bar.style.width = `${Number(bar.dataset.cpuWidth)}%`; });
+    tbody.querySelectorAll('[data-temperature-width]').forEach((bar) => { bar.style.width = `${Number(bar.dataset.temperatureWidth)}%`; });
     const columnLabels = Array.from(tbody.closest('table')?.querySelectorAll('thead th') || [], header => header.textContent.trim());
     tbody.querySelectorAll('tr').forEach(row => {
       row.querySelectorAll('td').forEach((cell, index) => {
@@ -306,8 +308,8 @@ export class DeviceController {
         for (const dev of devices) {
           try {
             const result = await fetchWithCacheAndDedupe(
-              `/api/devices/ping?deviceId=${encodeURIComponent(dev.deviceId)}`,
-              { method: 'GET', forceRefresh: true }
+              '/api/devices/ping',
+              { method: 'POST', body: { deviceId: dev.deviceId }, forceRefresh: true }
             );
             if (!result?.success) pingFailures++;
           } catch (err) {
@@ -360,8 +362,8 @@ export class DeviceController {
 
     try {
       const payload = await fetchWithCacheAndDedupe(
-        `/api/devices/ping?deviceId=${encodeURIComponent(deviceId)}`,
-        { method: 'GET', forceRefresh: true }
+        '/api/devices/ping',
+        { method: 'POST', body: { deviceId }, forceRefresh: true }
       );
 
       if (payload && payload.success) {
@@ -503,7 +505,7 @@ export class DeviceController {
         ? activeFlags.map(flag => `<span class="device-flag">${flagLabels[flag]}</span>`).join("")
         : `<span class="device-flag-empty">Tidak ada · optimal</span>`;
 
-      const healthColor = dev.healthLevel === 'HEALTHY' ? 'var(--status-success)' : dev.healthLevel === 'DEGRADED' ? 'var(--status-warning)' : 'var(--status-danger)';
+      const healthTone = dev.healthLevel === 'HEALTHY' ? 'good' : dev.healthLevel === 'DEGRADED' ? 'warning' : 'danger';
       const faultInjectionHtml = canConfigure ? `
         <div class="fault-injection-container">
             <label class="cfg-label">Suntik gangguan (simulasi)</label>
@@ -519,23 +521,23 @@ export class DeviceController {
       ` : '';
 
       diagBox.innerHTML = `
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:11px; margin-bottom:12px;">
-          <div>🌡️ Suhu GPU: <strong style="color:${temperatureC > 75 ? 'var(--status-danger)' : '#fff'};">${temperatureC === null ? '—' : `${temperatureC}°C`}</strong></div>
+        <div class="csp-style-20a9c76724" >
+          <div>🌡️ Suhu GPU: <strong class="device-metric-tone ${temperatureC > 75 ? 'danger' : 'neutral'}">${temperatureC === null ? '—' : `${temperatureC}°C`}</strong></div>
           <div>📊 Beban CPU/GPU: <strong>${cpuPercent === null ? '—' : `${cpuPercent}%`}</strong></div>
           <div>💾 RAM Node: <strong>${deviceType.includes("PLC") ? "256 KB" : "4.2 / 8.0 GB"}</strong></div>
           <div>🌀 Fan Speed: <strong>${deviceType.includes("PLC") ? "N/A" : dev.healthLevel === "OFFLINE" ? "0 RPM" : "2400 RPM"}</strong></div>
-          <div>⏳ Uptime %: <strong style="color:var(--status-success);">${dev.healthLevel === 'OFFLINE' ? '0.0%' : uptimePercent + '%'}</strong></div>
-          <div>❌ Kehilangan paket: <strong style="color:${packetLossPercent > 5 ? 'var(--status-danger)' : '#fff'};">${packetLossPercent === null ? '—' : `${packetLossPercent}%`}</strong></div>
-          <div>📶 Status: <strong style="color:${healthColor};">${escapeHtml(({ HEALTHY: 'Sehat', DEGRADED: 'Menurun', STALE: 'Usang', FAULT: 'Gangguan', RECOVERING: 'Pemulihan', OFFLINE: 'Terputus', SIMULATED: 'Simulasi' })[dev.healthLevel] || dev.healthLevel || 'Tidak diketahui')}</strong></div>
-          <div>🎯 Skor kesehatan: <strong style="color:${healthColor}; font-size:12px; font-family:'Share Tech Mono';">${healthScore === null ? '—' : `${healthScore}/100`}</strong></div>
+          <div>⏳ Uptime %: <strong class="csp-style-e776a92b23" >${dev.healthLevel === 'OFFLINE' ? '0.0%' : uptimePercent + '%'}</strong></div>
+          <div>❌ Kehilangan paket: <strong class="device-metric-tone ${packetLossPercent > 5 ? 'danger' : 'neutral'}">${packetLossPercent === null ? '—' : `${packetLossPercent}%`}</strong></div>
+          <div>📶 Status: <strong class="device-health-tone ${healthTone}">${escapeHtml(({ HEALTHY: 'Sehat', DEGRADED: 'Menurun', STALE: 'Usang', FAULT: 'Gangguan', RECOVERING: 'Pemulihan', OFFLINE: 'Terputus', SIMULATED: 'Simulasi' })[dev.healthLevel] || dev.healthLevel || 'Tidak diketahui')}</strong></div>
+          <div>🎯 Skor kesehatan: <strong class="device-health-tone ${healthTone} csp-style-health-score">${healthScore === null ? '—' : `${healthScore}/100`}</strong></div>
         </div>
-        <div class="diag-extra-details" style="font-size:10.5px; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px; margin-top:10px; color:var(--text-secondary);">
-          <div style="margin-bottom:6px;">🚩 Tanda aktif: ${flagsText}</div>
-          <div style="margin-bottom:4px;">⏰ Heartbeat terakhir: <strong style="color:#fff;">${escapeHtml(heartbeatLabel)} WIB</strong></div>
-          <div style="margin-bottom:6px;">📦 Sumber data: <strong style="color:#00e5ff; font-family:'Share Tech Mono';">${escapeHtml(dev.source || 'SIMULATED')} · MODEL SIMULASI</strong></div>
-          <div style="border-top:1px solid rgba(255,255,255,0.05); margin-top:8px; padding-top:8px;">
+        <div class="diag-extra-details csp-style-9d43825bc5" >
+          <div class="csp-style-abd137b89b" >🚩 Tanda aktif: ${flagsText}</div>
+          <div class="csp-style-ae01e5f41e" >⏰ Heartbeat terakhir: <strong class="csp-style-ef83576e9d" >${escapeHtml(heartbeatLabel)} WIB</strong></div>
+          <div class="csp-style-abd137b89b" >📦 Sumber data: <strong class="csp-style-7f04ae8c33" >${escapeHtml(dev.source || 'SIMULATED')} · MODEL SIMULASI</strong></div>
+          <div class="csp-style-07130becba" >
             <strong>Audit perintah terakhir:</strong>
-            <div id="diagLastCommand" style="font-family:'Share Tech Mono', monospace; font-size:10px; color:#38bdf8; margin-top:3px; word-break:break-all; line-height:1.3;">Memuat riwayat audit...</div>
+            <div id="diagLastCommand" class="csp-style-ea4628453a" >Memuat riwayat audit...</div>
           </div>
         </div>
         ${faultInjectionHtml}
@@ -652,7 +654,7 @@ export class DeviceController {
 
         html = `
           <strong>[${time} WIB] ID: ${escapeHtml(typeof cmd.actionId === 'string' ? cmd.actionId.slice(-6) : '-')}</strong><br/>
-          <span style="color:var(--status-success);">• Status: ${escapeHtml(cmd.status || 'APPLIED')}</span><br/>
+          <span class="csp-style-e776a92b23" >• Status: ${escapeHtml(cmd.status || 'APPLIED')}</span><br/>
           <span>• Detail: ${escapeHtml(desc)}</span>
         `;
       } else {
@@ -836,7 +838,7 @@ export class DeviceController {
 
       const html = `
         <strong>[${time} WIB] ID: ${escapeHtml(typeof data.actionId === 'string' ? data.actionId.slice(-6) : '-')}</strong><br/>
-        <span style="color:${statusColor}; font-weight:700;">• Status: ${escapeHtml(data.status)}</span><br/>
+        <span class="device-audit-status ${data.status === 'APPLIED' ? 'is-applied' : data.status === 'REJECTED' ? 'is-rejected' : 'is-validating'}">• Status: ${escapeHtml(data.status)}</span><br/>
         <span>• Param: FPS:${escapeHtml(safeFps)}, Res:${escapeHtml(safeResolution)}</span>
       `;
       this.deviceAuditCache.set(String(data.deviceId), html);

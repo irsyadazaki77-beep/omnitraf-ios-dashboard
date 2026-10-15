@@ -93,7 +93,7 @@ export class ChatSystem {
     `;
     const safeSender = escapeHtml(msg.sender);
     const safeTime = escapeHtml(msg.time);
-    meta.innerHTML = `<strong style="color: ${isMe ? 'var(--primary-2)' : 'var(--text)'};">${safeSender}</strong> <span>${safeTime}</span>`;
+    meta.innerHTML = `<strong class="chat-sender ${isMe ? 'chat-sender-self' : 'chat-sender-other'}">${safeSender}</strong> <span>${safeTime}</span>`;
 
     const textBubble = document.createElement("div");
     textBubble.style.cssText = `

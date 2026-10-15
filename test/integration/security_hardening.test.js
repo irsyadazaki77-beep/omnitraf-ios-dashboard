@@ -174,11 +174,14 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
     const originalExecute = commandExecutor.executeCommand;
     commandExecutor.executeCommand = async (...args) => { commandCalls++; return originalExecute.apply(commandExecutor, args); };
     try {
-      const issuerRes = await fetch(`${baseUrl}/api/devices/ping?deviceId=NODE-EDGE-01`, {
-        headers: { Authorization: `Bearer ${invalidIssuer}` }
+      const issuerRes = await fetch(`${baseUrl}/api/devices/ping`, {
+        method: 'POST', headers: { Authorization: `Bearer ${invalidIssuer}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId: 'NODE-EDGE-01' })
       });
       assert.equal(issuerRes.status, 401);
-      const queryRes = await fetch(`${baseUrl}/api/devices/ping?deviceId=NODE-EDGE-01&token=${encodeURIComponent(adminToken)}`);
+      const queryRes = await fetch(`${baseUrl}/api/devices/ping?token=${encodeURIComponent(adminToken)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deviceId: 'NODE-EDGE-01' })
+      });
       assert.equal(queryRes.status, 401);
       assert.equal(commandCalls, 0);
       assert.equal(backendState.sequence, beforeSequence);
@@ -255,7 +258,10 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
     commandExecutor.executeCommand = async (...args) => { commandCalls++; return originalExecute.apply(commandExecutor, args); };
     dbManager.execute = (sql, ...args) => { if (sql.includes('INSERT INTO signal_configs')) persistenceCalls++; return originalDbExecute.call(dbManager, sql, ...args); };
     try {
-      const anonymousPing = await fetch(`${baseUrl}/api/devices/ping?deviceId=NODE-EDGE-01`);
+      const anonymousPing = await fetch(`${baseUrl}/api/devices/ping`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deviceId: 'NODE-EDGE-01' })
+      });
+      const getPing = await fetch(`${baseUrl}/api/devices/ping?deviceId=NODE-EDGE-01`);
       const anonymousAudit = await fetch(`${baseUrl}/api/audit-logs`);
       const viewerAudit = await fetch(`${baseUrl}/api/audit-logs`, { headers: { Cookie: `omnitraf_session=${viewerToken}` } });
       const anonymousDiagnostics = await fetch(`${baseUrl}/api/diagnostics/health`);
@@ -263,6 +269,7 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
       const anonymousDeviceAudit = await fetch(`${baseUrl}/api/devices/audit`);
 
       assert.equal(anonymousPing.status, 401);
+      assert.equal(getPing.status, 404);
       assert.equal(anonymousAudit.status, 401);
       assert.equal(viewerAudit.status, 403);
       assert.equal(anonymousDiagnostics.status, 401);
@@ -281,6 +288,29 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
       commandExecutor.executeCommand = originalExecute;
       dbManager.execute = originalDbExecute;
       socket.disconnect();
+    }
+  });
+
+  test('Cookie-authenticated writes reject an untrusted browser Origin', async () => {
+    const response = await fetch(`${baseUrl}/api/devices/ping`, {
+      method: 'POST',
+      headers: { Cookie: `omnitraf_session=${operatorToken}`, Origin: 'https://attacker.invalid', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId: 'NODE-EDGE-01' })
+    });
+    assert.equal(response.status, 403);
+    assert.equal((await response.json()).code, 'CSRF_ORIGIN_REJECTED');
+  });
+
+  test('Readiness probes use the cached database result and enforce a per-client limit', async () => {
+    const originalPing = dbManager.ping;
+    let probePingCalls = 0;
+    dbManager.ping = async (...args) => { probePingCalls += 1; return originalPing.apply(dbManager, args); };
+    try {
+      const responses = await Promise.all(Array.from({ length: 65 }, () => fetch(`${baseUrl}/readyz`)));
+      assert.equal(probePingCalls, 0);
+      assert.ok(responses.some(response => response.status === 429));
+    } finally {
+      dbManager.ping = originalPing;
     }
   });
 
@@ -368,8 +398,17 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
     assert.strictEqual(res.headers.get('x-content-type-options'), 'nosniff');
     assert.strictEqual(res.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
     assert.strictEqual(res.headers.get('x-frame-options'), 'SAMEORIGIN');
-    assert.ok(res.headers.get('content-security-policy'), 'CSP header must be present');
-    assert.ok(res.headers.get('content-security-policy').includes("default-src 'self'"));
+    const csp = res.headers.get('content-security-policy');
+    assert.ok(csp, 'CSP header must be present');
+    assert.ok(csp.includes("default-src 'self'"));
+    assert.ok(csp.includes("style-src-elem 'self'"), 'inline style elements must stay blocked');
+    assert.ok(csp.includes("style-src-attr 'none'"), 'inline style attributes must stay blocked');
+    assert.equal(csp.includes("style-src 'self' 'unsafe-inline'"), false);
+    assert.equal(csp.includes("'unsafe-inline'"), false, 'CSP must not allow inline script or style sources');
+    const connectSrc = csp.split(';').find(directive => directive.trim().startsWith('connect-src')) || '';
+    assert.ok(connectSrc.includes("'self'"), 'same-origin application APIs must remain available');
+    assert.equal(/\s(?:ws|wss):(?:\s|$)/.test(connectSrc), false, 'websocket permissions must not use scheme-wide sources');
+    assert.equal(/cartocdn|openstreetmap/i.test(connectSrc), false, 'map tiles are images and must not expand connect-src');
   });
 
   // 10. Rate Limiting Multi-Tier Verification Check

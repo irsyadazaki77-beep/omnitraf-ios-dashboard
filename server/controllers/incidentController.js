@@ -1,4 +1,5 @@
 import { backendState } from '../services/stateManager.js';
+import { auditRepository } from '../repositories/auditRepository.js';
 import { createApiResponse, createApiErrorResponse, createCommandErrorResponse, getCommandErrorStatus, sanitizeString } from '../middlewares/errorHandler.js';
 import { commandExecutor } from '../services/commandExecutor.js';
 import { INCIDENT_STATUS_VALUES, INCIDENT_SEVERITIES, INCIDENT_CATEGORIES } from '../config/contracts.js';
@@ -123,14 +124,38 @@ export async function cancelEmergencyRest(req, res) {
   }
 }
 
-export function getAuditLogs(req, res) {
+export async function getAuditLogs(req, res) {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  const persisted = await auditRepository.findAll({ limit: 250 });
+  if (persisted.status !== 'OK') {
+    return res.status(503).json(createApiErrorResponse(
+      503,
+      'AUDIT_STORAGE_UNAVAILABLE',
+      'Riwayat audit tidak dapat dimuat dari penyimpanan durable.',
+      { retryable: true }
+    ));
+  }
+
+  const events = new Map();
+  for (const event of persisted.data) {
+    const key = `${event.action}:${event.commandId || event.correlationId || `persisted:${event.id}`}`;
+    events.set(key, event);
+  }
+  for (const event of backendState.auditLogs) {
+    if (event.action === 'AUTH_LOGIN' || event.action === 'AUTH_LOGOUT') continue;
+    const key = `${event.action}:${event.commandId || event.correlationId || `memory:${event.entity}:${event.timestamp}`}`;
+    if (!events.has(key)) events.set(key, event);
+  }
+  const logs = [...events.values()]
+    .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
+    .slice(0, 250);
+
   res.status(200).json(createApiResponse({
     type: "audit_log_list",
-    data: backendState.auditLogs,
+    data: logs,
     extra: {
       status: "success",
-      logs: backendState.auditLogs
+      logs
     }
   }));
 }
@@ -205,5 +230,33 @@ export async function resolveIncident(req, res) {
     const response = createCommandErrorResponse(err);
     const statusCode = err.message.includes('STATE_CONFLICT') || err.message.includes('masih berstatus aktif') ? 409 : getCommandErrorStatus(err);
     res.status(statusCode).json(response);
+  }
+}
+
+export async function markIncidentRoadRecovered(req, res) {
+  const incidentId = typeof req.params?.id === 'string' ? sanitizeString(req.params.id, 64) : req.params?.id;
+  const notes = typeof req.body?.notes === 'string' ? sanitizeString(req.body.notes, 1000) : undefined;
+  const commandId = req.headers['x-command-id'] || req.body?.commandId || `CMD-REST-ROAD-RECOVERY-${Date.now()}`;
+  const correlationId = req.headers['x-correlation-id'] || req.body?.correlationId || `CORR-REST-ROAD-RECOVERY-${Date.now()}`;
+  try {
+    const outcome = await commandExecutor.executeCommand({
+      action: 'incident:road-recovered',
+      targetId: incidentId,
+      payload: { notes },
+      commandId,
+      correlationId,
+      idempotencyKey: req.headers['x-idempotency-key'] || req.body?.idempotencyKey || `IDEMP-REST-INC-ROAD-RECOVERY-${incidentId}`,
+      authenticatedUser: req.user,
+      sourceChannel: 'rest'
+    });
+    res.status(200).json(createApiResponse({
+      type: 'incident_road_recovered',
+      sequence: backendState.incidentSequence,
+      data: outcome.newState,
+      extra: { status: 'success', incident: outcome.newState, command: outcome }
+    }));
+  } catch (error) {
+    const response = createCommandErrorResponse(error);
+    res.status(getCommandErrorStatus(error)).json(response);
   }
 }

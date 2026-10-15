@@ -19,12 +19,16 @@ export const TRAFFIC_MODEL_PARAMETERS = Object.freeze({
     'Corridor capacities and free-flow speeds are model assumptions, not field-calibrated measurements.',
     'Queue conservation is evaluated over the selected finite horizon; no lane-level behavior is represented.',
     'Rain changes modeled capacity and speed; incident effects apply only to a matching corridor/location.',
+    'Workflow status does not clear a road impact; an explicit road recovery acknowledgement does.',
     'Adaptive split nudges the current green by 50 × (demandShare − 0.5) + 8 × (pressure − 0.5), then enforces a 30% minimum approach share.'
   ]
 });
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-const activeIncident = incident => !['RESOLVED', 'ARCHIVED', 'CLOSED', 'CANCELLED'].includes(String(incident?.status || 'ACTIVE').toUpperCase());
+// Workflow status and physical-model impact are separate. Resolving an incident
+// does not imply that the simulated road has recovered; only an explicit
+// roadImpactRecoveredAt acknowledgement removes its traffic effect.
+const activeIncident = incident => !incident?.roadImpactRecoveredAt && incident?.roadImpactRecovered !== true;
 const CORRIDOR_NODES = {
   'corridor-ayani': 'node-wonokromo',
   'corridor-jemursari': 'node-jemursari',
@@ -33,6 +37,11 @@ const CORRIDOR_NODES = {
   'corridor-merr': 'node-merr',
   'corridor-diponegoro': 'node-darmo'
 };
+
+export const EMERGENCY_ROUTES = Object.freeze({
+  'route-yani-darmo': { label: 'Ahmad Yani → Darmo → RSUD Dr. Soetomo', corridors: ['corridor-ayani', 'corridor-jemursari', 'corridor-darmo'], junctions: ['node-jemursari', 'node-wonokromo', 'node-darmo'] },
+  'route-merr-soetomo': { label: 'MERR Kertajaya → Gubeng → RSUD Dr. Soetomo', corridors: ['corridor-merr', 'corridor-darmo'], junctions: ['node-merr', 'node-darmo'] }
+});
 
 function seededUnit(seed, key) {
   let value = (Number(seed) || 0) >>> 0;
@@ -62,6 +71,9 @@ function corridorGreenShare(corridor, state, control, demandVehPerHour, initialQ
 
 function incidentLoss(corridor, incidents) {
   const matched = incidents.filter(incident => {
+    if (incident.corridorId || incident.intersectionId) {
+      return incident.corridorId ? incident.corridorId === corridor.id : incident.intersectionId === CORRIDOR_NODES[corridor.id];
+    }
     const text = `${incident.location || ''} ${incident.title || ''} ${incident.corridorId || ''} ${incident.intersectionId || ''}`.toLowerCase();
     return text.includes(corridor.name.split(/[ /-]/)[0].toLowerCase()) ||
       (corridor.id === 'corridor-ayani' && /ayani|wonokromo|demo 01/.test(text)) ||
@@ -72,8 +84,27 @@ function incidentLoss(corridor, incidents) {
   return matched.reduce((loss, incident) => {
     const severity = String(incident.severity || incident.priority || 'medium').toLowerCase();
     const mapped = severity === 'danger' ? 'high' : severity;
-    return 1 - (1 - loss) * (1 - (TRAFFIC_MODEL_PARAMETERS.incidentCapacityLoss[mapped] ?? 0.25));
+    const severityLoss = TRAFFIC_MODEL_PARAMETERS.incidentCapacityLoss[mapped] ?? 0.25;
+    const laneCount = Math.max(0, Number(incident.closedLanes ?? incident.lanesClosed ?? 0));
+    const totalLanes = Math.max(1, Number(incident.totalLanes ?? incident.lanesAvailable ?? 3));
+    const laneLoss = clamp(laneCount / totalLanes, 0, 0.85);
+    const reportedLoss = clamp(Number(incident.capacityReductionPct ?? 0) / 100, 0, 0.9);
+    const incidentLossValue = Math.max(severityLoss, laneLoss, reportedLoss);
+    return 1 - (1 - loss) * (1 - incidentLossValue);
   }, 0);
+}
+
+function emergencyCapacityEffect(corridorId, state, options) {
+  const enabled = options.emergencyGreenWave ?? options.greenWave ?? state.greenWaveActive;
+  if (!enabled) return 1;
+  const active = (options.activeEmergencies ?? state.activeEmergencies ?? [])
+    .filter(item => !['ARRIVED', 'COMPLETED', 'CANCELLED', 'TERMINAL_ARCHIVED'].includes(String(item.status || '').toUpperCase()));
+  const routeIds = [options.emergencyRouteId, ...active.map(item => item.routeId || item.assignedRoute)].filter(Boolean);
+  if (!routeIds.length && enabled) routeIds.push('route-yani-darmo');
+  const selectedRoutes = routeIds.map(id => EMERGENCY_ROUTES[id]).filter(Boolean);
+  if (selectedRoutes.some(route => route.corridors.includes(corridorId))) return 1.04;
+  const conflictCorridors = new Set(selectedRoutes.flatMap(route => route.corridors));
+  return conflictCorridors.size ? 0.97 : 1;
 }
 
 function resolveSimulationHour(state, requestedHour) {
@@ -142,12 +173,15 @@ export function simulateTrafficNetwork(state = {}, options = {}) {
     ? [...baseIncidents, { id: 'scenario-incident', title: 'Major incident (scenario)', location: options.incidentLocation || 'A. Yani / Wonokromo', severity: 'critical', status: 'ACTIVE' }]
     : baseIncidents;
   const control = options.signalControl || 'fixed';
+  const demandMultiplier = clamp(Number(options.demandMultiplier ?? (rushHour ? TRAFFIC_MODEL_PARAMETERS.rushDemandMultiplier : 1)), 0.5, 1.75);
+  const corridorDemandMultipliers = options.corridorDemandMultipliers && typeof options.corridorDemandMultipliers === 'object'
+    ? options.corridorDemandMultipliers : {};
   const initialQueues = options.initialQueues ?? resolveInitialQueues(state);
   const perCorridor = CORRIDORS_CONFIG.map(corridor => {
     const variation = 0.96 + seededUnit(seed, corridor.id) * 0.08;
-    const rushMultiplier = rushHour ? TRAFFIC_MODEL_PARAMETERS.rushDemandMultiplier : 1;
-    const emergencyRelief = emergencies && ['corridor-ayani', 'corridor-jemursari', 'corridor-darmo'].includes(corridor.id) ? 1.04 : 1;
-    const demandVehPerHour = corridor.capacity * clamp(intensity * 0.78 + 0.12, 0.08, 0.98) * variation * rushMultiplier;
+    const corridorMultiplier = clamp(Number(corridorDemandMultipliers[corridor.id] ?? 1), 0.5, 1.75);
+    const emergencyRelief = emergencyCapacityEffect(corridor.id, state, { ...options, emergencyGreenWave: emergencies });
+    const demandVehPerHour = corridor.capacity * clamp(intensity * 0.78 + 0.12, 0.08, 0.98) * variation * demandMultiplier * corridorMultiplier;
     const loss = incidentLoss(corridor, incidents);
     const startingQueue = Math.max(0, Number(initialQueues[corridor.id] || 0));
     const { split } = corridorGreenShare(corridor, state, control, demandVehPerHour, startingQueue, seed);
@@ -175,7 +209,8 @@ export function simulateTrafficNetwork(state = {}, options = {}) {
       travelTimeMinutes: Number((corridor.lengthKm / speedKmh * 60).toFixed(2)),
       congestionIndex: Math.round(clamp(volumeCapacityRatio, 0, 1.5) / 1.5 * 100),
       greenSplitSec: split,
-      incidentCapacityLossPct: Math.round(loss * 100)
+      incidentCapacityLossPct: Math.round(loss * 100),
+      emergencyPriorityCapacityEffectPct: Math.round((emergencyRelief - 1) * 100)
     };
   });
   const demand = perCorridor.reduce((sum, item) => sum + item.demandVehPerHour, 0);
@@ -202,11 +237,67 @@ export function simulateTrafficNetwork(state = {}, options = {}) {
     throughputInHorizon: Number(throughputHorizon.toFixed(2)),
     initialQueueVehicles: Number(initialQueue.toFixed(2)),
     queueConservationResidual: Number((initialQueue + arrivalsHorizon - throughputHorizon - queue).toFixed(6)),
-    scenario: { rushHour, rain, majorIncident: !!options.majorIncident, signalControl: control, greenWave, emergencyGreenWave: emergencies, incidentCount: incidents.length },
+    scenario: { rushHour, demandMultiplier, rain, majorIncident: !!options.majorIncident, signalControl: control, greenWave, emergencyGreenWave: emergencies, incidentCount: incidents.length },
     corridors: perCorridor,
     assumptions: TRAFFIC_MODEL_PARAMETERS.assumptions,
     provenance: 'SIMULATED'
   };
+}
+
+export function analyzeIncidentImpact(incident, state = {}) {
+  if (incident?.roadImpactRecoveredAt || incident?.roadImpactRecovered === true) {
+    return {
+      affectedCorridors: [],
+      networkTravelTimeDeltaMinutes: 0,
+      networkQueueDeltaVehicles: 0,
+      severity: String(incident?.severity || incident?.priority || 'medium').toUpperCase(),
+      recommendation: 'Jalan sudah ditandai pulih pada simulator; lanjutkan pemantauan model bila diperlukan.',
+      provenance: 'SIMULATED',
+      reason: 'Pemulihan jalan telah dikonfirmasi; insiden ini tidak lagi mengurangi kapasitas koridor pada model.'
+    };
+  }
+  const baselineState = {
+    ...state,
+    incidents: (state.incidents || []).filter(item => String(item.id) !== String(incident?.id))
+  };
+  const current = simulateTrafficNetwork(baselineState);
+  const withIncident = simulateTrafficNetwork(baselineState, {
+    incidents: [...baselineState.incidents, { ...incident, status: incident?.status || 'ACTIVE' }]
+  });
+  const severity = String(incident?.severity || incident?.priority || 'medium').toUpperCase();
+  const affected = withIncident.corridors.filter(corridor => corridor.incidentCapacityLossPct > 0);
+  const worst = affected.reduce((item, corridor) => !item || corridor.incidentCapacityLossPct > item.incidentCapacityLossPct ? corridor : item, null);
+  const status = String(incident?.status || 'ACTIVE').toUpperCase();
+  const laneCount = Math.max(0, Number(incident?.closedLanes ?? incident?.lanesClosed ?? 0));
+  let recommendation = 'Verifikasi lokasi dan kondisi lajur pada simulasi, lalu perbarui status setelah ditinjau operator.';
+  if (['CRITICAL', 'DANGER', 'HIGH'].includes(severity)) recommendation = 'Akui alert, tetapkan unit sintetis, lalu evaluasi rute alternatif sebelum disposisi.';
+  else if (laneCount > 0) recommendation = `Tinjau penutupan ${laneCount} lajur dan kapasitas sisa; gunakan rute alternatif bila antrean model bertambah.`;
+  if (status === 'MITIGATED') recommendation = 'Pantau antrean yang tersisa; lanjutkan ke selesai setelah dampak model stabil.';
+  return {
+    affectedCorridors: affected.map(item => ({ corridorId: item.corridorId, name: item.name, capacityLossPct: item.incidentCapacityLossPct, queueDelta: Number((item.queueVehicles - (current.corridors.find(base => base.corridorId === item.corridorId)?.queueVehicles || 0)).toFixed(2)) })),
+    networkTravelTimeDeltaMinutes: Number((withIncident.averageTravelTimeMinutes - current.averageTravelTimeMinutes).toFixed(2)),
+    networkQueueDeltaVehicles: Number((withIncident.queueVehicles - current.queueVehicles).toFixed(2)),
+    severity, recommendation, provenance: 'SIMULATED',
+    reason: `${affected.length} koridor cocok dengan lokasi/ID insiden; kehilangan kapasitas terburuk ${worst?.incidentCapacityLossPct ?? 0}%${laneCount ? ` dengan ${laneCount} lajur ditutup` : ''}.`
+  };
+}
+
+export function planEmergencyRoutes(state = {}, options = {}) {
+  const traffic = simulateTrafficNetwork(state);
+  const incidents = (state.incidents || []).filter(activeIncident);
+  const evaluations = Object.entries(EMERGENCY_ROUTES).map(([routeId, route]) => {
+    const segments = route.corridors.map(id => traffic.corridors.find(corridor => corridor.corridorId === id)).filter(Boolean);
+    const junctions = route.junctions.map(id => (state.intersections || []).find(node => node.id === id)).filter(Boolean);
+    const incidentCount = incidents.filter(incident => route.corridors.some(id => incidentLoss(CORRIDORS_CONFIG.find(corridor => corridor.id === id), [incident]) > 0)).length;
+    const intersectionDelayMinutes = junctions.reduce((sum, node) => sum + Math.min(2, Math.max(0, Number(node.queueVehicles || 0)) / 90), 0);
+    const travelTimeMinutes = Number((segments.reduce((sum, segment) => sum + segment.travelTimeMinutes, 0) + intersectionDelayMinutes).toFixed(2));
+    const bottleneck = [...segments].sort((a, b) => b.congestionIndex - a.congestionIndex)[0];
+    return { routeId, label: route.label, corridors: route.corridors, junctions: route.junctions, travelTimeMinutes, incidentCount, averageSpeedKmh: Number((segments.reduce((sum, item) => sum + item.speedKmh, 0) / Math.max(1, segments.length)).toFixed(1)), congestionIndex: Math.round(segments.reduce((sum, item) => sum + item.congestionIndex, 0) / Math.max(1, segments.length)), bottleneck: bottleneck?.name || 'Koridor belum tersedia', reason: `${incidentCount} insiden aktif pada koridor rute; antrean simpang menambah ${intersectionDelayMinutes.toFixed(1)} menit.`, provenance: 'SIMULATED' };
+  }).sort((a, b) => a.travelTimeMinutes - b.travelTimeMinutes || a.routeId.localeCompare(b.routeId));
+  const selectedRouteId = EMERGENCY_ROUTES[options.routeId] ? options.routeId : evaluations[0]?.routeId || null;
+  const baseline = simulateTrafficNetwork(state);
+  const withPriority = simulateTrafficNetwork(state, { emergencyGreenWave: true, emergencyRouteId: selectedRouteId });
+  return { routes: evaluations, recommendedRouteId: evaluations[0]?.routeId || null, selectedRouteId, estimatedTripMinutes: evaluations.find(item => item.routeId === selectedRouteId)?.travelTimeMinutes ?? null, trafficImpact: { baselineQueueVehicles: baseline.queueVehicles, priorityQueueVehicles: withPriority.queueVehicles, queueDeltaVehicles: Number((withPriority.queueVehicles - baseline.queueVehicles).toFixed(2)), baselineAverageTravelTimeMinutes: baseline.averageTravelTimeMinutes, priorityAverageTravelTimeMinutes: withPriority.averageTravelTimeMinutes, travelTimeDeltaMinutes: Number((withPriority.averageTravelTimeMinutes - baseline.averageTravelTimeMinutes).toFixed(2)) }, provenance: 'SIMULATED', seed: baseline.seed };
 }
 
 export function compareTrafficScenarios(state = {}, options = {}) {

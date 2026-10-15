@@ -8,6 +8,14 @@ export const ROLES = {
   ADMIN: 'ADMIN'        // Bisa aktifkan Green Wave, ubah config sensor, toggle chaos mode, terminal
 };
 
+const BCRYPT_HASH_PATTERN = /^\$2[aby]\$1[0-5]\$[./A-Za-z0-9]{53}$/;
+
+function failProductionUserConfig(message) {
+  console.error(`[USERS_DB] FATAL: ${message}`);
+  process.exit(1);
+  throw new Error(`Invalid production user configuration: ${message}`);
+}
+
 // Database pengguna: default development credentials hanya aktif di development/testing.
 // Di environment production, pengguna harus dikonfigurasi melalui server configuration / environment variables.
 const DEV_USERS = [
@@ -39,10 +47,30 @@ const DEV_USERS = [
 
 function loadProductionUsers() {
   const users = [];
+  const addUser = (user) => {
+    const normalized = {
+      id: String(user.id || '').trim(),
+      username: String(user.username || '').trim(),
+      passwordHash: String(user.passwordHash || ''),
+      role: user.role,
+      name: String(user.name || user.username || '').trim(),
+      email: user.email ? String(user.email).trim() : null
+    };
+    if (!normalized.id || !normalized.username || !normalized.name || !Object.values(ROLES).includes(normalized.role)) {
+      failProductionUserConfig('each configured user must have a non-empty id, username, name, and supported role.');
+    }
+    if (!BCRYPT_HASH_PATTERN.test(normalized.passwordHash)) {
+      failProductionUserConfig(`password hash for user '${normalized.username}' must be a bcrypt hash with cost 10–15.`);
+    }
+    if (users.some((existing) => existing.id === normalized.id || existing.username.toLowerCase() === normalized.username.toLowerCase())) {
+      failProductionUserConfig(`duplicate production user id or username '${normalized.username}'.`);
+    }
+    users.push(normalized);
+  };
 
   // 1. Production Admin
   if (process.env.ADMIN_PASSWORD_HASH) {
-    users.push({
+    addUser({
       id: 'usr-admin-prod',
       username: process.env.ADMIN_USERNAME || 'admin_sits_surabaya',
       passwordHash: process.env.ADMIN_PASSWORD_HASH,
@@ -54,7 +82,7 @@ function loadProductionUsers() {
 
   // 2. Production Operator
   if (process.env.OPERATOR_PASSWORD_HASH) {
-    users.push({
+    addUser({
       id: 'usr-operator-prod',
       username: process.env.OPERATOR_USERNAME || 'operator_sits_surabaya',
       passwordHash: process.env.OPERATOR_PASSWORD_HASH,
@@ -66,7 +94,7 @@ function loadProductionUsers() {
 
   // 3. Production Viewer
   if (process.env.VIEWER_PASSWORD_HASH) {
-    users.push({
+    addUser({
       id: 'usr-viewer-prod',
       username: process.env.VIEWER_USERNAME || 'viewer_sits_surabaya',
       passwordHash: process.env.VIEWER_PASSWORD_HASH,
@@ -78,28 +106,21 @@ function loadProductionUsers() {
 
   // 4. Production Structured JSON User DB (opsional untuk banyak user)
   if (process.env.PRODUCTION_USERS_JSON) {
+    let parsed;
     try {
-      const parsed = JSON.parse(process.env.PRODUCTION_USERS_JSON);
-      if (Array.isArray(parsed)) {
-        for (const u of parsed) {
-          if (u.id && u.username && u.passwordHash && Object.values(ROLES).includes(u.role)) {
-            // Cegah duplikasi ID atau username
-            if (!users.some(existing => existing.username.toLowerCase() === u.username.toLowerCase())) {
-              users.push({
-                id: String(u.id),
-                username: String(u.username),
-                passwordHash: String(u.passwordHash),
-                role: u.role,
-                name: String(u.name || u.username),
-                email: u.email ? String(u.email) : null
-              });
-            }
-          }
-        }
-      }
+      parsed = JSON.parse(process.env.PRODUCTION_USERS_JSON);
     } catch (e) {
-      console.warn('[USERS_DB] Gagal mem-parse PRODUCTION_USERS_JSON:', e.message);
+      failProductionUserConfig(`could not parse PRODUCTION_USERS_JSON: ${e.message}`);
     }
+    if (!Array.isArray(parsed)) failProductionUserConfig('PRODUCTION_USERS_JSON must contain an array.');
+    for (const user of parsed) {
+      if (!user || typeof user !== 'object' || Array.isArray(user)) failProductionUserConfig('PRODUCTION_USERS_JSON contains an invalid user entry.');
+      addUser(user);
+    }
+  }
+
+  if (!users.some((user) => user.role === ROLES.ADMIN)) {
+    failProductionUserConfig('at least one valid ADMIN account must be configured.');
   }
 
   return users;

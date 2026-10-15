@@ -11,6 +11,7 @@ export const CAMERA_DEFINITIONS = Object.freeze([
     shortName: 'SIMPANG WONOKROMO',
     location: 'Jl. Wonokromo - Frontage Road A. Yani, Surabaya',
     nodeId: 'node-wonokromo',
+    mapCoordinates: Object.freeze([112.7345, -7.2985]),
     edgeDeviceId: 'NODE-EDGE-01',
     capabilities: Object.freeze(['detection', 'tracking', 'telemetry', 'snapshot']),
     defaultResolution: '1920x1080',
@@ -23,6 +24,7 @@ export const CAMERA_DEFINITIONS = Object.freeze([
     shortName: 'SIMPANG WONOKROMO',
     location: 'Jl. Wonokromo - Frontage Road A. Yani, Surabaya',
     nodeId: 'node-wonokromo',
+    mapCoordinates: Object.freeze([112.7345, -7.2985]),
     edgeDeviceId: 'NODE-EDGE-01',
     capabilities: Object.freeze(['detection', 'tracking', 'telemetry', 'snapshot']),
     defaultResolution: '1920x1080',
@@ -35,6 +37,7 @@ export const CAMERA_DEFINITIONS = Object.freeze([
     shortName: 'KORIDOR RAYA DARMO',
     location: 'Jl. Raya Darmo (Taman Bungkul), Surabaya',
     nodeId: 'node-darmo',
+    mapCoordinates: Object.freeze([112.7395, -7.2810]),
     edgeDeviceId: 'NODE-EDGE-02',
     capabilities: Object.freeze(['detection', 'tracking', 'telemetry', 'snapshot']),
     defaultResolution: '1920x1080',
@@ -47,6 +50,8 @@ export const CAMERA_DEFINITIONS = Object.freeze([
     shortName: 'BUNDARAN WARU',
     location: 'Bundaran Waru - Gerbang Masuk Kota Surabaya',
     nodeId: null,
+    mapCoordinates: Object.freeze([112.7300, -7.3450]),
+    city3dAnchorNodeId: 'node-jemursari',
     edgeDeviceId: 'NODE-EDGE-03',
     capabilities: Object.freeze(['detection', 'tracking', 'telemetry', 'snapshot']),
     defaultResolution: '1920x1080',
@@ -59,6 +64,7 @@ export const CAMERA_DEFINITIONS = Object.freeze([
     shortName: 'SIMPANG JEMURSARI',
     location: 'Jl. Jemursari - Margorejo, Surabaya',
     nodeId: 'node-jemursari',
+    mapCoordinates: Object.freeze([112.7315, -7.3320]),
     edgeDeviceId: 'NODE-CTRL-01',
     capabilities: Object.freeze(['detection', 'tracking', 'telemetry', 'snapshot']),
     defaultResolution: '1920x1080',
@@ -77,6 +83,33 @@ export const CAMERA_DEFINITIONS = Object.freeze([
     defaultFps: 30
   }
 ]);
+
+const MAP_CAMERA_IDS = Object.freeze(['cctvCanvas1', 'cctvCanvas2', 'cctvCanvas3', 'cctvCanvas4']);
+
+export function getCameraMapFeatureCollection() {
+  return {
+    type: 'FeatureCollection',
+    features: MAP_CAMERA_IDS.map((id) => {
+      const camera = CAMERA_DEFINITIONS.find((definition) => definition.id === id);
+      if (!camera || !Array.isArray(camera.mapCoordinates) || camera.mapCoordinates.length !== 2 || !camera.mapCoordinates.every(Number.isFinite)) {
+        throw new Error(`Camera ${id} has no valid map coordinates`);
+      }
+      return {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [...camera.mapCoordinates] },
+        properties: {
+          id: camera.id,
+          cameraId: camera.id,
+          name: camera.name,
+          status: 'Feed sintetis',
+          statusClass: 'badge-info',
+          ruas: camera.location,
+          speed: 'Belum dihitung'
+        }
+      };
+    })
+  };
+}
 
 export class CameraRegistry {
   constructor() {

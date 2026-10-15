@@ -1,0 +1,278 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: visual.spec.js >> Phase 5 visual audit baseline and responsive contracts >> captures every view in both themes and checks responsive overflow at required sizes
+- Location: tests\e2e\visual.spec.js:21:3
+
+# Error details
+
+```
+Error: A snapshot doesn't exist at C:\Users\zakii\Downloads\omnitraf-ios-dashboard (2)\tests\e2e\__snapshots__\visual.spec.js-snapshots\view-city3d-dark-desktop-Desktop-Dark-win32.png, writing actual.
+```
+
+```
+Error: A snapshot doesn't exist at C:\Users\zakii\Downloads\omnitraf-ios-dashboard (2)\tests\e2e\__snapshots__\visual.spec.js-snapshots\view-city3d-dark-mobile-Desktop-Dark-win32.png, writing actual.
+```
+
+```
+Error: A snapshot doesn't exist at C:\Users\zakii\Downloads\omnitraf-ios-dashboard (2)\tests\e2e\__snapshots__\visual.spec.js-snapshots\view-city3d-light-desktop-Desktop-Dark-win32.png, writing actual.
+```
+
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - link "Lewati ke konten utama" [ref=e2] [cursor=pointer]:
+    - /url: "#mainContent"
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - button "Tutup menu" [ref=e5] [cursor=pointer]: ×
+      - link "OmniTRAF home" [ref=e6] [cursor=pointer]:
+        - /url: "#dashboard"
+        - img "Ikon OmniTRAF SITS Surabaya" [ref=e8]
+        - generic [ref=e9]:
+          - img "Logo OmniTRAF Adaptive Urban Mobility System" [ref=e10]
+          - generic [ref=e11]: Surabaya Command Center
+      - button "Cari halaman Ctrl K" [ref=e12] [cursor=pointer]:
+        - generic [ref=e17]:
+          - text: Cari halaman
+          - generic [ref=e18]: Ctrl K
+      - navigation "Primary navigation" [ref=e19]:
+        - region [ref=e20]:
+          - heading "Operasi" [level=2] [ref=e21]
+          - link "Ikhtisar" [ref=e22] [cursor=pointer]:
+            - /url: "#dashboard"
+          - link "Peta kota" [ref=e30] [cursor=pointer]:
+            - /url: "#map"
+          - link "Digital Twin 3D" [ref=e36] [cursor=pointer]:
+            - /url: "#city3d"
+            - generic [aria-hidden] [ref=e37]: 3D
+          - link "Insiden" [ref=e39] [cursor=pointer]:
+            - /url: "#incidents"
+          - link "Darurat" [ref=e44] [cursor=pointer]:
+            - /url: "#emergency"
+        - region [ref=e49]:
+          - heading "Pemantauan" [level=2] [ref=e50]
+          - link "CCTV" [ref=e51] [cursor=pointer]:
+            - /url: "#cctv"
+          - link "Sinyal" [ref=e58] [cursor=pointer]:
+            - /url: "#signals"
+          - link "Perangkat" [ref=e66] [cursor=pointer]:
+            - /url: "#devices"
+        - region [ref=e72]:
+          - heading "Analitik & prediksi" [level=2] [ref=e73]
+          - link "Analitik" [ref=e74] [cursor=pointer]:
+            - /url: "#analytics"
+          - link "Prediksi" [ref=e80] [cursor=pointer]:
+            - /url: "#prediction"
+          - button "Intelijen sinyal" [ref=e86] [cursor=pointer]
+          - link "Laporan" [ref=e91] [cursor=pointer]:
+            - /url: "#reports"
+            - generic [aria-hidden] [ref=e92]: ▤
+        - region [ref=e94]:
+          - heading "Sistem" [level=2] [ref=e95]
+          - link "Integrasi" [ref=e96] [cursor=pointer]:
+            - /url: "#integration"
+          - link "Pengaturan" [ref=e102] [cursor=pointer]:
+            - /url: "#settings"
+          - link "Arsitektur sistem" [ref=e106] [cursor=pointer]:
+            - /url: "#about-engine"
+          - button "Demo Coordination Chat" [ref=e111] [cursor=pointer]
+    - main [ref=e116]:
+      - generic "Navigasi halaman" [ref=e117]:
+        - generic [ref=e118]:
+          - button "Buka menu" [ref=e119] [cursor=pointer]
+          - strong [ref=e124]: Pengaturan
+        - generic "Aksi utama" [ref=e125]:
+          - button [ref=e126] [cursor=pointer]:
+            - generic [aria-hidden] [ref=e127]: ⌕
+          - generic "Status prototipe OmniTRAF" [ref=e128]
+          - generic [ref=e131]:
+            - button "Ganti ke tema gelap" [active] [pressed] [ref=e132] [cursor=pointer]:
+              - generic [aria-hidden] [ref=e133]: ☼
+            - 'button "Active scenario notifications: 3" [ref=e134] [cursor=pointer]':
+              - generic [ref=e138]: "3"
+            - group [ref=e139]:
+              - generic "Aksi lainnya" [ref=e140] [cursor=pointer]: ···
+      - group "Batas simulasi" [ref=e141]:
+        - generic [ref=e142] [cursor=pointer]:
+          - strong [ref=e143]: SIMULASI
+          - text: Data sintetis · tanpa kendali perangkat lapangan
+      - status [ref=e144]:
+        - generic [ref=e145]:
+          - generic [aria-hidden] [ref=e146]: 📡
+          - generic [ref=e147]:
+            - strong [ref=e148]: Data simulasi tertahan
+            - text: — Pembaruan terakhir tidak diterima; nilai yang tampil mungkin sudah lama.
+        - button "Tutup pemberitahuan offline" [ref=e149] [cursor=pointer]: ×
+      - generic [ref=e150]:
+        - text: · · · · · · · · · · · · ID perangkat Nama Node / Lokasi Tipe Hardware Status Koneksi Beban CPU/GPU Temperatur Latensi Riwayat Latensi Laju inferensi Aksi ID perangkat Nama Node / Lokasi Tipe Hardware Status Koneksi Beban CPU/GPU Temperatur Latensi Riwayat Latensi Laju inferensi Aksi ID perangkat Nama Node / Lokasi Tipe Hardware Status Koneksi Beban CPU/GPU Temperatur Latensi Riwayat Latensi Laju inferensi Aksi ID perangkat Nama Node / Lokasi Tipe Hardware Status Koneksi Beban CPU/GPU Temperatur Latensi Riwayat Latensi Laju inferensi Aksi
+        - generic [ref=e151]:
+          - article [ref=e152]:
+            - generic [ref=e153]:
+              - paragraph [ref=e154]: PREFERENSI WORKSPACE
+              - heading "Pengaturan Antarmuka & Sistem" [level=2] [ref=e155]
+              - paragraph [ref=e156]: Kelola tema tampilan, profil audio interaktif, pintasan aksesibilitas, dan preferensi runtime.
+            - generic [ref=e157]: UI PREFERENCES
+          - generic [ref=e158]:
+            - navigation "Kategori Pengaturan" [ref=e159]:
+              - list [ref=e160]:
+                - listitem [ref=e161]:
+                  - link "Tampilan" [ref=e162] [cursor=pointer]:
+                    - /url: "#settings-cat-appearance"
+                    - generic [aria-hidden] [ref=e163]: 🎨
+                - listitem [ref=e165]:
+                  - link "Audio & Notifikasi" [ref=e166] [cursor=pointer]:
+                    - /url: "#settings-cat-audio"
+                    - generic [aria-hidden] [ref=e167]: 🔊
+                - listitem [ref=e169]:
+                  - link "Aksesibilitas" [ref=e170] [cursor=pointer]:
+                    - /url: "#settings-cat-accessibility"
+                    - generic [aria-hidden] [ref=e171]: ♿
+                - listitem [ref=e173]:
+                  - link "Sistem & Reset" [ref=e174] [cursor=pointer]:
+                    - /url: "#settings-cat-system"
+                    - generic [aria-hidden] [ref=e175]: ⚙️
+            - generic [ref=e177]:
+              - generic [ref=e178]:
+                - generic [ref=e179]:
+                  - heading "🎨 Tampilan & Layout" [level=3] [ref=e180]
+                  - paragraph [ref=e181]: Konfigurasi tema warna dan tingkat kepadatan ruang kerja.
+                - generic [ref=e182]:
+                  - generic [ref=e183]:
+                    - generic [ref=e184]:
+                      - strong [ref=e185]: Tema Visual
+                      - paragraph [ref=e186]: Pilih mode kontras tinggi (Gelap) atau mode terang untuk ruang kontrol.
+                    - button "Ganti tema terang atau gelap" [ref=e187] [cursor=pointer]
+                  - generic [ref=e188]:
+                    - generic [ref=e189]:
+                      - strong [ref=e190]: Kepadatan Antarmuka
+                      - paragraph [ref=e191]: Sesuaikan jarak vertikal antarelemen (Rapat untuk monitor ringkas, Lapang untuk layar besar).
+                    - group "Kepadatan antarmuka" [ref=e192]:
+                      - button "Rapat" [pressed] [ref=e193] [cursor=pointer]
+                      - button "Lapang" [ref=e194] [cursor=pointer]
+              - generic [ref=e195]:
+                - generic [ref=e196]:
+                  - heading "🔊 Audio & Notifikasi Suara" [level=3] [ref=e197]
+                  - paragraph [ref=e198]: Umpan balik audio sintetis dan ambience kota Surabaya.
+                - generic [ref=e199]:
+                  - generic [ref=e200]:
+                    - generic [ref=e201]:
+                      - strong [ref=e202]: Suara Interaksi
+                      - paragraph [ref=e203]: Umpan balik audio sintetis saat menekan tombol dan filter.
+                    - button "Matikan suara" [pressed] [ref=e204] [cursor=pointer]
+                  - generic [ref=e206]:
+                    - strong [ref=e207]: Volume & Karakter Nada
+                    - paragraph [ref=e208]: Atur tingkat desibel klik dan pilih karakteristik synthesizer.
+                    - generic [ref=e209]:
+                      - generic [ref=e210]: "Volume:"
+                      - slider "Volume:" [ref=e211] [cursor=pointer]: "70"
+                      - status [ref=e212]: 70%
+                      - generic [ref=e213]: "Nada:"
+                      - combobox "Tipe audio sintetis" [ref=e214]:
+                        - option "Klik mekanis" [selected]
+                        - option "Synthesizer digital"
+                        - option "Nada retro"
+                      - button "Pratinjau nada" [ref=e215] [cursor=pointer]
+                    - status [ref=e216]: Pratinjau memakai nada dan volume yang dipilih.
+                  - generic [ref=e217]:
+                    - generic [ref=e218]:
+                      - strong [ref=e219]: Ambience Lalu Lintas Kota
+                      - paragraph [ref=e220]: Putar efek suara latar sintetis perkotaan Surabaya secara opsional.
+                      - generic [ref=e221]:
+                        - generic [ref=e222]: "Volume:"
+                        - slider "Volume:" [ref=e223] [cursor=pointer]: "30"
+                        - status [ref=e224]: 30%
+                    - generic [ref=e225]:
+                      - generic [ref=e226] [cursor=pointer]:
+                        - checkbox "Nonaktif" [ref=e227]
+                        - generic [ref=e228]: Nonaktif
+                      - status [ref=e229]: Ambience berhenti sampai diaktifkan.
+                  - generic [ref=e230]:
+                    - generic [ref=e231]:
+                      - strong [ref=e232]: Pembacaan Notifikasi (TTS Voice)
+                      - paragraph [ref=e233]: Sintesis suara browser untuk pemberitahuan insiden lalu lintas baru (Opt-in eksplisit).
+                    - generic [ref=e234]:
+                      - generic [ref=e235] [cursor=pointer]:
+                        - checkbox "Nonaktif" [ref=e236]
+                        - generic [ref=e237]: Nonaktif
+                      - status [ref=e238]: Pembacaan alert nonaktif.
+              - generic [ref=e239]:
+                - generic [ref=e240]:
+                  - heading "♿ Aksesibilitas & Navigasi Keyboard" [level=3] [ref=e241]
+                  - paragraph [ref=e242]: Panduan pintasan cepat dan kompatibilitas sistem operasional.
+                - generic [ref=e243]:
+                  - generic [ref=e244]:
+                    - generic [ref=e245]:
+                      - strong [ref=e246]: Pintasan Papan Ketik (Keyboard Shortcuts)
+                      - paragraph [ref=e247]: Daftar kombinasi tombol pintas untuk operator ruang kendali.
+                    - button "Tampilkan panduan pintasan" [ref=e248] [cursor=pointer]
+                  - generic [ref=e249]:
+                    - generic [ref=e250]:
+                      - strong [ref=e251]: Navigasi Cepat Global
+                      - paragraph [ref=e252]: "Buka Command Palette kapan saja dengan menekan tombol pintas:"
+                    - generic [ref=e253]: Ctrl / Cmd + K
+                  - generic [ref=e254]:
+                    - generic [ref=e255]:
+                      - strong [ref=e256]: Pengurangan Gerak (Reduced Motion)
+                      - paragraph [ref=e257]: Animasi antarmuka secara otomatis menghormati preferensi prefers-reduced-motion dari OS Anda.
+                    - generic [ref=e258]: OTOMATIS (OS ALIGNED)
+              - generic [ref=e259]:
+                - generic [ref=e260]:
+                  - heading "⚙️ Informasi Sistem & Pemulihan" [level=3] [ref=e261]
+                  - paragraph [ref=e262]: Informasi batasan prototipe dan reset preferensi lokal.
+                - generic [ref=e263]:
+                  - generic [ref=e264]:
+                    - generic [ref=e265]:
+                      - strong [ref=e266]: Batasan Lingkungan Demo
+                      - paragraph [ref=e267]: OmniTRAF pada platform ini beroperasi dalam mode emulasi dan tidak terhubung ke APILL fisik Dishub.
+                    - generic [ref=e268]: SIMULASI SAJA
+                  - generic [ref=e269]:
+                    - generic [ref=e270]:
+                      - strong [ref=e271]: Pulihkan Preferensi Antarmuka
+                      - paragraph [ref=e272]: Kembalikan tema, kepadatan, volume, dan pengaturan suara ke nilai standar bawaan.
+                    - button "Pulihkan preferensi" [ref=e273] [cursor=pointer]
+  - dialog [aria-hidden] [ref=e274]:
+    - generic [ref=e275]:
+      - generic [ref=e276]:
+        - generic [ref=e277]: 🔔
+        - generic [ref=e278]:
+          - heading [level=3] [ref=e279]: Contoh Skenario Insiden
+          - paragraph [ref=e280]: Data demo, bukan laporan operasional
+      - button [ref=e281] [cursor=pointer]: ×
+    - generic [ref=e282]:
+      - article [ref=e283]:
+        - generic [ref=e284]:
+          - generic [ref=e285]: ⚠️ BARU (Open)
+          - generic [ref=e286]: 18.38 WIB
+        - strong [ref=e287]: Skenario kendaraan mogok - Simpang demo 01
+        - paragraph [ref=e288]: Skenario contoh; tidak ada petugas atau unit derek yang ditugaskan.
+        - generic [ref=e289]:
+          - button [ref=e290] [cursor=pointer]: 📍 Buka di Peta
+          - button [ref=e291] [cursor=pointer]: Akui skenario
+      - article [ref=e292]:
+        - generic [ref=e293]:
+          - generic [ref=e294]: ✓ Diakui · menunggu disposisi
+          - generic [ref=e295]: 18.28 WIB
+        - strong [ref=e296]: Skenario genangan air - Koridor demo 02
+        - paragraph [ref=e297]: Skenario contoh genangan; bukan pengukuran atau laporan lapangan.
+        - generic [ref=e298]:
+          - button [ref=e299] [cursor=pointer]: 📍 Buka di Peta
+          - button [ref=e300] [cursor=pointer]: Disposisi simulasi
+      - article [ref=e301]:
+        - generic [ref=e302]:
+          - generic [ref=e303]: ⚠️ BARU (Open)
+          - generic [ref=e304]: 18.33 WIB
+        - strong [ref=e305]: Skenario antrean panjang - Simpang demo 03
+        - paragraph [ref=e306]: Antrean sintetis 180 meter pada skenario simulator.
+        - generic [ref=e307]:
+          - button [ref=e308] [cursor=pointer]: 📍 Buka di Peta
+          - button [ref=e309] [cursor=pointer]: Akui skenario
+  - status [ref=e311]: ✓ Notifikasi
+  - status
+```

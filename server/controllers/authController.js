@@ -5,11 +5,52 @@ import { createApiErrorResponse, createApiResponse, sanitizeString } from '../mi
 import { backendState } from '../services/stateManager.js';
 import { IS_PRODUCTION, TRUST_PROXY } from '../config/env.js';
 import { tokenRevocationService } from '../services/tokenRevocationService.js';
+import { auditRepository } from '../repositories/auditRepository.js';
+
+async function recordAuthEvent({ action, username, name, role, result, details = '' }) {
+  const safeUsername = sanitizeString(username || 'unknown', 64) || 'unknown';
+  const event = {
+    operator: sanitizeString(name || safeUsername, 100) || safeUsername,
+    action,
+    entity: `User ${safeUsername}`,
+    result,
+    actorRole: role || null,
+    details,
+    timestamp: new Date().toISOString()
+  };
+
+  // Auth events are security records: acknowledge them only after the database
+  // has committed (and, for the embedded adapter, flushed the file to disk).
+  await auditRepository.insert(event, true);
+  backendState.auditLogs.unshift(event);
+  if (backendState.auditLogs.length > 250) backendState.auditLogs.pop();
+}
+
+function auditUnavailable(res) {
+  return res.status(503).json(createApiErrorResponse(
+    503,
+    'AUTH_AUDIT_UNAVAILABLE',
+    'Layanan autentikasi sementara tidak tersedia karena audit tidak dapat disimpan.',
+    { retryable: true }
+  ));
+}
 
 export async function login(req, res) {
   const { username, password } = req.body || {};
+  const cleanUsername = sanitizeString(username, 64);
 
   if (!username || !password) {
+    try {
+      await recordAuthEvent({
+        action: 'AUTH_LOGIN',
+        username: cleanUsername,
+        result: 'FAILURE (MISSING_CREDENTIALS)',
+        details: 'Login ditolak: kredensial tidak lengkap.'
+      });
+    } catch (error) {
+      console.error('[AuthController] Login audit persistence failed.', error.code || error.message);
+      return auditUnavailable(res);
+    }
     return res.status(400).json(createApiErrorResponse(
       400,
       'VALIDATION_ERROR',
@@ -18,18 +59,22 @@ export async function login(req, res) {
     ));
   }
 
-  const cleanUsername = sanitizeString(username, 64);
   const user = USERS_DB.find(u => u.username.toLowerCase() === cleanUsername.toLowerCase());
-  if (!user) {
-    return res.status(401).json(createApiErrorResponse(
-      401,
-      'INVALID_CREDENTIALS',
-      'Username atau password tidak sesuai.'
-    ));
-  }
-
-  const isMatch = await bcrypt.compare(password, user.passwordHash);
+  const isMatch = user ? await bcrypt.compare(password, user.passwordHash) : false;
   if (!isMatch) {
+    try {
+      await recordAuthEvent({
+        action: 'AUTH_LOGIN',
+        username: cleanUsername,
+        name: user?.name,
+        role: user?.role,
+        result: 'FAILURE (INVALID_CREDENTIALS)',
+        details: 'Login ditolak: kredensial tidak valid.'
+      });
+    } catch (error) {
+      console.error('[AuthController] Login audit persistence failed.', error.code || error.message);
+      return auditUnavailable(res);
+    }
     return res.status(401).json(createApiErrorResponse(
       401,
       'INVALID_CREDENTIALS',
@@ -46,6 +91,20 @@ export async function login(req, res) {
     email: user.email
   };
 
+  // Persist the success event before issuing a usable session.
+  try {
+    await recordAuthEvent({
+      action: 'AUTH_LOGIN',
+      username: user.username,
+      name: user.name,
+      role: user.role,
+      result: `SUCCESS (Role: ${user.role})`
+    });
+  } catch (error) {
+    console.error('[AuthController] Login audit persistence failed.', error.code || error.message);
+    return auditUnavailable(res);
+  }
+
   // Set secure, HttpOnly, SameSite session cookie
   const cookieOptions = {
     httpOnly: true,
@@ -55,16 +114,6 @@ export async function login(req, res) {
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   };
   res.cookie('omnitraf_session', token, cookieOptions);
-
-  // Catat login ke audit logs (sanitized control characters)
-  backendState.auditLogs.unshift({
-    operator: sanitizeString(user.name, 100),
-    action: 'AUTH_LOGIN',
-    entity: `User ${cleanUsername}`,
-    result: `SUCCESS (Role: ${user.role})`,
-    timestamp: new Date().toISOString()
-  });
-  if (backendState.auditLogs.length > 250) backendState.auditLogs.pop();
 
   res.status(200).json(createApiResponse({
     type: 'auth_login_success',
@@ -111,14 +160,18 @@ export async function logout(req, res) {
   });
 
   if (principal) {
-    backendState.auditLogs.unshift({
-      operator: sanitizeString(principal.name, 100),
-      action: 'AUTH_LOGOUT',
-      entity: `User ${sanitizeString(principal.username, 64)}`,
-      result: `SUCCESS (Role: ${principal.role})`,
-      timestamp: new Date().toISOString()
-    });
-    if (backendState.auditLogs.length > 250) backendState.auditLogs.pop();
+    try {
+      await recordAuthEvent({
+        action: 'AUTH_LOGOUT',
+        username: principal.username,
+        name: principal.name,
+        role: principal.role,
+        result: `SUCCESS (Role: ${principal.role})`
+      });
+    } catch (error) {
+      // Logout must remain effective even when the audit database is degraded.
+      console.error('[AuthController] Logout audit persistence failed after session revocation.', error.code || error.message);
+    }
   }
 
   res.status(200).json(createApiResponse({

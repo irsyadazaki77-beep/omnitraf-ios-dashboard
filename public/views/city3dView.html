@@ -14,6 +14,8 @@
         <div class="city3d-stage-actions">
           <label class="city3d-select-label" for="city3dCameraSelect">Virtual camera</label>
           <select id="city3dCameraSelect" aria-label="Pilih sudut pandang virtual kamera"></select>
+          <label class="city3d-select-label" for="city3dQuality">Kualitas</label>
+          <select id="city3dQuality" aria-label="Kualitas render kota 3D"><option value="low">Low</option><option value="balanced" selected>Balanced</option><option value="high">High</option></select>
           <button class="city3d-control" id="city3dResetCamera" type="button">Reset</button>
           <a class="city3d-control city3d-map-link" href="#map" data-view="map">Peta 2D</a>
           <details class="city3d-layers"><summary>Lapisan</summary><div>
@@ -26,7 +28,7 @@
       </div>
       <div id="city3dCanvasHost" class="city3d-canvas-host" role="application" aria-label="Kota simulasi 3D. Seret untuk orbit, geser dengan tombol kanan atau Shift, gulir untuk zoom, klik entity untuk detail."></div>
       <div class="city3d-cctv-preview" id="city3dCctvPreview" aria-live="polite"><strong>Virtual camera preview</strong><span>Pilih kamera sintetis untuk mengubah titik pandang scene.</span></div>
-      <div class="city3d-status-row"><span class="city3d-live-dot"></span><span id="city3dDataStatus">Menunggu state simulator</span><span id="city3dFps">— FPS</span><span>AGEN VISUAL SINTETIS</span></div>
+      <div class="city3d-status-row"><span class="city3d-live-dot"></span><span id="city3dDataStatus">Menunggu state simulator</span><span id="city3dLocationStatus" title="Entity tanpa koordinat atau ID simpang yang dikenali tidak digambar pada lokasi perkiraan.">Lokasi terpetakan</span><span id="city3dFps">— FPS</span><span id="city3dPerf">CPU — · GPU — · Draw — · Mem —</span><span id="city3dVehicleFrame">Menunggu snapshot SIMULATED</span><span>AGEN VISUAL SINTETIS</span></div>
       <div class="city3d-fallback" id="city3dFallback" hidden role="status"><strong>3D tidak tersedia pada perangkat ini.</strong><span>Visualisasi 2D tetap tersedia dan menggunakan state yang sama.</span><a class="btn btn-primary compact" href="#map" data-view="map">Buka peta 2D</a></div>
     </div>
     <aside class="city3d-inspector" id="city3dInspector" hidden aria-live="polite">

@@ -521,6 +521,15 @@ class CommandLayer {
       }
     }
 
+    if (action === 'incident:road-recovered') {
+      const id = intent.targetId;
+      const incident = (state.incidents || []).find(item => String(item.id) === String(id));
+      if (!incident) return `Insiden #${id} tidak ditemukan di state simulasi.`;
+      if (incident.roadImpactRecoveredAt || incident.roadImpactRecovered === true) {
+        return `Dampak jalan insiden #${id} sudah ditandai pulih.`;
+      }
+    }
+
     if (action === 'emergency:activate') {
       const code = intent.payload?.code;
       const existing = (state.activeEmergencies || []).find(

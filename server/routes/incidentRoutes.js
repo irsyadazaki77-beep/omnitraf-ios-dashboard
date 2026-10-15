@@ -9,7 +9,8 @@ import {
   cancelEmergencyRest,
   getAuditLogs,
   updateIncidentStatus,
-  resolveIncident
+  resolveIncident,
+  markIncidentRoadRecovered
 } from '../controllers/incidentController.js';
 
 const router = Router();
@@ -22,6 +23,7 @@ router.patch('/incidents/:id/status', requireCapability('incident:update-status'
 router.patch('/incidents/:id/resolve', requireCapability('incident:resolve'), mutationRateLimiter, resolveIncident);
 router.put('/incidents/:id/resolve', requireCapability('incident:resolve'), mutationRateLimiter, resolveIncident);
 router.post('/incidents/:id/resolve', requireCapability('incident:resolve'), mutationRateLimiter, resolveIncident);
+router.patch('/incidents/:id/road-recovered', requireCapability('incident:road-recovered'), mutationRateLimiter, markIncidentRoadRecovered);
 
 // Emergency Priority Endpoints
 router.get('/emergencies', requireCapability('emergencies:read'), getEmergencies);

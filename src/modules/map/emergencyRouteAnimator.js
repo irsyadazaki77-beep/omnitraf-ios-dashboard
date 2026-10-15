@@ -87,7 +87,7 @@ export class EmergencyRouteAnimator {
     const ambIcon = L.divIcon({
       className: 'emergency-112-ambulance-icon',
       html: `
-        <div style="position: relative; width: 44px; height: 28px;">
+        <div class="csp-style-2a2d99efe3" >
           <div class="amb-radar-ring"></div>
           <div class="amb-radar-ring ring-delay"></div>
           <div class="amb-siren-beacon">

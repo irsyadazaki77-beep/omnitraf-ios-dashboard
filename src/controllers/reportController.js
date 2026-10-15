@@ -16,6 +16,8 @@ export class ReportController {
     this.isGenerating = false;
     this.abortController = null;
     this.lastType = "Snapshot sesi";
+    this.snapshot = null;
+    this.returnFocusTo = null;
     this._isBound = false;
     this.disposer = new Disposer('ReportController');
   }
@@ -34,6 +36,7 @@ export class ReportController {
     this._bindPrintExecutive();
     this._bindCopyJson();
     this._exposeGlobalBridges();
+    this._syncSnapshotControls();
   }
 
   deactivate() {
@@ -70,7 +73,7 @@ export class ReportController {
       try {
         const snapshot = this._getActiveSnapshot();
         const csv = buildIncidentCsv(snapshot.incidents, snapshot.source, snapshot);
-        this._logExportHistory(`CSV · ${snapshot.id} · berkas dibuat`);
+        this._logExportHistory(`CSV · ${snapshot.id} · berkas dibuat`, snapshot.id);
         const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
         const link = document.createElement('a');
         link.href = url;
@@ -82,7 +85,7 @@ export class ReportController {
         window.setTimeout(() => URL.revokeObjectURL(url), 0);
         if (typeof window.showToast === 'function') {
           const count = Array.isArray(snapshot.incidents) ? snapshot.incidents.length : 0;
-          window.showToast(count ? `CSV simulasi berhasil dibuat dari ${count} insiden pada state saat ini.` : 'CSV dibuat; snapshot ini tidak memiliki insiden.');
+          window.showToast(count ? `CSV simulasi dibuat dari snapshot ${snapshot.id} (${count} insiden).` : `CSV snapshot ${snapshot.id} dibuat tanpa insiden.`);
         }
         soundManager.play('success');
       } catch (error) {
@@ -138,7 +141,7 @@ export class ReportController {
 
         try {
           const { generateReportPdf } = await import('../../shared/reportPdf.js');
-          const snapshot = this.snapshot;
+          const snapshot = this._getActiveSnapshot();
           if (!snapshot) throw new Error('Buat pratinjau snapshot terlebih dahulu.');
           const bytes = await generateReportPdf(snapshot);
           const blob = new Blob([bytes], { type: 'application/pdf' });
@@ -152,7 +155,7 @@ export class ReportController {
           a.remove();
           setTimeout(() => URL.revokeObjectURL(url), 5000);
 
-          this._logExportHistory(`PDF · ${snapshot.id} · berkas dibuat`);
+          this._logExportHistory(`PDF · ${snapshot.id} · berkas dibuat`, snapshot.id);
           if (typeof window.showToast === "function") {
             window.showToast("PDF simulasi dibuat dan unduhan dimulai.");
           }
@@ -195,8 +198,12 @@ export class ReportController {
     const previewState = document.getElementById("reportDocPreviewState");
 
     if (modal) {
+      if (!modal.classList.contains('show')) this.returnFocusTo = document.activeElement;
+      modal.inert = false;
+      modal.setAttribute('aria-hidden', 'false');
       modal.classList.add("show", "open");
       modal.style.setProperty("display", "flex", "important");
+      document.getElementById('closeModal')?.focus({ preventScroll: true });
     }
 
     if (loaderState) loaderState.style.display = "block";
@@ -251,13 +258,37 @@ export class ReportController {
   }
 
   _getReportTelemetry(type) {
-    this.snapshot = createReportSnapshot(stateStore.getState() || {}, 'Snapshot sesi');
+    this.snapshot = createReportSnapshot(stateStore.getState() || {}, type || 'Snapshot sesi');
+    this._syncSnapshotControls();
     return { ...this.snapshot.metrics, docId: this.snapshot.id, timestamp: this.snapshot.timestamp };
   }
 
   _getActiveSnapshot() {
-    if (!this.snapshot) this.snapshot = createReportSnapshot(stateStore.getState() || {}, 'Snapshot sesi');
+    if (!this.snapshot) throw new Error('Buat snapshot sesi terlebih dahulu.');
     return this.snapshot;
+  }
+
+  _syncSnapshotControls() {
+    const snapshot = this.snapshot;
+    const status = document.getElementById('activeReportSnapshotState');
+    const controls = ['btnExportCsv', 'btnPrintExecutive', 'btnCopyTelemetryJson', 'btnCopyApiJson'];
+    controls.forEach((id) => {
+      const button = document.getElementById(id);
+      if (button) button.disabled = !snapshot;
+    });
+    if (status) {
+      if (!snapshot) {
+        status.textContent = 'Belum ada snapshot. Buat snapshot untuk mengaktifkan ekspor CSV, PDF, JSON, dan cetak.';
+        delete status.dataset.snapshotId;
+      } else {
+        const createdAt = Number.isFinite(new Date(snapshot.timestamp).getTime())
+          ? new Date(snapshot.timestamp).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB'
+          : 'waktu tidak tersedia';
+        const freshness = snapshot.stale ? ' · state sumber berstatus STALE' : '';
+        status.textContent = `Snapshot aktif ${snapshot.id} · dibuat ${createdAt}${freshness}. Semua format memakai snapshot ini.`;
+        status.dataset.snapshotId = snapshot.id;
+      }
+    }
   }
 
   _showDocPreviewState(data) {
@@ -290,6 +321,21 @@ export class ReportController {
       ? new Date(data.timestamp).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB'
       : 'waktu tidak tersedia';
     if (docIdEl) docIdEl.textContent = `ID: ${data.docId} · dibuat ${createdAt} · snapshot simulasi`;
+    const snapshot = this.snapshot;
+    const modal = document.getElementById('reportModal');
+    if (modal && snapshot) modal.dataset.snapshotId = snapshot.id;
+    const previewId = document.getElementById('docPreviewSnapshotId');
+    if (previewId && snapshot) previewId.textContent = snapshot.id;
+    const previewFreshness = document.getElementById('docPreviewFreshness');
+    if (previewFreshness && snapshot) previewFreshness.textContent = snapshot.stale ? 'STALE' : 'CURRENT';
+    const previewTime = document.getElementById('docPreviewTime');
+    if (previewTime) previewTime.textContent = createdAt;
+    const previewVolume = document.getElementById('docPreviewVolume');
+    if (previewVolume) previewVolume.textContent = formatValue(data.volume, ' kendaraan');
+    const previewWait = document.getElementById('docPreviewWait');
+    if (previewWait) previewWait.textContent = formatValue(data.waitTime, ' detik');
+    const previewCo2 = document.getElementById('docPreviewCo2');
+    if (previewCo2) previewCo2.textContent = formatValue(data.co2Saved, ' kg');
   }
 
   _showErrorState(message) {
@@ -329,10 +375,15 @@ export class ReportController {
     if (modal) {
       modal.classList.remove("show", "open");
       modal.style.setProperty("display", "none", "important");
+      modal.setAttribute('aria-hidden', 'true');
+      modal.inert = true;
     }
+    const returnFocusTo = this.returnFocusTo;
+    this.returnFocusTo = null;
+    if (returnFocusTo?.isConnected && !returnFocusTo.disabled) returnFocusTo.focus({ preventScroll: true });
   }
 
-  _logExportHistory(type) {
+  _logExportHistory(type, snapshotId = null) {
     const list = document.getElementById("exportHistoryList");
     if (!list) return;
 
@@ -342,6 +393,7 @@ export class ReportController {
     const time = new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' });
     const item = document.createElement("div");
     item.className = "export-history-item glass-soft";
+    if (snapshotId) item.dataset.snapshotId = snapshotId;
     item.style.cssText = "padding: 8px 12px; border-radius: 8px; margin-bottom: 6px; display: flex; justify-content: space-between; font-size: 11.5px;";
     const label = document.createElement('span');
     label.textContent = `${String(type ?? '')}`;
@@ -360,9 +412,14 @@ export class ReportController {
     printBtns.forEach(btn => {
       this.disposer.addEventListener(btn, "click", () => {
         soundManager.play('click');
-        this._refreshExecutivePrintDocument();
-        this._logExportHistory(`Cetak · ${(this.snapshot || {}).id || "snapshot sesi"} · dialog dibuka`);
-        window.print();
+        try {
+          const snapshot = this._getActiveSnapshot();
+          this._refreshExecutivePrintDocument();
+          this._logExportHistory(`Cetak · ${snapshot.id} · dialog dibuka`, snapshot.id);
+          window.print();
+        } catch (error) {
+          if (typeof window.showToast === 'function') window.showToast(error.message, 'warning');
+        }
       });
     });
   }
@@ -371,12 +428,15 @@ export class ReportController {
     const root = document.getElementById('executivePrintDoc');
     if (!root) return;
     const snapshot = this._getActiveSnapshot();
+    root.dataset.snapshotId = snapshot.id;
     const telemetry = { vehiclesToday: snapshot.metrics.volume, avgWaitTime: snapshot.metrics.waitTime, co2SavedKg: snapshot.metrics.co2Saved };
     const formatValue = (value, unit = '') => value === null || value === undefined || value === ''
       ? 'Tidak tersedia'
       : `${Number.isFinite(Number(value)) ? Number(value).toLocaleString('id-ID') : String(value)}${unit}`;
     const setText = (id, value) => { const element = document.getElementById(id); if (element) element.textContent = value; };
 
+    setText('printSnapshotId', snapshot.id);
+    setText('printSourceFreshness', snapshot.stale ? 'STALE' : 'CURRENT');
     setText('printDateStr', new Date(snapshot.timestamp).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB');
     setText('printVolVal', formatValue(telemetry.vehiclesToday ?? telemetry.totalVehicles, ' kendaraan'));
     setText('printWaitVal', formatValue(telemetry.avgWaitTime, ' detik'));
@@ -423,7 +483,12 @@ export class ReportController {
 
     copyBtns.forEach(btn => {
       this.disposer.addEventListener(btn, "click", () => {
-        const snapshot = this._getActiveSnapshot();
+        let snapshot;
+        try { snapshot = this._getActiveSnapshot(); }
+        catch (error) {
+          if (typeof window.showToast === 'function') window.showToast(error.message, 'warning');
+          return;
+        }
         const payload = JSON.stringify(snapshot, null, 2);
         if (!navigator.clipboard?.writeText) {
           if (typeof window.showToast === "function") window.showToast("Clipboard tidak tersedia pada browser ini.", "danger");
@@ -433,7 +498,7 @@ export class ReportController {
           if (typeof window.showToast === "function") {
             window.showToast("✓ Snapshot sesi dalam format JSON disalin ke Clipboard.");
           }
-          this._logExportHistory(`JSON · ${snapshot.id} · disalin`);
+          this._logExportHistory(`JSON · ${snapshot.id} · disalin`, snapshot.id);
           soundManager.play('success');
         }).catch((error) => {
           if (typeof window.showToast === "function") {

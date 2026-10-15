@@ -1,0 +1,218 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: interactions.spec.js >> Phase 5 key interaction checks >> command palette supports keyboard entity search and selection
+- Location: tests\e2e\interactions.spec.js:46:3
+
+# Error details
+
+```
+Error: expect(received).toBe(expected) // Object.is equality
+
+Expected: "node-wonokromo"
+Received: undefined
+
+Call Log:
+- Timeout 10000ms exceeded while waiting on the predicate
+```
+
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - link "Lewati ke konten utama" [ref=e2] [cursor=pointer]:
+    - /url: "#mainContent"
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - link "OmniTRAF home" [ref=e5] [cursor=pointer]:
+        - /url: "#dashboard"
+        - img "Ikon OmniTRAF SITS Surabaya" [ref=e7]
+        - generic [ref=e8]:
+          - img "Logo OmniTRAF Adaptive Urban Mobility System" [ref=e9]
+          - generic [ref=e10]: Surabaya Command Center
+      - button "Ciutkan sidebar" [expanded] [ref=e11] [cursor=pointer]:
+        - generic [ref=e14]: Collapse sidebar
+      - button "Cari halaman Ctrl K" [ref=e15] [cursor=pointer]:
+        - generic [ref=e20]:
+          - text: Cari halaman
+          - generic [ref=e21]: Ctrl K
+      - navigation "Primary navigation" [ref=e22]:
+        - region [ref=e23]:
+          - heading "Operasi" [level=2] [ref=e24]
+          - link "Ikhtisar" [ref=e25] [cursor=pointer]:
+            - /url: "#dashboard"
+          - link "Peta kota" [ref=e33] [cursor=pointer]:
+            - /url: "#map"
+          - link "Digital Twin 3D" [ref=e39] [cursor=pointer]:
+            - /url: "#city3d"
+            - generic [aria-hidden] [ref=e40]: 3D
+          - link "Insiden" [ref=e42] [cursor=pointer]:
+            - /url: "#incidents"
+          - link "Darurat" [ref=e47] [cursor=pointer]:
+            - /url: "#emergency"
+        - region [ref=e52]:
+          - heading "Pemantauan" [level=2] [ref=e53]
+          - link "CCTV" [ref=e54] [cursor=pointer]:
+            - /url: "#cctv"
+          - link "Sinyal" [ref=e61] [cursor=pointer]:
+            - /url: "#signals"
+          - link "Perangkat" [ref=e69] [cursor=pointer]:
+            - /url: "#devices"
+        - region [ref=e75]:
+          - heading "Analitik & prediksi" [level=2] [ref=e76]
+          - link "Analitik" [ref=e77] [cursor=pointer]:
+            - /url: "#analytics"
+          - link "Prediksi" [ref=e83] [cursor=pointer]:
+            - /url: "#prediction"
+          - button "Intelijen sinyal" [ref=e89] [cursor=pointer]
+          - link "Laporan" [ref=e94] [cursor=pointer]:
+            - /url: "#reports"
+            - generic [aria-hidden] [ref=e95]: ▤
+        - region [ref=e97]:
+          - heading "Sistem" [level=2] [ref=e98]
+          - link "Integrasi" [ref=e99] [cursor=pointer]:
+            - /url: "#integration"
+          - link "Pengaturan" [ref=e105] [cursor=pointer]:
+            - /url: "#settings"
+          - link "Arsitektur sistem" [ref=e109] [cursor=pointer]:
+            - /url: "#about-engine"
+    - main [ref=e114]:
+      - generic "Navigasi halaman" [ref=e115]:
+        - generic [ref=e117]:
+          - generic [ref=e118]: OMNITRAF · SIMULASI
+          - strong [ref=e119]: Sinyal lalu lintas
+        - generic "Aksi utama" [ref=e120]:
+          - button "Cari Ctrl K" [ref=e121] [cursor=pointer]:
+            - generic [aria-hidden] [ref=e122]: ⌕
+            - generic [ref=e123]: Cari
+            - generic [ref=e124]: Ctrl K
+          - generic "Status prototipe OmniTRAF" [ref=e125]:
+            - generic [ref=e126]: Selasa, 13 Okt 2026 | 18.57 WIB
+            - strong [ref=e129]: Server Simulasi Tersambung
+          - generic [ref=e130]:
+            - button "Ganti ke tema terang" [ref=e131] [cursor=pointer]:
+              - generic [aria-hidden] [ref=e132]: ☾
+            - 'button "Active scenario notifications: 3" [ref=e133] [cursor=pointer]':
+              - generic [ref=e137]: "3"
+            - group [ref=e138]:
+              - generic "Aksi lainnya" [ref=e139] [cursor=pointer]: ···
+          - button "Sesi Operator Demo. Kontrol keluar tersedia di navigasi." [ref=e140] [cursor=pointer]:
+            - generic [aria-hidden] [ref=e142]: OD
+            - generic [ref=e143]:
+              - strong [ref=e144]: Operator Demo
+              - generic [ref=e145]: Operator
+          - button "Keluar" [ref=e146] [cursor=pointer]
+      - group "Batas simulasi" [ref=e147]:
+        - generic [ref=e148] [cursor=pointer]:
+          - strong [ref=e149]: SIMULASI
+          - text: Data sintetis · tanpa kendali perangkat lapangan
+      - generic [ref=e151]:
+        - generic [ref=e152]:
+          - generic [ref=e153]:
+            - paragraph [ref=e154]: OMNITRAF · SIMULASI
+            - heading "Sinyal lalu lintas" [level=1] [ref=e155]
+            - paragraph [ref=e156]: Pantau fase simpang dan sesuaikan parameter model jika diizinkan.
+          - generic [ref=e157]: SIMULATION_ONLY · TIDAK MENGENDALIKAN APILL
+        - generic [ref=e158]:
+          - generic [ref=e159]: Cari simpang
+          - searchbox "Cari simpang" [ref=e160]
+          - generic [ref=e161]: Status dan waktu berasal dari state simulator.
+        - article [ref=e162]:
+          - generic [ref=e163]:
+            - generic [ref=e164]:
+              - heading "Simpang dalam model" [level=2] [ref=e165]
+              - paragraph [ref=e166]: Pilih simpang untuk memusatkan peta. State berasal dari simulator.
+            - generic [ref=e167]: 5 simpang
+          - table [ref=e169]:
+            - rowgroup [ref=e170]:
+              - row [ref=e171]:
+                - columnheader "Persimpangan" [ref=e172]
+                - columnheader "Fase" [ref=e173]
+                - columnheader "Kepadatan" [ref=e174]
+                - columnheader "Waktu tunggu" [ref=e175]
+                - columnheader "Pembaruan" [ref=e176]
+            - rowgroup [ref=e177]:
+              - row [ref=e178]:
+                - cell [ref=e179]:
+                  - button "Fokus peta ke Simpang Wonokromo" [ref=e180] [cursor=pointer]: Simpang Wonokromo
+                - cell "Hijau · simulasi" [ref=e181]
+                - cell "Lancar" [ref=e182]
+                - cell "757 dtk" [ref=e184]
+                - cell "18.57.46" [ref=e185]
+              - row [ref=e186]:
+                - cell [ref=e187]:
+                  - button "Fokus peta ke Simpang Jemursari" [ref=e188] [cursor=pointer]: Simpang Jemursari
+                - cell "Hijau · simulasi" [ref=e189]
+                - cell "Lancar" [ref=e190]
+                - cell "464 dtk" [ref=e192]
+                - cell "18.57.46" [ref=e193]
+              - row [ref=e194]:
+                - cell [ref=e195]:
+                  - button "Fokus peta ke Simpang Raya Darmo" [ref=e196] [cursor=pointer]: Simpang Raya Darmo
+                - cell "Merah · simulasi" [ref=e197]
+                - cell "Padat" [ref=e198]
+                - cell "79 dtk" [ref=e200]
+                - cell "18.57.46" [ref=e201]
+              - row [ref=e202]:
+                - cell [ref=e203]:
+                  - button "Fokus peta ke Simpang Tunjungan" [ref=e204] [cursor=pointer]: Simpang Tunjungan
+                - cell "Hijau · simulasi" [ref=e205]
+                - cell "Lancar" [ref=e206]
+                - cell "112 dtk" [ref=e208]
+                - cell "18.57.46" [ref=e209]
+              - row [ref=e210]:
+                - cell [ref=e211]:
+                  - button "Fokus peta ke Simpang MERR Kertajaya" [ref=e212] [cursor=pointer]: Simpang MERR Kertajaya
+                - cell "Hijau · simulasi" [ref=e213]
+                - cell "Lancar" [ref=e214]
+                - cell "15 dtk" [ref=e216]
+                - cell "18.57.46" [ref=e217]
+        - group [ref=e218]:
+          - generic "Konfigurasi dan override simulasi" [ref=e219] [cursor=pointer]
+  - dialog [aria-hidden] [ref=e220]:
+    - generic [ref=e221]:
+      - generic [ref=e222]:
+        - generic [ref=e223]: 🔔
+        - generic [ref=e224]:
+          - heading [level=3] [ref=e225]: Contoh Skenario Insiden
+          - paragraph [ref=e226]: Data demo, bukan laporan operasional
+      - button [ref=e227] [cursor=pointer]: ×
+    - generic [ref=e228]:
+      - article [ref=e229]:
+        - generic [ref=e230]:
+          - generic [ref=e231]: ⚠️ BARU (Open)
+          - generic [ref=e232]: 18.48 WIB
+        - strong [ref=e233]: Skenario kendaraan mogok - Simpang demo 01
+        - paragraph [ref=e234]: Skenario contoh; tidak ada petugas atau unit derek yang ditugaskan.
+        - generic [ref=e235]:
+          - button [ref=e236] [cursor=pointer]: 📍 Buka di Peta
+          - button [ref=e237] [cursor=pointer]: Akui skenario
+      - article [ref=e238]:
+        - generic [ref=e239]:
+          - generic [ref=e240]: ✓ Diakui · menunggu disposisi
+          - generic [ref=e241]: 18.38 WIB
+        - strong [ref=e242]: Skenario genangan air - Koridor demo 02
+        - paragraph [ref=e243]: Skenario contoh genangan; bukan pengukuran atau laporan lapangan.
+        - generic [ref=e244]:
+          - button [ref=e245] [cursor=pointer]: 📍 Buka di Peta
+          - button [ref=e246] [cursor=pointer]: Disposisi simulasi
+      - article [ref=e247]:
+        - generic [ref=e248]:
+          - generic [ref=e249]: ⚠️ BARU (Open)
+          - generic [ref=e250]: 18.43 WIB
+        - strong [ref=e251]: Skenario antrean panjang - Simpang demo 03
+        - paragraph [ref=e252]: Antrean sintetis 180 meter pada skenario simulator.
+        - generic [ref=e253]:
+          - button [ref=e254] [cursor=pointer]: 📍 Buka di Peta
+          - button [ref=e255] [cursor=pointer]: Akui skenario
+  - status [ref=e257]: ✓ Notifikasi
+  - status:
+    - status [ref=e258]:
+      - generic [ref=e259]: ⚠
+      - generic [ref=e260]: Penundaan koneksi data terdeteksi. Mencoba ulang...
+```

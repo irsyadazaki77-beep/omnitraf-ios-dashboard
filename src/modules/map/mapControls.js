@@ -182,11 +182,11 @@ export class MapControls {
           const popupContent = `
             <div class="ios-popup-card incident-popup">
               <div class="ios-popup-header alert">
-                <span class="alert-pill" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 2px 6px; border-radius: 4px; font-weight: bold;">⚠️ SKENARIO DEMO</span>
+                <span class="alert-pill csp-style-5e672a0723" >⚠️ SKENARIO DEMO</span>
                 <span class="ios-popup-subtitle">SIMULASI</span>
               </div>
               <h4 class="ios-popup-title">${safeTitle}</h4>
-              <p style="font-size: 11.5px; color: #cbd5e1; margin-top: 4px; line-height: 1.4;">
+              <p class="csp-style-0d303bd35d" >
                 Lokasi contoh: <strong>${safeLocation}</strong><br/>
                 Status: Contoh skenario; tidak ada tim SITS atau layanan 112 yang dihubungi.
               </p>

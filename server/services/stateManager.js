@@ -1135,11 +1135,7 @@ export class BackendStateManager {
               if (pt.isIntersection) {
                 const node = this.state.intersections.find(n => n.id === pt.id);
                 if (node && node.preemptionVehicleId === emg.id) {
-                  node.state = "green";
-                  node.timer = node.greenSplit || 35;
-                  node.status = "Lancar";
-                  delete node.isPreempted;
-                  delete node.preemptionVehicleId;
+                  this._releaseEmergencySignal(node, emgNowMs);
                 }
               }
             });
@@ -1192,24 +1188,11 @@ export class BackendStateManager {
                     });
                   }
 
-                  node.state = "green";
-                  node.timer = "∞";
-                  node.status = "Preemption Aktif";
-                  node.isPreempted = true;
-                  node.preemptionVehicleId = emg.id;
+                  if (node.lastPreemptionVehicleId !== emg.id) this._startEmergencySignalClearance(node, emg.id, emgNowMs);
                 }
               }
 
-              if (segIndex > idx && dist > 0.0028) {
-                const node = this.state.intersections.find(n => n.id === pt.id);
-                if (node && node.preemptionVehicleId === emg.id) {
-                  node.state = "green";
-                  node.timer = node.greenSplit || 35;
-                  node.status = "Normal";
-                  delete node.isPreempted;
-                  delete node.preemptionVehicleId;
-                }
-              }
+              // The bounded priority phase completes and restores through the signal state machine.
             });
 
             emg.nextIntersection = nextIntName;
@@ -1226,11 +1209,7 @@ export class BackendStateManager {
               if (pt.isIntersection) {
                 const node = this.state.intersections.find(n => n.id === pt.id);
                 if (node && node.preemptionVehicleId === emg.id) {
-                  node.state = "green";
-                  node.timer = node.greenSplit || 35;
-                  node.status = "Normal";
-                  delete node.isPreempted;
-                  delete node.preemptionVehicleId;
+                  this._releaseEmergencySignal(node, emgNowMs);
                 }
               }
             });
@@ -1262,21 +1241,76 @@ export class BackendStateManager {
     }
   }
 
+  _startEmergencySignalClearance(node, emergencyId, nowMs) {
+    const yellowSec = Math.max(3, Number(node.yellowDuration) || 3);
+    node.isPreempted = true;
+    node.preemptionVehicleId = emergencyId;
+    node.lastPreemptionVehicleId = emergencyId;
+    node.preemptionPhase = 'YELLOW_CLEARANCE';
+    node.preemptionPhaseEndsAtMs = nowMs + yellowSec * 1000;
+    node.state = 'yellow';
+    node.timer = yellowSec;
+    node.status = 'Prioritas · clearance kuning';
+  }
+
+  _releaseEmergencySignal(node, nowMs) {
+    if (!node?.isPreempted) return;
+    const yellowSec = Math.max(3, Number(node.yellowDuration) || 3);
+    node.preemptionPhase = 'RECOVERY_CLEARANCE';
+    node.preemptionPhaseEndsAtMs = nowMs + yellowSec * 1000;
+    node.state = 'yellow';
+    node.timer = yellowSec;
+    node.status = 'Pemulihan prioritas · clearance';
+  }
+
   _stepSignalSimulation() {
     // Advance APILL Light Timers using Epoch Timestamp Synchronization (from this.clock.now())
     const nowMs = this.clock.now();
     this.state.intersections.forEach(node => {
       if (node.isPreempted) {
-        node.state = "green";
-        node.timer = "∞";
-        node.status = "Preemption Aktif";
-        return;
-      }
-
-      if (this.state.greenWaveActive && (node.id === "node-wonokromo" || node.id === "node-jemursari" || node.id === "node-darmo")) {
-        node.state = "green";
-        node.timer = "∞";
-        node.status = "Green Wave";
+        const remainingSec = Math.max(0, Math.ceil((Number(node.preemptionPhaseEndsAtMs) - nowMs) / 1000));
+        node.timer = remainingSec;
+        if (node.preemptionPhase === 'YELLOW_CLEARANCE') {
+          node.state = 'yellow';
+          node.status = 'Prioritas · clearance kuning';
+          if (remainingSec === 0) {
+            node.preemptionPhase = 'ALL_RED_CLEARANCE';
+            node.preemptionPhaseEndsAtMs = nowMs + 1000;
+          }
+          return;
+        }
+        if (node.preemptionPhase === 'ALL_RED_CLEARANCE') {
+          node.state = 'red';
+          node.status = 'Prioritas · clearance merah';
+          if (remainingSec === 0) {
+            node.preemptionPhase = 'PRIORITY_GREEN';
+            node.preemptionPhaseEndsAtMs = nowMs + Math.min(90, Math.max(15, Number(node.greenSplit) || 35)) * 1000;
+          }
+          return;
+        }
+        if (node.preemptionPhase === 'PRIORITY_GREEN') {
+          node.state = 'green';
+          node.status = 'Prioritas simulasi';
+          if (remainingSec === 0) this._releaseEmergencySignal(node, nowMs);
+          return;
+        }
+        if (node.preemptionPhase === 'RECOVERY_CLEARANCE') {
+          node.state = 'yellow';
+          node.status = 'Pemulihan prioritas · clearance';
+          if (remainingSec === 0) {
+            node.isPreempted = false;
+            delete node.preemptionVehicleId;
+            delete node.preemptionPhase;
+            delete node.preemptionPhaseEndsAtMs;
+            node.state = 'red';
+            node.timer = 1;
+            node.status = 'Pemulihan prioritas · clearance merah';
+            node.cycleStartTime = nowMs + 1000;
+          }
+          return;
+        }
+        node.state = 'yellow';
+        node.status = 'Pemulihan prioritas · clearance';
         return;
       }
 
@@ -1443,21 +1477,8 @@ export class BackendStateManager {
     this.state.seq = this.sequence;
     this.state.timestampMs = this.lastUpdated;
     this.state.greenWaveActive = !!active;
-    if (active) {
-      this.state.intersections.forEach(node => {
-        if (node.id === "node-wonokromo" || node.id === "node-jemursari" || node.id === "node-darmo") {
-          node.state = "green";
-          node.timer = "∞";
-          node.status = "Green Wave";
-        }
-      });
-    } else {
-      const wNode = this.state.intersections.find(n => n.id === "node-wonokromo");
-      if (wNode) {
-        wNode.state = "green";
-        wNode.timer = this.state.greenSplitWonokromo;
-      }
-    }
+    // Activation is a model flag only. Route-linked emergency phases are sequenced
+    // by _stepSignalSimulation with bounded green and yellow/all-red clearance.
     return this.state;
   }
 
@@ -1639,6 +1660,71 @@ export class BackendStateManager {
     return inc;
   }
 
+  async markIncidentRoadRecovered(id, notes = '', options = {}) {
+    const inc = this.state.incidents.find(item => String(item.id) === String(id));
+    if (!inc) {
+      throw new ContractValidationError('NOT_FOUND', `Incident '${id}' was not found.`, { field: 'targetId', expected: 'known incident', actual: id, statusCode: 404 });
+    }
+    if (inc.roadImpactRecoveredAt) return inc;
+
+    const previous = {
+      roadImpactRecoveredAt: inc.roadImpactRecoveredAt,
+      roadImpactRecoveryNote: inc.roadImpactRecoveryNote,
+      updatedAt: inc.updatedAt,
+      activity: inc.activity,
+      sequence: this.sequence,
+      incidentSequence: this.incidentSequence,
+      lastUpdated: this.lastUpdated,
+      stateSeq: this.state.seq,
+      timestampMs: this.state.timestampMs
+    };
+    const recoveredAt = this.clock.nowIso();
+    const recoveredAtMs = this.clock.now();
+    const recoveryNote = String(notes || 'Pemulihan jalan dikonfirmasi pada model simulasi.').trim();
+    inc.roadImpactRecoveredAt = recoveredAt;
+    inc.roadImpactRecoveryNote = recoveryNote;
+    inc.updatedAt = recoveredAt;
+    inc.activity = [
+      ...(Array.isArray(inc.activity) ? inc.activity : []),
+      { action: 'ROAD_IMPACT_RECOVERED', status: inc.status, actor: options.actor || 'Operator', timestamp: recoveredAt, note: recoveryNote }
+    ];
+    this.sequence++;
+    this.incidentSequence++;
+    this.lastUpdated = recoveredAtMs;
+    this.state.seq = this.sequence;
+    this.state.timestampMs = this.lastUpdated;
+
+    try {
+      await incidentRepository.upsert(inc, true);
+    } catch (err) {
+      if (previous.roadImpactRecoveredAt === undefined) delete inc.roadImpactRecoveredAt;
+      else inc.roadImpactRecoveredAt = previous.roadImpactRecoveredAt;
+      if (previous.roadImpactRecoveryNote === undefined) delete inc.roadImpactRecoveryNote;
+      else inc.roadImpactRecoveryNote = previous.roadImpactRecoveryNote;
+      if (previous.updatedAt === undefined) delete inc.updatedAt;
+      else inc.updatedAt = previous.updatedAt;
+      if (previous.activity === undefined) delete inc.activity;
+      else inc.activity = previous.activity;
+      this.sequence = previous.sequence;
+      this.incidentSequence = previous.incidentSequence;
+      this.lastUpdated = previous.lastUpdated;
+      this.state.seq = previous.stateSeq;
+      this.state.timestampMs = previous.timestampMs;
+      throw new Error(`PERSISTENCE_FAILED: Gagal menyimpan pemulihan dampak jalan insiden #${id} (${err.message})`);
+    }
+
+    if (this.io) {
+      this.io.emit('incident:update', {
+        id: String(id),
+        seq: this.incidentSequence,
+        timestamp: recoveredAtMs,
+        source: 'server',
+        payload: inc
+      });
+    }
+    return inc;
+  }
+
   async activateEmergencyPriority(code, routeId, options = {}) {
     const canonical = validateDomainCommand('emergency:activate', code, { code, route: routeId, type: options.vehicleType, incidentId: options.incidentId || options.associatedIncidentId });
     code = canonical.code;
@@ -1777,13 +1863,7 @@ export class BackendStateManager {
     route.forEach(pt => {
       if (pt.isIntersection) {
         const node = this.state.intersections.find(n => n.id === pt.id);
-        if (node && node.preemptionVehicleId === emg.id) {
-          node.state = "green";
-          node.timer = node.greenSplit || 35;
-          node.status = "Normal";
-          delete node.isPreempted;
-          delete node.preemptionVehicleId;
-        }
+        if (node && node.preemptionVehicleId === emg.id) this._releaseEmergencySignal(node, this.clock.now());
       }
     });
 

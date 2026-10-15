@@ -701,17 +701,17 @@ export class SignalsController {
         const safeWaitTime = escapeHtml(waitTime);
 
         return `
-          <div class="intersection-card-item glass-soft" data-name="${safeName}" style="padding: 14px; border-radius: 12px; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s ease;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-              <strong style="font-size: 13px; color: var(--text);">${safeName}</strong>
+          <div class="intersection-card-item glass-soft csp-style-1ddbf04bba" data-name="${safeName}" >
+            <div class="csp-style-3d50d9b20b" >
+              <strong class="csp-style-579798b495" >${safeName}</strong>
               <span class="tag tag-${densityClass}">${safeDensity}</span>
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: var(--text-muted);">
-              <span>Status: <strong style="color: var(--success);">${safeStatus}</strong></span>
-              <span>Waktu Tunggu: <strong style="color: var(--text);">${safeWaitTime}</strong></span>
+            <div class="csp-style-4589155f25" >
+              <span>Status: <strong class="csp-style-594cc49b9c" >${safeStatus}</strong></span>
+              <span>Waktu Tunggu: <strong class="csp-style-a9fd68747a" >${safeWaitTime}</strong></span>
             </div>
-            <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
-              <button class="btn btn-ghost compact fly-btn" style="font-size: 10.5px; padding: 3px 8px;">🛰️ Fokus di Peta</button>
+            <div class="csp-style-a457c36bf1" >
+              <button class="btn btn-ghost compact fly-btn csp-style-0b0f2ee868" >🛰️ Fokus di Peta</button>
             </div>
           </div>
         `;
@@ -804,7 +804,7 @@ export class SignalsController {
 
     const renderSuggestions = (filtered) => {
       if (filtered.length === 0) {
-        suggestionsDiv.innerHTML = `<div class="suggestion-item empty" style="padding: 10px; color: var(--text-muted); font-size: 12px; text-align: center;">Tidak ada simpang ditemukan</div>`;
+        suggestionsDiv.innerHTML = `<div class="suggestion-item empty csp-style-9dd5c14504" >Tidak ada simpang ditemukan</div>`;
         suggestionsDiv.classList.remove("is-hidden");
         return;
       }
@@ -816,12 +816,12 @@ export class SignalsController {
         const safeId = escapeHtml(item.id);
         const statusClass = ['success', 'warning', 'danger'].includes(item.status) ? item.status : 'success';
         return `
-        <div class="suggestion-item" data-id="${safeId}" data-name="${safeName}" data-index="${idx}" style="padding: 8px 12px; cursor: pointer; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; transition: background 0.15s ease;">
+        <div class="suggestion-item csp-style-a68866e2c8" data-id="${safeId}" data-name="${safeName}" data-index="${idx}" >
           <div>
-            <strong style="color: var(--text);">${safeName}</strong>
-            <div style="font-size: 10px; color: var(--text-muted);">${safeCorridor} • ${safeDistrict}</div>
+            <strong class="csp-style-a9fd68747a" >${safeName}</strong>
+            <div class="csp-style-51c0d45556" >${safeCorridor} • ${safeDistrict}</div>
           </div>
-          <span class="tag tag-${statusClass}" style="font-size: 9px; padding: 1px 6px;">${statusClass === 'danger' ? 'Macet' : statusClass === 'warning' ? 'Padat' : 'Lancar'}</span>
+          <span class="tag tag-${statusClass} csp-style-39ff62d23e" >${statusClass === 'danger' ? 'Macet' : statusClass === 'warning' ? 'Padat' : 'Lancar'}</span>
         </div>
       `;
       }).join("");

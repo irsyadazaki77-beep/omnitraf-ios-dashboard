@@ -117,9 +117,8 @@ export function generateForecastSnapshot(hour = 8, state = {}) {
   const isRain = !!state.isRainMode || state.roadCondition === 'wet';
   const greenWave = !!state.greenWaveActive;
   const greenSplit = Number(state.greenSplitWonokromo || 35);
-  const terminalIncidentStatuses = new Set(['RESOLVED', 'ARCHIVED', 'CLOSED', 'CANCELLED']);
   const incidents = Array.isArray(state.incidents)
-    ? state.incidents.filter(i => !terminalIncidentStatuses.has(String(i.status || 'ACTIVE').toUpperCase()))
+    ? state.incidents.filter(i => !i.roadImpactRecoveredAt && i.roadImpactRecovered !== true)
     : [];
   const activeEmergencies = Array.isArray(state.activeEmergencies) ? state.activeEmergencies.filter(e => e.status !== 'COMPLETED' && e.status !== 'CANCELLED') : [];
 

@@ -95,7 +95,11 @@ export function normalizeCanonicalIntersection(raw = {}) {
   const state = String(raw.state || rawSignal.state || 'green');
   const controlMode = String(raw.controlMode || raw.mode || rawSignal.controlMode || 'ADAPTIVE_AI');
   const isPreempted = !!(raw.isPreempted ?? rawSignal.isPreempted ?? (raw.status === 'Preemption Aktif'));
-  const isOverrideActive = !!(raw.isOverrideActive ?? raw.overrideDuration > 0 ?? rawSignal.isOverrideActive);
+  const isOverrideActive = raw.isOverrideActive !== undefined
+    ? !!raw.isOverrideActive
+    : raw.overrideDuration !== undefined
+      ? Number(raw.overrideDuration) > 0
+      : !!rawSignal.isOverrideActive;
 
   const rawTraffic = raw.traffic || {};
   const waitTime = Number(raw.waitTime ?? rawTraffic.waitTime ?? 35);
@@ -303,7 +307,10 @@ export function normalizeCanonicalIncident(raw = {}) {
     reportedAt: createdAt,
     updatedAt,
     acknowledgedAt,
-    resolvedAt
+    resolvedAt,
+    roadImpactRecoveredAt: raw.roadImpactRecoveredAt ? normalizeIsoTimestamp(raw.roadImpactRecoveredAt) : null,
+    roadImpactRecoveryNote: String(raw.roadImpactRecoveryNote || ''),
+    activity: Array.isArray(raw.activity) ? raw.activity.map(entry => ({ ...entry })) : []
   };
 }
 
@@ -457,7 +464,10 @@ export const CompatibilityAdapters = {
       createdAt: canonical.createdAt,
       updatedAt: canonical.updatedAt,
       acknowledgedAt: canonical.acknowledgedAt,
-      resolvedAt: canonical.resolvedAt
+      resolvedAt: canonical.resolvedAt,
+      roadImpactRecoveredAt: canonical.roadImpactRecoveredAt,
+      roadImpactRecoveryNote: canonical.roadImpactRecoveryNote,
+      activity: canonical.activity
     };
   },
 

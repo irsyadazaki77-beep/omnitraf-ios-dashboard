@@ -1,0 +1,317 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: visual.spec.js >> Phase 5 visual audit baseline and responsive contracts >> captures every view in both themes and checks responsive overflow at required sizes
+- Location: tests\e2e\visual.spec.js:21:3
+
+# Error details
+
+```
+Error: Ikhtisar light 390x844 controls clipped horizontally
+
+expect(received).toEqual(expected) // deep equality
+
+- Expected  -  1
++ Received  + 10
+
+- Array []
++ Array [
++   Object {
++     "className": "leaflet-marker-icon omni-cluster-icon leaflet-zoom-animated leaflet-interactive",
++     "id": "",
++     "left": 499,
++     "right": 539,
++     "tag": "DIV",
++     "text": "4",
++   },
++ ]
+```
+
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - link "Lewati ke konten utama" [ref=e2] [cursor=pointer]:
+    - /url: "#mainContent"
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - button "Tutup menu" [ref=e5] [cursor=pointer]: ×
+      - link "OmniTRAF home" [ref=e6] [cursor=pointer]:
+        - /url: "#dashboard"
+        - img "Ikon OmniTRAF SITS Surabaya" [ref=e8]
+        - generic [ref=e9]:
+          - img "Logo OmniTRAF Adaptive Urban Mobility System" [ref=e10]
+          - generic [ref=e11]: Surabaya Command Center
+      - button "Cari halaman Ctrl K" [ref=e12] [cursor=pointer]:
+        - generic [ref=e17]:
+          - text: Cari halaman
+          - generic [ref=e18]: Ctrl K
+      - navigation "Primary navigation" [ref=e19]:
+        - region [ref=e20]:
+          - heading "Operasi" [level=2] [ref=e21]
+          - link "Ikhtisar" [ref=e22] [cursor=pointer]:
+            - /url: "#dashboard"
+          - link "Peta kota" [ref=e30] [cursor=pointer]:
+            - /url: "#map"
+          - link "Digital Twin 3D" [ref=e36] [cursor=pointer]:
+            - /url: "#city3d"
+            - generic [aria-hidden] [ref=e37]: 3D
+          - link "Insiden" [ref=e39] [cursor=pointer]:
+            - /url: "#incidents"
+          - link "Darurat" [ref=e44] [cursor=pointer]:
+            - /url: "#emergency"
+        - region [ref=e49]:
+          - heading "Pemantauan" [level=2] [ref=e50]
+          - link "CCTV" [ref=e51] [cursor=pointer]:
+            - /url: "#cctv"
+          - link "Sinyal" [ref=e58] [cursor=pointer]:
+            - /url: "#signals"
+          - link "Perangkat" [ref=e66] [cursor=pointer]:
+            - /url: "#devices"
+        - region [ref=e72]:
+          - heading "Analitik & prediksi" [level=2] [ref=e73]
+          - link "Analitik" [ref=e74] [cursor=pointer]:
+            - /url: "#analytics"
+          - link "Prediksi" [ref=e80] [cursor=pointer]:
+            - /url: "#prediction"
+          - button "Intelijen sinyal" [ref=e86] [cursor=pointer]
+          - link "Laporan" [ref=e91] [cursor=pointer]:
+            - /url: "#reports"
+            - generic [aria-hidden] [ref=e92]: ▤
+        - region [ref=e94]:
+          - heading "Sistem" [level=2] [ref=e95]
+          - link "Integrasi" [ref=e96] [cursor=pointer]:
+            - /url: "#integration"
+          - link "Pengaturan" [ref=e102] [cursor=pointer]:
+            - /url: "#settings"
+          - link "Arsitektur sistem" [ref=e106] [cursor=pointer]:
+            - /url: "#about-engine"
+          - button "Demo Coordination Chat" [ref=e111] [cursor=pointer]
+    - main [ref=e116]:
+      - generic "Navigasi halaman" [ref=e117]:
+        - generic [ref=e118]:
+          - button "Buka menu" [ref=e119] [cursor=pointer]
+          - strong [ref=e124]: Ikhtisar
+        - generic "Aksi utama" [ref=e125]:
+          - button [ref=e126] [cursor=pointer]:
+            - generic [aria-hidden] [ref=e127]: ⌕
+          - generic "Status prototipe OmniTRAF" [ref=e128]
+          - generic [ref=e131]:
+            - button "Ganti ke tema gelap" [active] [pressed] [ref=e132] [cursor=pointer]:
+              - generic [aria-hidden] [ref=e133]: ☼
+            - 'button "Active scenario notifications: 3" [ref=e134] [cursor=pointer]':
+              - generic [ref=e138]: "3"
+            - group [ref=e139]:
+              - generic "Aksi lainnya" [ref=e140] [cursor=pointer]: ···
+      - group "Batas simulasi" [ref=e141]:
+        - generic [ref=e142] [cursor=pointer]:
+          - strong [ref=e143]: SIMULASI
+          - text: Data sintetis · tanpa kendali perangkat lapangan
+      - status [ref=e144]:
+        - generic [ref=e145]:
+          - generic [aria-hidden] [ref=e146]: 📡
+          - generic [ref=e147]:
+            - strong [ref=e148]: Data simulasi tertahan
+            - text: — Pembaruan terakhir tidak diterima; nilai yang tampil mungkin sudah lama.
+        - button "Tutup pemberitahuan offline" [ref=e149] [cursor=pointer]: ×
+      - generic [ref=e151]:
+        - generic [ref=e152]:
+          - generic [ref=e153]:
+            - paragraph [ref=e154]: OMNITRAF · SIMULASI
+            - heading "Ikhtisar operasi" [level=1] [ref=e155]
+            - paragraph [ref=e156]: Kondisi lalu lintas Surabaya dari model simulasi.
+          - generic [ref=e157]:
+            - generic "Status model simulasi" [ref=e158]:
+              - generic [ref=e160]: ADVISORY
+              - generic "Stream server simulasi tersambung dan data diperbarui" [ref=e161]: STREAM SIMULATOR TERHUBUNG
+            - button "Segarkan data" [ref=e162] [cursor=pointer]
+        - status "Insiden prioritas" [ref=e163]:
+          - generic [ref=e164]:
+            - strong [ref=e165]: Insiden prioritas
+            - generic [ref=e166]: "1"
+          - list [ref=e167]:
+            - listitem [ref=e168]:
+              - generic [ref=e169]:
+                - strong [ref=e170]: Skenario kendaraan mogok
+                - generic [ref=e171]: Simpang demo 01
+                - generic [ref=e172]: DANGER · ACTIVE
+              - link "Inspect incident Skenario kendaraan mogok" [ref=e173] [cursor=pointer]:
+                - /url: "#incidents"
+                - text: Inspect
+        - region "Ringkasan kondisi model" [ref=e174]:
+          - article [ref=e175]:
+            - generic [ref=e176]: Indeks kemacetan model
+            - strong [ref=e177]: 85/100
+            - generic [ref=e178]: Skor model, bukan probabilitas
+          - article [ref=e179]:
+            - generic [ref=e180]: Insiden aktif
+            - strong [ref=e181]: "3"
+            - generic [ref=e182]: Dalam sesi simulasi
+          - article [ref=e183]:
+            - generic [ref=e184]: Pengecualian sinyal
+            - strong [ref=e185]: "0"
+            - generic [ref=e186]: Status simpang yang dilaporkan
+          - article [ref=e187]:
+            - generic [ref=e188]: Pengecualian perangkat
+            - strong [ref=e189]: "0"
+            - generic [ref=e190]: Status perangkat yang dilaporkan
+        - region "Peta dan antrean prioritas" [ref=e191]:
+          - article [ref=e192]:
+            - generic [ref=e193]:
+              - generic [ref=e194]:
+                - heading "Peta kota" [level=2] [ref=e195]
+                - paragraph [ref=e196]: Penanda dan kepadatan berasal dari model, bukan telemetri lapangan.
+              - link "Buka peta lengkap" [ref=e197] [cursor=pointer]:
+                - /url: "#map"
+            - generic [ref=e198]:
+              - generic "Kontrol peta" [ref=e199]:
+                - button "Perbesar peta" [ref=e200] [cursor=pointer]: +
+                - button "Perkecil peta" [ref=e201] [cursor=pointer]: −
+                - button "Reset tampilan peta" [ref=e202] [cursor=pointer]: Reset
+              - application "Peta operasi simulasi Surabaya" [ref=e203]:
+                - generic:
+                  - generic:
+                    - button "⚠️" [ref=e205] [cursor=pointer]:
+                      - generic "Simpang Kupang / Pasar Kembang" [ref=e206]: ⚠️
+                    - button "📷 CCTV A. Yani (Jemursari)" [ref=e207] [cursor=pointer]
+                    - button "🏛️ Pelabuhan Tanjung Perak" [ref=e209] [cursor=pointer]
+                    - button [ref=e211] [cursor=pointer]:
+                      - img "Cluster berisi 2 aset" [ref=e212]:
+                        - generic [aria-hidden] [ref=e213]: "2"
+                    - button [ref=e214] [cursor=pointer]:
+                      - img "Cluster berisi 3 aset" [ref=e215]:
+                        - generic [aria-hidden] [ref=e216]: "3"
+                    - button [ref=e217] [cursor=pointer]:
+                      - img "Cluster berisi 2 aset" [ref=e218]:
+                        - generic [aria-hidden] [ref=e219]: "2"
+                    - button "Simpang A. Yani - Jemursari" [ref=e220] [cursor=pointer]
+                    - button [ref=e221] [cursor=pointer]:
+                      - img "Cluster berisi 2 aset" [ref=e222]:
+                        - generic [aria-hidden] [ref=e223]: "2"
+                    - button [ref=e224] [cursor=pointer]:
+                      - img "Cluster berisi 4 aset" [ref=e225]:
+                        - generic [aria-hidden] [ref=e226]: "4"
+                - generic [ref=e227]:
+                  - link "Leaflet" [ref=e228] [cursor=pointer]:
+                    - /url: https://leafletjs.com
+                  - text: "| ©"
+                  - link "OpenStreetMap" [ref=e233] [cursor=pointer]:
+                    - /url: https://www.openstreetmap.org/copyright
+                  - text: contributors
+              - group [ref=e234]:
+                - generic "Lapisan dan legenda" [ref=e235] [cursor=pointer]
+            - group [ref=e236]:
+              - generic "Cari atau filter simpang pada peta" [ref=e237] [cursor=pointer]
+          - complementary [ref=e238]:
+            - generic [ref=e239]:
+              - generic [ref=e240]:
+                - heading "Antrean prioritas" [level=2] [ref=e241]
+                - paragraph [ref=e242]: Insiden, sinyal, perangkat, dan simulasi darurat.
+              - generic [ref=e243]: SIMULASI
+            - list [ref=e244]:
+              - listitem [ref=e245] [cursor=pointer]:
+                - generic [ref=e246]:
+                  - strong [ref=e247]: Skenario kendaraan mogok
+                  - generic [ref=e248]: Simpang demo 01 · ACTIVE
+                - generic [ref=e249]: Insiden
+              - listitem [ref=e250] [cursor=pointer]:
+                - generic [ref=e251]:
+                  - strong [ref=e252]: A. Yani / Wonokromo
+                  - generic [ref=e253]: Antrean model 320 kendaraan · 6 km/jam
+                - generic [ref=e254]: Antrean
+              - listitem [ref=e255] [cursor=pointer]:
+                - generic [ref=e256]:
+                  - strong [ref=e257]: A. Yani - Jemursari
+                  - generic [ref=e258]: Antrean model 162 kendaraan · 6 km/jam
+                - generic [ref=e259]: Antrean
+              - listitem [ref=e260] [cursor=pointer]:
+                - generic [ref=e261]:
+                  - strong [ref=e262]: Raya Darmo
+                  - generic [ref=e263]: Antrean model 171 kendaraan · 6 km/jam
+                - generic [ref=e264]: Antrean
+              - listitem [ref=e265] [cursor=pointer]:
+                - generic [ref=e266]:
+                  - strong [ref=e267]: Tunjungan - Siola
+                  - generic [ref=e268]: Antrean model 48 kendaraan · 8 km/jam
+                - generic [ref=e269]: Antrean
+              - listitem [ref=e270] [cursor=pointer]:
+                - generic [ref=e271]:
+                  - strong [ref=e272]: Diponegoro
+                  - generic [ref=e273]: Antrean model 41 kendaraan · 10 km/jam
+                - generic [ref=e274]: Antrean
+            - navigation "Halaman operasi terkait" [ref=e275]:
+              - link "Insiden" [ref=e276] [cursor=pointer]:
+                - /url: "#incidents"
+              - link "Sinyal" [ref=e277] [cursor=pointer]:
+                - /url: "#signals"
+              - link "Perangkat" [ref=e278] [cursor=pointer]:
+                - /url: "#devices"
+              - link "Darurat" [ref=e279] [cursor=pointer]:
+                - /url: "#emergency"
+        - region "Aktivitas terbaru" [ref=e280]:
+          - article [ref=e281]:
+            - generic [ref=e282]:
+              - generic [ref=e283]:
+                - heading "Aktivitas terbaru" [level=2] [ref=e284]
+                - paragraph [ref=e285]: Insiden dari sesi simulasi.
+              - link "Lihat semua" [ref=e286] [cursor=pointer]:
+                - /url: "#incidents"
+            - list [ref=e288]:
+              - listitem [ref=e289]:
+                - generic [ref=e291]:
+                  - strong [ref=e292]: Skenario kendaraan mogok
+                  - generic [ref=e293]: Simpang demo 01 · 18.48 WIB · ACTIVE
+              - listitem [ref=e294]:
+                - generic [ref=e296]:
+                  - strong [ref=e297]: Skenario genangan air
+                  - generic [ref=e298]: Koridor demo 02 · 18.38 WIB · ACKNOWLEDGED
+              - listitem [ref=e299]:
+                - generic [ref=e301]:
+                  - strong [ref=e302]: Skenario antrean panjang
+                  - generic [ref=e303]: Simpang demo 03 · 18.43 WIB · ACTIVE
+        - group [ref=e304]:
+          - generic "Kontrol simulasi dan rekomendasi model" [ref=e305] [cursor=pointer]
+  - dialog [aria-hidden] [ref=e306]:
+    - generic [ref=e307]:
+      - generic [ref=e308]:
+        - generic [ref=e309]: 🔔
+        - generic [ref=e310]:
+          - heading [level=3] [ref=e311]: Contoh Skenario Insiden
+          - paragraph [ref=e312]: Data demo, bukan laporan operasional
+      - button [ref=e313] [cursor=pointer]: ×
+    - generic [ref=e314]:
+      - article [ref=e315]:
+        - generic [ref=e316]:
+          - generic [ref=e317]: ⚠️ BARU (Open)
+          - generic [ref=e318]: 18.48 WIB
+        - strong [ref=e319]: Skenario kendaraan mogok - Simpang demo 01
+        - paragraph [ref=e320]: Skenario contoh; tidak ada petugas atau unit derek yang ditugaskan.
+        - generic [ref=e321]:
+          - button [ref=e322] [cursor=pointer]: 📍 Buka di Peta
+          - button [ref=e323] [cursor=pointer]: Akui skenario
+      - article [ref=e324]:
+        - generic [ref=e325]:
+          - generic [ref=e326]: ✓ Diakui · menunggu disposisi
+          - generic [ref=e327]: 18.38 WIB
+        - strong [ref=e328]: Skenario genangan air - Koridor demo 02
+        - paragraph [ref=e329]: Skenario contoh genangan; bukan pengukuran atau laporan lapangan.
+        - generic [ref=e330]:
+          - button [ref=e331] [cursor=pointer]: 📍 Buka di Peta
+          - button [ref=e332] [cursor=pointer]: Disposisi simulasi
+      - article [ref=e333]:
+        - generic [ref=e334]:
+          - generic [ref=e335]: ⚠️ BARU (Open)
+          - generic [ref=e336]: 18.43 WIB
+        - strong [ref=e337]: Skenario antrean panjang - Simpang demo 03
+        - paragraph [ref=e338]: Antrean sintetis 180 meter pada skenario simulator.
+        - generic [ref=e339]:
+          - button [ref=e340] [cursor=pointer]: 📍 Buka di Peta
+          - button [ref=e341] [cursor=pointer]: Akui skenario
+  - status [ref=e343]: ✓ Notifikasi
+  - status
+```

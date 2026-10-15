@@ -26,6 +26,20 @@ const ROOM_ROLES = new Map([
   [REALTIME_ROOMS.ADMIN, [ROLES.ADMIN]],
   [REALTIME_ROOMS.CCTV_ALL, [ROLES.OPERATOR, ROLES.ADMIN]]
 ]);
+const MAX_SOCKETS_PER_USER = 10;
+const activeSocketsByUser = new Map();
+
+function consumeSocketEventBudget(socket, eventName, max, windowMs = 60000) {
+  const now = Date.now();
+  const events = socket.data.eventBudgets || (socket.data.eventBudgets = new Map());
+  let budget = events.get(eventName);
+  if (!budget || now >= budget.resetAt) budget = { count: 0, resetAt: now + windowMs };
+  budget.count += 1;
+  events.set(eventName, budget);
+  if (budget.count <= max) return true;
+  socket.emit('security:rate-limited', { event: eventName, retryAfterMs: budget.resetAt - now });
+  return false;
+}
 
 function isRoomAllowedForRole(room, role) {
   const allowedRoles = ROOM_ROLES.get(room) ||
@@ -99,7 +113,49 @@ export function initializeSocketServer(httpServer, { redisManager = null, leader
 
   // Client Connection Handler
   io.on('connection', (socket) => {
+    const userId = socket.user.id;
+    const userSockets = activeSocketsByUser.get(userId) || new Set();
+    if (userSockets.size >= MAX_SOCKETS_PER_USER) {
+      socket.disconnect(true);
+      return;
+    }
+    userSockets.add(socket.id);
+    activeSocketsByUser.set(userId, userSockets);
     console.log(`🔌 [Socket.io] Client terhubung: ${socket.id} (User: ${socket.user?.name}, Role: ${socket.user?.role})`);
+
+    const validateCurrentAccount = () => {
+      const principal = verifyToken(socket.token);
+      if (!principal || principal.id !== socket.user.id || principal.role !== socket.user.role) {
+        socket.disconnect(true);
+        return false;
+      }
+      socket.user = principal;
+      socket.data.user = principal;
+      return true;
+    };
+    socket.use((_packet, next) => {
+      if (!validateCurrentAccount()) return next(new Error('AUTHENTICATION_FAILED: Akun atau role token tidak lagi aktif.'));
+      return next();
+    });
+    const sessionValidationTimer = setInterval(() => {
+      const principal = verifyToken(socket.token);
+      if (!principal || principal.id !== socket.user.id || principal.role !== socket.user.role) {
+        socket.disconnect(true);
+        return;
+      }
+      tokenRevocationService.isTokenRevoked(socket.token, principal).then((revoked) => {
+        if (revoked) {
+          socket.disconnect(true);
+          return;
+        }
+        socket.user = principal;
+        socket.data.user = principal;
+      }).catch((error) => {
+        console.error('[Socket Event] Gagal memvalidasi sesi:', error.message);
+        socket.disconnect(true);
+      });
+    }, 15000);
+    sessionValidationTimer.unref?.();
 
     // Join only rooms this authenticated role may read.
     if (socket.user?.id) {
@@ -137,6 +193,7 @@ export function initializeSocketServer(httpServer, { redisManager = null, leader
 
     // Dynamic Room Subscription Management (Langkah 4 & 13)
     socket.on('channel:subscribe', (data, callback) => {
+      if (!consumeSocketEventBudget(socket, 'channel:subscribe', 60)) { if (typeof callback === 'function') callback({ success: false, code: 'RATE_LIMITED' }); return; }
       const { channels, room } = data && typeof data === 'object' ? data : {};
       const targetChannels = (Array.isArray(channels) ? channels : (room ? [room] : [])).slice(0, 32);
       const accepted = [];
@@ -155,6 +212,7 @@ export function initializeSocketServer(httpServer, { redisManager = null, leader
     });
 
     socket.on('channel:unsubscribe', (data, callback) => {
+      if (!consumeSocketEventBudget(socket, 'channel:unsubscribe', 60)) { if (typeof callback === 'function') callback({ success: false, code: 'RATE_LIMITED' }); return; }
       const { channels, room } = data && typeof data === 'object' ? data : {};
       const targetChannels = (Array.isArray(channels) ? channels : (room ? [room] : [])).slice(0, 32);
       const accepted = [];
@@ -174,6 +232,7 @@ export function initializeSocketServer(httpServer, { redisManager = null, leader
 
     // 0. Idempotent State Resync
     socket.on('state:resync', (data, callback) => {
+      if (!consumeSocketEventBudget(socket, 'state:resync', 20)) { if (typeof callback === 'function') callback({ success: false, code: 'RATE_LIMITED' }); return; }
       const snapshot = backendState.getSnapshot();
       socket.emit('traffic:init', {
         state: backendState.state,
@@ -199,6 +258,7 @@ export function initializeSocketServer(httpServer, { redisManager = null, leader
 
     // 0.1 Heartbeat Ping-Pong
     socket.on('heartbeat:ping', (data, callback) => {
+      if (!consumeSocketEventBudget(socket, 'heartbeat:ping', 120)) { if (typeof callback === 'function') callback({ success: false, code: 'RATE_LIMITED' }); return; }
       const res = {
         pong: true,
         clientTimestamp: data?.timestamp || null,
@@ -218,6 +278,10 @@ export function initializeSocketServer(httpServer, { redisManager = null, leader
     registerChaosHandlers(io, socket);
 
     socket.on('disconnect', () => {
+      clearInterval(sessionValidationTimer);
+      const currentSockets = activeSocketsByUser.get(userId);
+      currentSockets?.delete(socket.id);
+      if (currentSockets?.size === 0) activeSocketsByUser.delete(userId);
       console.log(`❌ [Socket.io] Client terputus: ${socket.id}`);
     });
   });

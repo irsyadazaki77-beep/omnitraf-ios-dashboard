@@ -7,11 +7,15 @@ export function encodeCsvCell(value) {
 
 export function buildIncidentCsv(incidents, provenance = 'SIMULATED', snapshot = null) {
   const headers = ['ID', 'Waktu', 'Lokasi', 'Judul', 'Kategori', 'Severity', 'Status', 'Unit simulasi', 'Provenance'];
-  if (snapshot) headers.push('Snapshot ID', 'Waktu snapshot');
+  if (snapshot) {
+    headers.unshift('Jenis baris');
+    headers.push('Snapshot ID', 'Waktu snapshot', 'State sumber');
+  }
   const rows = Array.isArray(incidents) ? incidents : [];
   const lines = [headers.map(encodeCsvCell).join(',')];
   for (const incident of rows) {
     lines.push([
+      ...(snapshot ? ['INSIDEN'] : []),
       incident?.id,
       incident?.reportedAt || incident?.createdAt,
       incident?.location,
@@ -21,8 +25,11 @@ export function buildIncidentCsv(incidents, provenance = 'SIMULATED', snapshot =
       incident?.status,
       incident?.assignedUnit,
       provenance,
-      ...(snapshot ? [snapshot.id, snapshot.timestamp] : [])
+      ...(snapshot ? [snapshot.id, snapshot.timestamp, snapshot.stale ? 'STALE' : 'CURRENT'] : [])
     ].map(encodeCsvCell).join(','));
+  }
+  if (snapshot && rows.length === 0) {
+    lines.push(['SNAPSHOT', '', '', '', '', '', '', '', '', provenance, snapshot.id, snapshot.timestamp, snapshot.stale ? 'STALE' : 'CURRENT'].map(encodeCsvCell).join(','));
   }
   return `\uFEFF${lines.join('\r\n')}\r\n`;
 }

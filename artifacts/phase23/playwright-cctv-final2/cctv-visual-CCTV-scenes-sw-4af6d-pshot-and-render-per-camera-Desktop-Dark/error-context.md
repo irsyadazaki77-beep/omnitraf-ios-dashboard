@@ -1,0 +1,219 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: cctv-visual.spec.js >> CCTV scenes switch, remain visible without detections, pause, snapshot and render per camera
+- Location: tests\e2e\cctv-visual.spec.js:7:1
+
+# Error details
+
+```
+Test timeout of 120000ms exceeded.
+```
+
+```
+Error: locator.click: Test timeout of 120000ms exceeded.
+Call log:
+  - waiting for locator('#closeCctvZoomModal')
+    - locator resolved to <button type="button" class="modal-close" id="closeCctvZoomModal" aria-label="Tutup visualisasi kamera">×</button>
+  - attempting click action
+    - scrolling into view if needed
+
+```
+
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - link "Lewati ke konten utama" [ref=e2] [cursor=pointer]:
+    - /url: "#mainContent"
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - link "OmniTRAF home" [ref=e5] [cursor=pointer]:
+        - /url: "#dashboard"
+        - img "Ikon OmniTRAF SITS Surabaya" [ref=e7]
+        - generic [ref=e8]:
+          - img "Logo OmniTRAF Adaptive Urban Mobility System" [ref=e9]
+          - generic [ref=e10]: Surabaya Command Center
+      - button "Ciutkan sidebar" [expanded] [ref=e11] [cursor=pointer]:
+        - generic [ref=e14]: Collapse sidebar
+      - button "Cari halaman Ctrl K" [ref=e15] [cursor=pointer]:
+        - generic [ref=e20]:
+          - text: Cari halaman
+          - generic [ref=e21]: Ctrl K
+      - navigation "Primary navigation" [ref=e22]:
+        - region [ref=e23]:
+          - heading "Operasi" [level=2] [ref=e24]
+          - link "Ikhtisar" [ref=e25] [cursor=pointer]:
+            - /url: "#dashboard"
+          - link "Peta kota" [ref=e33] [cursor=pointer]:
+            - /url: "#map"
+          - link "Digital Twin 3D" [ref=e39] [cursor=pointer]:
+            - /url: "#city3d"
+            - generic [aria-hidden] [ref=e40]: 3D
+          - link "Insiden" [ref=e42] [cursor=pointer]:
+            - /url: "#incidents"
+          - link "Darurat" [ref=e47] [cursor=pointer]:
+            - /url: "#emergency"
+        - region [ref=e52]:
+          - heading "Pemantauan" [level=2] [ref=e53]
+          - link "CCTV" [ref=e54] [cursor=pointer]:
+            - /url: "#cctv"
+          - link "Sinyal" [ref=e61] [cursor=pointer]:
+            - /url: "#signals"
+          - link "Perangkat" [ref=e69] [cursor=pointer]:
+            - /url: "#devices"
+        - region [ref=e75]:
+          - heading "Analitik & prediksi" [level=2] [ref=e76]
+          - link "Analitik" [ref=e77] [cursor=pointer]:
+            - /url: "#analytics"
+          - link "Scenario Lab" [ref=e83] [cursor=pointer]:
+            - /url: "#prediction"
+          - button "Intelijen sinyal" [ref=e89] [cursor=pointer]
+          - link "Laporan" [ref=e94] [cursor=pointer]:
+            - /url: "#reports"
+            - generic [aria-hidden] [ref=e95]: ▤
+        - region [ref=e97]:
+          - heading "Sistem" [level=2] [ref=e98]
+          - link "Integrasi" [ref=e99] [cursor=pointer]:
+            - /url: "#integration"
+          - link "Pengaturan" [ref=e105] [cursor=pointer]:
+            - /url: "#settings"
+          - link "Arsitektur sistem" [ref=e109] [cursor=pointer]:
+            - /url: "#about-engine"
+    - main [ref=e114]:
+      - generic "Navigasi halaman" [ref=e115]:
+        - generic [ref=e117]:
+          - generic [ref=e118]: OMNITRAF · SIMULASI
+          - strong [ref=e119]: Pemantauan CCTV
+        - generic "Aksi utama" [ref=e120]:
+          - button "Cari Ctrl K" [ref=e121] [cursor=pointer]:
+            - generic [aria-hidden] [ref=e122]: ⌕
+            - generic [ref=e123]: Cari
+            - generic [ref=e124]: Ctrl K
+          - generic "Status prototipe OmniTRAF" [ref=e125]:
+            - generic [ref=e126]: Rabu, 14 Okt 2026 | 10.56 WIB
+            - strong [ref=e129]: Server simulasi lambat
+          - generic [ref=e130]:
+            - button "Ganti ke tema terang" [ref=e131] [cursor=pointer]:
+              - generic [aria-hidden] [ref=e132]: ☾
+            - 'button "Active scenario notifications: 3" [ref=e133] [cursor=pointer]':
+              - generic [ref=e137]: "3"
+            - group [ref=e138]:
+              - generic "Aksi lainnya" [ref=e139] [cursor=pointer]: ···
+          - button "Sesi Operator Demo. Kontrol keluar tersedia di navigasi." [ref=e140] [cursor=pointer]:
+            - generic [aria-hidden] [ref=e142]: OD
+            - generic [ref=e143]:
+              - strong [ref=e144]: Operator Demo
+              - generic [ref=e145]: Operator
+          - button "Keluar" [ref=e146] [cursor=pointer]
+      - group "Batas simulasi" [ref=e147]:
+        - generic [ref=e148] [cursor=pointer]:
+          - strong [ref=e149]: SIMULASI
+          - text: Data sintetis · tanpa kendali perangkat lapangan
+      - status [ref=e150]:
+        - generic [ref=e151]:
+          - generic [aria-hidden] [ref=e152]: 📡
+          - generic [ref=e153]:
+            - strong [ref=e154]: Stream simulator melambat
+            - text: — Data mungkin terlambat diperbarui.
+        - button "Tutup pemberitahuan offline" [ref=e155] [cursor=pointer]: ×
+      - generic [ref=e158]:
+        - generic [ref=e159]:
+          - generic [ref=e160]:
+            - paragraph [ref=e161]: OMNITRAF · FEED VISI SIMULASI
+            - heading "Pemantauan CCTV" [level=1] [ref=e162]
+            - paragraph [ref=e163]: Pilih kamera untuk melihat visual dan deteksi sintetis.
+          - generic [ref=e164]: SIMULASI · BUKAN FEED LAPANGAN
+        - generic [ref=e165]:
+          - generic [ref=e166]:
+            - generic [aria-hidden] [ref=e167]: ⌕
+            - searchbox "Cari kamera berdasarkan nama atau lokasi" [ref=e168]
+          - button "⏸ Jeda" [ref=e169] [cursor=pointer]:
+            - generic [ref=e170]: ⏸
+            - text: Jeda
+          - button "Perbesar" [ref=e171] [cursor=pointer]:
+            - generic [aria-hidden] [ref=e172]: ⤢
+            - text: Perbesar
+          - button "▣ Cuplikan demo" [ref=e173] [cursor=pointer]:
+            - generic [ref=e174]: ▣
+            - text: Cuplikan demo
+          - group [ref=e175]:
+            - generic "Opsi tampilan" [ref=e176] [cursor=pointer]
+            - option "Pagi"
+            - option "Siang"
+            - option "Sore"
+            - option "Malam" [selected]
+            - option "Cerah"
+            - option "Mendung"
+            - option "Hujan ringan"
+            - option "Hujan lebat" [selected]
+        - generic [ref=e177]:
+          - generic [ref=e178]:
+            - text: · · · · · · · · ·
+            - generic [ref=e179]:
+              - generic [ref=e180]:
+                - generic [ref=e181]:
+                  - generic [ref=e182]: CAM 04
+                  - heading "Simpang Jemursari" [level=3] [ref=e183]
+                - generic [ref=e184]:
+                  - button "📸 Cuplikan demo" [ref=e185] [cursor=pointer]:
+                    - generic [ref=e186]: 📸
+                    - text: Cuplikan demo
+                  - generic [ref=e187]: Active
+              - generic [ref=e189]: · · ·
+          - complementary "Daftar kamera simulasi" [ref=e191]:
+            - heading "Kamera" [level=2] [ref=e192]
+            - group "Pilih kamera simulasi" [ref=e193]:
+              - button "01 · Simpang Wonokromo" [ref=e194] [cursor=pointer]
+              - button "02 · Koridor Raya Darmo" [ref=e195] [cursor=pointer]
+              - button "03 · Bundaran Waru" [ref=e196] [cursor=pointer]
+              - button "04 · Simpang Jemursari" [pressed] [ref=e197] [cursor=pointer]
+            - paragraph [ref=e198]: Seluruh visual dan deteksi dibuat oleh simulator lokal.
+  - dialog [aria-hidden] [ref=e199]:
+    - generic [ref=e200]:
+      - generic [ref=e201]:
+        - generic [ref=e202]: 🔔
+        - generic [ref=e203]:
+          - heading [level=3] [ref=e204]: Contoh Skenario Insiden
+          - paragraph [ref=e205]: Data demo, bukan laporan operasional
+      - button [ref=e206] [cursor=pointer]: ×
+    - generic [ref=e207]:
+      - article [ref=e208]:
+        - strong [ref=e209]: Skenario kendaraan mogok
+        - paragraph [ref=e210]: Simpang demo 01 · ACTIVE
+        - paragraph [ref=e211]: Skenario contoh; tidak ada petugas atau unit derek yang ditugaskan.
+        - link [ref=e212] [cursor=pointer]:
+          - /url: "#incidents"
+          - text: Buka daftar insiden
+      - article [ref=e213]:
+        - strong [ref=e214]: Skenario genangan air
+        - paragraph [ref=e215]: Koridor demo 02 · ACKNOWLEDGED
+        - paragraph [ref=e216]: Skenario contoh genangan; bukan pengukuran atau laporan lapangan.
+        - link [ref=e217] [cursor=pointer]:
+          - /url: "#incidents"
+          - text: Buka daftar insiden
+      - article [ref=e218]:
+        - strong [ref=e219]: Skenario antrean panjang
+        - paragraph [ref=e220]: Simpang demo 03 · ACTIVE
+        - paragraph [ref=e221]: Antrean sintetis 180 meter pada skenario simulator.
+        - link [ref=e222] [cursor=pointer]:
+          - /url: "#incidents"
+          - text: Buka daftar insiden
+  - generic [ref=e223]:
+    - status [ref=e224]: ✓ Notifikasi
+    - dialog [ref=e225]:
+      - generic [ref=e226]:
+        - button "Tutup visualisasi kamera" [active] [ref=e227] [cursor=pointer]: ×
+        - generic [ref=e228]:
+          - heading "CAM-04 · Simpang Jemursari" [level=2] [ref=e229]
+          - paragraph [ref=e230]: Jl. Jemursari - Margorejo, Surabaya · Pembaruan simulasi 10.55.57. Bukan feed CCTV lapangan.
+  - status:
+    - status [ref=e234]:
+      - generic [ref=e235]: ⚠
+      - generic [ref=e236]: Penundaan koneksi data terdeteksi. Mencoba ulang...
+```

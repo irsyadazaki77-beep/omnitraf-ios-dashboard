@@ -94,7 +94,9 @@ export class SpatialStateSync {
             className: 'emergency-route-active'
           }).addTo(simGroup);
 
-          map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50], maxZoom: 15 });
+          if (typeof L.latLngBounds === 'function') {
+            map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50], maxZoom: 15 });
+          }
         }
       });
 
@@ -109,7 +111,7 @@ export class SpatialStateSync {
       }
 
       const iconHtml = `
-        <div style="position: relative; width: 44px; height: 28px;">
+        <div class="csp-style-2a2d99efe3" >
           <div class="amb-radar-ring ${isPmk ? 'pmk' : ''}"></div>
           <div class="amb-radar-ring ring-delay ${isPmk ? 'pmk' : ''}"></div>
           <div class="amb-siren-beacon">
@@ -157,9 +159,8 @@ export class SpatialStateSync {
   syncIncidents(layerGroupsMap, incidents) {
     if (!Array.isArray(incidents)) return;
 
-    const terminalStatuses = new Set(['RESOLVED', 'ARCHIVED', 'CLOSED', 'CANCELLED']);
     const projectedIncidents = incidents
-      .filter(inc => !terminalStatuses.has(String(inc.status || '').toUpperCase()))
+      .filter(inc => !inc.roadImpactRecoveredAt && inc.roadImpactRecovered !== true)
       .map(toIncidentMarkerProjection);
 
     layerGroupsMap.forEach((groups) => {

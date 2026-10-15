@@ -3,11 +3,12 @@ import { authenticateAs, logoutUser } from './fixtures/auth.fixture.js';
 import { TEST_USERS } from './fixtures/test-data.js';
 import { waitForViewReady } from './fixtures/simulation.fixture.js';
 
-test.describe('E2E Full Lifecycle: Login -> 12 Views Navigation -> RBAC Verification -> Logout', () => {
+test.describe('E2E Full Lifecycle: Login -> 13 Views Navigation -> RBAC Verification -> Logout', () => {
   const VIEWS_SEQUENCE = [
     { name: 'Dashboard', hash: '#dashboard', id: 'view-dashboard' },
     { name: 'Map', hash: '#map', id: 'view-map' },
     { name: 'CCTV', hash: '#cctv', id: 'view-cctv' },
+    { name: 'City3D', hash: '#city3d', id: 'view-city3d' },
     { name: 'Signals', hash: '#signals', id: 'view-signals' },
     { name: 'Incidents', hash: '#incidents', id: 'view-incidents' },
     { name: 'Emergency', hash: '#emergency', id: 'view-emergency' },
@@ -19,7 +20,7 @@ test.describe('E2E Full Lifecycle: Login -> 12 Views Navigation -> RBAC Verifica
     { name: 'Settings', hash: '#settings', id: 'view-settings' },
   ];
 
-  test('complete operator journey across all 12 views followed by session logout', async ({ page }) => {
+  test('complete operator journey across all 13 workspaces followed by session logout', async ({ page }) => {
     // 1. Login as Operator
     await authenticateAs(page, 'OPERATOR');
     await page.goto('/#dashboard');

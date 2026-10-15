@@ -63,7 +63,7 @@ tbody tr.active-row-highlight {
 }
 
 .tag-high {
-  color: var(--danger);
+  color: var(--status-danger);
   font-weight: 600;
   display: inline-flex;
   align-items: center;

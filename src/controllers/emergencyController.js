@@ -11,6 +11,7 @@ import { trafficEngine } from '../modules/trafficEngine.js';
 import { commandLayer } from '../core/commandLayer.js';
 import { Disposer } from '../core/disposer.js';
 import { authManager } from '../core/authManager.js';
+import { planEmergencyRoutes } from '../modules/trafficModel.js';
 
 export class EmergencyController {
   constructor() {
@@ -154,8 +155,18 @@ export class EmergencyController {
     const route = document.getElementById('respRoute');
     const target = document.getElementById('gwSelectedRoute');
     const vehicle = document.getElementById('gwSelectedVehicle');
-    if (target) target.textContent = route?.selectedOptions[0]?.textContent || 'Koridor A. Yani–Darmo';
+    const routePlan = planEmergencyRoutes(stateStore.getState(), { routeId: route?.value });
+    const selectedRoute = routePlan.routes.find(item => item.routeId === route?.value) || routePlan.routes.find(item => item.routeId === routePlan.recommendedRouteId);
+    if (target) target.textContent = selectedRoute?.label || route?.selectedOptions[0]?.textContent || 'Koridor simulasi';
     if (vehicle) vehicle.textContent = document.getElementById('respName')?.value.trim() || 'AMB-112';
+    const eta = document.getElementById('gwEstimatedEta');
+    const recommendation = document.getElementById('gwRouteRecommendation');
+    const reason = document.getElementById('gwRouteReason');
+    const impact = document.getElementById('gwTrafficImpact');
+    if (eta) eta.textContent = selectedRoute ? `±${selectedRoute.travelTimeMinutes} menit · ${selectedRoute.averageSpeedKmh} km/jam` : 'Estimasi tidak tersedia';
+    if (recommendation) recommendation.textContent = selectedRoute?.routeId === routePlan.recommendedRouteId ? 'Rute dengan estimasi tercepat' : 'Rute alternatif yang dipilih';
+    if (reason) reason.textContent = selectedRoute ? `${selectedRoute.reason} Hambatan utama: ${selectedRoute.bottleneck}.` : 'Tidak ada rute yang dapat dinilai; route fallback server tetap tersedia.';
+    if (impact) impact.textContent = `Prioritas model pada jaringan: ${routePlan.trafficImpact.queueDeltaVehicles > 0 ? '+' : ''}${routePlan.trafficImpact.queueDeltaVehicles} kendaraan antrean; perubahan waktu rata-rata ${routePlan.trafficImpact.travelTimeDeltaMinutes > 0 ? '+' : ''}${routePlan.trafficImpact.travelTimeDeltaMinutes} menit. Perkiraan ini deterministik (seed ${routePlan.seed}).`;
 
     modal.style.display = "flex";
     modal.classList.add("show");
@@ -183,7 +194,7 @@ export class EmergencyController {
       const respRoute = document.getElementById("respRoute")?.value || "route-yani-darmo";
       const respName = document.getElementById("respName")?.value.trim() || "AMB-112";
 
-      await commandLayer.dispatchCommand({
+      const outcome = await commandLayer.dispatchCommand({
         action: 'emergency:activate',
         targetType: 'emergency',
         targetId: respName,
@@ -192,7 +203,7 @@ export class EmergencyController {
 
       this.remainingGreenWaveSec = durationSec;
       if (typeof window.showToast === "function") {
-        window.showToast(`Skenario prioritas ${respRoute.replace('route-', '').toUpperCase()} aktif di simulator; 112, GPS, dan APILL tidak terhubung.`, "warning");
+        window.showToast(`Acknowledgment server diterima (${outcome.commandId}). Skenario prioritas aktif pada model; tidak ada 112, GPS, atau APILL nyata yang terhubung.`, "warning");
       }
     } catch (err) {
       throw err;
@@ -371,6 +382,12 @@ export class EmergencyController {
 
     if (!emergencyListGrid) return;
 
+    // Keep contextual navigation and keyboard focus stable when telemetry
+    // refreshes an emergency card while the operator is reviewing it.
+    const focusedCard = document.activeElement?.closest?.('#emergencyListGrid [data-emergency-id]');
+    const focusedEmergencyId = focusedCard?.dataset.emergencyId || null;
+    const currentEmergencyId = emergencyListGrid.querySelector('[aria-current="location"][data-emergency-id]')?.dataset.emergencyId || null;
+
     emergencyListGrid.innerHTML = "";
 
     const list = Array.isArray(activeEmergencies) ? activeEmergencies.filter(e => (e.vehicleId || e.id) && !['ARRIVED', 'COMPLETED', 'CANCELLED', 'TERMINAL_ARCHIVED'].includes(String(e.status).toUpperCase())) : [];
@@ -426,6 +443,7 @@ export class EmergencyController {
       card.className = `emergency-card-item ${isFinished ? 'is-finished' : ''}`;
       card.dataset.emergencyId = String(emg.vehicleId || emg.id);
       card.tabIndex = -1;
+      if (card.dataset.emergencyId === currentEmergencyId) card.setAttribute('aria-current', 'location');
       card.innerHTML = `
         <div class="em-header">
           <span class="badge-em ${isPmk ? 'amber' : 'red'}">${safeVehicleId} · ${safeVehicleType}</span>
@@ -441,6 +459,10 @@ export class EmergencyController {
       `;
       emergencyListGrid.appendChild(card);
     });
+
+    if (focusedEmergencyId) {
+      emergencyListGrid.querySelector(`[data-emergency-id="${CSS.escape(focusedEmergencyId)}"]`)?.focus({ preventScroll: true });
+    }
   }
 }
 

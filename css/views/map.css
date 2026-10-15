@@ -1174,3 +1174,8 @@
   .map-weather-micro-widget { top: 64px; }
   .map-floating-toolbar { max-width: calc(100% - 28px); }
 }
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .55; transform: scale(.82); }
+}

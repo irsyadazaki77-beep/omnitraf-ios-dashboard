@@ -20,6 +20,7 @@ class City3DController {
     this._bindControls();
     this.disposer.addStoreSubscription(stateStore, 'state:changed', () => { this.scene?.updateState(stateStore.getState()); this.setStatus(); });
     this.disposer.addStoreSubscription(stateStore, 'state:resynced', () => { this.scene?.updateState(stateStore.getState()); this.setStatus(); });
+    this.disposer.addStoreSubscription(stateStore, 'state:cctvVisionData', ({ value }) => { this.scene?.syncCctvVehicles(value); this.setStatus(value); });
     this.disposer.addEventListener(window, 'omnitraf:entity-focus', (event) => {
       if (event.detail?.route !== 'city3d') return;
       const state = stateStore.getState();
@@ -37,6 +38,22 @@ class City3DController {
       this.scene = new City3DScene(host, {
         onFallback: () => { if (fallback) fallback.hidden = false; },
         onFps: (fps) => { const label = document.getElementById('city3dFps'); if (label) label.textContent = `${fps} FPS`; },
+        onPerformance: (metrics) => this.renderPerformance(metrics),
+        onLocationIntegrity: ({ unmappedCount }) => {
+          const label = document.getElementById('city3dLocationStatus');
+          if (label) label.textContent = unmappedCount ? `${unmappedCount} lokasi belum dipetakan` : 'Semua lokasi terpetakan';
+        },
+        onVehicleFrame: (frame) => {
+          const status = document.getElementById('city3dVehicleFrame');
+          if (status) {
+            status.textContent = `SIMULATED · frame ${frame.sequence} · ${frame.vehicleCount} agen${frame.timestamp ? ` · ${new Date(frame.timestamp).toLocaleTimeString()}` : ''}`;
+            status.dataset.vehicleIds = frame.vehicleIds.join(',');
+          }
+        },
+        onContextLost: () => {
+          if (fallback) { fallback.querySelector('strong').textContent = 'WebGL context terputus.'; fallback.querySelector('span').textContent = 'Peta 2D tetap tersedia; scene 3D akan mencoba pulih saat browser memulihkan context.'; fallback.hidden = false; }
+        },
+        onContextRestored: () => { if (fallback) fallback.hidden = true; },
         onCamera: (camera) => this.renderCameraPreview(camera),
         onSelect: (entity) => {
           if (entity.kind === 'camera') {
@@ -75,6 +92,8 @@ class City3DController {
     }));
     const cameraSelect = document.getElementById('city3dCameraSelect');
     if (cameraSelect) this.disposer.addEventListener(cameraSelect, 'change', () => this.scene?.setVirtualCamera(cameraSelect.value));
+    const qualitySelect = document.getElementById('city3dQuality');
+    if (qualitySelect) this.disposer.addEventListener(qualitySelect, 'change', () => this.scene?.setQuality(qualitySelect.value));
     const reset = document.getElementById('city3dResetCamera');
     if (reset) this.disposer.addEventListener(reset, 'click', () => {
       this.scene?.setView('isometric');
@@ -88,7 +107,19 @@ class City3DController {
   setStatus() {
     const state = stateStore.getState();
     const status = document.getElementById('city3dDataStatus');
-    if (status) status.textContent = state.isStaleData ? 'SIMULATED · STATE STALE' : `SIMULATED · ${state.connectionStatus === 'connected' ? 'STREAM SIMULATOR' : 'SIMULATOR LOCAL'}`;
+    if (status) {
+      const mode = state.isStaleData ? 'STALE' : state.connectionStatus === 'connected' ? 'ACTIVE' : 'OFFLINE';
+      status.textContent = `SIMULATED · ${mode}`;
+      status.dataset.status = mode.toLowerCase();
+    }
+  }
+
+  renderPerformance(metrics) {
+    const label = document.getElementById('city3dPerf');
+    if (!label) return;
+    const gpu = metrics.gpuMs == null ? 'GPU n/a' : `GPU ${metrics.gpuMs.toFixed(1)}ms`;
+    label.textContent = `CPU ${metrics.cpuMs.toFixed(1)}ms · p95 ${Number(metrics.frameTimeP95Ms || 0).toFixed(1)}ms · ${gpu} · ${metrics.drawCalls} draw · ${metrics.geometries}g/${metrics.textures}t`;
+    label.title = `${metrics.triangles} triangles · ${metrics.quality} · render scale ${metrics.pixelRatio.toFixed(2)} · frame-time p95 from the last 90 rendered frames`;
   }
 
   renderCameraPreview(camera) {
@@ -115,7 +146,7 @@ class City3DController {
       : kind === 'incident' ? [['Status', data.status || 'ACTIVE'], ['Severity', data.severity || '—'], ['Lokasi', data.location || '—']]
         : kind === 'camera' ? [['Feed', 'Virtual view'], ['Provenance', 'SIMULATED'], ['Intersection', entity.nodeId || 'Representasi scene']]
           : kind === 'device' ? [['Status', data.status || data.healthLevel || '—'], ['Provenance', 'SIMULATED']]
-            : [['Tipe', entity.type || 'kendaraan'], ['Kecepatan animasi', `${Math.round((entity.speed || 0) * 10)} unit visual`], ['Sumber', 'Agen sintetis']];
+            : [['ID agen', entity.id || '—'], ['Tipe', entity.type || 'kendaraan'], ['Kecepatan model', entity.speedKmh == null ? '—' : `${entity.speedKmh} km/jam`], ['Arah', entity.direction == null ? '—' : entity.direction < 0 ? 'Berlawanan' : 'Normal'], ['Sumber', 'SIMULATED · CCTV shared snapshot']];
     properties.replaceChildren(...rows.map(([label, value]) => { const row = document.createElement('div'); const dt = document.createElement('dt'); const dd = document.createElement('dd'); dt.textContent = label; dd.textContent = String(value); row.append(dt, dd); return row; }));
     links.replaceChildren();
     const route = kind === 'intersection' ? 'signals' : kind === 'incident' ? 'incidents' : kind === 'camera' ? 'cctv' : kind === 'device' ? 'devices' : null;

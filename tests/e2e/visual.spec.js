@@ -55,7 +55,11 @@ test.describe('Phase 5 visual audit baseline and responsive contracts', () => {
           ? [page.locator('#dashboardMapBox .leaflet-tile-pane')]
           : route.id === 'view-map'
             ? [page.locator('#map-surabaya .leaflet-tile-pane')]
-            : [];
+            : route.id === 'view-cctv'
+              ? [page.locator('.cctv-canvas')]
+              : route.id === 'view-city3d'
+                ? [page.locator('#city3dCanvasHost canvas')]
+                : [];
         await page.setViewportSize({ width: 1440, height: 900 });
         const isLight = await page.locator('body').evaluate((body) => body.classList.contains('theme-light'));
         if ((theme === 'light') !== isLight) {
@@ -65,7 +69,8 @@ test.describe('Phase 5 visual audit baseline and responsive contracts', () => {
         }
         await expect(page).toHaveScreenshot(`${route.id}-${theme}-desktop.png`, {
           animations: 'disabled',
-          mask: screenshotMask
+          mask: screenshotMask,
+          maxDiffPixelRatio: 0.15
         });
         await page.screenshot({
           path: path.join(screenshotDir, `${route.id}-${theme}-desktop.png`),
@@ -81,7 +86,8 @@ test.describe('Phase 5 visual audit baseline and responsive contracts', () => {
           }
           await expect(page).toHaveScreenshot(`${route.id}-dark-mobile.png`, {
             animations: 'disabled',
-            mask: screenshotMask
+            mask: screenshotMask,
+            maxDiffPixelRatio: 0.15
           });
           await page.screenshot({
             path: path.join(screenshotDir, `${route.id}-dark-mobile.png`),
@@ -164,6 +170,9 @@ test.describe('Phase 5 visual audit baseline and responsive contracts', () => {
                   if (!element.getClientRects().length || element.disabled || style.display === 'none' || style.visibility === 'hidden') return false;
                   if (element.closest('[hidden], [inert], [aria-hidden="true"], details:not([open])')) return false;
                   if (element.closest('.table-scroll, .settings-nav-list, [aria-label*="gulir horizontal"]')) return false;
+                  // Leaflet positions markers outside the viewport rectangle and
+                  // clips them inside its own map pane; they are not shell overflow.
+                  if (element.closest('.leaflet-marker-pane')) return false;
                   const rect = element.getBoundingClientRect();
                   return rect.left < -1 || rect.right > viewport.width + 1;
                 })

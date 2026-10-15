@@ -10,9 +10,12 @@
  * @param {import('@playwright/test').Page} page
  */
 export async function stabilizeVisualState(page) {
-  // 1. Inject CSS to stop non-essential CSS animations, blinking, marquee
-  await page.addStyleTag({
-    content: `
+  // 1. Load the deterministic test overrides as a same-origin stylesheet so
+  // the production CSP can keep inline styles disabled.
+  await page.route('**/__e2e/stabilize.css', (route) => route.fulfill({
+    status: 200,
+    contentType: 'text/css; charset=utf-8',
+    body: `
       *, *::before, *::after {
         animation-duration: 0.001s !important;
         animation-iteration-count: 1 !important;
@@ -26,7 +29,9 @@ export async function stabilizeVisualState(page) {
         display: none !important;
       }
     `
-  });
+  }));
+  const origin = new URL(page.url()).origin;
+  await page.addStyleTag({ url: `${origin}/__e2e/stabilize.css` });
 
   // 2. Wait for fonts to finish loading
   await page.evaluate(async () => {

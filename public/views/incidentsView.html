@@ -55,7 +55,8 @@
                 <header class="entity-inspector-header"><div><p class="eyebrow">DETAIL INSIDEN</p><h2 id="incidentInspectorTitle">Pilih insiden</h2></div><button type="button" class="entity-inspector-close" id="btnCloseIncidentInspector" aria-label="Tutup detail insiden">×</button></header>
                 <p class="entity-inspector-summary" id="incidentInspectorSummary">Pilih item pada daftar untuk melihat detail.</p>
                 <dl class="entity-inspector-properties" id="incidentInspectorProperties"></dl>
-                <div class="entity-inspector-actions"><button class="btn btn-secondary" type="button" id="btnIncidentOpenMap">Lihat di peta</button><button class="btn btn-secondary" type="button" id="btnIncidentOpenCctv" hidden>Lihat kamera terkait</button><button class="btn btn-primary" type="button" id="btnIncidentInspectorAction" hidden></button></div>
+                <p class="incident-road-impact-hint" id="incidentRoadImpactHint">Status workflow dan dampak jalan dicatat terpisah. Dampak model hanya berhenti setelah pemulihan jalan dikonfirmasi di simulator.</p>
+                <div class="entity-inspector-actions"><button class="btn btn-secondary" type="button" id="btnIncidentOpenMap">Lihat di peta</button><button class="btn btn-secondary" type="button" id="btnIncidentOpenCctv" hidden>Lihat kamera terkait</button><button class="btn btn-primary" type="button" id="btnIncidentInspectorAction" hidden></button><button class="btn btn-secondary" type="button" id="btnIncidentMarkRoadRecovered" aria-describedby="incidentRoadImpactHint" disabled title="Pilih insiden terlebih dahulu">Tandai jalan pulih (simulasi)</button></div>
               </aside>
             </div>
         </article>

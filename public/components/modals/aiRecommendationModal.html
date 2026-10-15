@@ -1,66 +1,66 @@
-<div class="modal-overlay" id="aiRecommendationModal" role="dialog" aria-modal="true" aria-labelledby="aiRecModalTitle" style="display: none; background: rgba(3, 8, 14, 0.75); backdrop-filter: blur(12px);">
-  <div class="modal-content glass-panel ios-sheet-modal" style="max-width: 520px; width: 92%; border: 1px solid var(--border-glow); background: rgba(13, 22, 38, 0.92); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);">
+<div class="modal-overlay csp-style-2ed38af434" id="aiRecommendationModal" role="dialog" aria-modal="true" aria-labelledby="aiRecModalTitle" >
+  <div class="modal-content glass-panel ios-sheet-modal csp-style-83b9ef56b9" >
     <button class="modal-close" id="closeAiRecModal" aria-label="Tutup modal Rekomendasi AI">&times;</button>
     
-    <div class="modal-header" style="border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px;">
-      <div class="modal-kicker-row" style="display: flex; align-items: center; gap: 8px;">
-        <span class="pill pill-ai" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">Skenario alokasi hijau</span>
-        <span class="unboxed-meta-sep" style="color: var(--text-muted);">·</span>
+    <div class="modal-header csp-style-f7c3b547f7" >
+      <div class="modal-kicker-row csp-style-378e76576a" >
+        <span class="pill pill-ai csp-style-8e7225a8df" >Skenario alokasi hijau</span>
+        <span class="unboxed-meta-sep csp-style-9d21da37c4" >·</span>
         <span class="cctv-live-tag">MODEL SIMULASI</span>
       </div>
-      <h2 id="aiRecModalTitle" style="margin: 8px 0 4px 0; font-size: 18px; font-weight: 700; color: var(--text);">Pratinjau skenario green split</h2>
-      <p style="margin: 0; font-size: 12.5px; color: var(--text-muted);">Pratinjau perubahan green split dalam simulator. Arus jenuh dan dampak waktu tunggu belum tersedia; hasil bukan optimasi Webster terkalibrasi.</p>
+      <h2 id="aiRecModalTitle" class="csp-style-31c0d9023f" >Pratinjau skenario green split</h2>
+      <p class="csp-style-d055627935" >Pratinjau perubahan green split dalam simulator. Arus jenuh dan dampak waktu tunggu belum tersedia; hasil bukan optimasi Webster terkalibrasi.</p>
     </div>
 
-    <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px;">
+    <div class="modal-body csp-style-ff69c307f1" >
       <!-- Parameter Metric Comparison Card -->
-      <div class="glass-soft" style="padding: 14px; border-radius: 12px; border: 1px solid var(--border); background: rgba(255, 255, 255, 0.03);">
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
+      <div class="glass-soft csp-style-ba35854226" >
+        <div class="csp-style-937313af0a" >
           
-          <div style="background: var(--panel-soft); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);">
-            <span style="font-size: 11px; color: var(--text-muted); display: block;">Volume Kepadatan Arus (q)</span>
-            <strong id="aiRecVolumeQ" style="font-size: 16px; color: var(--cyan); font-family: var(--font-mono, monospace);">2,450 smp/jam</strong>
-            <small style="display: block; font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">Rasio Saturasi (q/s): <span id="aiRecFlowRatio">belum diukur</span></small>
+          <div class="csp-style-889df04d94" >
+            <span class="csp-style-e46a6c2264" >Volume Kepadatan Arus (q)</span>
+            <strong id="aiRecVolumeQ" class="csp-style-a3f0add733" >2,450 smp/jam</strong>
+            <small class="csp-style-30c973d5bf" >Rasio Saturasi (q/s): <span id="aiRecFlowRatio">belum diukur</span></small>
           </div>
 
-          <div style="background: var(--panel-soft); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);">
-            <span style="font-size: 11px; color: var(--text-muted); display: block;">Estimasi Hemat Waktu Tunggu</span>
-            <strong id="aiRecDelaySaved" style="font-size: 16px; color: var(--success); font-family: var(--font-mono, monospace);">Belum dievaluasi</strong>
-            <small style="display: block; font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">Reduksi Tunda Rata-rata</small>
+          <div class="csp-style-889df04d94" >
+            <span class="csp-style-e46a6c2264" >Estimasi Hemat Waktu Tunggu</span>
+            <strong id="aiRecDelaySaved" class="csp-style-cdb166edb1" >Belum dievaluasi</strong>
+            <small class="csp-style-30c973d5bf" >Reduksi Tunda Rata-rata</small>
           </div>
 
         </div>
 
-        <div style="background: var(--panel-soft); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-            <span style="font-size: 11.5px; color: var(--text-muted);">Durasi terjadwal vs skenario:</span>
-            <strong id="aiRecSplitDiff" style="font-size: 12.5px; color: var(--primary-2);">Belum tersedia</strong>
+        <div class="csp-style-d5266a9803" >
+          <div class="csp-style-afe7b82785" >
+            <span class="csp-style-0b61ee3cec" >Durasi terjadwal vs skenario:</span>
+            <strong id="aiRecSplitDiff" class="csp-style-bd2b3ff9bb" >Belum tersedia</strong>
           </div>
           
           <!-- Visual Split Comparison Bar -->
-          <div style="height: 8px; width: 100%; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; display: flex; margin-top: 6px;">
-            <div id="aiRecBarOld" style="width: 38.8%; background: var(--amber); height: 100%; transition: width 0.3s;" title="Split Awal"></div>
-            <div id="aiRecBarNew" style="width: 0%; background: var(--success); height: 100%; transition: width 0.3s;" title="Penambahan green split dalam simulasi"></div>
+          <div class="csp-style-0a7b8a0721" >
+            <div id="aiRecBarOld" title="Split Awal" class="csp-style-fc36c88d04"></div>
+            <div id="aiRecBarNew" title="Penambahan green split dalam simulasi" class="csp-style-0f9294e489"></div>
           </div>
-          <div style="display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-muted); margin-top: 4px;">
-            <span>Awal: <strong id="aiRecOldText" style="color: var(--amber);">—</strong></span>
-            <span>Skenario: <strong id="aiRecNewText" style="color: var(--success);">—</strong></span>
+          <div class="csp-style-51acc5a798" >
+            <span>Awal: <strong id="aiRecOldText" class="csp-style-80223951ea" >—</strong></span>
+            <span>Skenario: <strong id="aiRecNewText" class="csp-style-594cc49b9c" >—</strong></span>
           </div>
         </div>
       </div>
 
       <!-- Smooth Transition Notice -->
-      <div style="padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.08); display: flex; gap: 10px; align-items: flex-start;">
-        <span style="font-size: 16px;">🔄</span>
-        <p style="margin: 0; font-size: 11.5px; color: var(--text-muted); line-height: 1.45;">
-          <strong style="color: var(--text);">Perubahan lokal simulasi:</strong> Nilai kandidat hanya memperbarui state demo setelah dikonfirmasi; tidak ada komunikasi ke APILL fisik.
+      <div class="csp-style-9d53fefd26" >
+        <span class="csp-style-79741bc81f" >🔄</span>
+        <p class="csp-style-6f5be5cc19" >
+          <strong class="csp-style-a9fd68747a" >Perubahan lokal simulasi:</strong> Nilai kandidat hanya memperbarui state demo setelah dikonfirmasi; tidak ada komunikasi ke APILL fisik.
         </p>
       </div>
     </div>
 
-    <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--border);">
-      <button class="btn btn-ghost" id="btnCancelAiRecModal" type="button" style="padding: 8px 16px; font-size: 12.5px;">Batalkan</button>
-      <button class="btn btn-primary" id="btnConfirmAiRecModal" type="button" style="padding: 8px 18px; font-size: 12.5px; font-weight: 600;">✓ Terapkan Pada Siklus Berikutnya</button>
+    <div class="modal-footer csp-style-18bc32744e" >
+      <button class="btn btn-ghost csp-style-ff231adcad" id="btnCancelAiRecModal" type="button" >Batalkan</button>
+      <button class="btn btn-primary csp-style-343da786ab" id="btnConfirmAiRecModal" type="button" >✓ Terapkan Pada Siklus Berikutnya</button>
     </div>
   </div>
 </div>

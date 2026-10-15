@@ -73,6 +73,45 @@ test('pause freezes traffic and day/night/weather rebuilds the cached scene', ()
   assert.equal(renderer.environment.weather, 'heavy-rain');
 });
 
+test('wet road reflections are rendered beneath simulation-sourced vehicles', () => {
+  const renderer = makeRenderer('cctvCanvas1');
+  let ellipseCalls = 0;
+  const ctx = createContext();
+  ctx.ellipse = () => { ellipseCalls++; };
+  const vehicle = { type: 'car', color: '#899385', braking: false };
+  renderer._drawVehicle(ctx, vehicle, { x: .5, y: .6, angle: 0, depth: .8 }, 640, 360);
+  const dryEllipseCalls = ellipseCalls;
+  renderer.setEnvironment({ weather: 'light-rain' });
+  renderer._drawVehicle(ctx, vehicle, { x: .5, y: .6, angle: 0, depth: .8 }, 640, 360);
+  assert.equal(ellipseCalls - dryEllipseCalls, dryEllipseCalls + 1, 'wet mode retains vehicle geometry and adds one low-cost reflection');
+});
+
+test('stable vehicle IDs ease between camera frames and stop interpolating while paused', () => {
+  const renderer = makeRenderer('cctvCanvas1');
+  renderer.updateVehicles([{ id: 'track-stable', trackId: 'track-stable', class: 'car', x: .2, y: .4, w: .05, h: .06 }]);
+  renderer.render(false, false, false, .016);
+  const firstX = renderer._vehicleVisuals.get('track-stable').x;
+  renderer.updateVehicles([{ id: 'track-stable', trackId: 'track-stable', class: 'car', x: .6, y: .4, w: .05, h: .06 }]);
+  renderer.render(false, false, false, .016);
+  const easedX = renderer._vehicleVisuals.get('track-stable').x;
+  assert.ok(easedX > firstX && easedX < .625, 'new coordinates should be approached over several frames');
+  renderer.updateVehicles([{ id: 'track-stable', trackId: 'track-stable', class: 'car', x: .8, y: .4, w: .05, h: .06 }]);
+  renderer.render(false, true, false, .016);
+  assert.equal(renderer._vehicleVisuals.get('track-stable').x, easedX, 'pause must preserve the last rendered position');
+});
+
+test('intersection signal lamps follow the authoritative signal phase', () => {
+  const renderer = makeRenderer('cctvCanvas1');
+  const colors = [];
+  const ctx = createContext();
+  ctx.fill = () => colors.push(ctx.fillStyle);
+  renderer._drawSignal(ctx, 640, 360, 'red');
+  assert.equal(colors[0], '#ff514b');
+  colors.length = 0;
+  renderer._drawSignal(ctx, 640, 360, 'green');
+  assert.equal(colors[2], '#4ee0a6');
+});
+
 test('unsupported environment and filter values safely fall back', () => {
   const renderer = makeRenderer('cctvCanvas4');
   renderer.setEnvironment({ timeOfDay: 'dusk-ish', weather: 'storm' });

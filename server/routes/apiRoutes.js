@@ -6,6 +6,7 @@ import reportRoutes from './reportRoutes.js';
 import terminalRoutes from './terminalRoutes.js';
 import sandboxRoutes from './sandboxRoutes.js';
 import diagnosticRoutes from './diagnosticRoutes.js';
+import scenarioLabRoutes from './scenarioLabRoutes.js';
 import { getStateSnapshot, streamTrafficSse } from '../controllers/signalController.js';
 import { requireCapability } from '../middlewares/auth.js';
 
@@ -24,5 +25,6 @@ router.use('/', incidentRoutes);
 router.use('/', reportRoutes);
 router.use('/', terminalRoutes);
 router.use('/v1', sandboxRoutes);
+router.use('/', scenarioLabRoutes);
 
 export default router;

@@ -6,16 +6,19 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     env_file:
       - .env
     environment:
-      - NODE_ENV=${NODE_ENV:-production}
+      - NODE_ENV=production
       - PORT=3000
       - DB_PATH=/usr/src/app/data/omnitraf.sqlite
     volumes:
       - omnitraf-data:/usr/src/app/data
+    networks:
+      - default
+      - ingress
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/healthz || exit 1"]
@@ -41,6 +44,11 @@ services:
       retries: 10
       start_period: 10s
     restart: unless-stopped
+
+networks:
+  ingress:
+    name: ${OMNITRAF_INGRESS_NETWORK:-omnitraf-ingress}
+    external: true
 
 volumes:
   omnitraf-data:

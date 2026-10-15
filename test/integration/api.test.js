@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import fs from 'fs';
 import { rateLimitStore } from '../../server/middlewares/rateLimiter.js';
 import { testDatabasePath } from '../helpers/testDatabasePath.js';
+import { auditRepository } from '../../server/repositories/auditRepository.js';
 
 // Setup environment variables before importing the server to listen on a random free port (0)
 process.env.PORT = '0';
@@ -216,6 +217,89 @@ describe('REST API Integration Tests', () => {
     assert.strictEqual(validConfigData.data.status, 'APPLIED');
   });
 
+  test('authentication events are durable and never include credentials or tokens', async () => {
+    const password = 'operator123';
+    const loginResponse = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'operator', password })
+    });
+    assert.equal(loginResponse.status, 200);
+    const tokenCookie = sessionCookie(loginResponse);
+    assert.ok(tokenCookie);
+
+    const failedResponse = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'operator', password: 'incorrect-password' })
+    });
+    assert.equal(failedResponse.status, 401);
+
+    const logoutResponse = await fetch(`${baseUrl}/api/auth/logout`, {
+      method: 'POST', headers: { Cookie: tokenCookie }
+    });
+    assert.equal(logoutResponse.status, 200);
+
+    const events = (await auditRepository.findAll({ limit: 100, action: 'AUTH_LOGIN' })).data;
+    const successfulLogin = events.find(event => event.entity === 'User operator' && event.result === 'SUCCESS (Role: OPERATOR)');
+    const failedLogin = events.find(event => event.entity === 'User operator' && event.result === 'FAILURE (INVALID_CREDENTIALS)');
+    const logout = (await auditRepository.findAll({ limit: 100, action: 'AUTH_LOGOUT' })).data
+      .find(event => event.entity === 'User operator');
+
+    assert.ok(successfulLogin, 'successful login should be present in durable audit storage');
+    assert.ok(failedLogin, 'failed login should be present in durable audit storage');
+    assert.ok(logout, 'logout should be present in durable audit storage');
+    for (const event of [successfulLogin, failedLogin, logout]) {
+      assert.equal(JSON.stringify(event).includes(password), false);
+      assert.equal(JSON.stringify(event).includes(tokenCookie.split('=')[1]), false);
+    }
+
+    const adminLogin = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'admin', password: 'admin123' })
+    });
+    const auditResponse = await fetch(`${baseUrl}/api/audit-logs`, { headers: { Cookie: sessionCookie(adminLogin) } });
+    assert.equal(auditResponse.status, 200);
+    const auditBody = await auditResponse.json();
+    assert.ok(auditBody.data.some(event => event.action === 'AUTH_LOGIN' && event.entity === 'User operator'));
+    assert.ok(auditBody.data.some(event => event.action === 'AUTH_LOGOUT' && event.entity === 'User operator'));
+  });
+
+  test('login fails closed on audit outage while logout still revokes its session', async () => {
+    const originalInsert = auditRepository.insert;
+    auditRepository.insert = async () => { throw new Error('simulated audit outage'); };
+    try {
+      const deniedLogin = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'operator', password: 'operator123' })
+      });
+      assert.equal(deniedLogin.status, 503);
+      assert.equal(deniedLogin.headers.get('set-cookie'), null);
+      const deniedBody = await deniedLogin.json();
+      assert.equal(deniedBody.error.code, 'AUTH_AUDIT_UNAVAILABLE');
+    } finally {
+      auditRepository.insert = originalInsert;
+    }
+
+    const loginResponse = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'operator', password: 'operator123' })
+    });
+    const cookie = sessionCookie(loginResponse);
+    assert.ok(cookie);
+
+    auditRepository.insert = async () => { throw new Error('simulated audit outage'); };
+    try {
+      const logoutResponse = await fetch(`${baseUrl}/api/auth/logout`, {
+        method: 'POST', headers: { Cookie: cookie }
+      });
+      assert.equal(logoutResponse.status, 200);
+    } finally {
+      auditRepository.insert = originalInsert;
+    }
+
+    const protectedResponse = await fetch(`${baseUrl}/api/state/snapshot`, { headers: { Cookie: cookie } });
+    assert.equal(protectedResponse.status, 401);
+  });
+
   test('PDF report download endpoint should produce valid application/pdf', async () => {
     const res = await fetch(`${baseUrl}/api/reports/download`, { headers: { Cookie: operatorCookie } });
     assert.strictEqual(res.status, 200);
@@ -406,7 +490,11 @@ describe('REST API Integration Tests', () => {
 
   test('Device Ping, Fault Injection and Audit Trail contract', async () => {
     // 1. Ping device -> 200 with latencyMs and actionId
-    const resPing = await fetch(`${baseUrl}/api/devices/ping?deviceId=NODE-EDGE-01`, { headers: { Cookie: operatorCookie } });
+    const resPing = await fetch(`${baseUrl}/api/devices/ping`, {
+      method: 'POST',
+      headers: { Cookie: operatorCookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId: 'NODE-EDGE-01' })
+    });
     assert.strictEqual(resPing.status, 200);
     const pingData = await resPing.json();
     assert.strictEqual(pingData.success, true);
