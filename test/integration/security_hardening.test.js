@@ -669,4 +669,82 @@ describe('PHASE 18 — Comprehensive Security Hardening & Trust Boundary Verific
     assert.ok(!created.title.includes('\r'), 'Carriage return must be stripped');
     assert.ok(!created.title.includes('\n'), 'Newline must be stripped');
   });
+
+  // 19. WebSocket Upgrade Origin Validation
+  test('19. WebSocket Security: Forbidden Origin is rejected during handshake / allowRequest upgrade', async () => {
+    const socket = Client(baseUrl, {
+      transports: ['websocket'],
+      forceNew: true,
+      extraHeaders: {
+        Origin: 'https://evil-hacker.com'
+      },
+      auth: { token: adminToken }
+    });
+    const error = await new Promise((resolve) => socket.once('connect_error', resolve));
+    assert.ok(error, 'Connection should fail with untrusted origin');
+    socket.disconnect();
+  });
+
+  // 20. Sandbox API Contract Integrity
+  test('20. Sandbox API: Known endpoints return 200 with provenance; unknown return 404; non-GET returns 405', async () => {
+    // 20a. GET known sandbox endpoint
+    const resRealtime = await fetch(`${baseUrl}/api/v1/traffic/realtime`, {
+      headers: { Cookie: `omnitraf_session=${viewerToken}` }
+    });
+    assert.strictEqual(resRealtime.status, 200);
+    const bodyRealtime = await resRealtime.json();
+    assert.strictEqual(bodyRealtime.status, 'success');
+    assert.strictEqual(bodyRealtime.provenance, 'SYNTHETIC_SIMULATOR');
+    assert.strictEqual(bodyRealtime.deviceConnected, false);
+
+    // 20b. Non-GET on known sandbox endpoint returns 405
+    const resPostRealtime = await fetch(`${baseUrl}/api/v1/traffic/realtime`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: `omnitraf_session=${viewerToken}`
+      },
+      body: JSON.stringify({ dummy: 1 })
+    });
+    assert.strictEqual(resPostRealtime.status, 405);
+    const bodyPost = await resPostRealtime.json();
+    assert.strictEqual(bodyPost.code, 'METHOD_NOT_ALLOWED');
+
+    // 20c. Unknown endpoint returns 404 (no fake successes)
+    const resUnknown = await fetch(`${baseUrl}/api/v1/unknown-nonexistent-endpoint`, {
+      headers: { Cookie: `omnitraf_session=${viewerToken}` }
+    });
+    assert.strictEqual(resUnknown.status, 404);
+    const bodyUnknown = await resUnknown.json();
+    assert.strictEqual(bodyUnknown.code, 'API_ENDPOINT_NOT_FOUND');
+  });
+
+  // 21. Scenario Lab Rate Limiting
+  test('21. Rate Limiting: Scenario Lab compute operations are rate limited', async () => {
+    rateLimitStore.clear();
+    let rateLimited = false;
+    for (let i = 0; i < 25; i++) {
+      const res = await fetch(`${baseUrl}/api/scenario-lab/compare`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cookie': `omnitraf_session=${operatorToken}`,
+          'X-Forwarded-For': '198.51.100.99'
+        },
+        body: JSON.stringify({
+          base: { seed: 10, hour: 8, horizonMinutes: 5, corridorId: 'all', weather: 'clear', incidentSeverity: 'none', signalStrategy: 'fixed', demandMultiplier: 1 },
+          candidate: { seed: 10, hour: 8, horizonMinutes: 5, corridorId: 'all', weather: 'clear', incidentSeverity: 'none', signalStrategy: 'adaptive', demandMultiplier: 1 }
+        })
+      });
+      if (res.status === 429) {
+        rateLimited = true;
+        const errBody = await res.json();
+        assert.strictEqual(errBody.code, 'TOO_MANY_REQUESTS');
+        break;
+      }
+    }
+    assert.strictEqual(rateLimited, true, 'Excessive scenario lab requests must trigger 429');
+    rateLimitStore.clear();
+  });
 });
+

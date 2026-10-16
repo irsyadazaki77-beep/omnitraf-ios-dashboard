@@ -52,6 +52,13 @@ export function initializeSocketServer(httpServer, { redisManager = null, leader
     maxHttpBufferSize: 1e6, // 1 MB payload protection
     pingTimeout: 20000,
     pingInterval: 10000,
+    allowRequest: (req, callback) => {
+      const origin = req.headers.origin;
+      if (isOriginAllowed(origin)) {
+        return callback(null, true);
+      }
+      return callback('Origin not allowed by WebSocket security policy', false);
+    },
     cors: {
       origin: (origin, callback) => {
         if (isOriginAllowed(origin)) {

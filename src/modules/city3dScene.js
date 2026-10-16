@@ -708,19 +708,44 @@ export class City3DScene {
     if (name === 'incidents') this.incidentObjects.forEach((object) => { object.visible = Boolean(visible); });
   }
 
-  setView(view) {
+  setView(view, options = {}) {
+    this.followedVehicleId = null;
     const presets = {
-      top: { position: [0, 12, .01], target: [0, 0, 0] },
+      top: { position: [0, 14, .01], target: [0, 0, 0] },
       isometric: { position: [7.5, 8.5, 8.5], target: [0, 0, 0] },
-      street: { position: [0, 2.2, 5.2], target: [0, .6, 0] }
+      street: { position: [0, 2.2, 5.2], target: [0, .6, 0] },
+      wonokromo: { position: [-0.8, 4.2, 4.8], target: [-0.94, .2, 1.76] },
+      darmo: { position: [1.2, 3.8, 2.2], target: [0.93, .1, -0.79] },
+      jemursari: { position: [4.2, 4.5, 5.5], target: [2.86, .2, 3.76] },
+      follow: { position: [0, 1.8, 3.5], target: [0, .4, 0] }
     };
+    if (view === 'follow') {
+      const vehicles = this.vehicleBodyMesh?.userData?.instances || [];
+      const targetVehicle = options.vehicleId
+        ? vehicles.find((v) => v.id === options.vehicleId)
+        : vehicles[0];
+      if (targetVehicle) {
+        this.followedVehicleId = targetVehicle.id;
+        const h = targetVehicle.renderHeading || targetVehicle.heading || 0;
+        const camDist = 2.2, camHeight = 1.1;
+        const cx = targetVehicle.renderX - Math.sin(h) * camDist;
+        const cz = targetVehicle.renderZ - Math.cos(h) * camDist;
+        this.camera.position.set(cx, camHeight, cz);
+        this.controls.target.set(targetVehicle.renderX, .35, targetVehicle.renderZ);
+        this.controls.update();
+        return;
+      }
+    }
     const preset = presets[view] || presets.isometric;
-    this.camera.position.set(...preset.position); this.controls.target.set(...preset.target); this.controls.update();
+    this.camera.position.set(...preset.position);
+    this.controls.target.set(...preset.target);
+    this.controls.update();
   }
 
   setVirtualCamera(cameraId) {
     const mesh = this.cameraObjects.get(String(cameraId)); if (!mesh) return;
     this.selectedCamera = mesh;
+    this.followedVehicleId = null;
     const data = mesh.data;
     const definition = CAMERA_DEFINITIONS.find((item) => item.id === cameraId);
     const node = this.scene.userData.nodes.find((item) => item.id === definition?.nodeId) || mesh;
@@ -769,6 +794,23 @@ export class City3DScene {
       this.frameTimeCount = Math.min(this.frameTimeSamples.length, this.frameTimeCount + 1);
     }
     this.lastFrame = now; this.frameCount++; this.controls.update(); this.updateVehicles(delta);
+    if (this.followedVehicleId) {
+      const vehicles = this.vehicleBodyMesh?.userData?.instances || [];
+      const followed = vehicles.find((v) => v.id === this.followedVehicleId);
+      if (followed) {
+        const h = followed.renderHeading || followed.heading || 0;
+        const camDist = 2.2, camHeight = 1.1;
+        const targetX = followed.renderX - Math.sin(h) * camDist;
+        const targetZ = followed.renderZ - Math.cos(h) * camDist;
+        const lerpFactor = Math.min(1, delta * 5);
+        this.camera.position.x += (targetX - this.camera.position.x) * lerpFactor;
+        this.camera.position.y += (camHeight - this.camera.position.y) * lerpFactor;
+        this.camera.position.z += (targetZ - this.camera.position.z) * lerpFactor;
+        this.controls.target.x += (followed.renderX - this.controls.target.x) * lerpFactor;
+        this.controls.target.y += (.35 - this.controls.target.y) * lerpFactor;
+        this.controls.target.z += (followed.renderZ - this.controls.target.z) * lerpFactor;
+      }
+    }
     const width = this.renderer.domElement.clientWidth, height = this.renderer.domElement.clientHeight;
     const cpuStart = performance.now();
     this.beginGpuTimer();

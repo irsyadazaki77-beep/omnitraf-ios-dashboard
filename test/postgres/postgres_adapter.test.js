@@ -95,9 +95,34 @@ test('PostgreSQL adapter connection, migrations, repository semantics and rollba
     assert.equal(await receipts.claim(receipt, tx), true);
     await receipts.complete(receipt.actorId, receipt.idempotencyKey, {success:true, commandId:receipt.commandId}, tx);
   });
-  assert.equal((await receipts.find(receipt.actorId, receipt.idempotencyKey)).result.success, true);
+  // 1. commandId = null query test
+  const foundNullCmd = await receipts.find(receipt.actorId, receipt.idempotencyKey, db, null);
+  assert.equal(foundNullCmd.result.success, true);
+  // 2. commandId valid query test
+  const foundValidCmd = await receipts.find(receipt.actorId, 'rotated-key', db, receipt.commandId);
+  assert.equal(foundValidCmd.result.success, true);
+  // 3. Idempotency replay verification
   await db.transaction(async (tx) => assert.equal(await receipts.claim(receipt, tx), false));
-  assert.equal((await receipts.find(receipt.actorId, 'rotated-key', db, receipt.commandId)).result.success, true);
+  // 4. Inter-user conflict verification (different actor trying same idempotency key or command ID)
+  const conflictingUserClaim = await db.transaction(async (tx) => receipts.claim({
+    actorId: 'operator-attacker',
+    idempotencyKey: receipt.idempotencyKey,
+    fingerprint: 'different-fp',
+    commandId: 'cmd-attacker',
+    correlationId: 'corr-attacker',
+    action: 'incident:create'
+  }, tx));
+  assert.equal(conflictingUserClaim, false, 'conflicting user claim on existing idempotency key must be rejected');
+  const conflictingCmdClaim = await db.transaction(async (tx) => receipts.claim({
+    actorId: 'operator-attacker',
+    idempotencyKey: 'attacker-key',
+    fingerprint: 'different-fp',
+    commandId: receipt.commandId,
+    correlationId: 'corr-attacker',
+    action: 'incident:create'
+  }, tx));
+  assert.equal(conflictingCmdClaim, false, 'conflicting user claim on existing command_id must be rejected');
+
 
   for (let index = 0; index < 505; index++) await audits.insert({action:'retention_probe',result:'RECORDED',commandId:`retention-${index}`});
   const retained = await audits.findAll({limit:10,offset:500,action:'retention_probe'});

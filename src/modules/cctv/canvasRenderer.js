@@ -387,61 +387,178 @@ export class CctvCanvasRenderer {
   }
 
   _drawVehicle(ctx, vehicle, pos, w, h) {
-    const depth = clamp(pos.depth, .44, 1.2);
-    const typeSize = { car: 1, motorcycle: .62, bus: 1.42, truck: 1.28, ambulance: 1.05 }[vehicle.type] || 1;
+    const depth = clamp(pos.depth, .44, 1.25);
+    const typeSize = { car: 1, motorcycle: .58, bus: 1.48, truck: 1.34, ambulance: 1.08 }[vehicle.type] || 1;
     const width = Number.isFinite(vehicle.w) ? vehicle.w * w * .84 : w * .034 * depth * typeSize;
     const height = Number.isFinite(vehicle.h) ? vehicle.h * h * .84 : h * .026 * depth * typeSize;
     const x = pos.x * w, y = pos.y * h;
-    ctx.save(); ctx.translate(x, y); ctx.rotate(pos.angle);
-    // Wet asphalt carries a short, low contrast reflection under each moving track.
-    if (this.environment.weather.includes('rain')) {
-      ctx.save(); ctx.globalCompositeOperation = 'screen';
-      ctx.fillStyle = this.environment.timeOfDay === 'night' ? 'rgba(255,208,133,.16)' : 'rgba(169,198,200,.11)';
-      ctx.beginPath(); ctx.ellipse(0, height * .38, width * .34, height * .66, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    const isNight = this.environment.timeOfDay === 'night';
+    const isWet = this.environment.weather.includes('rain');
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(pos.angle);
+
+    // Wet asphalt mirror reflection with directional ground spread
+    if (isWet) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      const reflectionGrad = ctx.createLinearGradient(0, height * .1, 0, height * 1.1);
+      reflectionGrad.addColorStop(0, isNight ? 'rgba(255,214,140,.24)' : 'rgba(180,210,218,.16)');
+      reflectionGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = reflectionGrad;
+      ctx.beginPath();
+      ctx.ellipse(0, height * .48, width * .42, height * .78, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     }
-    // Contact shadow and four separated tires make vehicle scale read against the road.
-    ctx.fillStyle = 'rgba(5,9,10,.34)'; ctx.beginPath(); ctx.ellipse(0, height * .13, width * .62, height * .40, 0, 0, Math.PI * 2); ctx.fill();
-    const tireW = Math.max(1, width * .12), tireH = Math.max(1, height * .23);
-    for (const tx of [-.40, .40]) for (const ty of [-.18, .18]) {
-      ctx.fillStyle = '#171b1b'; ctx.beginPath(); ctx.ellipse(width * tx, height * ty, tireW * .5, tireH * .5, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = 'rgba(168,177,175,.68)'; ctx.beginPath(); ctx.arc(width * tx, height * ty, Math.max(.6, tireW * .23), 0, Math.PI * 2); ctx.fill();
+
+    // Soft multi-layered ambient contact shadow
+    ctx.fillStyle = 'rgba(4,8,10,.38)';
+    ctx.beginPath();
+    ctx.ellipse(0, height * .16, width * .66, height * .44, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(2,4,6,.22)';
+    ctx.beginPath();
+    ctx.ellipse(0, height * .16, width * .74, height * .52, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 4 detailed tires with hub caps & tire tread accents
+    const tireW = Math.max(1.2, width * .13), tireH = Math.max(1.5, height * .24);
+    for (const tx of [-.41, .41]) {
+      for (const ty of [-.19, .19]) {
+        ctx.fillStyle = '#111516';
+        ctx.beginPath();
+        ctx.ellipse(width * tx, height * ty, tireW * .5, tireH * .5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(185,195,193,.75)';
+        ctx.beginPath();
+        ctx.arc(width * tx, height * ty, Math.max(.7, tireW * .22), 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
-    // Raised cabin with windshield, rear glass, and a subtle roof highlight.
-    ctx.fillStyle = vehicle.type === 'ambulance' ? '#e6e7df' : vehicle.color;
-    ctx.beginPath(); ctx.moveTo(-width * .48, height * .34); ctx.lineTo(-width * .53, height * .12); ctx.lineTo(-width * .48, -height * .24);
-    ctx.lineTo(-width * .28, -height * .40); ctx.quadraticCurveTo(0, -height * .46, width * .28, -height * .40);
-    ctx.lineTo(width * .48, -height * .24); ctx.lineTo(width * .53, height * .12); ctx.lineTo(width * .48, height * .34); ctx.closePath(); ctx.fill();
-    const cabin = ctx.createLinearGradient(-width * .25, -height * .34, width * .24, height * .02);
-    cabin.addColorStop(0, 'rgba(136,164,166,.94)'); cabin.addColorStop(.45, 'rgba(40,66,73,.96)'); cabin.addColorStop(1, 'rgba(23,39,45,.98)');
-    ctx.fillStyle = cabin; ctx.beginPath(); ctx.moveTo(-width * .29, -height * .26); ctx.lineTo(-width * .18, -height * .36);
-    ctx.quadraticCurveTo(0, -height * .40, width * .18, -height * .34); ctx.lineTo(width * .30, -height * .16);
-    ctx.lineTo(width * .30, height * .10); ctx.lineTo(-width * .30, height * .10); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = 'rgba(214,229,226,.32)'; ctx.lineWidth = Math.max(.6, width * .012);
-    ctx.beginPath(); ctx.moveTo(0, -height * .34); ctx.lineTo(0, height * .08); ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,.20)'; ctx.beginPath(); ctx.moveTo(-width * .44, height * .19); ctx.lineTo(width * .44, height * .19); ctx.lineTo(width * .40, height * .27); ctx.lineTo(-width * .40, height * .27); ctx.closePath(); ctx.fill();
-    const headlightsOn = this.environment.timeOfDay === 'night';
-    if (headlightsOn) {
-      const glow = ctx.createRadialGradient(0, -height * .52, 0, 0, -height * 2.0, height * 3.6);
-      glow.addColorStop(0, this.environment.weather.includes('rain') ? 'rgba(255,226,155,.18)' : 'rgba(255,226,155,.12)');
-      glow.addColorStop(1, 'rgba(255,226,155,0)');
-      ctx.fillStyle = glow; ctx.beginPath(); ctx.moveTo(-width * .24, -height * .36); ctx.lineTo(-width * 1.15, -height * 4.2);
-      ctx.lineTo(width * 1.15, -height * 4.2); ctx.lineTo(width * .24, -height * .36); ctx.closePath(); ctx.fill();
+
+    // Chassis body with sculpted curvature
+    const baseColor = vehicle.type === 'ambulance' ? '#f0f3ee' : vehicle.color;
+    ctx.fillStyle = baseColor;
+    ctx.beginPath();
+    ctx.moveTo(-width * .48, height * .35);
+    ctx.lineTo(-width * .53, height * .12);
+    ctx.lineTo(-width * .48, -height * .25);
+    ctx.lineTo(-width * .29, -height * .41);
+    ctx.quadraticCurveTo(0, -height * .47, width * .29, -height * .41);
+    ctx.lineTo(width * .48, -height * .25);
+    ctx.lineTo(width * .53, height * .12);
+    ctx.lineTo(width * .48, height * .35);
+    ctx.closePath();
+    ctx.fill();
+
+    // Side metallic gradient bevel
+    const bevelGrad = ctx.createLinearGradient(-width * .5, 0, width * .5, 0);
+    bevelGrad.addColorStop(0, 'rgba(0,0,0,.22)');
+    bevelGrad.addColorStop(.15, 'rgba(255,255,255,.18)');
+    bevelGrad.addColorStop(.85, 'rgba(255,255,255,.12)');
+    bevelGrad.addColorStop(1, 'rgba(0,0,0,.28)');
+    ctx.fillStyle = bevelGrad;
+    ctx.fill();
+
+    // Aerodynamic tinted glass cabin & windshield
+    const cabin = ctx.createLinearGradient(-width * .26, -height * .35, width * .26, height * .04);
+    cabin.addColorStop(0, 'rgba(145,178,182,.96)');
+    cabin.addColorStop(.35, 'rgba(38,62,69,.98)');
+    cabin.addColorStop(1, 'rgba(18,32,38,.99)');
+    ctx.fillStyle = cabin;
+    ctx.beginPath();
+    ctx.moveTo(-width * .30, -height * .27);
+    ctx.lineTo(-width * .19, -height * .37);
+    ctx.quadraticCurveTo(0, -height * .41, width * .19, -height * .37);
+    ctx.lineTo(width * .30, -height * .27);
+    ctx.lineTo(width * .31, height * .11);
+    ctx.lineTo(-width * .31, height * .11);
+    ctx.closePath();
+    ctx.fill();
+
+    // Center roof ridge highlight
+    ctx.strokeStyle = 'rgba(230,242,240,.40)';
+    ctx.lineWidth = Math.max(.7, width * .014);
+    ctx.beginPath();
+    ctx.moveTo(0, -height * .35);
+    ctx.lineTo(0, height * .09);
+    ctx.stroke();
+
+    // Rear window glare strip
+    ctx.fillStyle = 'rgba(255,255,255,.24)';
+    ctx.beginPath();
+    ctx.moveTo(-width * .44, height * .19);
+    ctx.lineTo(width * .44, height * .19);
+    ctx.lineTo(width * .40, height * .28);
+    ctx.lineTo(-width * .40, height * .28);
+    ctx.closePath();
+    ctx.fill();
+
+    // Night headlights & realistic roadway light cones
+    if (isNight) {
+      const cone = ctx.createRadialGradient(0, -height * .52, 0, 0, -height * 2.2, height * 4.0);
+      cone.addColorStop(0, isWet ? 'rgba(255,232,165,.22)' : 'rgba(255,232,165,.14)');
+      cone.addColorStop(.4, isWet ? 'rgba(255,220,140,.09)' : 'rgba(255,220,140,.05)');
+      cone.addColorStop(1, 'rgba(255,220,140,0)');
+      ctx.fillStyle = cone;
+      ctx.beginPath();
+      ctx.moveTo(-width * .25, -height * .36);
+      ctx.lineTo(-width * 1.35, -height * 4.4);
+      ctx.lineTo(width * 1.35, -height * 4.4);
+      ctx.lineTo(width * .25, -height * .36);
+      ctx.closePath();
+      ctx.fill();
     }
-    ctx.fillStyle = headlightsOn ? '#fff1c4' : '#e7dfc3';
-    ctx.fillRect(-width * .37, -height * .36, width * .13, height * .055); ctx.fillRect(width * .24, -height * .36, width * .13, height * .055);
-    ctx.fillStyle = vehicle.braking ? '#ff5549' : '#913c36';
-    ctx.fillRect(-width * .43, height * .25, width * .10, height * .075); ctx.fillRect(width * .33, height * .25, width * .10, height * .075);
+
+    // Headlight emitter lenses
+    ctx.fillStyle = isNight ? '#fff5cf' : '#ece4cb';
+    ctx.fillRect(-width * .38, -height * .37, width * .14, height * .06);
+    ctx.fillRect(width * .24, -height * .37, width * .14, height * .06);
+
+    // Brake / Tail lights (dynamic glowing red if braking)
+    if (vehicle.braking) {
+      ctx.fillStyle = '#ff3b30';
+      ctx.fillRect(-width * .44, height * .26, width * .12, height * .085);
+      ctx.fillRect(width * .32, height * .26, width * .12, height * .085);
+      // Brake flare
+      const flare = ctx.createRadialGradient(0, height * .32, 0, 0, height * .32, width * .65);
+      flare.addColorStop(0, 'rgba(255,59,48,.25)');
+      flare.addColorStop(1, 'rgba(255,59,48,0)');
+      ctx.fillStyle = flare;
+      ctx.fillRect(-width * .6, height * .18, width * 1.2, height * .3);
+    } else {
+      ctx.fillStyle = isNight ? '#d93829' : '#88322c';
+      ctx.fillRect(-width * .43, height * .26, width * .10, height * .075);
+      ctx.fillRect(width * .33, height * .26, width * .10, height * .075);
+    }
+
+    // Vehicle specific overlays
     if (vehicle.type === 'bus') {
-      ctx.fillStyle = 'rgba(29,53,60,.85)';
-      for (let i = 0; i < 4; i++) ctx.fillRect(-width * .34 + i * width * .17, -height * .25, width * .12, height * .12);
+      ctx.fillStyle = 'rgba(24,46,52,.92)';
+      for (let i = 0; i < 5; i++) {
+        ctx.fillRect(-width * .36 + i * width * .15, -height * .26, width * .11, height * .12);
+      }
     } else if (vehicle.type === 'truck') {
-      ctx.fillStyle = '#777c78'; ctx.fillRect(-width * .10, -height * .32, width * .48, height * .49);
+      ctx.fillStyle = '#6b7270';
+      ctx.fillRect(-width * .11, -height * .33, width * .50, height * .51);
+      ctx.strokeStyle = '#525856';
+      ctx.strokeRect(-width * .11, -height * .33, width * .50, height * .51);
     } else if (vehicle.type === 'motorcycle') {
-      ctx.fillStyle = '#292f30'; ctx.beginPath(); ctx.arc(0, -height * .1, height * .28, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#23292a';
+      ctx.beginPath();
+      ctx.arc(0, -height * .1, height * .28, 0, Math.PI * 2);
+      ctx.fill();
     } else if (vehicle.type === 'ambulance') {
-      ctx.fillStyle = '#c94f48'; ctx.fillRect(-width * .08, height * .05, width * .2, height * .08);
-      ctx.fillStyle = '#d94b41'; ctx.fillRect(-width * .08, -height * .42, width * .16, height * .045);
+      ctx.fillStyle = '#d93829';
+      ctx.fillRect(-width * .09, height * .04, width * .22, height * .085);
+      // Flashing emergency siren bar
+      const sirenColor = (Math.floor(Date.now() / 240) % 2 === 0) ? '#ff3b30' : '#007aff';
+      ctx.fillStyle = sirenColor;
+      ctx.fillRect(-width * .09, -height * .43, width * .18, height * .055);
     }
+
     ctx.restore();
   }
 
@@ -456,21 +573,61 @@ export class CctvCanvasRenderer {
       const bw = box.w * w, bh = box.h * h;
       const x = box.x * w, y = box.y * h;
       const cls = String(box.class || 'car').toLowerCase(), color = CLASS_COLORS[cls] || '#7dd3fc';
-      ctx.strokeStyle = color; ctx.lineWidth = Math.max(1, w / 900); ctx.strokeRect(x, y, bw, bh);
+
+      // Crisp cornered bounding box styling
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(1, w / 850);
+      ctx.strokeRect(x, y, bw, bh);
+
+      // Corner notch accents for high-tech CCTV HUD aesthetic
+      const corner = Math.min(bw * .22, bh * .22, 6);
+      ctx.lineWidth = Math.max(1.8, w / 600);
+      ctx.beginPath();
+      ctx.moveTo(x, y + corner); ctx.lineTo(x, y); ctx.lineTo(x + corner, y);
+      ctx.moveTo(x + bw - corner, y); ctx.lineTo(x + bw, y); ctx.lineTo(x + bw, y + corner);
+      ctx.moveTo(x + bw, y + bh - corner); ctx.lineTo(x + bw, y + bh); ctx.lineTo(x + bw - corner, y + bh);
+      ctx.moveTo(x + corner, y + bh); ctx.lineTo(x, y + bh); ctx.lineTo(x, y + bh - corner);
+      ctx.stroke();
+
       const rawId = String(box.trackId || box.id || 'SIM');
       const id = rawId.match(/\d+$/)?.[0] ? `#${rawId.match(/\d+$/)[0].padStart(2, '0')}` : rawId.slice(0, 8);
       const shortClass = ({ motorcycle: 'MOTO', ambulance: 'AMB' })[cls] || cls.toUpperCase();
       const text = `${id} ${shortClass} ${Math.round(box.localSpeedKmh)} km/h`;
-      ctx.font = `${Math.max(8, w / 120)}px sans-serif`;
-      const labelW = ctx.measureText(text).width + 6, labelH = Math.max(13, h / 29);
-      const candidates = [y - labelH - 2, y + bh + 2, y - (labelH + 3) * 2, y - (labelH + 3) * 3];
-      const labelY = candidates.find((candidateY) => candidateY >= 22 && candidateY + labelH < h - 3 &&
-        !drawnLabels.some((r) => x < r.x + r.w && x + labelW > r.x && candidateY < r.y + r.h && candidateY + labelH > r.y) &&
-        !(x < x + bw && x + labelW > x && candidateY < y + bh && candidateY + labelH > y));
-      if (labelY !== undefined) {
-        drawnLabels.push({ x, y: labelY, w: labelW, h: labelH });
-        ctx.fillStyle = 'rgba(13,20,21,.72)'; ctx.fillRect(x, labelY, labelW, labelH);
-        ctx.fillStyle = '#fff'; ctx.fillText(text, x + 3, labelY + labelH * .72);
+      ctx.font = `600 ${Math.max(8, w / 115)}px sans-serif`;
+      const labelW = ctx.measureText(text).width + 8, labelH = Math.max(14, h / 27);
+
+      // Intelligent anti-collision candidates: above, below, right-shifted, or clamped inside
+      const candidates = [
+        y - labelH - 3,
+        y + bh + 3,
+        y - (labelH + 4) * 2,
+        y + bh + labelH + 4,
+        y + 2
+      ];
+
+      let chosenY = null;
+      let chosenX = x;
+      for (const candY of candidates) {
+        if (candY < 22 || candY + labelH > h - 4) continue;
+        const testX = clamp(x, 4, w - labelW - 4);
+        const collides = drawnLabels.some((r) =>
+          testX < r.x + r.w && testX + labelW > r.x && candY < r.y + r.h && candY + labelH > r.y
+        );
+        if (!collides) {
+          chosenY = candY;
+          chosenX = testX;
+          break;
+        }
+      }
+
+      if (chosenY !== null) {
+        drawnLabels.push({ x: chosenX, y: chosenY, w: labelW, h: labelH });
+        ctx.fillStyle = 'rgba(9,16,18,.82)';
+        ctx.fillRect(chosenX, chosenY, labelW, labelH);
+        ctx.fillStyle = color;
+        ctx.fillRect(chosenX, chosenY, 2.5, labelH);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(text, chosenX + 5, chosenY + labelH * .72);
       }
     });
   }

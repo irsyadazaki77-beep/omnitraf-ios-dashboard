@@ -523,12 +523,34 @@ export class App {
   }
 
   _showToastNotification(msg, type = "normal") {
+    const rawText = msg == null ? '' : String(msg).trim();
+    if (!rawText) return;
+
+    // Deduplication within 2.5 seconds window to prevent repeated alert flooding
+    const now = Date.now();
+    this._recentToasts = this._recentToasts || new Map();
+    const lastSeen = this._recentToasts.get(rawText);
+    if (lastSeen && (now - lastSeen) < 2500) {
+      return;
+    }
+    this._recentToasts.set(rawText, now);
+    if (this._recentToasts.size > 50) {
+      const oldest = this._recentToasts.keys().next().value;
+      if (oldest) this._recentToasts.delete(oldest);
+    }
+
     const toast = document.getElementById("toast");
     const stack = document.getElementById("toastStack");
 
     if (stack) {
+      // Bound visible toasts to 3 on desktop and mobile to keep navigation unobstructed
+      while (stack.children.length >= 3) {
+        stack.firstElementChild?.remove();
+      }
+
       const item = document.createElement("div");
       item.className = `toast-item glass-panel ${type === 'warning' || type === 'alert' ? 'toast-alert' : ''}`;
+
       item.style.cssText = `
         padding: 10px 14px;
         border-radius: 8px;

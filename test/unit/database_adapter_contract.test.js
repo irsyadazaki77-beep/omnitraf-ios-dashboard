@@ -28,9 +28,19 @@ test('sqljs implements shared query and rollback contract', async () => {
       assert.equal(await receipts.claim(receipt, tx), true);
       await receipts.complete(receipt.actorId, receipt.idempotencyKey, {success:true}, tx);
     });
-    assert.equal((await receipts.find(receipt.actorId, receipt.idempotencyKey)).result.success, true);
-    assert.equal(await database.transaction((tx) => receipts.claim(receipt, tx)), false);
+    assert.equal((await receipts.find(receipt.actorId, receipt.idempotencyKey, database, null)).result.success, true);
     assert.equal((await receipts.find(receipt.actorId, 'rotated-key', database, receipt.commandId)).result.success, true);
+    assert.equal(await database.transaction((tx) => receipts.claim(receipt, tx)), false);
+    const conflictClaim = await database.transaction((tx) => receipts.claim({
+      actorId: 'operator-attacker',
+      idempotencyKey: receipt.idempotencyKey,
+      fingerprint: 'different-fp',
+      commandId: 'cmd-diff',
+      correlationId: 'corr-diff',
+      action: 'incident:create'
+    }, tx));
+    assert.equal(conflictClaim, false);
+
     for (let index = 0; index < 510; index++) await audits.insert({action:'retention_probe',result:'RECORDED',commandId:`retention-${index}`});
     assert.equal((await audits.findAll({limit:10,offset:500,action:'retention_probe'})).data.length,10);
     await database.execute('INSERT INTO incidents(id,status) VALUES($1,$2)', ['CONTRACT-1', 'ACTIVE']);

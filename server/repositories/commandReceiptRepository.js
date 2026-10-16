@@ -3,10 +3,11 @@ import { dbManager } from '../db/database.js';
 export function createCommandReceiptRepository(database = dbManager) {
   return {
     async find(actorId, idempotencyKey, tx = database, commandId = null) {
-      const { rows } = await tx.query(
-        'SELECT actor_id,idempotency_key,fingerprint,command_id,correlation_id,action,status,result_json FROM command_receipts WHERE idempotency_key=$1 OR ($2 IS NOT NULL AND command_id=$2) ORDER BY CASE WHEN idempotency_key=$1 THEN 0 ELSE 1 END LIMIT 1',
-        [String(idempotencyKey), commandId == null ? null : String(commandId)]
-      );
+      const sql = commandId == null
+        ? 'SELECT actor_id,idempotency_key,fingerprint,command_id,correlation_id,action,status,result_json FROM command_receipts WHERE idempotency_key=$1 ORDER BY CASE WHEN idempotency_key=$1 THEN 0 ELSE 1 END LIMIT 1'
+        : 'SELECT actor_id,idempotency_key,fingerprint,command_id,correlation_id,action,status,result_json FROM command_receipts WHERE idempotency_key=$1 OR command_id=$2 ORDER BY CASE WHEN idempotency_key=$1 THEN 0 ELSE 1 END LIMIT 1';
+      const params = commandId == null ? [String(idempotencyKey)] : [String(idempotencyKey), String(commandId)];
+      const { rows } = await tx.query(sql, params);
       if (!rows[0]) return null;
       let result = null;
       try { result = rows[0].result_json ? JSON.parse(rows[0].result_json) : null; } catch (error) {

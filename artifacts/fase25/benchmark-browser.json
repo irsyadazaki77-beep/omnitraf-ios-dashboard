@@ -1,9 +1,9 @@
 {
   "webgl2": true,
   "error": 0,
-  "renderer": "CPU 0.4ms · p95 83.3ms · GPU n/a · 34 draw · 34g/1t",
-  "fps": "17 FPS",
-  "heapBytes": 13400000,
+  "renderer": "CPU 0.5ms · p95 83.3ms · GPU n/a · 32 draw · 32g/1t",
+  "fps": "12 FPS",
+  "heapBytes": 12700000,
   "canvas": {
     "width": 862,
     "height": 478

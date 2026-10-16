@@ -1,40 +1,50 @@
-.city3d-view { display:grid; gap:14px; min-width:0; }
-.city3d-header { align-items:flex-start; }
-.city3d-workspace { display:grid; grid-template-columns:minmax(0,1fr) minmax(260px,310px); gap:12px; min-width:0; }
-.city3d-workspace:has(.city3d-inspector[hidden]) { grid-template-columns:minmax(0,1fr); }
-.city3d-stage { position:relative; min-width:0; min-height:640px; overflow:hidden; border:1px solid var(--border-default); border-radius:var(--radius-lg); background:#0d171b; box-shadow:var(--shadow-sm); }
-.city3d-canvas-host { position:absolute; inset:0; }
-.city3d-canvas-host canvas { display:block; width:100%; height:100%; touch-action:none; outline:none; }
-.city3d-topbar { position:absolute; z-index:2; top:12px; right:12px; left:12px; display:flex; align-items:center; justify-content:space-between; gap:10px; pointer-events:none; }
-.city3d-view-modes,.city3d-stage-actions { display:flex; align-items:center; gap:6px; pointer-events:auto; padding:5px; border:1px solid rgba(150,180,180,.18); border-radius:12px; background:rgba(10,20,23,.86); backdrop-filter:blur(12px); }
-.city3d-control { min-height:34px; padding:0 10px; border:1px solid transparent; border-radius:8px; background:transparent; color:#dce8e7; font:600 12px/1 inherit; text-decoration:none; cursor:pointer; }
-.city3d-control:hover,.city3d-control.is-active { border-color:rgba(90,217,220,.28); background:rgba(42,184,190,.16); color:#9af5ed; }
-.city3d-select-label { padding-left:5px; color:#a7b8b7; font-size:11px; }
-.city3d-stage-actions select { max-width:190px; height:34px; padding:0 8px; border:1px solid rgba(150,180,180,.18); border-radius:8px; background:#172528; color:#e5eeee; }
-.city3d-layers { position:relative; color:#dce8e7; font-size:12px; }.city3d-layers summary { padding:8px; cursor:pointer; }.city3d-layers div { position:absolute; top:calc(100% + 5px); right:0; display:grid; gap:8px; min-width:145px; padding:10px; border:1px solid rgba(150,180,180,.2); border-radius:9px; background:#142124; }.city3d-layers label { display:flex; align-items:center; gap:7px; white-space:nowrap; }
-.city3d-cctv-preview { position:absolute; z-index:2; right:14px; bottom:56px; display:grid; gap:3px; width:190px; padding:10px; border:1px solid rgba(113,220,222,.34); border-radius:10px; background:rgba(8,18,21,.83); color:#dce8e7; pointer-events:none; }
-.city3d-cctv-preview strong { color:#9af5ed; font-size:11px; }
-.city3d-cctv-preview span { color:#b5c5c4; font-size:10px; line-height:1.4; }
-.city3d-status-row { position:absolute; z-index:2; right:14px; bottom:14px; left:14px; display:flex; align-items:center; gap:8px; color:#d4dfde; font-size:10px; text-shadow:0 1px 3px #000; pointer-events:none; }
-.city3d-status-row > :last-child { margin-left:auto; color:#9af5ed; letter-spacing:.06em; }
-.city3d-live-dot,.legend-dot { width:8px; height:8px; flex:0 0 auto; border-radius:50%; background:#45dfb4; box-shadow:0 0 10px currentColor; }
-.city3d-inspector { align-self:start; min-width:0; padding:16px; border:1px solid var(--border-default); border-radius:var(--radius-lg); background:var(--surface-raised); color:var(--text-primary); }
-.city3d-inspector header { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
-.city3d-inspector h2 { margin:3px 0 0; font-size:17px; }
-.city3d-inspector header button { width:32px; height:32px; border:1px solid var(--border-default); border-radius:8px; background:transparent; color:inherit; font-size:20px; cursor:pointer; }
-.city3d-inspector > p { color:var(--text-secondary); font-size:13px; line-height:1.5; }
-.city3d-inspector dl { display:grid; gap:8px; margin:14px 0; }
-.city3d-inspector dl div { display:grid; grid-template-columns:1fr auto; gap:8px; padding-bottom:7px; border-bottom:1px solid var(--border-subtle); }
-.city3d-inspector dt { color:var(--text-secondary); font-size:12px; }
-.city3d-inspector dd { max-width:150px; margin:0; color:var(--text-primary); font-size:12px; text-align:right; overflow-wrap:anywhere; }
-.city3d-inspector nav:not([hidden]) { display:flex; flex-wrap:wrap; gap:7px; }
-.city3d-inspector nav a { padding:7px 9px; border:1px solid var(--border-default); border-radius:8px; color:var(--text-primary); font-size:11px; text-decoration:none; }
-.city3d-legend { display:flex; flex-wrap:wrap; gap:12px 18px; color:var(--text-secondary); font-size:11px; }
-.city3d-legend span { display:flex; align-items:center; gap:6px; }
-.city3d-legend .green { background:#45dfb4; }.city3d-legend .amber { background:#f5b942; }.city3d-legend .red { background:#ff5f64; }.city3d-legend .cyan { background:#52dbe6; }
-.city3d-fallback:not([hidden]) { position:absolute; z-index:4; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:24px; background:var(--surface); color:var(--text-primary); text-align:center; }
-.city3d-fallback span { color:var(--text-secondary); }
-@media (max-width:900px) { .city3d-workspace { grid-template-columns:minmax(0,1fr); }.city3d-inspector { order:-1; }.city3d-stage { min-height:60vh; } }
-@media (max-width:620px) { .city3d-stage { min-height:68vh; }.city3d-topbar { right:7px; left:7px; align-items:flex-start; flex-direction:column; }.city3d-view-modes,.city3d-stage-actions { max-width:100%; flex-wrap:wrap; }.city3d-stage-actions select { max-width:120px; }.city3d-select-label { display:none; }.city3d-cctv-preview { width:150px; }.city3d-header { flex-direction:column; } }
-@media (max-width:760px) { .city3d-status-row { right:8px; bottom:8px; left:8px; flex-wrap:wrap; gap:5px 8px; max-width:calc(100% - 16px); font-size:9px; }.city3d-status-row > :last-child { margin-left:0; }.city3d-status-row #city3dPerf { order:5; flex-basis:100%; }.city3d-status-row #city3dVehicleFrame { order:6; flex-basis:100%; } }
-@media (prefers-reduced-motion:reduce) { .city3d-control { transition:none; } }
+.city3d-view { display: grid; gap: 14px; min-width: 0; }
+.city3d-header { align-items: flex-start; }
+.city3d-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 310px); gap: 12px; min-width: 0; }
+.city3d-workspace:has(.city3d-inspector[hidden]) { grid-template-columns: minmax(0, 1fr); }
+.city3d-stage { position: relative; min-width: 0; min-height: 640px; overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--bg-base); box-shadow: var(--shadow-sm); }
+.city3d-canvas-host { position: absolute; inset: 0; }
+.city3d-canvas-host canvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
+.city3d-topbar { position: absolute; z-index: 2; top: 12px; right: 12px; left: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; pointer-events: none; }
+.city3d-view-modes,
+.city3d-stage-actions { display: flex; align-items: center; gap: 6px; pointer-events: auto; padding: 5px; border: 1px solid var(--border-subtle); border-radius: 12px; background: color-mix(in srgb, var(--surface-overlay) 88%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.city3d-control { min-height: 34px; padding: 0 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text-primary); font: 600 12px/1 inherit; text-decoration: none; cursor: pointer; transition: all var(--duration-fast) var(--ease); }
+.city3d-control:hover,
+.city3d-control.is-active { border-color: var(--primary-border); background: var(--primary-soft); color: var(--text-link); }
+.city3d-select-label { padding-left: 5px; color: var(--text-secondary); font-size: 11px; }
+.city3d-stage-actions select { max-width: 190px; height: 34px; padding: 0 8px; border: 1px solid var(--border-default); border-radius: 8px; background: var(--surface-base); color: var(--text-primary); }
+.city3d-layers { position: relative; color: var(--text-primary); font-size: 12px; }
+.city3d-layers summary { padding: 8px; cursor: pointer; }
+.city3d-layers div { position: absolute; top: calc(100% + 5px); right: 0; display: grid; gap: 8px; min-width: 145px; padding: 10px; border: 1px solid var(--border-default); border-radius: 9px; background: var(--surface-raised); box-shadow: var(--shadow-md); }
+.city3d-layers label { display: flex; align-items: center; gap: 7px; white-space: nowrap; color: var(--text-secondary); }
+.city3d-cctv-preview { position: absolute; z-index: 2; right: 14px; bottom: 56px; display: grid; gap: 3px; width: 190px; padding: 10px; border: 1px solid var(--primary-border); border-radius: 10px; background: color-mix(in srgb, var(--surface-raised) 90%, transparent); color: var(--text-primary); pointer-events: none; }
+.city3d-cctv-preview strong { color: var(--primary-2); font-size: 11px; }
+.city3d-cctv-preview span { color: var(--text-secondary); font-size: 10px; line-height: 1.4; }
+.city3d-status-row { position: absolute; z-index: 2; right: 14px; bottom: 14px; left: 14px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-size: 10px; pointer-events: none; }
+.city3d-status-row > :last-child { margin-left: auto; color: var(--primary-2); letter-spacing: .06em; }
+.city3d-live-dot,
+.legend-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--status-success); box-shadow: 0 0 10px currentColor; }
+.city3d-inspector { align-self: start; min-width: 0; padding: 16px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-raised); color: var(--text-primary); }
+.city3d-inspector header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.city3d-inspector h2 { margin: 3px 0 0; font-size: 17px; }
+.city3d-inspector header button { width: 32px; height: 32px; border: 1px solid var(--border-default); border-radius: 8px; background: transparent; color: inherit; font-size: 20px; cursor: pointer; }
+.city3d-inspector > p { color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
+.city3d-inspector dl { display: grid; gap: 8px; margin: 14px 0; }
+.city3d-inspector dl div { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding-bottom: 7px; border-bottom: 1px solid var(--border-subtle); }
+.city3d-inspector dt { color: var(--text-secondary); font-size: 12px; }
+.city3d-inspector dd { max-width: 150px; margin: 0; color: var(--text-primary); font-size: 12px; text-align: right; overflow-wrap: anywhere; }
+.city3d-inspector nav:not([hidden]) { display: flex; flex-wrap: wrap; gap: 7px; }
+.city3d-inspector nav a { padding: 7px 9px; border: 1px solid var(--border-default); border-radius: 8px; color: var(--text-primary); font-size: 11px; text-decoration: none; }
+.city3d-legend { display: flex; flex-wrap: wrap; gap: 12px 18px; color: var(--text-secondary); font-size: 11px; }
+.city3d-legend span { display: flex; align-items: center; gap: 6px; }
+.city3d-legend .green { background: var(--status-success); }
+.city3d-legend .amber { background: var(--status-warning); }
+.city3d-legend .red { background: var(--status-danger); }
+.city3d-legend .cyan { background: var(--primary-2); }
+.city3d-fallback:not([hidden]) { position: absolute; z-index: 4; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; background: var(--surface-raised); color: var(--text-primary); text-align: center; }
+.city3d-fallback span { color: var(--text-secondary); }
+@media (max-width: 900px) { .city3d-workspace { grid-template-columns: minmax(0, 1fr); } .city3d-inspector { order: -1; } .city3d-stage { min-height: 60vh; } }
+@media (max-width: 620px) { .city3d-stage { min-height: 68vh; } .city3d-topbar { right: 7px; left: 7px; align-items: flex-start; flex-direction: column; } .city3d-view-modes, .city3d-stage-actions { max-width: 100%; flex-wrap: wrap; } .city3d-stage-actions select { max-width: 120px; } .city3d-select-label { display: none; } .city3d-cctv-preview { width: 150px; } .city3d-header { flex-direction: column; } }
+@media (max-width: 760px) { .city3d-status-row { right: 8px; bottom: 8px; left: 8px; flex-wrap: wrap; gap: 5px 8px; max-width: calc(100% - 16px); font-size: 9px; } .city3d-status-row > :last-child { margin-left: 0; } .city3d-status-row #city3dPerf { order: 5; flex-basis: 100%; } .city3d-status-row #city3dVehicleFrame { order: 6; flex-basis: 100%; } }
+@media (prefers-reduced-motion: reduce) { .city3d-control { transition: none; } }
+

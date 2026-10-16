@@ -118,3 +118,5 @@ export const authSessionRateLimiter = rateLimiter({ windowMs: 60000, max: 30, ke
 export const mutationRateLimiter = rateLimiter({ windowMs: 10000, max: 60, keyPrefix: 'cmd-mutation' });
 export const reportRateLimiter = rateLimiter({ windowMs: 30000, max: 15, keyPrefix: 'report-export' });
 export const diagnosticRateLimiter = rateLimiter({ windowMs: 15000, max: 50, keyPrefix: 'diag-inspection' });
+export const scenarioLabRateLimiter = rateLimiter({ windowMs: 30000, max: 20, keyPrefix: 'scenario-lab' });
+
